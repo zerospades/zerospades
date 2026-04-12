@@ -18,6 +18,7 @@
 
  */
 
+#include "KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/Client.h>
@@ -62,6 +63,18 @@ namespace spades {
 		void MainScreen::RestoreRenderer() {
 			if (ui)
 				ui->SetupRenderer();
+		}
+
+		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew) {
+			try {
+				subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice, &*fontManager,
+				                                     path, isNew)
+				            .Cast<View>();
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error while opening the KV6 editor: %s", ex.what());
+				return ex.what();
+			}
+			return "";
 		}
 
 		bool MainScreen::NeedsAbsoluteMouseCoordinate() {

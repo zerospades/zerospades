@@ -38,6 +38,7 @@ namespace spades {
 		width = w;
 		height = h;
 		depth = d;
+		origin = MakeVector3(0, 0, 0);
 
 		if (d > 64)
 			SPRaise("Voxel model with depth > 64 is not supported.");
@@ -258,5 +259,75 @@ namespace spades {
 		SPAssert(pos == blkdata.size());
 		model->HollowFill();
 		return model;
+	}
+
+	void VoxelModel::SaveKV6(IStream& stream) const {
+		SPADES_MARK_FUNCTION();
+
+		// Visibility (cull) flags for a voxel face. The loader ignores these and
+		// recomputes its own meshing, but external tools rely on them, so we emit
+		// the standard "face is visible when the neighbouring voxel is air" set.
+		auto VisFaces = [this](int x, int y, int z) -> uint8_t {
+			uint8_t f = 0;
+			if (!IsSolid(x - 1, y, z)) f |= 0x01; // -x
+			if (!IsSolid(x + 1, y, z)) f |= 0x02; // +x
+			if (!IsSolid(x, y - 1, z)) f |= 0x04; // -y
+			if (!IsSolid(x, y + 1, z)) f |= 0x08; // +y
+			if (!IsSolid(x, y, z - 1)) f |= 0x10; // -z
+			if (!IsSolid(x, y, z + 1)) f |= 0x20; // +z
+			return f;
+		};
+
+		// Gather surface voxels grouped by (x, y) column, z-ascending. Fully
+		// enclosed voxels (no visible face) are skipped: they are reconstructed
+		// by `HollowFill` on load, which also keeps the `0xDDBEEF` interior
+		// sentinels from leaking back into the file.
+		std::vector<KV6Block> blocks;
+		std::vector<uint16_t> xyoffset(width * height, 0);
+		std::vector<uint32_t> xoffset(width, 0);
+
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				uint64_t bits = GetSolidBitsAtUnchecked(x, y);
+				uint16_t spanCount = 0;
+				for (int z = 0; z < depth; z++) {
+					if (!((bits >> z) & 1))
+						continue;
+					uint8_t vis = VisFaces(x, y, z);
+					if (vis == 0)
+						continue;
+
+					KV6Block b;
+					// `swapColor` is its own inverse for the RGB bytes; the high
+					// byte is conventionally 128 in KV6 files.
+					b.color = swapColor(GetColorUnchecked(x, y, z) & 0xFFFFFF) | (128u << 24);
+					b.zPos = static_cast<uint16_t>(z);
+					b.visFaces = vis;
+					b.lighting = 0;
+					blocks.push_back(b);
+					spanCount++;
+				}
+				xyoffset[x * height + y] = spanCount;
+				xoffset[x] += spanCount;
+			}
+		}
+
+		KV6Header header;
+		header.xsiz = static_cast<uint32_t>(width);
+		header.ysiz = static_cast<uint32_t>(height);
+		header.zsiz = static_cast<uint32_t>(depth);
+		// The loader sets `origin = -pivot`, so invert the relationship here.
+		header.xpivot = -origin.x;
+		header.ypivot = -origin.y;
+		header.zpivot = -origin.z;
+		header.blklen = static_cast<uint32_t>(blocks.size());
+
+		stream.Write("Kvxl", 4);
+		stream.Write(&header, sizeof(header));
+		if (!blocks.empty())
+			stream.Write(blocks.data(), sizeof(KV6Block) * blocks.size());
+		stream.Write(xoffset.data(), sizeof(uint32_t) * xoffset.size());
+		stream.Write(xyoffset.data(), sizeof(uint16_t) * xyoffset.size());
+		stream.Flush();
 	}
 } // namespace spades

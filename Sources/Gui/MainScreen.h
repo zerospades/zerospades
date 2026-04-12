@@ -51,6 +51,7 @@ namespace spades {
 
 			std::string Connect(const ServerAddress &host);
 		std::string PlayDemo(const std::string &demoPath);
+			std::string OpenKV6Editor(const std::string &path, bool isNew);
 
 		protected:
 			~MainScreen();
