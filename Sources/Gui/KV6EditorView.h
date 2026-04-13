@@ -87,6 +87,12 @@ namespace spades {
 			float globalTime = 0.0F;
 			bool wantsClose = false;
 
+			// --- Mode (Blender-style) -----------------------------------------
+			// KV6 documents only support Edit mode for now; Object/Animation are
+			// shown but disabled.
+			enum class EditorMode { Object, Edit, Animation };
+			EditorMode currentMode = EditorMode::Edit;
+
 			// --- Colour picker (HSV is the source of truth) -------------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
 			float hue = 0.0F, sat = 0.0F, val = 0.78F;
@@ -196,6 +202,8 @@ namespace spades {
 			void GizmoAxis(const Vector2& c, Vector3 a, const Vector4& col, const char* label,
 			               client::IFont& font);
 			void DrawOverlay(float sw, float sh);
+			void DrawModeBar(float sw, float sh);
+			int ModeBarHitTest(const Vector2& p); // -1 none, else mode index 0/1/2
 			void DrawCursor();
 
 			// Pause menu / Save As prompt

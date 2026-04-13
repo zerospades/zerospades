@@ -797,6 +797,44 @@ namespace spades {
 				                    MakeVector2(cursor.x - 8.0F, cursor.y - 8.0F));
 		}
 
+		// --- Mode bar (Object / Edit / Animation) ----------------------------
+
+		static const char* kModeNames[3] = {"Object", "Edit", "Animation"};
+
+		int KV6EditorView::ModeBarHitTest(const Vector2& p) {
+			float sw = renderer->ScreenWidth();
+			float segW = 92.0F, segH = 26.0F, gap = 2.0F;
+			float total = segW * 3.0F + gap * 2.0F;
+			float x0 = (sw - total) * 0.5F;
+			for (int i = 0; i < 3; i++) {
+				if (InRect(p, x0 + float(i) * (segW + gap), 10.0F, segW, segH))
+					return i;
+			}
+			return -1;
+		}
+
+		void KV6EditorView::DrawModeBar(float sw, float sh) {
+			(void)sh;
+			client::IFont& font = fontManager->GetGuiFont();
+			float segW = 92.0F, segH = 26.0F, gap = 2.0F, s = 0.85F;
+			float total = segW * 3.0F + gap * 2.0F;
+			float x0 = (sw - total) * 0.5F, y = 10.0F;
+			for (int i = 0; i < 3; i++) {
+				bool active = int(currentMode) == i;
+				bool enabled = (i == 1); // only Edit is available for KV6
+				float x = x0 + float(i) * (segW + gap);
+				ColorNP(active ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
+				               : MakeVector4(0.14F, 0.14F, 0.16F, 0.9F));
+				FillRect(x, y, segW, segH);
+				StrokeRect(x, y, segW, segH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+				Vector4 tc = enabled ? MakeVector4(1, 1, 1, 1) : MakeVector4(0.45F, 0.45F, 0.45F, 1);
+				Vector2 ts = font.Measure(kModeNames[i]);
+				font.Draw(kModeNames[i],
+				          MakeVector2(x + (segW - ts.x * s) * 0.5F, y + (segH - ts.y * s) * 0.5F),
+				          s, tc);
+			}
+		}
+
 		// --- Pause menu / Save As prompt -------------------------------------
 
 		static const char* kMenuItems[4] = {"Resume", "Save", "Save As...", "Exit to Menu"};
@@ -940,6 +978,12 @@ namespace spades {
 
 			if (key == "LeftMouseButton") {
 				if (!down) { dragPick = 0; return; }
+				int m = ModeBarHitTest(cursor);
+				if (m >= 0) {
+					if (m != 1)
+						SetStatus("Only Edit mode is available for KV6 models");
+					return;
+				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
 				if (altHeld || pickMode) { Eyedropper(); pickMode = false; return; }
@@ -1018,6 +1062,7 @@ namespace spades {
 			renderer->EndScene();
 
 			DrawOverlay(sw, sh);
+			DrawModeBar(sw, sh);
 			LayoutPicker();
 			DrawMirrorToggles();
 			DrawGizmo();
