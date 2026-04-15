@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		class KV6ScreenHelper;
+		class EditorTool;
 
 		/**
 		 * In-app KV6 voxel model editor.
@@ -67,6 +69,24 @@ namespace spades {
 			void Closing() override {}
 			bool WantsToBeClosed() override { return wantsClose; }
 
+			// --- Tool-facing API (used by EditorTool subclasses) --------------
+			void DoPick();
+			bool HasPick() const { return pickHit; }
+			IntVector3 PickPlace() const { return MakeIntVector3(pickPX, pickPY, pickPZ); }
+			IntVector3 PickSolid() const { return MakeIntVector3(pickHX, pickHY, pickHZ); }
+			bool InBounds(int x, int y, int z) const;
+			VoxelModel& Model() { return *model; }
+			uint32_t CurrentColor() const { return currentColor; }
+			bool AltHeld() const { return altHeld; }
+			bool PickModeActive() const { return pickMode; }
+			void ClearPickMode() { pickMode = false; }
+			void PlaceCube();
+			void DeleteCube();
+			void Eyedropper();
+			void SetStatus(const std::string&);
+			void DrawCellOutline(int x, int y, int z, const Vector4& color);
+			Vector4 ColorToVec(uint32_t c) const;
+
 		protected:
 			~KV6EditorView();
 
@@ -92,6 +112,11 @@ namespace spades {
 			// shown but disabled.
 			enum class EditorMode { Object, Edit, Animation };
 			EditorMode currentMode = EditorMode::Edit;
+
+			// --- Tools (available in Edit mode) -------------------------------
+			std::vector<std::unique_ptr<EditorTool>> tools;
+			int activeTool = 0;
+			EditorTool* ActiveTool(); // active tool in Edit mode, else null
 
 			// --- Colour picker (HSV is the source of truth) -------------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
@@ -149,10 +174,8 @@ namespace spades {
 			void NewModel(int n, const std::string& path);
 			void LoadModel(const std::string& path);
 			int CountSolids();
-			bool InBounds(int x, int y, int z) const;
 			void RebuildRenderModel();
 			void FrameCamera();
-			void SetStatus(const std::string&);
 			void Save();
 
 			// Camera
@@ -163,9 +186,6 @@ namespace spades {
 			client::SceneDefinition SetupScene(float sw, float sh);
 
 			// Editing
-			void DoPick();
-			void PlaceCube();
-			void DeleteCube();
 			int MirrorIdx(int i, float pivot) const;
 			void RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz);
 			void TrimVolume();
@@ -173,11 +193,9 @@ namespace spades {
 			// Colour
 			uint32_t PackRGB(float r, float g, float b) const;
 			uint32_t HSV(float h, float s, float v) const;
-			Vector4 ColorToVec(uint32_t c) const;
 			void BuildPresets();
 			void RGBToHSV(uint32_t c);
 			void SyncColor();
-			void Eyedropper();
 
 			// UI layout + hit testing
 			void LayoutPicker();
@@ -193,7 +211,6 @@ namespace spades {
 			void FillRect(float x, float y, float w, float h);
 			void StrokeRect(float x, float y, float w, float h, float t, const Vector4& c);
 			void DrawLine2D(const Vector2& a, const Vector2& b, float w, const Vector4& col);
-			void DrawCellOutline(int x, int y, int z, const Vector4& color);
 			void DrawHelpers();
 			void DrawMirrorPlanes();
 			void DrawPicker();
@@ -202,9 +219,16 @@ namespace spades {
 			void GizmoAxis(const Vector2& c, Vector3 a, const Vector4& col, const char* label,
 			               client::IFont& font);
 			void DrawOverlay(float sw, float sh);
-			void DrawModeBar(float sw, float sh);
-			int ModeBarHitTest(const Vector2& p); // -1 none, else mode index 0/1/2
 			void DrawCursor();
+
+			// Unified top toolbar: modes on the left, a separator, then the tools
+			// available in the current mode.
+			struct ToolbarHit {
+				enum Kind { None, Mode, Tool } kind = None;
+				int index = -1;
+			};
+			ToolbarHit ToolbarHitTest(const Vector2& p);
+			void DrawToolbar(float sw, float sh);
 
 			// Pause menu / Save As prompt
 			int MenuButtonAt(const Vector2& p); // -1 none, else index

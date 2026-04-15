@@ -19,6 +19,8 @@
  */
 
 #include "KV6EditorView.h"
+#include "KV6DrawTool.h"
+#include "KV6EditorTool.h"
 #include "KV6ScreenHelper.h"
 
 #include <algorithm>
@@ -67,6 +69,10 @@ namespace spades {
 			BuildPresets();
 			RGBToHSV(currentColor);
 			LayoutPicker();
+
+			// Register the Edit-mode tools (order = toolbar order).
+			tools.push_back(std::unique_ptr<EditorTool>(new DrawTool()));
+			activeTool = 0;
 
 			if (isNew || path.empty())
 				NewModel(cubeSize, path);
@@ -797,41 +803,76 @@ namespace spades {
 				                    MakeVector2(cursor.x - 8.0F, cursor.y - 8.0F));
 		}
 
-		// --- Mode bar (Object / Edit / Animation) ----------------------------
-
-		static const char* kModeNames[3] = {"Object", "Edit", "Animation"};
-
-		int KV6EditorView::ModeBarHitTest(const Vector2& p) {
-			float sw = renderer->ScreenWidth();
-			float segW = 92.0F, segH = 26.0F, gap = 2.0F;
-			float total = segW * 3.0F + gap * 2.0F;
-			float x0 = (sw - total) * 0.5F;
-			for (int i = 0; i < 3; i++) {
-				if (InRect(p, x0 + float(i) * (segW + gap), 10.0F, segW, segH))
-					return i;
-			}
-			return -1;
+		EditorTool* KV6EditorView::ActiveTool() {
+			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()))
+				return tools[activeTool].get();
+			return nullptr;
 		}
 
-		void KV6EditorView::DrawModeBar(float sw, float sh) {
+		// --- Unified toolbar: [modes] | [tools of current mode] -------------
+
+		static const char* kModeNames[3] = {"Object", "Edit", "Animation"};
+		namespace {
+			const float kTbY = 10.0F, kTbBtn = 84.0F, kTbH = 26.0F, kTbGap = 2.0F,
+			            kTbSep = 14.0F;
+		}
+
+		// The toolbar is centred horizontally. Returns the x of button `i` given
+		// the number of tool buttons; modes occupy 0..2, then a separator, then
+		// tools at 3.. .
+		static float ToolbarX(float sw, int slot, int toolCount) {
+			int slots = 3 + toolCount;
+			float total = float(slots) * kTbBtn + float(slots - 1) * kTbGap +
+			              (toolCount > 0 ? kTbSep : 0.0F);
+			float x0 = (sw - total) * 0.5F;
+			float x = x0 + float(slot) * (kTbBtn + kTbGap);
+			if (slot >= 3 && toolCount > 0)
+				x += kTbSep; // gap for the separator between modes and tools
+			return x;
+		}
+
+		KV6EditorView::ToolbarHit KV6EditorView::ToolbarHitTest(const Vector2& p) {
+			float sw = renderer->ScreenWidth();
+			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
+			for (int i = 0; i < 3; i++) {
+				if (InRect(p, ToolbarX(sw, i, toolCount), kTbY, kTbBtn, kTbH))
+					return {ToolbarHit::Mode, i};
+			}
+			for (int i = 0; i < toolCount; i++) {
+				if (InRect(p, ToolbarX(sw, 3 + i, toolCount), kTbY, kTbBtn, kTbH))
+					return {ToolbarHit::Tool, i};
+			}
+			return {};
+		}
+
+		void KV6EditorView::DrawToolbar(float sw, float sh) {
 			(void)sh;
 			client::IFont& font = fontManager->GetGuiFont();
-			float segW = 92.0F, segH = 26.0F, gap = 2.0F, s = 0.85F;
-			float total = segW * 3.0F + gap * 2.0F;
-			float x0 = (sw - total) * 0.5F, y = 10.0F;
-			for (int i = 0; i < 3; i++) {
-				bool active = int(currentMode) == i;
-				bool enabled = (i == 1); // only Edit is available for KV6
-				float x = x0 + float(i) * (segW + gap);
+			float s = 0.85F;
+			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
+
+			auto button = [&](float x, const char* label, bool active, bool enabled) {
 				ColorNP(active ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
 				               : MakeVector4(0.14F, 0.14F, 0.16F, 0.9F));
-				FillRect(x, y, segW, segH);
-				StrokeRect(x, y, segW, segH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+				FillRect(x, kTbY, kTbBtn, kTbH);
+				StrokeRect(x, kTbY, kTbBtn, kTbH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
 				Vector4 tc = enabled ? MakeVector4(1, 1, 1, 1) : MakeVector4(0.45F, 0.45F, 0.45F, 1);
-				Vector2 ts = font.Measure(kModeNames[i]);
-				font.Draw(kModeNames[i],
-				          MakeVector2(x + (segW - ts.x * s) * 0.5F, y + (segH - ts.y * s) * 0.5F),
+				Vector2 ts = font.Measure(label);
+				font.Draw(label,
+				          MakeVector2(x + (kTbBtn - ts.x * s) * 0.5F, kTbY + (kTbH - ts.y * s) * 0.5F),
 				          s, tc);
+			};
+
+			for (int i = 0; i < 3; i++)
+				button(ToolbarX(sw, i, toolCount), kModeNames[i], int(currentMode) == i, i == 1);
+
+			if (toolCount > 0) {
+				// Separator between the mode group and the tool group.
+				float sx = ToolbarX(sw, 3, toolCount) - kTbSep * 0.5F - kTbGap;
+				ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+				FillRect(sx, kTbY + 3.0F, 1.0F, kTbH - 6.0F);
+				for (int i = 0; i < toolCount; i++)
+					button(ToolbarX(sw, 3 + i, toolCount), tools[i]->Label(), activeTool == i, true);
 			}
 		}
 
@@ -977,22 +1018,29 @@ namespace spades {
 			if (key == "MiddleMouseButton") { lookActive = down; return; }
 
 			if (key == "LeftMouseButton") {
-				if (!down) { dragPick = 0; return; }
-				int m = ModeBarHitTest(cursor);
-				if (m >= 0) {
-					if (m != 1)
+				if (!down) {
+					dragPick = 0;
+					if (EditorTool* t = ActiveTool()) t->OnPointerUp(*this, key);
+					return;
+				}
+				ToolbarHit hit = ToolbarHitTest(cursor);
+				if (hit.kind == ToolbarHit::Mode) {
+					if (hit.index != 1)
 						SetStatus("Only Edit mode is available for KV6 models");
 					return;
 				}
+				if (hit.kind == ToolbarHit::Tool) { activeTool = hit.index; return; }
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
-				if (altHeld || pickMode) { Eyedropper(); pickMode = false; return; }
-				PlaceCube();
+				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
 				return;
 			}
-			if (key == "RightMouseButton" && down) {
-				if (CursorOverPicker(cursor)) return;
-				DeleteCube();
+			if (key == "RightMouseButton") {
+				if (down && CursorOverPicker(cursor)) return;
+				if (EditorTool* t = ActiveTool()) {
+					if (down) t->OnPointerDown(*this, key);
+					else t->OnPointerUp(*this, key);
+				}
 				return;
 			}
 
@@ -1054,19 +1102,20 @@ namespace spades {
 			DrawHelpers();
 			DrawMirrorPlanes();
 
-			DoPick();
-			if (pickHit) {
-				DrawCellOutline(pickPX, pickPY, pickPZ, ColorToVec(currentColor));
-				DrawCellOutline(pickHX, pickHY, pickHZ, MakeVector4(1.0F, 0.9F, 0.3F, 0.9F));
-			}
+			EditorTool* tool = (currentMode == EditorMode::Edit && activeTool < int(tools.size()))
+			                     ? tools[activeTool].get() : nullptr;
+			if (tool)
+				tool->DrawScene(*this);
 			renderer->EndScene();
 
 			DrawOverlay(sw, sh);
-			DrawModeBar(sw, sh);
+			DrawToolbar(sw, sh);
 			LayoutPicker();
 			DrawMirrorToggles();
 			DrawGizmo();
 			DrawPicker();
+			if (tool)
+				tool->DrawOverlay(*this);
 
 			if (menuOpen)
 				DrawMenu(sw, sh);
