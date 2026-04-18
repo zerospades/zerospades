@@ -146,7 +146,8 @@ namespace spades {
 			int pickHX, pickHY, pickHZ; // solid voxel hit
 			int pickPX, pickPY, pickPZ; // adjacent empty cell (placement)
 			Vector3 camEye, camRight, camUp, camFwd;
-			float camFovX, camFovY, camSW, camSH;
+			float camFovX, camFovY, camSW, camSH; // camSW/SH = viewport size
+			float camVpX, camVpY;                 // viewport top-left (below the bars)
 
 			// --- Camera -------------------------------------------------------
 			float yaw = -M_PI_F * 0.25F;
@@ -183,7 +184,7 @@ namespace spades {
 			Vector3 CameraEye() const;
 			void ToggleCameraMode();
 			void UpdateMovement(float dt);
-			client::SceneDefinition SetupScene(float sw, float sh);
+			client::SceneDefinition SetupScene(float vpX, float vpY, float vpW, float vpH);
 
 			// Editing
 			int MirrorIdx(int i, float pivot) const;
@@ -219,6 +220,7 @@ namespace spades {
 			void GizmoAxis(const Vector2& c, Vector3 a, const Vector4& col, const char* label,
 			               client::IFont& font);
 			void DrawOverlay(float sw, float sh);
+			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			void DrawCursor();
 
 			// Unified top toolbar: modes on the left, a separator, then the tools

@@ -56,6 +56,15 @@ namespace spades {
 			}
 
 			float Clampf(float v, float lo, float hi) { return std::max(lo, std::min(hi, v)); }
+
+			// Top UI bands (full width): a title ribbon above the toolbar. The 3D
+			// viewport is inset below them by kBarsH.
+			const float kRibbonH = 24.0F;
+			const float kToolbarH = 32.0F;
+			const float kBarsH = kRibbonH + kToolbarH;
+			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
+			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
+			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -203,7 +212,7 @@ namespace spades {
 				freePos += move.Normalize() * (float(cubeSize) * 0.7F * dt);
 		}
 
-		client::SceneDefinition KV6EditorView::SetupScene(float sw, float sh) {
+		client::SceneDefinition KV6EditorView::SetupScene(float vpX, float vpY, float vpW, float vpH) {
 			client::SceneDefinition sceneDef;
 			Vector3 eye = CameraEye();
 			Vector3 at = orbitMode ? orbitTarget : (eye + Forward());
@@ -218,13 +227,13 @@ namespace spades {
 			sceneDef.viewAxis[1] = up;
 			sceneDef.viewAxis[2] = dir;
 			sceneDef.fovY = 60.0F * M_PI_F / 180.0F;
-			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (sw / sh));
+			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (vpW / vpH));
 			sceneDef.zNear = 0.1F;
 			sceneDef.zFar = 1000.0F;
-			sceneDef.viewportLeft = 0;
-			sceneDef.viewportTop = 0;
-			sceneDef.viewportWidth = int(sw);
-			sceneDef.viewportHeight = int(sh);
+			sceneDef.viewportLeft = int(vpX);
+			sceneDef.viewportTop = int(vpY);
+			sceneDef.viewportWidth = int(vpW);
+			sceneDef.viewportHeight = int(vpH);
 			sceneDef.skipWorld = true;
 			sceneDef.denyCameraBlur = true;
 			sceneDef.time = (unsigned int)(globalTime * 1000.0F);
@@ -238,8 +247,8 @@ namespace spades {
 			if (camSW <= 0.0F || camSH <= 0.0F)
 				return;
 
-			float sx = (cursor.x / camSW) * 2.0F - 1.0F;
-			float sy = (cursor.y / camSH) * 2.0F - 1.0F;
+			float sx = ((cursor.x - camVpX) / camSW) * 2.0F - 1.0F;
+			float sy = ((cursor.y - camVpY) / camSH) * 2.0F - 1.0F;
 			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
 			              camUp * (sy * tanf(camFovY * 0.5F));
 			dir = dir.Normalize();
@@ -480,10 +489,12 @@ namespace spades {
 			float sh = renderer->ScreenHeight();
 			float bottomClear = 44.0F;
 
+			// Orientation gizmo: top-right corner of the viewport, just under the
+			// toolbar/ribbon bars.
 			float gizBox = 96.0F;
 			gizR = gizBox * 0.5F - 12.0F;
 			gizCx = sw - 16.0F - gizBox * 0.5F;
-			gizCy = sh - bottomClear - gizBox * 0.5F;
+			gizCy = kBarsH + 8.0F + gizBox * 0.5F;
 
 			presSwatch = (svSize + 6.0F + hueW) / float(presetCols);
 			float contentW = svSize + 6.0F + hueW;
@@ -491,7 +502,7 @@ namespace spades {
 			pkW = 8.0F * 2.0F + contentW;
 			pkH = 8.0F * 2.0F + svSize + 6.0F + prevH + 6.0F + 2.0F * presSwatch;
 			pkX = sw - 16.0F - pkW;
-			pkY = (sh - bottomClear - gizBox - 8.0F) - pkH;
+			pkY = sh - bottomClear - pkH; // picker now sits at the bottom-right
 			svX = pkX + 8.0F;
 			svY = pkY + 8.0F;
 			hueX = svX + svSize + 6.0F;
@@ -772,23 +783,14 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawOverlay(float sw, float sh) {
+			(void)sw;
 			client::IFont& font = fontManager->GetGuiFont();
-			Vector4 white = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
 			Vector4 grey = MakeVector4(0.75F, 0.75F, 0.75F, 1.0F);
 
-			font.Draw("KV6 Editor", MakeVector2(16.0F, 12.0F), 1.3F, white);
-
-			std::string name = (!filePath.empty()) ? filePath : "(unsaved model)";
-			if (dirty) name += " *";
-			font.Draw(name + "   (" + std::to_string(voxelCount) + " voxels)",
-			          MakeVector2(16.0F, 40.0F), 1.0F, grey);
-
-			std::string mode = orbitMode ? "Orbit" : "Free-fly";
-			font.Draw("Camera: " + mode + "  [Tab] switch  -  [Ctrl+S] save",
-			          MakeVector2(16.0F, 60.0F), 1.0F, grey);
-
+			// Title / filename / camera now live in the ribbon. Here we draw the
+			// transient status line (just below the bars) and the help line.
 			if (statusTimer > 0.0F)
-				font.Draw(statusMessage, MakeVector2(16.0F, 80.0F), 1.0F,
+				font.Draw(statusMessage, MakeVector2(16.0F, kBarsH + 8.0F), 1.0F,
 				          MakeVector4(0.5F, 1.0F, 0.6F, 1.0F));
 
 			font.Draw("[LMB] place  |  [Alt+LMB] or eyedropper = pick colour  |  [RMB] delete  |  "
@@ -809,37 +811,29 @@ namespace spades {
 			return nullptr;
 		}
 
-		// --- Unified toolbar: [modes] | [tools of current mode] -------------
+		// --- Ribbon (title) + unified toolbar [modes] | [tools] -------------
+		//
+		// Two stacked full-width bars at the very top: a ribbon (title/filename)
+		// above a left-aligned toolbar. The 3D viewport is drawn below them.
 
 		static const char* kModeNames[3] = {"Object", "Edit", "Animation"};
-		namespace {
-			const float kTbY = 10.0F, kTbBtn = 84.0F, kTbH = 26.0F, kTbGap = 2.0F,
-			            kTbSep = 14.0F;
-		}
 
-		// The toolbar is centred horizontally. Returns the x of button `i` given
-		// the number of tool buttons; modes occupy 0..2, then a separator, then
-		// tools at 3.. .
-		static float ToolbarX(float sw, int slot, int toolCount) {
-			int slots = 3 + toolCount;
-			float total = float(slots) * kTbBtn + float(slots - 1) * kTbGap +
-			              (toolCount > 0 ? kTbSep : 0.0F);
-			float x0 = (sw - total) * 0.5F;
-			float x = x0 + float(slot) * (kTbBtn + kTbGap);
+		// X of toolbar slot `i` (modes 0..2, then a separator, then tools 3..).
+		static float ToolbarX(int slot, int toolCount) {
+			float x = kTbX0 + float(slot) * (kTbBtn + kTbGap);
 			if (slot >= 3 && toolCount > 0)
-				x += kTbSep; // gap for the separator between modes and tools
+				x += kTbSep;
 			return x;
 		}
 
 		KV6EditorView::ToolbarHit KV6EditorView::ToolbarHitTest(const Vector2& p) {
-			float sw = renderer->ScreenWidth();
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 			for (int i = 0; i < 3; i++) {
-				if (InRect(p, ToolbarX(sw, i, toolCount), kTbY, kTbBtn, kTbH))
+				if (InRect(p, ToolbarX(i, toolCount), kTbY, kTbBtn, kTbH))
 					return {ToolbarHit::Mode, i};
 			}
 			for (int i = 0; i < toolCount; i++) {
-				if (InRect(p, ToolbarX(sw, 3 + i, toolCount), kTbY, kTbBtn, kTbH))
+				if (InRect(p, ToolbarX(3 + i, toolCount), kTbY, kTbBtn, kTbH))
 					return {ToolbarHit::Tool, i};
 			}
 			return {};
@@ -851,9 +845,13 @@ namespace spades {
 			float s = 0.85F;
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 
+			// Full-width toolbar band.
+			ColorNP(MakeVector4(0.10F, 0.10F, 0.12F, 1.0F));
+			FillRect(0.0F, kRibbonH, sw, kToolbarH);
+
 			auto button = [&](float x, const char* label, bool active, bool enabled) {
 				ColorNP(active ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
-				               : MakeVector4(0.14F, 0.14F, 0.16F, 0.9F));
+				               : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
 				FillRect(x, kTbY, kTbBtn, kTbH);
 				StrokeRect(x, kTbY, kTbBtn, kTbH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
 				Vector4 tc = enabled ? MakeVector4(1, 1, 1, 1) : MakeVector4(0.45F, 0.45F, 0.45F, 1);
@@ -864,16 +862,34 @@ namespace spades {
 			};
 
 			for (int i = 0; i < 3; i++)
-				button(ToolbarX(sw, i, toolCount), kModeNames[i], int(currentMode) == i, i == 1);
+				button(ToolbarX(i, toolCount), kModeNames[i], int(currentMode) == i, i == 1);
 
 			if (toolCount > 0) {
-				// Separator between the mode group and the tool group.
-				float sx = ToolbarX(sw, 3, toolCount) - kTbSep * 0.5F - kTbGap;
+				float sx = ToolbarX(3, toolCount) - kTbSep * 0.5F - kTbGap;
 				ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
 				FillRect(sx, kTbY + 3.0F, 1.0F, kTbH - 6.0F);
 				for (int i = 0; i < toolCount; i++)
-					button(ToolbarX(sw, 3 + i, toolCount), tools[i]->Label(), activeTool == i, true);
+					button(ToolbarX(3 + i, toolCount), tools[i]->Label(), activeTool == i, true);
 			}
+		}
+
+		void KV6EditorView::DrawRibbon(float sw) {
+			client::IFont& font = fontManager->GetGuiFont();
+			ColorNP(MakeVector4(0.06F, 0.06F, 0.08F, 1.0F));
+			FillRect(0.0F, 0.0F, sw, kRibbonH);
+
+			std::string name = (!filePath.empty()) ? filePath : "(unsaved model)";
+			if (dirty)
+				name += " *";
+			font.Draw("KV6 Editor", MakeVector2(12.0F, 4.0F), 0.95F, MakeVector4(1, 1, 1, 1));
+			font.Draw(name + "   (" + std::to_string(voxelCount) + " voxels)",
+			          MakeVector2(120.0F, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
+
+			std::string cam = std::string(orbitMode ? "Orbit" : "Free-fly") +
+			                  "   [Tab] camera   [Ctrl+S] save";
+			Vector2 cs = font.Measure(cam);
+			font.Draw(cam, MakeVector2(sw - 12.0F - cs.x * 0.8F, 5.0F), 0.8F,
+			          MakeVector4(0.6F, 0.6F, 0.63F, 1.0F));
 		}
 
 		// --- Pause menu / Save As prompt -------------------------------------
@@ -1082,15 +1098,19 @@ namespace spades {
 			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
 			renderer->SetFogDistance(1000.0F);
 
-			client::SceneDefinition sceneDef = SetupScene(sw, sh);
+			// The 3D viewport is inset below the ribbon + toolbar bars.
+			float vpY = kBarsH, vpH = sh - kBarsH;
+			client::SceneDefinition sceneDef = SetupScene(0.0F, vpY, sw, vpH);
 			camEye = sceneDef.viewOrigin;
 			camRight = sceneDef.viewAxis[0];
 			camUp = sceneDef.viewAxis[1];
 			camFwd = sceneDef.viewAxis[2];
 			camFovX = sceneDef.fovX;
 			camFovY = sceneDef.fovY;
+			camVpX = 0.0F;
+			camVpY = vpY;
 			camSW = sw;
-			camSH = sh;
+			camSH = vpH;
 
 			renderer->StartScene(sceneDef);
 			if (renderModel) {
@@ -1109,6 +1129,7 @@ namespace spades {
 			renderer->EndScene();
 
 			DrawOverlay(sw, sh);
+			DrawRibbon(sw);
 			DrawToolbar(sw, sh);
 			LayoutPicker();
 			DrawMirrorToggles();
