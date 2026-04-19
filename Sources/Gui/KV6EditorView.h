@@ -20,7 +20,9 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -77,6 +79,14 @@ namespace spades {
 			bool InBounds(int x, int y, int z) const;
 			VoxelModel& Model() { return *model; }
 			uint32_t CurrentColor() const { return currentColor; }
+
+			// Selection (a set of solid-voxel coords, shared across tools).
+			void ToggleSelect(int x, int y, int z);
+			void AddSelect(int x, int y, int z);
+			bool IsSelected(int x, int y, int z) const;
+			void ClearSelection();
+			int SelectionCount() const { return int(selection.size()); }
+
 			bool AltHeld() const { return altHeld; }
 			bool PickModeActive() const { return pickMode; }
 			void ClearPickMode() { pickMode = false; }
@@ -117,6 +127,11 @@ namespace spades {
 			std::vector<std::unique_ptr<EditorTool>> tools;
 			int activeTool = 0;
 			EditorTool* ActiveTool(); // active tool in Edit mode, else null
+
+			// --- Selection ----------------------------------------------------
+			std::set<int64_t> selection; // packed voxel keys
+			void DrawSelection();
+			void ShiftSelection(int ox, int oy, int oz); // keep keys valid on resize
 
 			// --- Colour picker (HSV is the source of truth) -------------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR

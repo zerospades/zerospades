@@ -22,6 +22,7 @@
 #include "KV6DrawTool.h"
 #include "KV6EditorTool.h"
 #include "KV6ScreenHelper.h"
+#include "KV6SelectTool.h"
 
 #include <algorithm>
 #include <cmath>
@@ -65,6 +66,17 @@ namespace spades {
 			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
+
+			// Pack a (non-negative) voxel coordinate into a selection-set key.
+			int64_t SelKey(int x, int y, int z) {
+				return (int64_t(x & 0xFFFFF) << 40) | (int64_t(y & 0xFFFFF) << 20) |
+				       int64_t(z & 0xFFFFF);
+			}
+			void SelDecode(int64_t k, int& x, int& y, int& z) {
+				x = int((k >> 40) & 0xFFFFF);
+				y = int((k >> 20) & 0xFFFFF);
+				z = int(k & 0xFFFFF);
+			}
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -81,6 +93,7 @@ namespace spades {
 
 			// Register the Edit-mode tools (order = toolbar order).
 			tools.push_back(std::unique_ptr<EditorTool>(new DrawTool()));
+			tools.push_back(std::unique_ptr<EditorTool>(new SelectTool()));
 			activeTool = 0;
 
 			if (isNew || path.empty())
@@ -315,6 +328,8 @@ namespace spades {
 			orbitTarget += shift;
 			freePos += shift;
 			cubeSize = std::max(nw, std::max(nh, nd));
+			ShiftSelection(ox, oy, oz); // keep selected voxel coords aligned
+
 		}
 
 		void KV6EditorView::TrimVolume() {
@@ -404,6 +419,7 @@ namespace spades {
 			for (int ic = 0; ic < nz; ic++) { int Z = (ic == 0) ? hz : zb;
 				if (InBounds(X, Y, Z) && model->IsSolid(X, Y, Z)) {
 					model->SetAir(X, Y, Z);
+					selection.erase(SelKey(X, Y, Z)); // drop stale selection entries
 					voxelCount--;
 				}
 			}}}
@@ -480,6 +496,42 @@ namespace spades {
 			currentColor = model->GetColor(pickHX, pickHY, pickHZ) & 0xFFFFFF;
 			RGBToHSV(currentColor);
 			SetStatus("Picked colour");
+		}
+
+		// --- Selection --------------------------------------------------------
+
+		void KV6EditorView::ToggleSelect(int x, int y, int z) {
+			int64_t k = SelKey(x, y, z);
+			auto it = selection.find(k);
+			if (it == selection.end())
+				selection.insert(k);
+			else
+				selection.erase(it);
+		}
+		void KV6EditorView::AddSelect(int x, int y, int z) { selection.insert(SelKey(x, y, z)); }
+		bool KV6EditorView::IsSelected(int x, int y, int z) const {
+			return selection.find(SelKey(x, y, z)) != selection.end();
+		}
+		void KV6EditorView::ClearSelection() { selection.clear(); }
+
+		void KV6EditorView::DrawSelection() {
+			Vector4 col = MakeVector4(1.0F, 0.55F, 0.1F, 0.95F);
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				DrawCellOutline(x, y, z, col);
+			}
+		}
+		void KV6EditorView::ShiftSelection(int ox, int oy, int oz) {
+			if (ox == 0 && oy == 0 && oz == 0)
+				return;
+			std::set<int64_t> shifted;
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				shifted.insert(SelKey(x + ox, y + oy, z + oz));
+			}
+			selection.swap(shifted);
 		}
 
 		// --- Layout / hit testing --------------------------------------------
@@ -1045,7 +1097,14 @@ namespace spades {
 						SetStatus("Only Edit mode is available for KV6 models");
 					return;
 				}
-				if (hit.kind == ToolbarHit::Tool) { activeTool = hit.index; return; }
+				if (hit.kind == ToolbarHit::Tool) {
+					if (hit.index != activeTool) {
+						if (EditorTool* t = ActiveTool()) t->OnDeactivate(*this);
+						activeTool = hit.index;
+						if (EditorTool* t = ActiveTool()) t->OnActivate(*this);
+					}
+					return;
+				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
 				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
@@ -1121,6 +1180,7 @@ namespace spades {
 			}
 			DrawHelpers();
 			DrawMirrorPlanes();
+			DrawSelection();
 
 			EditorTool* tool = (currentMode == EditorMode::Edit && activeTool < int(tools.size()))
 			                     ? tools[activeTool].get() : nullptr;
