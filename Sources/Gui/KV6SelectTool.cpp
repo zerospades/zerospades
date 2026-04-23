@@ -24,7 +24,18 @@
 namespace spades {
 	namespace gui {
 		void SelectTool::OnActivate(KV6EditorView& ed) {
-			ed.SetStatus("Select: click voxels to (de)select, click empty to clear");
+			ed.SetStatus("Select: click to (de)select  -  [L] select linked colour  -  click empty to clear");
+		}
+
+		void SelectTool::OnKey(KV6EditorView& ed, const std::string& key, bool down) {
+			// L: select all voxels linked to the one under the cursor by colour.
+			if (down && EqualsIgnoringCase(key, "L")) {
+				ed.DoPick();
+				if (ed.HasPick()) {
+					IntVector3 h = ed.PickSolid();
+					ed.SelectLinkedColor(h.x, h.y, h.z);
+				}
+			}
 		}
 
 		void SelectTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {

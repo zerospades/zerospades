@@ -86,6 +86,8 @@ namespace spades {
 			bool IsSelected(int x, int y, int z) const;
 			void ClearSelection();
 			int SelectionCount() const { return int(selection.size()); }
+			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
+			void SelectLinkedColor(int x, int y, int z);
 
 			bool AltHeld() const { return altHeld; }
 			bool PickModeActive() const { return pickMode; }

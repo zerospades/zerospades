@@ -514,6 +514,36 @@ namespace spades {
 		}
 		void KV6EditorView::ClearSelection() { selection.clear(); }
 
+		void KV6EditorView::SelectLinkedColor(int x, int y, int z) {
+			if (!InBounds(x, y, z) || !model->IsSolid(x, y, z))
+				return;
+			uint32_t target = model->GetColor(x, y, z) & 0xFFFFFF;
+			std::set<int64_t> visited;
+			std::vector<IntVector3> stack;
+			stack.push_back(MakeIntVector3(x, y, z));
+			int added = 0;
+			while (!stack.empty()) {
+				IntVector3 c = stack.back();
+				stack.pop_back();
+				int64_t key = SelKey(c.x, c.y, c.z);
+				if (!visited.insert(key).second)
+					continue;
+				if (!InBounds(c.x, c.y, c.z) || !model->IsSolid(c.x, c.y, c.z))
+					continue;
+				if ((model->GetColor(c.x, c.y, c.z) & 0xFFFFFF) != target)
+					continue;
+				AddSelect(c.x, c.y, c.z);
+				added++;
+				stack.push_back(MakeIntVector3(c.x + 1, c.y, c.z));
+				stack.push_back(MakeIntVector3(c.x - 1, c.y, c.z));
+				stack.push_back(MakeIntVector3(c.x, c.y + 1, c.z));
+				stack.push_back(MakeIntVector3(c.x, c.y - 1, c.z));
+				stack.push_back(MakeIntVector3(c.x, c.y, c.z + 1));
+				stack.push_back(MakeIntVector3(c.x, c.y, c.z - 1));
+			}
+			SetStatus("Selected " + std::to_string(added) + " linked voxels");
+		}
+
 		void KV6EditorView::DrawSelection() {
 			Vector4 col = MakeVector4(1.0F, 0.55F, 0.1F, 0.95F);
 			for (int64_t k : selection) {
@@ -1107,11 +1137,13 @@ namespace spades {
 				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
+				if (cursor.y < kBarsH) return; // over the ribbon/toolbar bars
 				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
 				return;
 			}
 			if (key == "RightMouseButton") {
 				if (down && CursorOverPicker(cursor)) return;
+				if (down && cursor.y < kBarsH) return; // over the bars
 				if (EditorTool* t = ActiveTool()) {
 					if (down) t->OnPointerDown(*this, key);
 					else t->OnPointerUp(*this, key);
@@ -1129,6 +1161,10 @@ namespace spades {
 			if (KV6CheckKey(rt, key)) { keyRight = down; return; }
 			if (KV6CheckKey(jp, key)) { keyUp = down; return; }
 			if (KV6CheckKey(cr, key)) { keyDown = down; return; }
+
+			// Remaining keys go to the active tool (e.g. Select's [L]).
+			if (EditorTool* t = ActiveTool())
+				t->OnKey(*this, key, down);
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
@@ -1157,9 +1193,11 @@ namespace spades {
 			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
 			renderer->SetFogDistance(1000.0F);
 
-			// The 3D viewport is inset below the ribbon + toolbar bars.
-			float vpY = kBarsH, vpH = sh - kBarsH;
-			client::SceneDefinition sceneDef = SetupScene(0.0F, vpY, sw, vpH);
+			// The scene is rendered full-screen (sub-viewport rendering isn't
+			// guaranteed across renderers — keep this renderer-agnostic), and the
+			// ribbon + toolbar bars are drawn opaque over the top. So the camera
+			// projection and the cursor->ray pick both use the full screen.
+			client::SceneDefinition sceneDef = SetupScene(0.0F, 0.0F, sw, sh);
 			camEye = sceneDef.viewOrigin;
 			camRight = sceneDef.viewAxis[0];
 			camUp = sceneDef.viewAxis[1];
@@ -1167,9 +1205,9 @@ namespace spades {
 			camFovX = sceneDef.fovX;
 			camFovY = sceneDef.fovY;
 			camVpX = 0.0F;
-			camVpY = vpY;
+			camVpY = 0.0F;
 			camSW = sw;
-			camSH = vpH;
+			camSH = sh;
 
 			renderer->StartScene(sceneDef);
 			if (renderModel) {
