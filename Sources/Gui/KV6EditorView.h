@@ -97,7 +97,21 @@ namespace spades {
 			void Eyedropper();
 			void SetStatus(const std::string&);
 			void DrawCellOutline(int x, int y, int z, const Vector4& color);
+			// 3D wireframe over the inclusive voxel range [lo, hi].
+			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi, const Vector4& color);
+			// Add every solid voxel in [lo, hi] to the selection.
+			void SelectBox(const IntVector3& lo, const IntVector3& hi);
 			Vector4 ColorToVec(uint32_t c) const;
+
+			// 2D drawing for tool overlays.
+			float ScreenW() const;
+			float ScreenH() const;
+			float ViewportTop() const; // y where the 3D area starts (below the bars)
+			const Vector2& CursorPos() const { return cursor; }
+			void Fill2D(float x, float y, float w, float h, const Vector4& c);
+			void Stroke2D(float x, float y, float w, float h, float t, const Vector4& c);
+			void Text2D(const std::string& s, float x, float y, float scale, const Vector4& c);
+			Vector2 MeasureText(const std::string& s);
 
 		protected:
 			~KV6EditorView();
@@ -230,6 +244,7 @@ namespace spades {
 			void StrokeRect(float x, float y, float w, float h, float t, const Vector4& c);
 			void DrawLine2D(const Vector2& a, const Vector2& b, float w, const Vector4& col);
 			void DrawHelpers();
+			void DrawOriginAxes();
 			void DrawMirrorPlanes();
 			void DrawPicker();
 			void DrawMirrorToggles();

@@ -698,6 +698,64 @@ namespace spades {
 			renderer->AddDebugLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
 		}
 
+		void KV6EditorView::DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
+		                                   const Vector4& color) {
+			Vector3 a = MakeVector3(float(lo.x) - 0.5F, float(lo.y) - 0.5F, float(lo.z) - 0.5F);
+			Vector3 b = MakeVector3(float(hi.x) + 0.5F, float(hi.y) + 0.5F, float(hi.z) + 0.5F);
+			for (int k = 0; k < 2; k++) {
+				float zz = (k == 0) ? a.z : b.z;
+				renderer->AddDebugLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
+				renderer->AddDebugLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
+				renderer->AddDebugLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
+				renderer->AddDebugLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
+			}
+			renderer->AddDebugLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
+			renderer->AddDebugLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
+			renderer->AddDebugLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
+			renderer->AddDebugLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
+		}
+
+		void KV6EditorView::SelectBox(const IntVector3& lo, const IntVector3& hi) {
+			for (int x = lo.x; x <= hi.x; x++)
+			for (int y = lo.y; y <= hi.y; y++)
+			for (int z = lo.z; z <= hi.z; z++) {
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
+					AddSelect(x, y, z);
+			}
+		}
+
+		// Long world axes through the model's origin (pivot), which renders at
+		// world coordinate -origin in the editor's grid space.
+		void KV6EditorView::DrawOriginAxes() {
+			Vector3 org = model->GetOrigin();
+			Vector3 p = MakeVector3(-org.x, -org.y, -org.z);
+			float L = 1000.0F;
+			renderer->AddDebugLine(p - MakeVector3(L, 0, 0), p + MakeVector3(L, 0, 0),
+			                       MakeVector4(1.0F, 0.3F, 0.3F, 0.5F));
+			renderer->AddDebugLine(p - MakeVector3(0, L, 0), p + MakeVector3(0, L, 0),
+			                       MakeVector4(0.4F, 1.0F, 0.4F, 0.5F));
+			renderer->AddDebugLine(p - MakeVector3(0, 0, L), p + MakeVector3(0, 0, L),
+			                       MakeVector4(0.45F, 0.6F, 1.0F, 0.5F));
+		}
+
+		float KV6EditorView::ScreenW() const { return renderer->ScreenWidth(); }
+		float KV6EditorView::ScreenH() const { return renderer->ScreenHeight(); }
+		float KV6EditorView::ViewportTop() const { return kBarsH; }
+		void KV6EditorView::Fill2D(float x, float y, float w, float h, const Vector4& c) {
+			ColorNP(c);
+			FillRect(x, y, w, h);
+		}
+		void KV6EditorView::Stroke2D(float x, float y, float w, float h, float t, const Vector4& c) {
+			StrokeRect(x, y, w, h, t, c);
+		}
+		void KV6EditorView::Text2D(const std::string& s, float x, float y, float scale,
+		                           const Vector4& c) {
+			fontManager->GetGuiFont().Draw(s, MakeVector2(x, y), scale, c);
+		}
+		Vector2 KV6EditorView::MeasureText(const std::string& s) {
+			return fontManager->GetGuiFont().Measure(s);
+		}
+
 		void KV6EditorView::DrawHelpers() {
 			Vector4 grid = MakeVector4(1.0F, 1.0F, 1.0F, 0.06F);
 			Vector4 box = MakeVector4(0.4F, 0.7F, 1.0F, 0.5F);
@@ -870,9 +928,9 @@ namespace spades {
 			Vector4 grey = MakeVector4(0.75F, 0.75F, 0.75F, 1.0F);
 
 			// Title / filename / camera now live in the ribbon. Here we draw the
-			// transient status line (just below the bars) and the help line.
+			// transient status line (above the help line) and the help line.
 			if (statusTimer > 0.0F)
-				font.Draw(statusMessage, MakeVector2(16.0F, kBarsH + 8.0F), 1.0F,
+				font.Draw(statusMessage, MakeVector2(16.0F, sh - 50.0F), 1.0F,
 				          MakeVector4(0.5F, 1.0F, 0.6F, 1.0F));
 
 			font.Draw("[LMB] place  |  [Alt+LMB] or eyedropper = pick colour  |  [RMB] delete  |  "
@@ -1217,6 +1275,7 @@ namespace spades {
 				renderer->RenderModel(*renderModel, param);
 			}
 			DrawHelpers();
+			DrawOriginAxes();
 			DrawMirrorPlanes();
 			DrawSelection();
 
