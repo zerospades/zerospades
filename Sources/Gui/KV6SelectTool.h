@@ -26,11 +26,11 @@
 
 namespace spades {
 	namespace gui {
-		// Select voxels, with selectable shapes:
-		//  - Block:    click toggles the voxel under the cursor.
+		// Select voxels, via sub-tools shown in the secondary toolbar:
+		//  - Point:    click toggles the voxel under the cursor.
 		//  - Rect:     3 clicks (corner, opposite corner, depth) select a box.
-		// [L] selects all voxels linked to the cursor's by colour. Clicking empty
-		// space clears the selection.
+		//  - By Colour: click flood-fills 6-connected voxels of the same colour.
+		// [L] also flood-fills from the cursor. Clicking empty space clears.
 		class SelectTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Select"; }
@@ -38,11 +38,15 @@ namespace spades {
 			void OnPointerDown(KV6EditorView&, const std::string& button) override;
 			void OnKey(KV6EditorView&, const std::string& key, bool down) override;
 			void DrawScene(KV6EditorView&) override;
-			void DrawOverlay(KV6EditorView&) override;
+
+			int SubToolCount() const override { return SubCount; }
+			const char* SubToolLabel(int i) const override;
+			int SubTool() const override { return sub; }
+			void SetSubTool(int i) override;
 
 		private:
-			enum Shape { Block, Rect, ShapeCount };
-			int shape = Block;
+			enum Sub { Point, Rect, ByColour, SubCount };
+			int sub = Point;
 
 			// 3-point rectangle box state.
 			int stage = 0;            // 0 none, 1 have corner, 2 have rectangle
@@ -53,8 +57,6 @@ namespace spades {
 			void ResetRect();
 			// The provisional box for the current rect stage given hover voxel `cur`.
 			void RectBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const;
-			// Sub-toolbar geometry/hit-test (Block / Rect buttons).
-			bool ShapeButtonHit(KV6EditorView& ed, int& outShape) const;
 		};
 	} // namespace gui
 } // namespace spades

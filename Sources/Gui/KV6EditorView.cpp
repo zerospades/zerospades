@@ -62,8 +62,9 @@ namespace spades {
 			// viewport is inset below them by kBarsH.
 			const float kRibbonH = 24.0F;
 			const float kToolbarH = 32.0F;
-			const float kBarsH = kRibbonH + kToolbarH;
+			const float kSubBarH = 28.0F; // secondary toolbar (active tool's sub-tools)
 			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
+			const float kSubBtn = 88.0F;  // sub-tool button width
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
 
@@ -576,7 +577,7 @@ namespace spades {
 			float gizBox = 96.0F;
 			gizR = gizBox * 0.5F - 12.0F;
 			gizCx = sw - 16.0F - gizBox * 0.5F;
-			gizCy = kBarsH + 8.0F + gizBox * 0.5F;
+			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
 
 			presSwatch = (svSize + 6.0F + hueW) / float(presetCols);
 			float contentW = svSize + 6.0F + hueW;
@@ -740,7 +741,15 @@ namespace spades {
 
 		float KV6EditorView::ScreenW() const { return renderer->ScreenWidth(); }
 		float KV6EditorView::ScreenH() const { return renderer->ScreenHeight(); }
-		float KV6EditorView::ViewportTop() const { return kBarsH; }
+
+		bool KV6EditorView::HasSubToolbar() {
+			EditorTool* t = ActiveTool();
+			return t && t->SubToolCount() > 0;
+		}
+		float KV6EditorView::BarsH() {
+			return kRibbonH + kToolbarH + (HasSubToolbar() ? kSubBarH : 0.0F);
+		}
+		float KV6EditorView::ViewportTop() { return BarsH(); }
 		void KV6EditorView::Fill2D(float x, float y, float w, float h, const Vector4& c) {
 			ColorNP(c);
 			FillRect(x, y, w, h);
@@ -1013,6 +1022,42 @@ namespace spades {
 			}
 		}
 
+		int KV6EditorView::SubToolbarHitTest(const Vector2& p) {
+			EditorTool* t = ActiveTool();
+			if (!t || t->SubToolCount() == 0)
+				return -1;
+			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
+			for (int i = 0; i < t->SubToolCount(); i++) {
+				if (InRect(p, kTbX0 + float(i) * (kSubBtn + kTbGap), by, kSubBtn, kTbH))
+					return i;
+			}
+			return -1;
+		}
+
+		void KV6EditorView::DrawSubToolbar(float sw) {
+			EditorTool* t = ActiveTool();
+			if (!t || t->SubToolCount() == 0)
+				return;
+			client::IFont& font = fontManager->GetGuiFont();
+			float s = 0.8F;
+			float bandY = kRibbonH + kToolbarH;
+			float by = bandY + (kSubBarH - kTbH) * 0.5F;
+			ColorNP(MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
+			FillRect(0.0F, bandY, sw, kSubBarH);
+			for (int i = 0; i < t->SubToolCount(); i++) {
+				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
+				bool on = t->SubTool() == i;
+				ColorNP(on ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
+				           : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
+				FillRect(x, by, kSubBtn, kTbH);
+				StrokeRect(x, by, kSubBtn, kTbH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+				const char* lbl = t->SubToolLabel(i);
+				Vector2 ts = font.Measure(lbl);
+				font.Draw(lbl, MakeVector2(x + (kSubBtn - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
+				          s, MakeVector4(1, 1, 1, 1));
+			}
+		}
+
 		void KV6EditorView::DrawRibbon(float sw) {
 			client::IFont& font = fontManager->GetGuiFont();
 			ColorNP(MakeVector4(0.06F, 0.06F, 0.08F, 1.0F));
@@ -1193,15 +1238,20 @@ namespace spades {
 					}
 					return;
 				}
+				int sub = SubToolbarHitTest(cursor);
+				if (sub >= 0) {
+					if (EditorTool* t = ActiveTool()) t->SetSubTool(sub);
+					return;
+				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
-				if (cursor.y < kBarsH) return; // over the ribbon/toolbar bars
+				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
 				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
 				return;
 			}
 			if (key == "RightMouseButton") {
 				if (down && CursorOverPicker(cursor)) return;
-				if (down && cursor.y < kBarsH) return; // over the bars
+				if (down && cursor.y < BarsH()) return; // over the bars
 				if (EditorTool* t = ActiveTool()) {
 					if (down) t->OnPointerDown(*this, key);
 					else t->OnPointerUp(*this, key);
@@ -1288,6 +1338,7 @@ namespace spades {
 			DrawOverlay(sw, sh);
 			DrawRibbon(sw);
 			DrawToolbar(sw, sh);
+			DrawSubToolbar(sw);
 			LayoutPicker();
 			DrawMirrorToggles();
 			DrawGizmo();

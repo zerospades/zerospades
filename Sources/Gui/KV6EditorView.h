@@ -106,7 +106,7 @@ namespace spades {
 			// 2D drawing for tool overlays.
 			float ScreenW() const;
 			float ScreenH() const;
-			float ViewportTop() const; // y where the 3D area starts (below the bars)
+			float ViewportTop(); // y where the 3D area starts (below the bars)
 			const Vector2& CursorPos() const { return cursor; }
 			void Fill2D(float x, float y, float w, float h, const Vector4& c);
 			void Stroke2D(float x, float y, float w, float h, float t, const Vector4& c);
@@ -263,6 +263,13 @@ namespace spades {
 			};
 			ToolbarHit ToolbarHitTest(const Vector2& p);
 			void DrawToolbar(float sw, float sh);
+
+			// Secondary toolbar (the active tool's sub-tools), drawn under the main
+			// toolbar when the active tool exposes any.
+			bool HasSubToolbar();
+			float BarsH(); // total height of ribbon + toolbar (+ sub-toolbar)
+			int SubToolbarHitTest(const Vector2& p); // -1 none, else sub-tool index
+			void DrawSubToolbar(float sw);
 
 			// Pause menu / Save As prompt
 			int MenuButtonAt(const Vector2& p); // -1 none, else index

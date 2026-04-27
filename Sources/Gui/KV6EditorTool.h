@@ -44,6 +44,13 @@ namespace spades {
 			virtual void OnActivate(KV6EditorView&) {}
 			virtual void OnDeactivate(KV6EditorView&) {}
 
+			// Optional sub-tools, shown in a secondary toolbar under the main one
+			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
+			virtual int SubToolCount() const { return 0; }
+			virtual const char* SubToolLabel(int) const { return ""; }
+			virtual int SubTool() const { return 0; }
+			virtual void SetSubTool(int) {}
+
 			// `button` is "LeftMouseButton" / "RightMouseButton".
 			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}
 			virtual void OnPointerUp(KV6EditorView&, const std::string& button) {}
