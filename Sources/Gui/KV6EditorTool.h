@@ -48,8 +48,8 @@ namespace spades {
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
 			virtual int SubToolCount() const { return 0; }
 			virtual const char* SubToolLabel(int) const { return ""; }
-			virtual int SubTool() const { return 0; }
-			virtual void SetSubTool(int) {}
+			virtual int ActiveSubTool() const { return 0; }
+			virtual void SetSubTool(KV6EditorView&, int) {}
 
 			// `button` is "LeftMouseButton" / "RightMouseButton".
 			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}

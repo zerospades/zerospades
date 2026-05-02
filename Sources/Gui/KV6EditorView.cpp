@@ -63,6 +63,7 @@ namespace spades {
 			const float kRibbonH = 24.0F;
 			const float kToolbarH = 32.0F;
 			const float kSubBarH = 28.0F; // secondary toolbar (active tool's sub-tools)
+			const float kBarsH = kRibbonH + kToolbarH + kSubBarH; // always-present bars
 			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
 			const float kSubBtn = 88.0F;  // sub-tool button width
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
@@ -725,6 +726,48 @@ namespace spades {
 			}
 		}
 
+		void KV6EditorView::SelectCells(const std::vector<IntVector3>& cells) {
+			for (const IntVector3& c : cells) {
+				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z))
+					AddSelect(c.x, c.y, c.z);
+			}
+		}
+
+		void KV6EditorView::FillCells(const std::vector<IntVector3>& cells, uint32_t color) {
+			if (cells.empty())
+				return;
+			// Grow the volume to contain every cell (plus the current model).
+			int loX = 0, loY = 0, loZ = 0;
+			int hiX = model->GetWidth(), hiY = model->GetHeight(), hiZ = model->GetDepth();
+			for (const IntVector3& c : cells) {
+				loX = std::min(loX, c.x); hiX = std::max(hiX, c.x + 1);
+				loY = std::min(loY, c.y); hiY = std::max(hiY, c.y + 1);
+				loZ = std::min(loZ, c.z); hiZ = std::max(hiZ, c.z + 1);
+			}
+			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
+			if (nw > 4096 || nh > 4096 || nd > 64) {
+				SetStatus("Reached the maximum model size");
+				return;
+			}
+			int ox = -loX, oy = -loY, oz = -loZ;
+			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
+			    nh != model->GetHeight() || nd != model->GetDepth())
+				RebuildVolume(nw, nh, nd, ox, oy, oz);
+			bool any = false;
+			for (const IntVector3& c : cells) {
+				int X = c.x + ox, Y = c.y + oy, Z = c.z + oz;
+				if (InBounds(X, Y, Z) && !model->IsSolid(X, Y, Z)) {
+					model->SetSolid(X, Y, Z, color);
+					voxelCount++;
+					any = true;
+				}
+			}
+			if (any) {
+				dirty = true;
+				RebuildRenderModel();
+			}
+		}
+
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {
@@ -739,31 +782,9 @@ namespace spades {
 			                       MakeVector4(0.45F, 0.6F, 1.0F, 0.5F));
 		}
 
-		float KV6EditorView::ScreenW() const { return renderer->ScreenWidth(); }
-		float KV6EditorView::ScreenH() const { return renderer->ScreenHeight(); }
-
-		bool KV6EditorView::HasSubToolbar() {
-			EditorTool* t = ActiveTool();
-			return t && t->SubToolCount() > 0;
-		}
-		float KV6EditorView::BarsH() {
-			return kRibbonH + kToolbarH + (HasSubToolbar() ? kSubBarH : 0.0F);
-		}
-		float KV6EditorView::ViewportTop() { return BarsH(); }
-		void KV6EditorView::Fill2D(float x, float y, float w, float h, const Vector4& c) {
-			ColorNP(c);
-			FillRect(x, y, w, h);
-		}
-		void KV6EditorView::Stroke2D(float x, float y, float w, float h, float t, const Vector4& c) {
-			StrokeRect(x, y, w, h, t, c);
-		}
-		void KV6EditorView::Text2D(const std::string& s, float x, float y, float scale,
-		                           const Vector4& c) {
-			fontManager->GetGuiFont().Draw(s, MakeVector2(x, y), scale, c);
-		}
-		Vector2 KV6EditorView::MeasureText(const std::string& s) {
-			return fontManager->GetGuiFont().Measure(s);
-		}
+		// The ribbon + main toolbar + sub-toolbar are always present; the 3D
+		// viewport sits below them.
+		float KV6EditorView::BarsH() { return kBarsH; }
 
 		void KV6EditorView::DrawHelpers() {
 			Vector4 grid = MakeVector4(1.0F, 1.0F, 1.0F, 0.06F);
@@ -1035,18 +1056,18 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawSubToolbar(float sw) {
-			EditorTool* t = ActiveTool();
-			if (!t || t->SubToolCount() == 0)
-				return;
 			client::IFont& font = fontManager->GetGuiFont();
 			float s = 0.8F;
 			float bandY = kRibbonH + kToolbarH;
 			float by = bandY + (kSubBarH - kTbH) * 0.5F;
 			ColorNP(MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
-			FillRect(0.0F, bandY, sw, kSubBarH);
+			FillRect(0.0F, bandY, sw, kSubBarH); // band is always present
+			EditorTool* t = ActiveTool();
+			if (!t)
+				return;
 			for (int i = 0; i < t->SubToolCount(); i++) {
 				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
-				bool on = t->SubTool() == i;
+				bool on = t->ActiveSubTool() == i;
 				ColorNP(on ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
 				           : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
 				FillRect(x, by, kSubBtn, kTbH);
@@ -1240,7 +1261,7 @@ namespace spades {
 				}
 				int sub = SubToolbarHitTest(cursor);
 				if (sub >= 0) {
-					if (EditorTool* t = ActiveTool()) t->SetSubTool(sub);
+					if (EditorTool* t = ActiveTool()) t->SetSubTool(*this, sub);
 					return;
 				}
 				if (PickerMouseDown(cursor)) return;

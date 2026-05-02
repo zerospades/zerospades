@@ -101,17 +101,11 @@ namespace spades {
 			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi, const Vector4& color);
 			// Add every solid voxel in [lo, hi] to the selection.
 			void SelectBox(const IntVector3& lo, const IntVector3& hi);
+			// Add the solid voxels among `cells` to the selection.
+			void SelectCells(const std::vector<IntVector3>& cells);
+			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
+			void FillCells(const std::vector<IntVector3>& cells, uint32_t color);
 			Vector4 ColorToVec(uint32_t c) const;
-
-			// 2D drawing for tool overlays.
-			float ScreenW() const;
-			float ScreenH() const;
-			float ViewportTop(); // y where the 3D area starts (below the bars)
-			const Vector2& CursorPos() const { return cursor; }
-			void Fill2D(float x, float y, float w, float h, const Vector4& c);
-			void Stroke2D(float x, float y, float w, float h, float t, const Vector4& c);
-			void Text2D(const std::string& s, float x, float y, float scale, const Vector4& c);
-			Vector2 MeasureText(const std::string& s);
 
 		protected:
 			~KV6EditorView();
@@ -264,10 +258,8 @@ namespace spades {
 			ToolbarHit ToolbarHitTest(const Vector2& p);
 			void DrawToolbar(float sw, float sh);
 
-			// Secondary toolbar (the active tool's sub-tools), drawn under the main
-			// toolbar when the active tool exposes any.
-			bool HasSubToolbar();
-			float BarsH(); // total height of ribbon + toolbar (+ sub-toolbar)
+			// Secondary toolbar showing the active tool's sub-tools (always shown).
+			float BarsH(); // total height of ribbon + toolbar + sub-toolbar
 			int SubToolbarHitTest(const Vector2& p); // -1 none, else sub-tool index
 			void DrawSubToolbar(float sw);
 

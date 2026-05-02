@@ -23,28 +23,15 @@
 
 namespace spades {
 	namespace gui {
-		void DrawTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button == "LeftMouseButton") {
-				if (ed.AltHeld() || ed.PickModeActive()) {
-					ed.Eyedropper();
-					ed.ClearPickMode();
-					return;
-				}
-				ed.PlaceCube();
-			} else if (button == "RightMouseButton") {
-				ed.DeleteCube();
-			}
-		}
-
-		void DrawTool::DrawScene(KV6EditorView& ed) {
-			ed.DoPick();
-			if (!ed.HasPick())
-				return;
-			IntVector3 p = ed.PickPlace();
-			IntVector3 h = ed.PickSolid();
-			// Where a new voxel would land (current colour) and the targeted voxel.
-			ed.DrawCellOutline(p.x, p.y, p.z, ed.ColorToVec(ed.CurrentColor()));
-			ed.DrawCellOutline(h.x, h.y, h.z, MakeVector4(1.0F, 0.9F, 0.3F, 0.9F));
+		DrawTool::DrawTool() {
+			// Region shapes fill their cells with the current colour.
+			auto fill = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+				ed.FillCells(cells, ed.CurrentColor());
+			};
+			subs.push_back(std::unique_ptr<SubTool>(new BlockSubTool()));
+			subs.push_back(std::unique_ptr<SubTool>(new ShapeSubTool(ShapeSubTool::Rect, "Rect", fill)));
+			subs.push_back(
+			  std::unique_ptr<SubTool>(new ShapeSubTool(ShapeSubTool::Cylinder, "Cylinder", fill)));
 		}
 	} // namespace gui
 } // namespace spades

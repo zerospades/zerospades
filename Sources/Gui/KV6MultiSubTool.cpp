@@ -18,17 +18,37 @@
 
  */
 
-#pragma once
-
 #include "KV6MultiSubTool.h"
 
 namespace spades {
 	namespace gui {
-		// Draw voxels: Block (single), Rect and Cylinder (filled regions).
-		class DrawTool : public MultiSubTool {
-		public:
-			DrawTool();
-			const char* Label() const override { return "Draw"; }
-		};
+		SubTool* MultiSubTool::Cur() {
+			return (active >= 0 && active < int(subs.size())) ? subs[active].get() : nullptr;
+		}
+
+		void MultiSubTool::SetSubTool(KV6EditorView& ed, int i) {
+			if (i == active || i < 0 || i >= int(subs.size()))
+				return;
+			active = i;
+			if (SubTool* s = Cur())
+				s->OnActivate(ed);
+		}
+
+		void MultiSubTool::OnActivate(KV6EditorView& ed) {
+			if (SubTool* s = Cur())
+				s->OnActivate(ed);
+		}
+		void MultiSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
+			if (SubTool* s = Cur())
+				s->OnPointerDown(ed, button);
+		}
+		void MultiSubTool::OnKey(KV6EditorView& ed, const std::string& key, bool down) {
+			if (SubTool* s = Cur())
+				s->OnKey(ed, key, down);
+		}
+		void MultiSubTool::DrawScene(KV6EditorView& ed) {
+			if (SubTool* s = Cur())
+				s->DrawScene(ed);
+		}
 	} // namespace gui
 } // namespace spades
