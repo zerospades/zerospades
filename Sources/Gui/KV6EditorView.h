@@ -143,6 +143,21 @@ namespace spades {
 			void DrawSelection();
 			void ShiftSelection(int ox, int oy, int oz); // keep keys valid on resize
 
+			// --- Clipboard / paste --------------------------------------------
+			struct ClipVoxel {
+				IntVector3 rel; // position relative to the clipboard's min corner
+				uint32_t color;
+			};
+			std::vector<ClipVoxel> clipboard;
+			bool pasteActive = false;
+			IntVector3 pasteAnchor; // where the clipboard's min lands (follows cursor)
+			void CopySelection();
+			bool CutSelection(); // returns false if it would empty the document
+			void StartPaste();
+			void CommitPaste();
+			void PasteClipboard(const IntVector3& anchor);
+			void DrawPastePreview();
+
 			// --- Colour picker (HSV is the source of truth) -------------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
 			float hue = 0.0F, sat = 0.0F, val = 0.78F;

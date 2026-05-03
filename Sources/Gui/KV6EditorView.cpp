@@ -566,6 +566,122 @@ namespace spades {
 			selection.swap(shifted);
 		}
 
+		// --- Clipboard / paste -----------------------------------------------
+
+		void KV6EditorView::CopySelection() {
+			if (selection.empty()) {
+				SetStatus("Nothing selected");
+				return;
+			}
+			int minX = model->GetWidth(), minY = model->GetHeight(), minZ = model->GetDepth();
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				minX = std::min(minX, x); minY = std::min(minY, y); minZ = std::min(minZ, z);
+			}
+			clipboard.clear();
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
+					clipboard.push_back({MakeIntVector3(x - minX, y - minY, z - minZ),
+					                     model->GetColor(x, y, z) & 0xFFFFFF});
+			}
+			SetStatus("Copied " + std::to_string(clipboard.size()) + " voxels");
+		}
+
+		bool KV6EditorView::CutSelection() {
+			if (selection.empty()) {
+				SetStatus("Nothing selected");
+				return false;
+			}
+			int cut = 0;
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
+					cut++;
+			}
+			if (voxelCount - cut < 1) {
+				SetStatus("Cannot cut every voxel");
+				return false;
+			}
+			CopySelection();
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z)) {
+					model->SetAir(x, y, z);
+					voxelCount--;
+				}
+			}
+			selection.clear();
+			TrimVolume();
+			dirty = true;
+			RebuildRenderModel();
+			SetStatus("Cut " + std::to_string(clipboard.size()) + " voxels");
+			return true;
+		}
+
+		void KV6EditorView::StartPaste() {
+			if (clipboard.empty()) {
+				SetStatus("Clipboard is empty");
+				return;
+			}
+			pasteActive = true;
+			pasteAnchor = MakeIntVector3(model->GetWidth() / 2, model->GetHeight() / 2,
+			                             model->GetDepth() / 2);
+			SetStatus("Paste: click to place, [Esc] to cancel");
+		}
+
+		void KV6EditorView::PasteClipboard(const IntVector3& anchor) {
+			if (clipboard.empty())
+				return;
+			int loX = 0, loY = 0, loZ = 0;
+			int hiX = model->GetWidth(), hiY = model->GetHeight(), hiZ = model->GetDepth();
+			for (const ClipVoxel& v : clipboard) {
+				int x = anchor.x + v.rel.x, y = anchor.y + v.rel.y, z = anchor.z + v.rel.z;
+				loX = std::min(loX, x); hiX = std::max(hiX, x + 1);
+				loY = std::min(loY, y); hiY = std::max(hiY, y + 1);
+				loZ = std::min(loZ, z); hiZ = std::max(hiZ, z + 1);
+			}
+			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
+			if (nw > 4096 || nh > 4096 || nd > 64) {
+				SetStatus("Reached the maximum model size");
+				return;
+			}
+			int ox = -loX, oy = -loY, oz = -loZ;
+			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
+			    nh != model->GetHeight() || nd != model->GetDepth())
+				RebuildVolume(nw, nh, nd, ox, oy, oz);
+			selection.clear();
+			for (const ClipVoxel& v : clipboard) {
+				int x = anchor.x + v.rel.x + ox, y = anchor.y + v.rel.y + oy,
+				    z = anchor.z + v.rel.z + oz;
+				if (!InBounds(x, y, z))
+					continue;
+				if (!model->IsSolid(x, y, z))
+					voxelCount++;
+				model->SetSolid(x, y, z, v.color);
+				AddSelect(x, y, z); // select the pasted voxels
+			}
+			dirty = true;
+			RebuildRenderModel();
+			SetStatus("Pasted " + std::to_string(clipboard.size()) + " voxels");
+		}
+
+		void KV6EditorView::CommitPaste() {
+			PasteClipboard(pasteAnchor);
+			pasteActive = false;
+		}
+
+		void KV6EditorView::DrawPastePreview() {
+			for (const ClipVoxel& v : clipboard) {
+				DrawCellOutline(pasteAnchor.x + v.rel.x, pasteAnchor.y + v.rel.y,
+				                pasteAnchor.z + v.rel.z, ColorToVec(v.color));
+			}
+		}
+
 		// --- Layout / hit testing --------------------------------------------
 
 		void KV6EditorView::LayoutPicker() {
@@ -963,8 +1079,8 @@ namespace spades {
 				font.Draw(statusMessage, MakeVector2(16.0F, sh - 50.0F), 1.0F,
 				          MakeVector4(0.5F, 1.0F, 0.6F, 1.0F));
 
-			font.Draw("[LMB] place  |  [Alt+LMB] or eyedropper = pick colour  |  [RMB] delete  |  "
-			          "hold [MMB] look  |  [WASD]/[Space]/[Ctrl] move  |  [Wheel] zoom  |  [Esc] menu",
+			font.Draw("[LMB] use tool  |  [RMB] delete/cancel  |  [MMB] look  |  [WASD/Space/Ctrl] move"
+			          "  |  [Wheel] zoom  |  [Ctrl+C/X/V] copy/cut/paste  |  [Esc] menu",
 			          MakeVector2(16.0F, sh - 28.0F), 1.0F, grey);
 		}
 
@@ -1231,11 +1347,22 @@ namespace spades {
 				return;
 			}
 
+			// While pasting, the mouse positions/places the clipboard; other keys
+			// (camera) fall through.
+			if (pasteActive && down) {
+				if (key == "Escape") { pasteActive = false; SetStatus("Paste cancelled"); return; }
+				if (key == "RightMouseButton") { pasteActive = false; return; }
+				if (key == "LeftMouseButton") { CommitPaste(); return; }
+			}
+
 			if (down && key == "Escape") { menuOpen = true; return; }
 
 			if (key == "Control") ctrlHeld = down;
 			if (key == "Alt") altHeld = down;
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "s")) { Save(); return; }
+			if (down && ctrlHeld && EqualsIgnoringCase(key, "c")) { CopySelection(); return; }
+			if (down && ctrlHeld && EqualsIgnoringCase(key, "x")) { CutSelection(); return; }
+			if (down && ctrlHeld && EqualsIgnoringCase(key, "v")) { StartPaste(); return; }
 
 			if (key == "MiddleMouseButton") { lookActive = down; return; }
 
@@ -1352,8 +1479,14 @@ namespace spades {
 
 			EditorTool* tool = (currentMode == EditorMode::Edit && activeTool < int(tools.size()))
 			                     ? tools[activeTool].get() : nullptr;
-			if (tool)
+			if (pasteActive) {
+				DoPick();
+				if (pickHit)
+					pasteAnchor = MakeIntVector3(pickHX, pickHY, pickHZ); // follow the cursor
+				DrawPastePreview();
+			} else if (tool) {
 				tool->DrawScene(*this);
+			}
 			renderer->EndScene();
 
 			DrawOverlay(sw, sh);
