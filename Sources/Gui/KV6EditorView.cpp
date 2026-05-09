@@ -257,6 +257,27 @@ namespace spades {
 
 		// --- Editing ----------------------------------------------------------
 
+		bool KV6EditorView::RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
+		                                 IntVector3& out) {
+			if (camSW <= 0.0F || camSH <= 0.0F)
+				return false;
+			float sx = ((cursor.x - camVpX) / camSW) * 2.0F - 1.0F;
+			float sy = ((cursor.y - camVpY) / camSH) * 2.0F - 1.0F;
+			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
+			              camUp * (sy * tanf(camFovY * 0.5F));
+			dir = dir.Normalize();
+			float denom = Vector3::Dot(dir, normal);
+			if (std::fabs(denom) < 1.0e-5F)
+				return false;
+			float t = Vector3::Dot(planePoint - camEye, normal) / denom;
+			if (t <= 0.0F)
+				return false;
+			Vector3 hit = camEye + dir * t;
+			out = MakeIntVector3(int(std::floor(hit.x + 0.5F)), int(std::floor(hit.y + 0.5F)),
+			                     int(std::floor(hit.z + 0.5F)));
+			return true;
+		}
+
 		void KV6EditorView::DoPick() {
 			pickHit = false;
 			if (camSW <= 0.0F || camSH <= 0.0F)

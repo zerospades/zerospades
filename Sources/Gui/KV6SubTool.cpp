@@ -22,7 +22,6 @@
 #include "KV6EditorView.h"
 
 #include <algorithm>
-#include <cmath>
 
 namespace spades {
 	namespace gui {
@@ -32,6 +31,12 @@ namespace spades {
 				if (a == 0) v.x = val;
 				else if (a == 1) v.y = val;
 				else v.z = val;
+			}
+			Vector3 VecOf(const IntVector3& v) {
+				return MakeVector3(float(v.x), float(v.y), float(v.z));
+			}
+			Vector3 AxisUnit(int a) {
+				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
 			}
 			const Vector4 kHover = MakeVector4(0.3F, 0.8F, 1.0F, 0.95F);
 			const Vector4 kSelected = MakeVector4(1.0F, 0.3F, 0.3F, 0.95F);
@@ -121,123 +126,107 @@ namespace spades {
 			ed.DrawCellOutline(h.x, h.y, h.z, kHover);
 		}
 
-		// --- ShapeSubTool (Rect / Cylinder, shared) --------------------------
+		// --- RectSubTool (axis-aligned box) ----------------------------------
 
-		void ShapeSubTool::OnActivate(KV6EditorView& ed) {
+		void RectSubTool::OnActivate(KV6EditorView& ed) {
 			Reset();
-			ed.SetStatus(kind == Rect ? "Rect: pick a corner" : "Cylinder: pick the centre");
+			ed.SetStatus("Rect: click a corner on a voxel face");
 		}
 
-		int ShapeSubTool::RadiusTo(const IntVector3& cur) const {
-			int u = (normalAxis + 1) % 3, v = (normalAxis + 2) % 3;
-			int du = Comp(cur, u) - Comp(p1, u), dv = Comp(cur, v) - Comp(p1, v);
-			return int(std::lround(std::sqrt(double(du * du + dv * dv))));
+		bool RectSubTool::ShapeCur(KV6EditorView& ed, IntVector3& out) const {
+			Vector3 pp = VecOf(p1);
+			// Opposite corner: free on the face plane. Depth: free along the normal
+			// (use only the normal-axis component of a view-facing plane pick).
+			if (stage == 1)
+				return ed.RayPlaneCell(pp, AxisUnit(normalAxis), out);
+			IntVector3 q;
+			if (!ed.RayPlaneCell(pp, ed.ViewDir(), q))
+				return false;
+			out = p1;
+			SetComp(out, normalAxis, Comp(q, normalAxis));
+			return true;
 		}
 
-		void ShapeSubTool::BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const {
+		void RectSubTool::BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const {
 			int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
-			if (kind == Rect) {
-				if (stage == 1) {
-					SetComp(lo, na, Comp(p1, na)); SetComp(hi, na, Comp(p1, na));
-					SetComp(lo, u, std::min(Comp(p1, u), Comp(cur, u)));
-					SetComp(hi, u, std::max(Comp(p1, u), Comp(cur, u)));
-					SetComp(lo, v, std::min(Comp(p1, v), Comp(cur, v)));
-					SetComp(hi, v, std::max(Comp(p1, v), Comp(cur, v)));
-				} else {
-					SetComp(lo, u, Comp(rectLo, u)); SetComp(hi, u, Comp(rectHi, u));
-					SetComp(lo, v, Comp(rectLo, v)); SetComp(hi, v, Comp(rectHi, v));
-					SetComp(lo, na, std::min(Comp(p1, na), Comp(cur, na)));
-					SetComp(hi, na, std::max(Comp(p1, na), Comp(cur, na)));
-				}
+			if (stage == 1) {
+				SetComp(lo, na, Comp(p1, na)); SetComp(hi, na, Comp(p1, na));
+				SetComp(lo, u, std::min(Comp(p1, u), Comp(cur, u)));
+				SetComp(hi, u, std::max(Comp(p1, u), Comp(cur, u)));
+				SetComp(lo, v, std::min(Comp(p1, v), Comp(cur, v)));
+				SetComp(hi, v, std::max(Comp(p1, v), Comp(cur, v)));
 			} else {
-				int cu = Comp(p1, u), cv = Comp(p1, v);
-				int r = (stage >= 2) ? radius : RadiusTo(cur);
-				SetComp(lo, u, cu - r); SetComp(hi, u, cu + r);
-				SetComp(lo, v, cv - r); SetComp(hi, v, cv + r);
-				if (stage == 1) { SetComp(lo, na, Comp(p1, na)); SetComp(hi, na, Comp(p1, na)); }
-				else {
-					SetComp(lo, na, std::min(Comp(p1, na), Comp(cur, na)));
-					SetComp(hi, na, std::max(Comp(p1, na), Comp(cur, na)));
-				}
+				SetComp(lo, u, Comp(rectLo, u)); SetComp(hi, u, Comp(rectHi, u));
+				SetComp(lo, v, Comp(rectLo, v)); SetComp(hi, v, Comp(rectHi, v));
+				SetComp(lo, na, std::min(Comp(p1, na), Comp(cur, na)));
+				SetComp(hi, na, std::max(Comp(p1, na), Comp(cur, na)));
 			}
 		}
 
-		void ShapeSubTool::Cells(const IntVector3& cur, std::vector<IntVector3>& out) const {
+		void RectSubTool::Cells(const IntVector3& cur, std::vector<IntVector3>& out) const {
 			IntVector3 lo, hi;
 			BBox(cur, lo, hi);
 			out.clear();
-			if (kind == Rect) {
-				for (int x = lo.x; x <= hi.x; x++)
-				for (int y = lo.y; y <= hi.y; y++)
-				for (int z = lo.z; z <= hi.z; z++)
-					out.push_back(MakeIntVector3(x, y, z));
-			} else {
-				int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
-				int cu = Comp(p1, u), cv = Comp(p1, v);
-				int r = (stage >= 2) ? radius : RadiusTo(cur);
-				for (int x = lo.x; x <= hi.x; x++)
-				for (int y = lo.y; y <= hi.y; y++)
-				for (int z = lo.z; z <= hi.z; z++) {
-					IntVector3 c = MakeIntVector3(x, y, z);
-					int du = Comp(c, u) - cu, dv = Comp(c, v) - cv;
-					if (du * du + dv * dv <= r * r)
-						out.push_back(c);
-				}
-			}
+			for (int x = lo.x; x <= hi.x; x++)
+			for (int y = lo.y; y <= hi.y; y++)
+			for (int z = lo.z; z <= hi.z; z++)
+				out.push_back(MakeIntVector3(x, y, z));
 		}
 
-		void ShapeSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
+		void RectSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
 			if (button == "RightMouseButton") { Reset(); return; } // cancel
 			if (button != "LeftMouseButton")
 				return;
-			ed.DoPick();
-			if (!ed.HasPick()) { Reset(); return; }
-			IntVector3 h = ed.PickSolid();
+
 			if (stage == 0) {
-				p1 = h;
-				IntVector3 d = ed.PickPlace() - h;
+				ed.DoPick();
+				if (!ed.HasPick()) { Reset(); return; }
+				p1 = ed.PickSolid();
+				IntVector3 d = ed.PickPlace() - p1;
 				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
 				stage = 1;
-				ed.SetStatus(kind == Rect ? "Rect: pick the opposite corner"
-				                          : "Cylinder: pick the radius");
-			} else if (stage == 1) {
-				if (kind == Rect) {
-					int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
-					SetComp(rectLo, na, Comp(p1, na)); SetComp(rectHi, na, Comp(p1, na));
-					SetComp(rectLo, u, std::min(Comp(p1, u), Comp(h, u)));
-					SetComp(rectHi, u, std::max(Comp(p1, u), Comp(h, u)));
-					SetComp(rectLo, v, std::min(Comp(p1, v), Comp(h, v)));
-					SetComp(rectHi, v, std::max(Comp(p1, v), Comp(h, v)));
-				} else {
-					radius = RadiusTo(h);
-				}
+				ed.SetStatus("Rect: pick the opposite corner");
+				return;
+			}
+
+			IntVector3 q;
+			if (!ShapeCur(ed, q))
+				return;
+			if (stage == 1) {
+				int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+				SetComp(rectLo, na, Comp(p1, na)); SetComp(rectHi, na, Comp(p1, na));
+				SetComp(rectLo, u, std::min(Comp(p1, u), Comp(q, u)));
+				SetComp(rectHi, u, std::max(Comp(p1, u), Comp(q, u)));
+				SetComp(rectLo, v, std::min(Comp(p1, v), Comp(q, v)));
+				SetComp(rectHi, v, std::max(Comp(p1, v), Comp(q, v)));
 				stage = 2;
-				ed.SetStatus("Pick the depth");
+				ed.SetStatus("Rect: pick the depth");
 			} else {
 				std::vector<IntVector3> cells;
-				Cells(h, cells);
+				Cells(q, cells);
 				apply(ed, cells);
 				Reset();
-				ed.SetStatus(kind == Rect ? "Rect applied" : "Cylinder applied");
+				ed.SetStatus("Rect applied");
 			}
 		}
 
-		void ShapeSubTool::DrawScene(KV6EditorView& ed) {
-			ed.DoPick();
+		void RectSubTool::DrawScene(KV6EditorView& ed) {
 			if (stage == 0) {
+				ed.DoPick();
 				if (ed.HasPick()) {
 					IntVector3 h = ed.PickSolid();
 					ed.DrawCellOutline(h.x, h.y, h.z, kHover);
 				}
 				return;
 			}
-			if (ed.HasPick()) {
-				IntVector3 h = ed.PickSolid(), lo, hi;
-				BBox(h, lo, hi);
-				ed.DrawBoxOutline(lo, hi, kHover);
-			} else {
+			IntVector3 q;
+			if (!ShapeCur(ed, q)) {
 				ed.DrawCellOutline(p1.x, p1.y, p1.z, kHover);
+				return;
 			}
+			IntVector3 lo, hi;
+			BBox(q, lo, hi);
+			ed.DrawBoxOutline(lo, hi, kHover);
 		}
 	} // namespace gui
 } // namespace spades

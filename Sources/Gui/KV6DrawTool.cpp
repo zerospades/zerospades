@@ -29,9 +29,7 @@ namespace spades {
 				ed.FillCells(cells, ed.CurrentColor());
 			};
 			subs.push_back(std::unique_ptr<SubTool>(new BlockSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new ShapeSubTool(ShapeSubTool::Rect, "Rect", fill)));
-			subs.push_back(
-			  std::unique_ptr<SubTool>(new ShapeSubTool(ShapeSubTool::Cylinder, "Cylinder", fill)));
+			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill)));
 		}
 	} // namespace gui
 } // namespace spades

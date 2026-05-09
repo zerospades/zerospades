@@ -24,7 +24,7 @@
 
 namespace spades {
 	namespace gui {
-		// Select voxels: Point (single), Rect / Cylinder (regions), By Colour.
+		// Select voxels: Point (single), Rect (box region), By Colour.
 		class SelectTool : public MultiSubTool {
 		public:
 			SelectTool();

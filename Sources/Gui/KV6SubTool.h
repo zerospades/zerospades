@@ -31,8 +31,8 @@ namespace spades {
 	namespace gui {
 		class KV6EditorView;
 
-		// A sub-tool of a main tool (e.g. Select's Point / Rect / Cylinder).
-		// Shown as a button in the secondary toolbar.
+		// A sub-tool of a main tool (e.g. Select's Point / Rect). Shown as a button
+		// in the secondary toolbar.
 		class SubTool {
 		public:
 			virtual ~SubTool() {}
@@ -72,16 +72,17 @@ namespace spades {
 			void DrawScene(KV6EditorView&) override;
 		};
 
-		// A 3-point rectangle/cylinder region. The geometry is shared; the action
-		// applied to the resulting cells (fill voxels, or add to the selection) is
-		// injected, so Draw and Select reuse the same code.
-		class ShapeSubTool : public SubTool {
+		// A 3-point axis-aligned box: corner, opposite corner (on the clicked face's
+		// plane), then depth. The corner/depth are placed in free space, so the box
+		// can be sized beyond the existing model. The action applied to the cells
+		// (fill voxels, or add to the selection) is injected, so Draw and Select
+		// reuse the same code.
+		class RectSubTool : public SubTool {
 		public:
-			enum Kind { Rect, Cylinder };
 			using ApplyFn = std::function<void(KV6EditorView&, const std::vector<IntVector3>&)>;
 
-			ShapeSubTool(Kind kind, const char* label, ApplyFn apply)
-			    : kind(kind), label(label), apply(std::move(apply)) {}
+			RectSubTool(const char* label, ApplyFn apply)
+			    : label(label), apply(std::move(apply)) {}
 
 			const char* Label() const override { return label; }
 			void OnActivate(KV6EditorView&) override;
@@ -89,18 +90,18 @@ namespace spades {
 			void DrawScene(KV6EditorView&) override;
 
 		private:
-			Kind kind;
 			const char* label;
 			ApplyFn apply;
 
-			int stage = 0;            // 0 none, 1 corner/centre, 2 rect/radius set
-			IntVector3 p1;            // first corner / centre
+			int stage = 0;            // 0 none, 1 corner set, 2 rectangle set
+			IntVector3 p1;            // first corner
 			int normalAxis = 2;       // axis of the clicked face's normal
-			IntVector3 rectLo, rectHi; // in-plane rectangle (Rect, after 2nd click)
-			int radius = 0;           // (Cylinder, after 2nd click)
+			IntVector3 rectLo, rectHi; // in-plane rectangle (after the 2nd click)
 
 			void Reset() { stage = 0; }
-			int RadiusTo(const IntVector3& cur) const;
+			// Construction point for the current stage, placed in free space so the
+			// box can be sized beyond existing voxels.
+			bool ShapeCur(KV6EditorView& ed, IntVector3& out) const;
 			void BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const;
 			void Cells(const IntVector3& cur, std::vector<IntVector3>& out) const;
 		};

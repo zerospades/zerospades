@@ -24,7 +24,7 @@
 
 namespace spades {
 	namespace gui {
-		// Draw voxels: Block (single), Rect and Cylinder (filled regions).
+		// Draw voxels: Block (single) and Rect (filled box).
 		class DrawTool : public MultiSubTool {
 		public:
 			DrawTool();

@@ -76,6 +76,10 @@ namespace spades {
 			bool HasPick() const { return pickHit; }
 			IntVector3 PickPlace() const { return MakeIntVector3(pickPX, pickPY, pickPZ); }
 			IntVector3 PickSolid() const { return MakeIntVector3(pickHX, pickHY, pickHZ); }
+			Vector3 ViewDir() const { return camFwd; }
+			// Voxel whose centre is nearest where the cursor ray meets the plane
+			// (planePoint, normal). Lets tools place points in empty space.
+			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal, IntVector3& out);
 			bool InBounds(int x, int y, int z) const;
 			VoxelModel& Model() { return *model; }
 			uint32_t CurrentColor() const { return currentColor; }
