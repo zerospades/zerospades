@@ -41,6 +41,19 @@ namespace spades {
 			const Vector4 kHover = MakeVector4(0.3F, 0.8F, 1.0F, 0.95F);
 			const Vector4 kSelected = MakeVector4(1.0F, 0.3F, 0.3F, 0.95F);
 			const Vector4 kTarget = MakeVector4(1.0F, 0.9F, 0.3F, 0.9F);
+			const Vector4 kAxisCol[3] = {MakeVector4(1.0F, 0.35F, 0.35F, 1.0F),
+			                             MakeVector4(0.4F, 1.0F, 0.4F, 1.0F),
+			                             MakeVector4(0.45F, 0.6F, 1.0F, 1.0F)};
+			const float kGizLen = 7.0F; // gizmo handle length (voxels)
+
+			// Distance from point p to the segment [a, b] in screen space.
+			float DistToSeg(const Vector2& p, const Vector2& a, const Vector2& b) {
+				Vector2 ab = b - a;
+				float l2 = Vector2::Dot(ab, ab);
+				float t = (l2 < 1.0e-6F) ? 0.0F : Vector2::Dot(p - a, ab) / l2;
+				t = std::max(0.0F, std::min(1.0F, t));
+				return (p - (a + ab * t)).GetLength();
+			}
 		} // namespace
 
 		// --- BlockSubTool (Draw single) --------------------------------------
@@ -227,6 +240,77 @@ namespace spades {
 			IntVector3 lo, hi;
 			BBox(q, lo, hi);
 			ed.DrawBoxOutline(lo, hi, kHover);
+		}
+
+		// --- MoveSubTool (drag a 3-axis gizmo) -------------------------------
+
+		void MoveSubTool::OnActivate(KV6EditorView& ed) {
+			grabAxis = -1;
+			ed.SetStatus("Move: drag an axis handle to move the selection");
+		}
+
+		int MoveSubTool::OffsetAlong(KV6EditorView& ed, const Vector3& c, int axis) const {
+			bool ok1, ok2;
+			Vector2 s0 = ed.WorldToScreen(c, ok1);
+			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
+			if (!ok1 || !ok2)
+				return 0;
+			Vector2 da = sa - s0;
+			float dl = da.GetLength();
+			if (dl < 0.5F)
+				return 0; // axis ~parallel to the view
+			Vector2 m = ed.CursorPos() - grabCursor;
+			return int(std::lround(Vector2::Dot(m, da) / (dl * dl)));
+		}
+
+		void MoveSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
+			if (button != "LeftMouseButton")
+				return;
+			Vector3 c;
+			if (!ed.SelectionCentroid(c))
+				return;
+			Vector2 cur = ed.CursorPos();
+			int best = -1;
+			float bestDist = 12.0F; // pixels
+			for (int a = 0; a < 3; a++) {
+				bool ok1, ok2;
+				Vector2 s0 = ed.WorldToScreen(c, ok1);
+				Vector2 sa = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok2);
+				if (!ok1 || !ok2)
+					continue;
+				float d = DistToSeg(cur, s0, sa);
+				if (d < bestDist) { bestDist = d; best = a; }
+			}
+			if (best >= 0) { grabAxis = best; grabCursor = cur; curOffset = 0; }
+		}
+
+		void MoveSubTool::OnPointerUp(KV6EditorView& ed, const std::string& button) {
+			if (button != "LeftMouseButton" || grabAxis < 0)
+				return;
+			Vector3 c;
+			int off = ed.SelectionCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
+			if (off != 0) {
+				int d[3] = {0, 0, 0};
+				d[grabAxis] = off;
+				ed.MoveSelection(d[0], d[1], d[2]);
+			}
+			grabAxis = -1;
+		}
+
+		void MoveSubTool::DrawScene(KV6EditorView& ed) {
+			Vector3 c;
+			if (!ed.SelectionCentroid(c))
+				return;
+			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, c, grabAxis) : 0;
+			for (int a = 0; a < 3; a++) {
+				Vector4 col = (grabAxis == a) ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
+			}
+			if (grabAxis >= 0 && curOffset != 0) {
+				int d[3] = {0, 0, 0};
+				d[grabAxis] = curOffset;
+				ed.DrawSelectionOffset(d[0], d[1], d[2], MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+			}
 		}
 	} // namespace gui
 } // namespace spades

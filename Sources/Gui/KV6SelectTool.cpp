@@ -31,6 +31,7 @@ namespace spades {
 			subs.push_back(std::unique_ptr<SubTool>(new PointSubTool()));
 			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", select)));
 			subs.push_back(std::unique_ptr<SubTool>(new ByColourSubTool()));
+			subs.push_back(std::unique_ptr<SubTool>(new MoveSubTool()));
 		}
 	} // namespace gui
 } // namespace spades

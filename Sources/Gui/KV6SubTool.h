@@ -39,6 +39,7 @@ namespace spades {
 			virtual const char* Label() const = 0;
 			virtual void OnActivate(KV6EditorView&) {}
 			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}
+			virtual void OnPointerUp(KV6EditorView&, const std::string& button) {}
 			virtual void OnKey(KV6EditorView&, const std::string& key, bool down) {}
 			virtual void DrawScene(KV6EditorView&) {}
 		};
@@ -104,6 +105,22 @@ namespace spades {
 			bool ShapeCur(KV6EditorView& ed, IntVector3& out) const;
 			void BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const;
 			void Cells(const IntVector3& cur, std::vector<IntVector3>& out) const;
+		};
+
+		// Move the current selection by dragging a 3-axis gizmo at its centroid.
+		class MoveSubTool : public SubTool {
+		public:
+			const char* Label() const override { return "Move"; }
+			void OnActivate(KV6EditorView&) override;
+			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			void OnPointerUp(KV6EditorView&, const std::string& button) override;
+			void DrawScene(KV6EditorView&) override;
+
+		private:
+			int grabAxis = -1;   // 0/1/2 while dragging a handle, else -1
+			Vector2 grabCursor;  // cursor at grab start
+			int curOffset = 0;   // current preview offset along grabAxis
+			int OffsetAlong(KV6EditorView& ed, const Vector3& c, int axis) const;
 		};
 	} // namespace gui
 } // namespace spades

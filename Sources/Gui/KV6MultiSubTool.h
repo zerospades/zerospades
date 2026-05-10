@@ -40,6 +40,7 @@ namespace spades {
 
 			void OnActivate(KV6EditorView&) override;
 			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			void OnPointerUp(KV6EditorView&, const std::string& button) override;
 			void OnKey(KV6EditorView&, const std::string& key, bool down) override;
 			void DrawScene(KV6EditorView&) override;
 

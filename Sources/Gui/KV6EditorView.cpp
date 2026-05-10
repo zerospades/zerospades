@@ -278,6 +278,24 @@ namespace spades {
 			return true;
 		}
 
+		Vector2 KV6EditorView::WorldToScreen(const Vector3& w, bool& ok) const {
+			Vector3 rel = w - camEye;
+			float fz = Vector3::Dot(rel, camFwd);
+			ok = fz > 0.001F;
+			if (!ok)
+				fz = 0.001F;
+			float fx = Vector3::Dot(rel, camRight);
+			float fy = Vector3::Dot(rel, camUp);
+			float sx = (fx / fz) / tanf(camFovX * 0.5F);
+			float sy = -(fy / fz) / tanf(camFovY * 0.5F);
+			return MakeVector2(camVpX + (sx + 1.0F) * 0.5F * camSW,
+			                   camVpY + (sy + 1.0F) * 0.5F * camSH);
+		}
+
+		void KV6EditorView::DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) {
+			renderer->AddDebugLine(a, b, color);
+		}
+
 		void KV6EditorView::DoPick() {
 			pickHit = false;
 			if (camSW <= 0.0F || camSH <= 0.0F)
@@ -701,6 +719,89 @@ namespace spades {
 				DrawCellOutline(pasteAnchor.x + v.rel.x, pasteAnchor.y + v.rel.y,
 				                pasteAnchor.z + v.rel.z, ColorToVec(v.color));
 			}
+		}
+
+		// --- Selection move (gizmo) ------------------------------------------
+
+		bool KV6EditorView::SelectionCentroid(Vector3& out) const {
+			if (selection.empty())
+				return false;
+			int minX = 1 << 30, minY = 1 << 30, minZ = 1 << 30;
+			int maxX = -(1 << 30), maxY = -(1 << 30), maxZ = -(1 << 30);
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				minX = std::min(minX, x); minY = std::min(minY, y); minZ = std::min(minZ, z);
+				maxX = std::max(maxX, x); maxY = std::max(maxY, y); maxZ = std::max(maxZ, z);
+			}
+			out = MakeVector3((minX + maxX) * 0.5F, (minY + maxY) * 0.5F, (minZ + maxZ) * 0.5F);
+			return true;
+		}
+
+		void KV6EditorView::DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) {
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				DrawCellOutline(x + dx, y + dy, z + dz, color);
+			}
+		}
+
+		void KV6EditorView::MoveSelection(int dx, int dy, int dz) {
+			if (selection.empty() || (dx == 0 && dy == 0 && dz == 0))
+				return;
+			// Lift the selected voxels (with their colours) off the model.
+			std::vector<ClipVoxel> moved;
+			for (int64_t k : selection) {
+				int x, y, z;
+				SelDecode(k, x, y, z);
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
+					moved.push_back({MakeIntVector3(x, y, z), model->GetColor(x, y, z) & 0xFFFFFF});
+			}
+			if (moved.empty())
+				return;
+			for (const ClipVoxel& v : moved) {
+				model->SetAir(v.rel.x, v.rel.y, v.rel.z);
+				voxelCount--;
+			}
+			selection.clear();
+			// Grow to fit the moved voxels at their new positions.
+			int loX = 0, loY = 0, loZ = 0;
+			int hiX = model->GetWidth(), hiY = model->GetHeight(), hiZ = model->GetDepth();
+			for (const ClipVoxel& v : moved) {
+				int x = v.rel.x + dx, y = v.rel.y + dy, z = v.rel.z + dz;
+				loX = std::min(loX, x); hiX = std::max(hiX, x + 1);
+				loY = std::min(loY, y); hiY = std::max(hiY, y + 1);
+				loZ = std::min(loZ, z); hiZ = std::max(hiZ, z + 1);
+			}
+			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
+			if (nw > 4096 || nh > 4096 || nd > 64) {
+				SetStatus("Reached the maximum model size");
+				// Put them back where they were.
+				for (const ClipVoxel& v : moved) {
+					if (!model->IsSolid(v.rel.x, v.rel.y, v.rel.z))
+						voxelCount++;
+					model->SetSolid(v.rel.x, v.rel.y, v.rel.z, v.color);
+					AddSelect(v.rel.x, v.rel.y, v.rel.z);
+				}
+				RebuildRenderModel();
+				return;
+			}
+			int ox = -loX, oy = -loY, oz = -loZ;
+			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
+			    nh != model->GetHeight() || nd != model->GetDepth())
+				RebuildVolume(nw, nh, nd, ox, oy, oz);
+			for (const ClipVoxel& v : moved) {
+				int x = v.rel.x + dx + ox, y = v.rel.y + dy + oy, z = v.rel.z + dz + oz;
+				if (!InBounds(x, y, z))
+					continue;
+				if (!model->IsSolid(x, y, z))
+					voxelCount++;
+				model->SetSolid(x, y, z, v.color);
+				AddSelect(x, y, z);
+			}
+			TrimVolume();
+			dirty = true;
+			RebuildRenderModel();
 		}
 
 		// --- Layout / hit testing --------------------------------------------
