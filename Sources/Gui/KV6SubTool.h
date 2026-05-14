@@ -41,6 +41,8 @@ namespace spades {
 			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}
 			virtual void OnPointerUp(KV6EditorView&, const std::string& button) {}
 			virtual void OnKey(KV6EditorView&, const std::string& key, bool down) {}
+			// Abort an in-progress operation (Esc); return true if consumed.
+			virtual bool OnEscape(KV6EditorView&) { return false; }
 			virtual void DrawScene(KV6EditorView&) {}
 		};
 
@@ -82,17 +84,21 @@ namespace spades {
 		public:
 			using ApplyFn = std::function<void(KV6EditorView&, const std::vector<IntVector3>&)>;
 
-			RectSubTool(const char* label, ApplyFn apply)
-			    : label(label), apply(std::move(apply)) {}
+			// `apply` runs when the final click is LMB, `applyAlt` when it is RMB
+			// (e.g. fill vs cut, or select vs deselect).
+			RectSubTool(const char* label, ApplyFn apply, ApplyFn applyAlt)
+			    : label(label), apply(std::move(apply)), applyAlt(std::move(applyAlt)) {}
 
 			const char* Label() const override { return label; }
 			void OnActivate(KV6EditorView&) override;
 			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			bool OnEscape(KV6EditorView&) override;
 			void DrawScene(KV6EditorView&) override;
 
 		private:
 			const char* label;
 			ApplyFn apply;
+			ApplyFn applyAlt;
 
 			int stage = 0;            // 0 none, 1 corner set, 2 rectangle set
 			IntVector3 p1;            // first corner
@@ -114,6 +120,7 @@ namespace spades {
 			void OnActivate(KV6EditorView&) override;
 			void OnPointerDown(KV6EditorView&, const std::string& button) override;
 			void OnPointerUp(KV6EditorView&, const std::string& button) override;
+			bool OnEscape(KV6EditorView&) override;
 			void DrawScene(KV6EditorView&) override;
 
 		private:

@@ -24,12 +24,15 @@
 namespace spades {
 	namespace gui {
 		SelectTool::SelectTool() {
-			// Region shapes add their solid cells to the selection.
+			// Rect adds its solid cells to the selection (LMB) or removes them (RMB).
 			auto select = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
 				ed.SelectCells(cells);
 			};
+			auto deselect = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+				ed.DeselectCells(cells);
+			};
 			subs.push_back(std::unique_ptr<SubTool>(new PointSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", select)));
+			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", select, deselect)));
 			subs.push_back(std::unique_ptr<SubTool>(new ByColourSubTool()));
 			subs.push_back(std::unique_ptr<SubTool>(new MoveSubTool()));
 		}

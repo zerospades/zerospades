@@ -117,6 +117,10 @@ namespace spades {
 			void SelectCells(const std::vector<IntVector3>& cells);
 			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
 			void FillCells(const std::vector<IntVector3>& cells, uint32_t color);
+			// Remove the solid voxels among `cells` (keeps at least one in the model).
+			void EraseCells(const std::vector<IntVector3>& cells);
+			// Remove `cells` from the selection.
+			void DeselectCells(const std::vector<IntVector3>& cells);
 			Vector4 ColorToVec(uint32_t c) const;
 
 		protected:

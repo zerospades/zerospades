@@ -187,8 +187,8 @@ namespace spades {
 		}
 
 		void RectSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button == "RightMouseButton") { Reset(); return; } // cancel
-			if (button != "LeftMouseButton")
+			bool lmb = button == "LeftMouseButton", rmb = button == "RightMouseButton";
+			if (!lmb && !rmb)
 				return;
 
 			if (stage == 0) {
@@ -198,7 +198,7 @@ namespace spades {
 				IntVector3 d = ed.PickPlace() - p1;
 				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
 				stage = 1;
-				ed.SetStatus("Rect: pick the opposite corner");
+				ed.SetStatus("Rect: pick the opposite corner  (RMB on the last click cuts)");
 				return;
 			}
 
@@ -213,14 +213,26 @@ namespace spades {
 				SetComp(rectLo, v, std::min(Comp(p1, v), Comp(q, v)));
 				SetComp(rectHi, v, std::max(Comp(p1, v), Comp(q, v)));
 				stage = 2;
-				ed.SetStatus("Rect: pick the depth");
+				ed.SetStatus("Rect: pick the depth  (RMB to cut)");
 			} else {
+				// The final click's button decides the action: LMB = apply, RMB = alt.
 				std::vector<IntVector3> cells;
 				Cells(q, cells);
-				apply(ed, cells);
+				if (rmb)
+					applyAlt(ed, cells);
+				else
+					apply(ed, cells);
 				Reset();
-				ed.SetStatus("Rect applied");
+				ed.SetStatus(rmb ? "Rect cut" : "Rect applied");
 			}
+		}
+
+		bool RectSubTool::OnEscape(KV6EditorView& ed) {
+			if (stage == 0)
+				return false;
+			Reset();
+			ed.SetStatus("Rect cancelled");
+			return true;
 		}
 
 		void RectSubTool::DrawScene(KV6EditorView& ed) {
@@ -295,6 +307,13 @@ namespace spades {
 				ed.MoveSelection(d[0], d[1], d[2]);
 			}
 			grabAxis = -1;
+		}
+
+		bool MoveSubTool::OnEscape(KV6EditorView&) {
+			if (grabAxis < 0)
+				return false;
+			grabAxis = -1; // cancel the drag (no move committed)
+			return true;
 		}
 
 		void MoveSubTool::DrawScene(KV6EditorView& ed) {

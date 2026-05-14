@@ -1006,6 +1006,35 @@ namespace spades {
 			}
 		}
 
+		void KV6EditorView::EraseCells(const std::vector<IntVector3>& cells) {
+			int count = 0;
+			for (const IntVector3& c : cells) {
+				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z))
+					count++;
+			}
+			if (count == 0)
+				return;
+			if (voxelCount - count < 1) {
+				SetStatus("Cannot remove every voxel");
+				return;
+			}
+			for (const IntVector3& c : cells) {
+				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z)) {
+					model->SetAir(c.x, c.y, c.z);
+					selection.erase(SelKey(c.x, c.y, c.z));
+					voxelCount--;
+				}
+			}
+			TrimVolume();
+			dirty = true;
+			RebuildRenderModel();
+		}
+
+		void KV6EditorView::DeselectCells(const std::vector<IntVector3>& cells) {
+			for (const IntVector3& c : cells)
+				selection.erase(SelKey(c.x, c.y, c.z));
+		}
+
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {
@@ -1477,7 +1506,16 @@ namespace spades {
 				if (key == "LeftMouseButton") { CommitPaste(); return; }
 			}
 
-			if (down && key == "Escape") { menuOpen = true; return; }
+			if (down && key == "Escape") {
+				// Let the active tool abort an in-progress operation first; only
+				// open the pause menu when there's nothing to cancel.
+				if (EditorTool* t = ActiveTool()) {
+					if (t->OnEscape(*this))
+						return;
+				}
+				menuOpen = true;
+				return;
+			}
 
 			if (key == "Control") ctrlHeld = down;
 			if (key == "Alt") altHeld = down;

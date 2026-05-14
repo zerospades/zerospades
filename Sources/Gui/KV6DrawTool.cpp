@@ -24,12 +24,15 @@
 namespace spades {
 	namespace gui {
 		DrawTool::DrawTool() {
-			// Region shapes fill their cells with the current colour.
+			// Rect fills its cells with the current colour (LMB) or erases them (RMB).
 			auto fill = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
 				ed.FillCells(cells, ed.CurrentColor());
 			};
+			auto erase = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+				ed.EraseCells(cells);
+			};
 			subs.push_back(std::unique_ptr<SubTool>(new BlockSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill)));
+			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill, erase)));
 		}
 	} // namespace gui
 } // namespace spades

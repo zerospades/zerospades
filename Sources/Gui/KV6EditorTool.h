@@ -44,6 +44,10 @@ namespace spades {
 			virtual void OnActivate(KV6EditorView&) {}
 			virtual void OnDeactivate(KV6EditorView&) {}
 
+			// Abort an in-progress operation (Esc). Returns true if it consumed the
+			// key (so the editor doesn't also open the pause menu).
+			virtual bool OnEscape(KV6EditorView&) { return false; }
+
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
 			virtual int SubToolCount() const { return 0; }

@@ -50,6 +50,10 @@ namespace spades {
 			if (SubTool* s = Cur())
 				s->OnKey(ed, key, down);
 		}
+		bool MultiSubTool::OnEscape(KV6EditorView& ed) {
+			SubTool* s = Cur();
+			return s ? s->OnEscape(ed) : false;
+		}
 		void MultiSubTool::DrawScene(KV6EditorView& ed) {
 			if (SubTool* s = Cur())
 				s->DrawScene(ed);
