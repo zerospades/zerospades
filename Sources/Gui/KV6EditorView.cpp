@@ -292,8 +292,30 @@ namespace spades {
 			                   camVpY + (sy + 1.0F) * 0.5F * camSH);
 		}
 
-		void KV6EditorView::DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) {
+		// A bright depth-tested 3D line, also collected for the dim see-through pass.
+		void KV6EditorView::EmitLine(const Vector3& a, const Vector3& b, const Vector4& color) {
 			renderer->AddDebugLine(a, b, color);
+			overlayLines.push_back({a, b, color});
+		}
+
+		void KV6EditorView::DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) {
+			EmitLine(a, b, color);
+		}
+
+		// Re-draw the collected overlay lines as dim 2D lines (always on top), so the
+		// parts hidden behind voxels still show. Cleared each frame.
+		void KV6EditorView::DrawOverlayLines2D() {
+			for (const OverlayLine& l : overlayLines) {
+				bool ok1, ok2;
+				Vector2 pa = WorldToScreen(l.a, ok1);
+				Vector2 pb = WorldToScreen(l.b, ok2);
+				if (!ok1 || !ok2)
+					continue; // endpoint behind the camera
+				Vector4 c = l.color;
+				c.w *= 0.35F; // dimmer than the visible (depth-tested) line
+				DrawLine2D(pa, pb, 1.0F, c);
+			}
+			overlayLines.clear();
 		}
 
 		void KV6EditorView::DoPick() {
@@ -927,15 +949,15 @@ namespace spades {
 			Vector3 b = MakeVector3(float(x) + 0.5F, float(y) + 0.5F, float(z) + 0.5F);
 			for (int k = 0; k < 2; k++) {
 				float zz = (k == 0) ? a.z : b.z;
-				renderer->AddDebugLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
+				EmitLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
+				EmitLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
+				EmitLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
+				EmitLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
 			}
-			renderer->AddDebugLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
+			EmitLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
+			EmitLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
+			EmitLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
+			EmitLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
 		}
 
 		void KV6EditorView::DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
@@ -944,15 +966,15 @@ namespace spades {
 			Vector3 b = MakeVector3(float(hi.x) + 0.5F, float(hi.y) + 0.5F, float(hi.z) + 0.5F);
 			for (int k = 0; k < 2; k++) {
 				float zz = (k == 0) ? a.z : b.z;
-				renderer->AddDebugLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
-				renderer->AddDebugLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
+				EmitLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
+				EmitLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
+				EmitLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
+				EmitLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
 			}
-			renderer->AddDebugLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
-			renderer->AddDebugLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
+			EmitLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
+			EmitLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
+			EmitLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
+			EmitLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
 		}
 
 		void KV6EditorView::SelectBox(const IntVector3& lo, const IntVector3& hi) {
@@ -1649,6 +1671,7 @@ namespace spades {
 			}
 			renderer->EndScene();
 
+			DrawOverlayLines2D(); // dim see-through pass for occluded outlines/gizmo
 			DrawOverlay(sw, sh);
 			DrawRibbon(sw);
 			DrawToolbar(sw, sh);

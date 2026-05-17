@@ -263,6 +263,14 @@ namespace spades {
 			bool PickerMouseDown(const Vector2& p);
 			bool MirrorHitTest(const Vector2& p);
 
+			// Editor overlay lines (cell/box outlines, gizmo) are drawn both as
+			// depth-tested 3D lines (bright where visible) and collected here to be
+			// re-drawn as dim 2D lines on top, so occluded parts still show through.
+			struct OverlayLine { Vector3 a, b; Vector4 color; };
+			std::vector<OverlayLine> overlayLines;
+			void EmitLine(const Vector3& a, const Vector3& b, const Vector4& color);
+			void DrawOverlayLines2D();
+
 			// Drawing
 			void ColorNP(const Vector4& c);
 			void FillRect(float x, float y, float w, float h);
