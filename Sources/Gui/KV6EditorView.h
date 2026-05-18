@@ -281,9 +281,12 @@ namespace spades {
 			void DrawMirrorPlanes();
 			void DrawPicker();
 			void DrawMirrorToggles();
-			void DrawGizmo();
-			void GizmoAxis(const Vector2& c, Vector3 a, const Vector4& col, const char* label,
-			               client::IFont& font);
+			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
+			// rotating cube whose faces are clickable to snap the view.
+			void DrawNaviCube();
+			void NaviCorners(int face, Vector2 out[4]); // projected screen corners
+			int NaviCubeFaceAt(const Vector2& p);        // face under cursor, or -1
+			void SnapCameraTo(int face);                 // look from that face's side
 			void DrawOverlay(float sw, float sh);
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			void DrawCursor();

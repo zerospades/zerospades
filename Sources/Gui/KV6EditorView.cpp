@@ -79,6 +79,31 @@ namespace spades {
 				y = int((k >> 20) & 0xFFFFF);
 				z = int(k & 0xFFFFF);
 			}
+
+			// Navigation cube faces: axis (0/1/2), sign, label, axis tint.
+			struct NaviFace { int ax, sg; const char* label; };
+			const NaviFace kNaviFaces[6] = {{0, +1, "Right"}, {0, -1, "Left"},
+			                                {1, +1, "Back"},  {1, -1, "Front"},
+			                                {2, +1, "Bottom"}, {2, -1, "Top"}};
+			Vector3 AxisUnit3(int a) {
+				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
+			}
+			Vector4 AxisTint(int a) {
+				if (a == 0) return MakeVector4(0.75F, 0.45F, 0.45F, 1.0F);
+				if (a == 1) return MakeVector4(0.45F, 0.72F, 0.45F, 1.0F);
+				return MakeVector4(0.5F, 0.55F, 0.74F, 1.0F);
+			}
+			bool PointInQuad(const Vector2& p, const Vector2 q[4]) {
+				float sign = 0.0F;
+				for (int i = 0; i < 4; i++) {
+					const Vector2& a = q[i];
+					const Vector2& b = q[(i + 1) % 4];
+					float cr = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+					if (i == 0) sign = cr;
+					else if (cr * sign < 0.0F) return false;
+				}
+				return true;
+			}
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -833,10 +858,10 @@ namespace spades {
 			float sh = renderer->ScreenHeight();
 			float bottomClear = 44.0F;
 
-			// Orientation gizmo: top-right corner of the viewport, just under the
+			// Navigation cube: top-right corner of the viewport, just under the
 			// toolbar/ribbon bars.
-			float gizBox = 96.0F;
-			gizR = gizBox * 0.5F - 12.0F;
+			float gizBox = 116.0F;
+			gizR = gizBox * 0.5F - 14.0F;
 			gizCx = sw - 16.0F - gizBox * 0.5F;
 			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
 
@@ -1218,27 +1243,74 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::GizmoAxis(const Vector2& c, Vector3 a, const Vector4& col,
-		                              const char* label, client::IFont& font) {
-			float rx = Vector3::Dot(a, camRight);
-			float ry = Vector3::Dot(a, camUp);
-			Vector2 tip = MakeVector2(c.x + rx * gizR, c.y - ry * gizR);
-			DrawLine2D(c, tip, 2.5F, col);
-			ColorNP(col);
-			FillRect(tip.x - 2.5F, tip.y - 2.5F, 5.0F, 5.0F);
-			font.Draw(label, MakeVector2(tip.x + (rx >= 0.0F ? 3.0F : -10.0F), tip.y - 6.0F), 0.8F,
-			          col);
+		// --- Navigation cube -------------------------------------------------
+
+		void KV6EditorView::NaviCorners(int face, Vector2 out[4]) {
+			const NaviFace& f = kNaviFaces[face];
+			float s = 0.62F;
+			int u = (f.ax + 1) % 3, v = (f.ax + 2) % 3;
+			Vector3 cen = AxisUnit3(f.ax) * (float(f.sg) * s);
+			Vector3 cu = AxisUnit3(u) * s, cv = AxisUnit3(v) * s;
+			Vector3 c[4] = {cen - cu - cv, cen + cu - cv, cen + cu + cv, cen - cu + cv};
+			for (int i = 0; i < 4; i++)
+				out[i] = MakeVector2(gizCx + Vector3::Dot(c[i], camRight) * gizR,
+				                     gizCy - Vector3::Dot(c[i], camUp) * gizR);
 		}
 
-		void KV6EditorView::DrawGizmo() {
+		int KV6EditorView::NaviCubeFaceAt(const Vector2& p) {
+			for (int i = 0; i < 6; i++) {
+				const NaviFace& f = kNaviFaces[i];
+				if (-Vector3::Dot(AxisUnit3(f.ax) * float(f.sg), camFwd) <= 0.01F)
+					continue; // back-facing
+				Vector2 q[4];
+				NaviCorners(i, q);
+				if (PointInQuad(p, q))
+					return i;
+			}
+			return -1;
+		}
+
+		void KV6EditorView::DrawNaviCube() {
 			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.40F));
-			FillRect(gizCx - gizR - 10.0F, gizCy - gizR - 10.0F, (gizR + 10.0F) * 2.0F,
-			         (gizR + 10.0F) * 2.0F);
-			Vector2 c = MakeVector2(gizCx, gizCy);
+			FillRect(gizCx - gizR - 12.0F, gizCy - gizR - 12.0F, (gizR + 12.0F) * 2.0F,
+			         (gizR + 12.0F) * 2.0F);
 			client::IFont& font = fontManager->GetGuiFont();
-			GizmoAxis(c, MakeVector3(1, 0, 0), MakeVector4(1.0F, 0.35F, 0.35F, 1.0F), "X", font);
-			GizmoAxis(c, MakeVector3(0, 1, 0), MakeVector4(0.40F, 1.0F, 0.40F, 1.0F), "Y", font);
-			GizmoAxis(c, MakeVector3(0, 0, 1), MakeVector4(0.45F, 0.60F, 1.0F, 1.0F), "Z", font);
+			int hover = NaviCubeFaceAt(cursor);
+			for (int i = 0; i < 6; i++) {
+				const NaviFace& f = kNaviFaces[i];
+				float facing = -Vector3::Dot(AxisUnit3(f.ax) * float(f.sg), camFwd);
+				if (facing <= 0.01F)
+					continue; // only the faces toward the camera
+				Vector2 q[4];
+				NaviCorners(i, q);
+				float sh = 0.4F + 0.6F * facing;
+				Vector4 base = AxisTint(f.ax);
+				Vector4 col = (i == hover) ? MakeVector4(0.4F, 0.7F, 1.0F, 0.96F)
+				                           : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.96F);
+				ColorNP(col);
+				renderer->DrawImage((client::IImage*)NULL, q[0], q[1], q[3], AABB2(0, 0, 1, 1));
+				Vector4 ec = MakeVector4(0.1F, 0.1F, 0.12F, 0.8F);
+				for (int e = 0; e < 4; e++)
+					DrawLine2D(q[e], q[(e + 1) % 4], 1.0F, ec);
+				Vector2 ctr = (q[0] + q[1] + q[2] + q[3]) * 0.25F;
+				float ls = 0.7F;
+				Vector2 ts = font.Measure(f.label);
+				font.Draw(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
+				          MakeVector4(1, 1, 1, 1));
+			}
+		}
+
+		void KV6EditorView::SnapCameraTo(int face) {
+			const NaviFace& f = kNaviFaces[face];
+			Vector3 n = AxisUnit3(f.ax) * float(f.sg); // outward face normal
+			// Look from the +n side: forward = -n. sin(pitch) = n.z; yaw faces -n.
+			if (std::fabs(n.z) > 0.999F) {
+				pitch = (n.z > 0.0F) ? (M_PI_F * 0.5F - 0.001F) : -(M_PI_F * 0.5F - 0.001F);
+			} else {
+				pitch = asinf(n.z);
+				yaw = atan2f(-n.y, -n.x);
+			}
+			orbitMode = true; // navicube clicks orbit around the model
 		}
 
 		void KV6EditorView::DrawOverlay(float sw, float sh) {
@@ -1575,6 +1647,8 @@ namespace spades {
 				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
+				int nf = NaviCubeFaceAt(cursor);
+				if (nf >= 0) { SnapCameraTo(nf); return; } // navicube face -> snap view
 				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
 				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
 				return;
@@ -1678,7 +1752,7 @@ namespace spades {
 			DrawSubToolbar(sw);
 			LayoutPicker();
 			DrawMirrorToggles();
-			DrawGizmo();
+			DrawNaviCube();
 			DrawPicker();
 			if (tool)
 				tool->DrawOverlay(*this);
