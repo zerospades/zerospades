@@ -208,6 +208,8 @@ namespace spades {
 			// --- Camera -------------------------------------------------------
 			float yaw = -M_PI_F * 0.25F;
 			float pitch = -M_PI_F * 0.30F;
+			float targetYaw = 0.0F, targetPitch = 0.0F; // navicube animates toward these
+			bool camAnim = false;
 			bool orbitMode = true;
 			Vector3 freePos;
 			Vector3 orbitTarget;
@@ -286,7 +288,10 @@ namespace spades {
 			void DrawNaviCube();
 			void NaviCorners(int face, Vector2 out[4]); // projected screen corners
 			int NaviCubeFaceAt(const Vector2& p);        // face under cursor, or -1
-			void SnapCameraTo(int face);                 // look from that face's side
+			// View direction for the cursor's spot on the cube (face centre, edge or
+			// corner -> 45deg / isometric). Returns false if not over the cube.
+			bool NaviCubeDir(const Vector2& p, Vector3& dir);
+			void SnapCameraDir(const Vector3& dir); // animate to look from `dir`
 			void DrawOverlay(float sw, float sh);
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			void DrawCursor();

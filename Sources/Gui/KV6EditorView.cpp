@@ -860,7 +860,7 @@ namespace spades {
 
 			// Navigation cube: top-right corner of the viewport, just under the
 			// toolbar/ribbon bars.
-			float gizBox = 116.0F;
+			float gizBox = 174.0F;
 			gizR = gizBox * 0.5F - 14.0F;
 			gizCx = sw - 16.0F - gizBox * 0.5F;
 			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
@@ -1293,23 +1293,51 @@ namespace spades {
 				for (int e = 0; e < 4; e++)
 					DrawLine2D(q[e], q[(e + 1) % 4], 1.0F, ec);
 				Vector2 ctr = (q[0] + q[1] + q[2] + q[3]) * 0.25F;
-				float ls = 0.7F;
+				float ls = 0.75F;
 				Vector2 ts = font.Measure(f.label);
-				font.Draw(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
-				          MakeVector4(1, 1, 1, 1));
+				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
+				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.7F));
 			}
 		}
 
-		void KV6EditorView::SnapCameraTo(int face) {
-			const NaviFace& f = kNaviFaces[face];
-			Vector3 n = AxisUnit3(f.ax) * float(f.sg); // outward face normal
-			// Look from the +n side: forward = -n. sin(pitch) = n.z; yaw faces -n.
-			if (std::fabs(n.z) > 0.999F) {
-				pitch = (n.z > 0.0F) ? (M_PI_F * 0.5F - 0.001F) : -(M_PI_F * 0.5F - 0.001F);
+		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
+			int f = NaviCubeFaceAt(p);
+			if (f < 0)
+				return false;
+			const NaviFace& face = kNaviFaces[f];
+			Vector2 q[4];
+			NaviCorners(f, q);
+			// Inverse of the affine map p = q0 + uu*(q1-q0) + vv*(q3-q0).
+			Vector2 e1 = q[1] - q[0], e2 = q[3] - q[0], d = p - q[0];
+			float det = e1.x * e2.y - e2.x * e1.y;
+			Vector3 n = AxisUnit3(face.ax) * float(face.sg);
+			if (std::fabs(det) < 1.0e-4F) { dir = n; return true; }
+			float uu = (d.x * e2.y - e2.x * d.y) / det;
+			float vv = (e1.x * d.y - d.x * e1.y) / det;
+			// A 3x3 grid: centre = face, edges = 45deg, corners = isometric.
+			int u = (face.ax + 1) % 3, v = (face.ax + 2) % 3;
+			int su = (uu < 0.34F) ? -1 : (uu > 0.66F) ? 1 : 0;
+			int sv = (vv < 0.34F) ? -1 : (vv > 0.66F) ? 1 : 0;
+			dir = (n + AxisUnit3(u) * float(su) + AxisUnit3(v) * float(sv)).Normalize();
+			return true;
+		}
+
+		void KV6EditorView::SnapCameraDir(const Vector3& dir) {
+			Vector3 f = dir * -1.0F; // camera forward = look toward the model
+			float tp, ty;
+			if (std::fabs(f.z) > 0.999F) {
+				tp = asinf(std::max(-1.0F, std::min(1.0F, -f.z)));
+				ty = yaw; // looking straight up/down: keep heading
 			} else {
-				pitch = asinf(n.z);
-				yaw = atan2f(-n.y, -n.x);
+				tp = asinf(-f.z);
+				ty = atan2f(f.y, f.x);
 			}
+			// Shortest angular path for yaw.
+			while (ty - yaw > M_PI_F) ty -= 2.0F * M_PI_F;
+			while (ty - yaw < -M_PI_F) ty += 2.0F * M_PI_F;
+			targetYaw = ty;
+			targetPitch = tp;
+			camAnim = true;
 			orbitMode = true; // navicube clicks orbit around the model
 		}
 
@@ -1532,6 +1560,7 @@ namespace spades {
 
 		void KV6EditorView::MouseEvent(float dx, float dy) {
 			if (lookActive) {
+				camAnim = false; // manual look cancels a navicube animation
 				float sens = 0.003F;
 				yaw += dx * sens;
 				pitch -= dy * sens;
@@ -1647,8 +1676,8 @@ namespace spades {
 				}
 				if (PickerMouseDown(cursor)) return;
 				if (MirrorHitTest(cursor)) return;
-				int nf = NaviCubeFaceAt(cursor);
-				if (nf >= 0) { SnapCameraTo(nf); return; } // navicube face -> snap view
+				Vector3 navDir;
+				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view
 				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
 				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
 				return;
@@ -1696,6 +1725,18 @@ namespace spades {
 			float sw = renderer->ScreenWidth();
 			float sh = renderer->ScreenHeight();
 			globalTime += dt;
+
+			// Smoothly rotate toward a navicube-selected view.
+			if (camAnim) {
+				float k = std::min(1.0F, dt * 12.0F);
+				yaw += (targetYaw - yaw) * k;
+				pitch += (targetPitch - pitch) * k;
+				if (std::fabs(targetYaw - yaw) < 0.002F && std::fabs(targetPitch - pitch) < 0.002F) {
+					yaw = targetYaw;
+					pitch = targetPitch;
+					camAnim = false;
+				}
+			}
 
 			if (!menuOpen && !promptOpen)
 				UpdateMovement(dt);
