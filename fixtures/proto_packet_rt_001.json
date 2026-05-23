@@ -1,0 +1,21 @@
+{
+    "version": "1.0.0",
+    "id": "proto_packet_rt_001",
+    "subsystem": "proto",
+    "behavior": "implementation_detail",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "inputs": [],
+    "kind": "packet_roundtrip",
+    "expected": {
+        "bytes_hex": "0900000000",
+        "decoded": {
+            "packet_type": "WorldUpdate",
+            "player_count": 0
+        }
+    }
+}

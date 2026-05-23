@@ -1,0 +1,25 @@
+{
+    "fixtures": [
+        {
+            "id": "phys_step_trace_001",
+            "path": "fixtures/phys_step_trace_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Step-trace exemplar: stationary player on flat map, single tick, zero velocity."
+        },
+        {
+            "id": "proto_packet_rt_001",
+            "path": "fixtures/proto_packet_rt_001.json",
+            "subsystem": "proto",
+            "behavior": "implementation_detail",
+            "description": "Packet-roundtrip exemplar: empty WorldUpdate (player_count 0) hex-encoded."
+        },
+        {
+            "id": "map_value_lookup_001",
+            "path": "fixtures/map_value_lookup_001.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "Value-lookup exemplar: IsSolid query at (0,0,62) on flat map returns solid."
+        }
+    ]
+}
