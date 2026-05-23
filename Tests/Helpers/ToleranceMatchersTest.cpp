@@ -70,7 +70,12 @@ TEST(ToleranceMatchers, NoExpectFloatEqInTestsDir) {
 	// an absolute path injected by CMake so the scan ignores the working dir.
 	const std::string banned = "EXPECT_FLOAT_EQ";
 	const std::string pattern = banned + "[[:space:]]*[(]";
-	const std::string cmd = "grep -rqE '" + pattern + "' " TESTS_DIR;
+	// Quote TESTS_DIR so a project root containing spaces does not split into
+	// multiple grep arguments — an unquoted path would make grep error out
+	// (non-zero exit), which EXPECT_NE(rc, 0) would misread as "no banned match"
+	// and silently disable the ban guard (WR-03). CMake-generated absolute paths
+	// cannot contain a single quote, so single-quoting is sufficient here.
+	const std::string cmd = "grep -rqE '" + pattern + "' '" TESTS_DIR "'";
 	int rc = std::system(cmd.c_str());
 	EXPECT_NE(rc, 0) << "banned matcher invocation found in " TESTS_DIR
 	                 << " — use EXPECT_NEAR-based matchers per D-17";
