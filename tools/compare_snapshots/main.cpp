@@ -107,6 +107,18 @@ int main(int argc, char* argv[]) {
 	std::ifstream fa(argv[1]);
 	std::ifstream fb(argv[2]);
 
+	// ifstream does not throw on open failure; it sets failbit. Check explicitly so
+	// the most common usage mistake (wrong path / unreadable file) reports a distinct
+	// "cannot open" error instead of being misattributed to "JSON parse error" (WR-04).
+	if (!fa.is_open()) {
+		std::cerr << "cannot open: " << argv[1] << "\n";
+		return 2;
+	}
+	if (!fb.is_open()) {
+		std::cerr << "cannot open: " << argv[2] << "\n";
+		return 2;
+	}
+
 	// allow_exceptions=false: malformed JSON yields a discarded value instead of
 	// throwing, so a bad input file exits cleanly with code 2 (T-02-14).
 	json a = json::parse(fa, nullptr, /*allow_exceptions=*/false);
