@@ -231,6 +231,7 @@ namespace spades {
 			bool IsOnGroundOrWade() {
 				return (velocity.z >= 0.0F && velocity.z < 0.017F) && !airborne;
 			}
+			bool IsAirborne() { return airborne; }
 
 			void UpdateSmooth(float dt);
 			void Update(float dt);
