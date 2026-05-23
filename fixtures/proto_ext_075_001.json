@@ -1,0 +1,26 @@
+{
+    "version": "1.0.0",
+    "id": "proto_ext_075_001",
+    "subsystem": "proto",
+    "behavior": "protocol_compat",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "comment": "ExtensionInfo negotiation (PROT-05): a synthetic ExtensionInfo packet (ordinal 60) advertising two extensions {id 0 v1, id 192 v1}. bytes_hex layout = type 0x3c, count 0x02, then count x {id,version}: 00 01, c0 01. Generated ONCE from EncodeExtensionInfo({{0,1},{192,1}}).GetData() and frozen. The ProtocolReplay fold (NetClient.cpp:448-464 oracle) records ALL advertised extensions per A3 (the portable wire fact), NOT NetClient's implementedExtensions filter (a deliberate, documented divergence). expected.value is the populated extensions map keyed by stringified id -> version. value_lookup kind keeps the locked Phase-2 schema untouched.",
+    "inputs": [
+        {
+            "comment": "Synthetic ExtensionInfo: count 2, advertising id 0 v1 (base) and id 192 v1 (player-properties ext). All advertised entries are recorded (A3).",
+            "bytes_hex": "3c020001c001"
+        }
+    ],
+    "kind": "value_lookup",
+    "expected": {
+        "value": {
+            "0": 1,
+            "192": 1
+        }
+    }
+}

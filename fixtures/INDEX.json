@@ -55,6 +55,13 @@
             "subsystem": "proto",
             "behavior": "protocol_compat",
             "description": "MapStart packet-roundtrip: single uint32 mapSize, version-independent wire layout (v3/v4 difference is a NetClient send side-effect)."
+        },
+        {
+            "id": "proto_ext_075_001",
+            "path": "fixtures/proto_ext_075_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "ExtensionInfo negotiation (value_lookup): synthetic ExtensionInfo packet advertises {id 0 v1, id 192 v1}; the fold records all advertised extensions per A3 (wire fact, not NetClient's implementedExtensions filter). expected.value is the populated extensions map id->version."
         }
     ]
 }
