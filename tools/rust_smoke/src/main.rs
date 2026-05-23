@@ -93,7 +93,19 @@ fn main() {
         .unwrap_or_else(|e| panic!("fixtures dir not found at {}: {e}", fixture_dir.display()));
 
     for entry in entries {
-        let entry = entry.unwrap();
+        // Each DirEntry is itself a Result; a mid-iteration OS error (permission
+        // denied on a specific entry, transient filesystem error during traversal)
+        // must be reported as a FAIL and skipped, never panic. This upholds the
+        // "report fail, never crash" contract for per-file errors (WR-02); only the
+        // read_dir() call above is a sanctioned panic path (T-02-10).
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("FAIL <dir entry>: read error: {e}");
+                fail += 1;
+                continue;
+            }
+        };
         let path = entry.path();
 
         // Skip non-.json files.
