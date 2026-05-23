@@ -51,6 +51,7 @@ add_library(zerospades_testable STATIC
 	Core/VoxelModel.cpp
 	Core/IRunnable.cpp
 	Core/PipeStream.cpp
+	Core/RefCountedObject.cpp
 	# --- Audio no-op ---
 	Audio/NullDevice.cpp
 )
@@ -103,6 +104,7 @@ set(TESTABLE_CORE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/VoxelModel.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/IRunnable.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/PipeStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/RefCountedObject.cpp
 )
 set(TESTABLE_AUDIO_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Audio/NullDevice.cpp
