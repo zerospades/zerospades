@@ -8,6 +8,55 @@
             "description": "Ground friction step-trace: player on flat map with initial vx=1.0, zero input, 10 ticks; velocity.x decays by f=dt*4+1 per tick."
         },
         {
+            "id": "phys_friction_air_001",
+            "path": "fixtures/phys_friction_air_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Air friction: player airborne at z=32 with vx=1.0, zero input, 5 ticks; velocity.x decays by f=dt+1 per tick."
+        },
+        {
+            "id": "phys_friction_wade_001",
+            "path": "fixtures/phys_friction_wade_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Wade friction: player at z=62.5 with vx=1.0, zero input, 10 ticks; position.z>61 triggers wade=true and f=dt*6+1 per tick."
+        },
+        {
+            "id": "phys_jump_001",
+            "path": "fixtures/phys_jump_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Jump vz=-0.36: player on flat ground, jump=true tick 0, 3 ticks; tick-0 velocity.z=-0.36 characterizes PlayerJump constant."
+        },
+        {
+            "id": "phys_jump_cooldown_001",
+            "path": "fixtures/phys_jump_cooldown_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Jump cooldown listener gate: jump tick 0, release tick 1, re-jump tick 2; velocity.z=-0.36 at both jumps; characterizes that cooldown only gates PlayerJumped listener, not vz assignment."
+        },
+        {
+            "id": "phys_crouch_offset_001",
+            "path": "fixtures/phys_crouch_offset_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Crouch offset 0.9: player standing, crouch=true tick 0; position.z increases by 0.9 on crouch-down transition."
+        },
+        {
+            "id": "phys_step_climb_001",
+            "path": "fixtures/phys_step_climb_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Step-climb: 1-block wall at (258,256,61), player at (256,256,60.5) moving +x; climb fires, velocity.x/y halved, player rises."
+        },
+        {
+            "id": "phys_step_climb_suppression_001",
+            "path": "fixtures/phys_step_climb_suppression_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "Step-climb suppression: same wall, crouch=true; climb is suppressed, velocity.x zeroed by wall collision."
+        },
+        {
             "id": "proto_packet_rt_001",
             "path": "fixtures/proto_packet_rt_001.json",
             "subsystem": "proto",
