@@ -50,6 +50,7 @@ add_executable(zerospades_tests
     Protocol/ProtocolRoundTripTest.cpp
     Protocol/ProtocolReplay.cpp
     Protocol/ProtocolReplayUnitTest.cpp
+    Protocol/ProtocolGoldenTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
@@ -120,4 +121,14 @@ if(ZEROSPADES_TESTS)
     add_test(NAME CompareSnapshotsUsage
              COMMAND $<TARGET_FILE:compare_snapshots>)
     set_tests_properties(CompareSnapshotsUsage PROPERTIES WILL_FAIL TRUE)
+
+    # PROT-03 success criterion: exercise the portable compare_snapshots runner
+    # against a committed proto golden fixture. Self-compare (oracle vs itself)
+    # proves the runner walks the proto world_snapshot shape and reports PASS,
+    # mirroring CompareSnapshotsMatch above.
+    add_test(NAME CompareSnapshotsProtoGolden075
+             COMMAND $<TARGET_FILE:compare_snapshots>
+                     ${CMAKE_SOURCE_DIR}/fixtures/proto_golden_075_001.json
+                     ${CMAKE_SOURCE_DIR}/fixtures/proto_golden_075_001.json)
+    set_tests_properties(CompareSnapshotsProtoGolden075 PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 endif()
