@@ -326,6 +326,311 @@ namespace spades {
 		};
 
 		// --- Per-packet POD structs + Decode/Encode (added in Plans 02/03) ---
+		//
+		// Each version-agnostic, fixed-layout PacketType gets a POD struct holding
+		// its decoded wire fields plus free Decode<Name>(NetPacketReader&)->struct and
+		// Encode<Name>(const struct&)->NetPacketWriter functions (D-05). The codec is
+		// PURE: no World/Player/NetClient state. Encode returns NetPacketWriter by value
+		// (D-05; NRVO). Floats round-trip byte-exact (same bits). Colors are BGR
+		// (WriteColor/ReadIntColor). For packets that exist in only one direction in
+		// NetClient, the missing direction is added here FOR TESTING ONLY (D-12) —
+		// NetClient's one-directional usage is unchanged. WorldUpdate(2)/ExistingPlayer(9)/
+		// CreatePlayer(12)/StateData(15) are Plan 03; this header covers the rest.
+
+		// --- Plan 02 Task 1: simple/fixed-width + dual-ordinal packets ---
+
+		struct PositionDataPacket {
+			Vector3 position;
+		};
+		PositionDataPacket DecodePositionData(NetPacketReader& r);
+		NetPacketWriter EncodePositionData(const PositionDataPacket& p);
+
+		struct OrientationDataPacket {
+			Vector3 orientation;
+		};
+		OrientationDataPacket DecodeOrientationData(NetPacketReader& r);
+		NetPacketWriter EncodeOrientationData(const OrientationDataPacket& p);
+
+		// Raw input bits preserved for byte-exactness (ParsePlayerInput decodes them).
+		struct InputDataPacket {
+			uint8_t playerId;
+			uint8_t bits;
+		};
+		InputDataPacket DecodeInputData(NetPacketReader& r);
+		NetPacketWriter EncodeInputData(const InputDataPacket& p);
+
+		struct WeaponInputPacket {
+			uint8_t playerId;
+			uint8_t bits;
+		};
+		WeaponInputPacket DecodeWeaponInput(NetPacketReader& r);
+		NetPacketWriter EncodeWeaponInput(const WeaponInputPacket& p);
+
+		// DUAL ORDINAL 5 (C2S). HitPacket and SetHP share PacketType 5 but are
+		// distinct shapes; the caller (direction) disambiguates. Decode added for test.
+		struct HitPacketPacket {
+			uint8_t targetId;
+			uint8_t hitType;
+		};
+		HitPacketPacket DecodeHitPacket(NetPacketReader& r);
+		NetPacketWriter EncodeHitPacket(const HitPacketPacket& p);
+
+		// DUAL ORDINAL 5 (S2C). Encode added for test.
+		struct SetHPPacket {
+			uint8_t hp;
+			uint8_t type;
+			Vector3 source;
+		};
+		SetHPPacket DecodeSetHP(NetPacketReader& r);
+		NetPacketWriter EncodeSetHP(const SetHPPacket& p);
+
+		struct GrenadePacket {
+			uint8_t playerId;
+			float fuse;
+			Vector3 position;
+			Vector3 velocity;
+		};
+		GrenadePacket DecodeGrenade(NetPacketReader& r);
+		NetPacketWriter EncodeGrenade(const GrenadePacket& p);
+
+		struct SetToolPacket {
+			uint8_t playerId;
+			uint8_t tool;
+		};
+		SetToolPacket DecodeSetTool(NetPacketReader& r);
+		NetPacketWriter EncodeSetTool(const SetToolPacket& p);
+
+		// color is BGR on the wire (WriteColor/ReadIntColor); IntVector3 = {x=R,y=G,z=B}.
+		struct SetColourPacket {
+			uint8_t playerId;
+			IntVector3 color;
+		};
+		SetColourPacket DecodeSetColour(NetPacketReader& r);
+		NetPacketWriter EncodeSetColour(const SetColourPacket& p);
+
+		// [ASSUMED] spec-derived layout — no in-repo decode oracle (RESEARCH A1).
+		// NetClient raises "Unexpected" on receipt (:953) and never encodes it; this
+		// is a self-consistent round-trip from the AoS 0.75 spec [id,team,weapon].
+		struct ShortPlayerDataPacket {
+			uint8_t playerId;
+			uint8_t team;
+			uint8_t weapon;
+		};
+		ShortPlayerDataPacket DecodeShortPlayerData(NetPacketReader& r);
+		NetPacketWriter EncodeShortPlayerData(const ShortPlayerDataPacket& p);
+
+		struct BlockActionPacket {
+			uint8_t playerId;
+			uint8_t action;
+			IntVector3 position;
+		};
+		BlockActionPacket DecodeBlockAction(NetPacketReader& r);
+		NetPacketWriter EncodeBlockAction(const BlockActionPacket& p);
+
+		struct BlockLinePacket {
+			uint8_t playerId;
+			IntVector3 start;
+			IntVector3 end;
+		};
+		BlockLinePacket DecodeBlockLine(NetPacketReader& r);
+		NetPacketWriter EncodeBlockLine(const BlockLinePacket& p);
+
+		// S2C. Encode added for test.
+		struct KillActionPacket {
+			uint8_t victimId;
+			uint8_t killerId;
+			uint8_t killType;
+			uint8_t respawnTime;
+		};
+		KillActionPacket DecodeKillAction(NetPacketReader& r);
+		NetPacketWriter EncodeKillAction(const KillActionPacket& p);
+
+		struct WeaponReloadPacket {
+			uint8_t playerId;
+			uint8_t clip;
+			uint8_t reserve;
+		};
+		WeaponReloadPacket DecodeWeaponReload(NetPacketReader& r);
+		NetPacketWriter EncodeWeaponReload(const WeaponReloadPacket& p);
+
+		struct ChangeTeamPacket {
+			uint8_t playerId;
+			uint8_t team;
+		};
+		ChangeTeamPacket DecodeChangeTeam(NetPacketReader& r);
+		NetPacketWriter EncodeChangeTeam(const ChangeTeamPacket& p);
+
+		struct ChangeWeaponPacket {
+			uint8_t playerId;
+			uint8_t weapon;
+		};
+		ChangeWeaponPacket DecodeChangeWeapon(NetPacketReader& r);
+		NetPacketWriter EncodeChangeWeapon(const ChangeWeaponPacket& p);
+
+		// DUAL ORDINAL 31 (C2S). MapCached and HandShakeInit share PacketType 31.
+		// Decode added for test.
+		struct MapCachedPacket {
+			uint8_t cached;
+		};
+		MapCachedPacket DecodeMapCached(NetPacketReader& r);
+		NetPacketWriter EncodeMapCached(const MapCachedPacket& p);
+
+		// DUAL ORDINAL 31 (S2C). Encode added for test.
+		struct HandShakeInitPacket {
+			uint32_t challenge;
+		};
+		HandShakeInitPacket DecodeHandShakeInit(NetPacketReader& r);
+		NetPacketWriter EncodeHandShakeInit(const HandShakeInitPacket& p);
+
+		// C2S. Decode added for test.
+		struct HandShakeReturnPacket {
+			uint32_t challenge;
+		};
+		HandShakeReturnPacket DecodeHandShakeReturn(NetPacketReader& r);
+		NetPacketWriter EncodeHandShakeReturn(const HandShakeReturnPacket& p);
+
+		// S2C. Encode added for test. All 8 bytes round-trip.
+		struct PlayerPropertiesPacket {
+			uint8_t subId;
+			uint8_t playerId;
+			uint8_t hp;
+			uint8_t blocks;
+			uint8_t grenades;
+			uint8_t clip;
+			uint8_t reserve;
+			uint8_t score;
+		};
+		PlayerPropertiesPacket DecodePlayerProperties(NetPacketReader& r);
+		NetPacketWriter EncodePlayerProperties(const PlayerPropertiesPacket& p);
+
+		// --- Plan 02 Task 2: game-mode-coupled, string, list, signed-field packets ---
+
+		// S2C. Encode added for test.
+		struct MoveObjectPacket {
+			uint8_t type;
+			uint8_t state;
+			Vector3 position;
+		};
+		MoveObjectPacket DecodeMoveObject(NetPacketReader& r);
+		NetPacketWriter EncodeMoveObject(const MoveObjectPacket& p);
+
+		// message round-trips via CP437/UTF-8 framing (cg_unicode pinned in tests).
+		struct ChatMessagePacket {
+			uint8_t playerId;
+			uint8_t type;
+			std::string message;
+		};
+		ChatMessagePacket DecodeChatMessage(NetPacketReader& r);
+		NetPacketWriter EncodeChatMessage(const ChatMessagePacket& p);
+
+		// S2C. Encode added for test. Bytes are version-independent (just mapSize); the
+		// v3/v4 difference is a NetClient SIDE-EFFECT (SendMapCached), not a wire layout
+		// change (D-13) — so a single round-trip here covers both protocol versions.
+		struct MapStartPacket {
+			uint32_t mapSize;
+		};
+		MapStartPacket DecodeMapStart(NetPacketReader& r);
+		NetPacketWriter EncodeMapStart(const MapStartPacket& p);
+
+		// Raw remaining bytes — no string normalization. Both directions added for test.
+		struct MapChunkPacket {
+			std::string data;
+		};
+		MapChunkPacket DecodeMapChunk(NetPacketReader& r);
+		NetPacketWriter EncodeMapChunk(const MapChunkPacket& p);
+
+		// S2P. Encode added for test.
+		struct PlayerLeftPacket {
+			uint8_t playerId;
+		};
+		PlayerLeftPacket DecodePlayerLeft(NetPacketReader& r);
+		NetPacketWriter EncodePlayerLeft(const PlayerLeftPacket& p);
+
+		// S2P. Encode added for test.
+		struct TerritoryCapturePacket {
+			uint8_t territoryId;
+			uint8_t winning;
+			uint8_t state;
+		};
+		TerritoryCapturePacket DecodeTerritoryCapture(NetPacketReader& r);
+		NetPacketWriter EncodeTerritoryCapture(const TerritoryCapturePacket& p);
+
+		// S2P. Encode added for test. rate is SIGNED ((int8_t)ReadByte() at :1322).
+		struct ProgressBarPacket {
+			uint8_t territoryId;
+			uint8_t capturingTeam;
+			int8_t rate;
+			float progress;
+		};
+		ProgressBarPacket DecodeProgressBar(NetPacketReader& r);
+		NetPacketWriter EncodeProgressBar(const ProgressBarPacket& p);
+
+		// S2P. Encode added for test.
+		struct IntelCapturePacket {
+			uint8_t playerId;
+			uint8_t winning;
+		};
+		IntelCapturePacket DecodeIntelCapture(NetPacketReader& r);
+		NetPacketWriter EncodeIntelCapture(const IntelCapturePacket& p);
+
+		// S2P. Encode added for test.
+		struct IntelPickupPacket {
+			uint8_t playerId;
+		};
+		IntelPickupPacket DecodeIntelPickup(NetPacketReader& r);
+		NetPacketWriter EncodeIntelPickup(const IntelPickupPacket& p);
+
+		// S2P. Encode added for test.
+		struct IntelDropPacket {
+			uint8_t playerId;
+			Vector3 position;
+		};
+		IntelDropPacket DecodeIntelDrop(NetPacketReader& r);
+		NetPacketWriter EncodeIntelDrop(const IntelDropPacket& p);
+
+		// S2P. Encode added for test.
+		struct RestockPacket {
+			uint8_t playerId;
+		};
+		RestockPacket DecodeRestock(NetPacketReader& r);
+		NetPacketWriter EncodeRestock(const RestockPacket& p);
+
+		// S2C. recv skips alpha then reads BGR color (:1424-1428). Encode added for test.
+		struct FogColourPacket {
+			uint8_t alpha;
+			IntVector3 color;
+		};
+		FogColourPacket DecodeFogColour(NetPacketReader& r);
+		NetPacketWriter EncodeFogColour(const FogColourPacket& p);
+
+		// Handshake. Empty list = simple variant; non-empty = enhanced. Both dirs for test.
+		struct VersionGetPacket {
+			std::vector<uint8_t> propertyIds;
+		};
+		VersionGetPacket DecodeVersionGet(NetPacketReader& r);
+		NetPacketWriter EncodeVersionGet(const VersionGetPacket& p);
+
+		// C2S. Decode added for test. tag is 'o' (:1756).
+		struct VersionSendPacket {
+			uint8_t tag;
+			uint8_t major;
+			uint8_t minor;
+			uint8_t patch;
+			std::string osInfo;
+		};
+		VersionSendPacket DecodeVersionSend(NetPacketReader& r);
+		NetPacketWriter EncodeVersionSend(const VersionSendPacket& p);
+
+		// count byte then count×{id,version} (:1769-1774).
+		struct ExtensionInfoEntry {
+			uint8_t id;
+			uint8_t version;
+		};
+		struct ExtensionInfoPacket {
+			std::vector<ExtensionInfoEntry> extensions;
+		};
+		ExtensionInfoPacket DecodeExtensionInfo(NetPacketReader& r);
+		NetPacketWriter EncodeExtensionInfo(const ExtensionInfoPacket& p);
 
 	} // namespace client
 } // namespace spades

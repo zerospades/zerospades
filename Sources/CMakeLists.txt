@@ -53,6 +53,7 @@ add_library(zerospades_testable STATIC
 	Core/IRunnable.cpp
 	Core/PipeStream.cpp
 	Core/RefCountedObject.cpp
+	Core/CP437.cpp # CP437<->UTF-8 framing used by ProtocolCodec EncodeString/DecodeString
 	# --- Audio no-op ---
 	Audio/NullDevice.cpp
 )
@@ -107,6 +108,7 @@ set(TESTABLE_CORE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/IRunnable.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/PipeStream.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/RefCountedObject.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/CP437.cpp
 )
 set(TESTABLE_AUDIO_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Audio/NullDevice.cpp

@@ -100,4 +100,276 @@ TEST_F(ProtocolRoundTripTest, AllPacketTypeOrdinalsStable) {
 	EXPECT_EQ(PacketTypeMapCached, PacketTypeHandShakeInit);
 }
 
+// ===========================================================================
+// Plan 02 Task 1: simple/fixed-width + dual-ordinal packet round-trips.
+// Pattern: build struct (distinctive non-default values) -> Encode -> ToReader
+// -> ASSERT_EQ(GetType()) -> Decode -> EXPECT_EQ per field (F2U for floats) ->
+// EXPECT_EQ(GetNumRemainingBytes(), 0u).
+// ===========================================================================
+
+TEST_F(ProtocolRoundTripTest, PositionData) {
+	PositionDataPacket in{Vector3{1.5f, -2.5f, 3.5f}};
+	NetPacketWriter w = EncodePositionData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypePositionData);
+	PositionDataPacket out = DecodePositionData(r);
+	EXPECT_EQ(F2U(out.position.x), F2U(in.position.x));
+	EXPECT_EQ(F2U(out.position.y), F2U(in.position.y));
+	EXPECT_EQ(F2U(out.position.z), F2U(in.position.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, OrientationData) {
+	OrientationDataPacket in{Vector3{-0.5f, 0.25f, -0.75f}};
+	NetPacketWriter w = EncodeOrientationData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeOrientationData);
+	OrientationDataPacket out = DecodeOrientationData(r);
+	EXPECT_EQ(F2U(out.orientation.x), F2U(in.orientation.x));
+	EXPECT_EQ(F2U(out.orientation.y), F2U(in.orientation.y));
+	EXPECT_EQ(F2U(out.orientation.z), F2U(in.orientation.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, InputData) {
+	InputDataPacket in{17, 0xA5};
+	NetPacketWriter w = EncodeInputData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeInputData);
+	InputDataPacket out = DecodeInputData(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.bits, in.bits);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, WeaponInput) {
+	WeaponInputPacket in{23, 0x03};
+	NetPacketWriter w = EncodeWeaponInput(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeWeaponInput);
+	WeaponInputPacket out = DecodeWeaponInput(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.bits, in.bits);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// DUAL ORDINAL 5 — HitPacket (C2S) and SetHP (S2C) share PacketType 5.
+TEST_F(ProtocolRoundTripTest, HitPacket) {
+	HitPacketPacket in{42, 4}; // targetId, hitType=melee
+	NetPacketWriter w = EncodeHitPacket(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeHitPacket);
+	HitPacketPacket out = DecodeHitPacket(r);
+	EXPECT_EQ(out.targetId, in.targetId);
+	EXPECT_EQ(out.hitType, in.hitType);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, SetHP) {
+	SetHPPacket in{73, 1, Vector3{10.5f, -20.5f, 30.5f}}; // hp, type=weapon, source
+	NetPacketWriter w = EncodeSetHP(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeSetHP);
+	SetHPPacket out = DecodeSetHP(r);
+	EXPECT_EQ(out.hp, in.hp);
+	EXPECT_EQ(out.type, in.type);
+	EXPECT_EQ(F2U(out.source.x), F2U(in.source.x));
+	EXPECT_EQ(F2U(out.source.y), F2U(in.source.y));
+	EXPECT_EQ(F2U(out.source.z), F2U(in.source.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, Grenade) {
+	GrenadePacket in{7, 2.5f, Vector3{1.f, 2.f, 3.f}, Vector3{-4.f, 5.f, -6.f}};
+	NetPacketWriter w = EncodeGrenade(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeGrenadePacket);
+	GrenadePacket out = DecodeGrenade(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(F2U(out.fuse), F2U(in.fuse));
+	EXPECT_EQ(F2U(out.position.x), F2U(in.position.x));
+	EXPECT_EQ(F2U(out.position.y), F2U(in.position.y));
+	EXPECT_EQ(F2U(out.position.z), F2U(in.position.z));
+	EXPECT_EQ(F2U(out.velocity.x), F2U(in.velocity.x));
+	EXPECT_EQ(F2U(out.velocity.y), F2U(in.velocity.y));
+	EXPECT_EQ(F2U(out.velocity.z), F2U(in.velocity.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, SetTool) {
+	SetToolPacket in{19, 3}; // playerId, tool=grenade
+	NetPacketWriter w = EncodeSetTool(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeSetTool);
+	SetToolPacket out = DecodeSetTool(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.tool, in.tool);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, SetColour) {
+	// Asymmetric color {R=10,G=20,B=30} catches a BGR/RGB swap.
+	SetColourPacket in{5, MakeIntVector3(10, 20, 30)};
+	NetPacketWriter w = EncodeSetColour(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeSetColour);
+	SetColourPacket out = DecodeSetColour(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.color.x, in.color.x); // R
+	EXPECT_EQ(out.color.y, in.color.y); // G
+	EXPECT_EQ(out.color.z, in.color.z); // B
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// GOLDEN-BYTE SPOT CHECK #1 (T-3-02): proves the on-wire color bytes are B,G,R
+// (not R,G,B). A symmetric Encode/Decode that wrote RGB would still round-trip,
+// but would fail this hardcoded byte assert.
+TEST_F(ProtocolRoundTripTest, SetColourGoldenBytesBGR) {
+	SetColourPacket in{5, MakeIntVector3(10, 20, 30)}; // R=10,G=20,B=30
+	NetPacketWriter w = EncodeSetColour(in);
+	std::vector<char> bytes = w.GetData();
+	// [0]=type tag(8), [1]=playerId(5), [2]=B(30), [3]=G(20), [4]=R(10)
+	std::vector<char> expected = {
+		(char)PacketTypeSetColour, (char)5, (char)30, (char)20, (char)10};
+	EXPECT_EQ(bytes, expected);
+}
+
+// [ASSUMED] spec-derived layout — no in-repo decode oracle (RESEARCH A1).
+TEST_F(ProtocolRoundTripTest, ShortPlayerData) {
+	ShortPlayerDataPacket in{12, 1, 2}; // playerId, team, weapon (spec layout)
+	NetPacketWriter w = EncodeShortPlayerData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeShortPlayerData);
+	ShortPlayerDataPacket out = DecodeShortPlayerData(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.team, in.team);
+	EXPECT_EQ(out.weapon, in.weapon);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, BlockAction) {
+	BlockActionPacket in{31, 2, MakeIntVector3(100, -200, 300)};
+	NetPacketWriter w = EncodeBlockAction(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeBlockAction);
+	BlockActionPacket out = DecodeBlockAction(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.action, in.action);
+	EXPECT_EQ(out.position.x, in.position.x);
+	EXPECT_EQ(out.position.y, in.position.y);
+	EXPECT_EQ(out.position.z, in.position.z);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, BlockLine) {
+	BlockLinePacket in{8, MakeIntVector3(1, 2, 3), MakeIntVector3(40, 50, 60)};
+	NetPacketWriter w = EncodeBlockLine(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeBlockLine);
+	BlockLinePacket out = DecodeBlockLine(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.start.x, in.start.x);
+	EXPECT_EQ(out.start.y, in.start.y);
+	EXPECT_EQ(out.start.z, in.start.z);
+	EXPECT_EQ(out.end.x, in.end.x);
+	EXPECT_EQ(out.end.y, in.end.y);
+	EXPECT_EQ(out.end.z, in.end.z);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, KillAction) {
+	KillActionPacket in{3, 9, 6, 15}; // victimId, killerId, killType=classChange, respawn
+	NetPacketWriter w = EncodeKillAction(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeKillAction);
+	KillActionPacket out = DecodeKillAction(r);
+	EXPECT_EQ(out.victimId, in.victimId);
+	EXPECT_EQ(out.killerId, in.killerId);
+	EXPECT_EQ(out.killType, in.killType);
+	EXPECT_EQ(out.respawnTime, in.respawnTime);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, WeaponReload) {
+	WeaponReloadPacket in{6, 11, 22}; // playerId, clip, reserve
+	NetPacketWriter w = EncodeWeaponReload(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeWeaponReload);
+	WeaponReloadPacket out = DecodeWeaponReload(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.clip, in.clip);
+	EXPECT_EQ(out.reserve, in.reserve);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, ChangeTeam) {
+	ChangeTeamPacket in{14, 2}; // playerId, team
+	NetPacketWriter w = EncodeChangeTeam(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeChangeTeam);
+	ChangeTeamPacket out = DecodeChangeTeam(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.team, in.team);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, ChangeWeapon) {
+	ChangeWeaponPacket in{21, 1}; // playerId, weapon=SMG
+	NetPacketWriter w = EncodeChangeWeapon(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeChangeWeapon);
+	ChangeWeaponPacket out = DecodeChangeWeapon(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.weapon, in.weapon);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// DUAL ORDINAL 31 — MapCached (C2S) and HandShakeInit (S2C) share PacketType 31.
+TEST_F(ProtocolRoundTripTest, MapCached) {
+	MapCachedPacket in{1}; // cached
+	NetPacketWriter w = EncodeMapCached(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeMapCached);
+	MapCachedPacket out = DecodeMapCached(r);
+	EXPECT_EQ(out.cached, in.cached);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, HandShakeInit) {
+	HandShakeInitPacket in{0xDEADBEEFu}; // challenge
+	NetPacketWriter w = EncodeHandShakeInit(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeHandShakeInit);
+	HandShakeInitPacket out = DecodeHandShakeInit(r);
+	EXPECT_EQ(out.challenge, in.challenge);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, HandShakeReturn) {
+	HandShakeReturnPacket in{0x12345678u}; // challenge
+	NetPacketWriter w = EncodeHandShakeReturn(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeHandShakeReturn);
+	HandShakeReturnPacket out = DecodeHandShakeReturn(r);
+	EXPECT_EQ(out.challenge, in.challenge);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, PlayerProperties) {
+	PlayerPropertiesPacket in{1, 2, 100, 50, 3, 8, 40, 250};
+	NetPacketWriter w = EncodePlayerProperties(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypePlayerProperties);
+	PlayerPropertiesPacket out = DecodePlayerProperties(r);
+	EXPECT_EQ(out.subId, in.subId);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.hp, in.hp);
+	EXPECT_EQ(out.blocks, in.blocks);
+	EXPECT_EQ(out.grenades, in.grenades);
+	EXPECT_EQ(out.clip, in.clip);
+	EXPECT_EQ(out.reserve, in.reserve);
+	EXPECT_EQ(out.score, in.score);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
 // Per-packet round-trip TESTs added in Plans 02/03
