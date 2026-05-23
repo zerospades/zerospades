@@ -88,3 +88,25 @@ add_test(NAME NoExpectFloatEq
     COMMAND ${CMAKE_COMMAND} -E env
             sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' ${CMAKE_SOURCE_DIR}/Tests/"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# ---------------------------------------------------------------------------
+# compare_snapshots C++ CLI (SCHE-06, D-19)
+# Field-level WorldSnapshot diff; inherits the already-fetched
+# nlohmann_json::nlohmann_json target declared above (no re-declaration).
+# ---------------------------------------------------------------------------
+if(ZEROSPADES_TESTS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/tools/compare_snapshots
+                     ${CMAKE_BINARY_DIR}/tools/compare_snapshots)
+
+    # Smoke: identical file → exit 0 ("PASS")
+    add_test(NAME CompareSnapshotsMatch
+             COMMAND compare_snapshots
+                     ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json
+                     ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json)
+    set_tests_properties(CompareSnapshotsMatch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
+    # Smoke: wrong arg count → exit 2 (usage error)
+    add_test(NAME CompareSnapshotsUsage
+             COMMAND compare_snapshots)
+    set_tests_properties(CompareSnapshotsUsage PROPERTIES WILL_FAIL TRUE)
+endif()
