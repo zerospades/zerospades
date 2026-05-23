@@ -48,6 +48,8 @@ add_executable(zerospades_tests
     Helpers/HeadlessWorld.cpp
     Helpers/ToleranceMatchersTest.cpp
     Protocol/ProtocolRoundTripTest.cpp
+    Protocol/ProtocolReplay.cpp
+    Protocol/ProtocolReplayUnitTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
