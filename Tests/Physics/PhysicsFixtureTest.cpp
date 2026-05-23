@@ -181,7 +181,11 @@ TEST(DISABLED_PhysicsGenerate, Jump) {
 }
 
 // Jump cooldown: jump tick 0, release tick 1, re-jump tick 2.
-// Cooldown only gates PlayerJumped listener; velocity.z=-0.36 fires at both tick 0 and 2.
+// The re-jump at tick 2 does NOT fire PlayerJump: after tick 0 the player is
+// airborne (airborne=true) so IsOnGroundOrWade() returns false and the
+// MovePlayer:1174 guard prevents the second PlayerJump call.
+// What the fixture actually captures: tick 2 jump input is silently ignored.
+// This fixture characterizes the airborne-jump suppression, not a cooldown.
 TEST(DISABLED_PhysicsGenerate, JumpCooldown) {
 	SettingsGuard guard;
 	auto vxl = MakeFlatMapBytes();
