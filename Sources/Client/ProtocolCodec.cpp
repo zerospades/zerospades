@@ -615,5 +615,140 @@ namespace spades {
 			return w;
 		}
 
+		// --- Plan 03: the four HARD packets ---
+
+		// WorldUpdate(2, S2C) — recv :797-836. VERSION-BRANCHED (D-08, D-13).
+		// v3: 24 B/entry, index implicit (idx=i). v4: 25 B/entry, leading ReadByte index.
+		// Entry count mirrors NetClient :804 EXACTLY: GetLength()/bytesPerEntry. GetLength()
+		// includes the 1-byte type tag, but integer division drops the +1 (e.g. (1+N*24)/24
+		// == N), so the count equals the number of entries the writer emitted. The codec does
+		// NOT replicate the idx range-check SPRaise, NaN asserts, RepositionPlayer, or the
+		// savedPlayerPos/Front writes — those stay in NetClient (D-09, Plan 04).
+		WorldUpdatePacket DecodeWorldUpdate(NetPacketReader& r, int protocolVersion) {
+			WorldUpdatePacket p;
+			int bytesPerEntry = 24;
+			if (protocolVersion == 4)
+				bytesPerEntry++;
+
+			int entries = static_cast<int>(r.GetLength() / bytesPerEntry);
+			for (int i = 0; i < entries; i++) {
+				WorldUpdateEntry e;
+				e.index = (protocolVersion == 4) ? r.ReadByte() : (uint8_t)i;
+				e.position = r.ReadVector3();
+				e.front = r.ReadVector3();
+				p.entries.push_back(e);
+			}
+			return p;
+		}
+		NetPacketWriter EncodeWorldUpdate(const WorldUpdatePacket& p, int protocolVersion) {
+			NetPacketWriter w(PacketTypeWorldUpdate);
+			for (const auto& e : p.entries) {
+				if (protocolVersion == 4)
+					w.WriteByte(e.index); // 0.76 leading per-entry index byte
+				w.WriteVector3(e.position);
+				w.WriteVector3(e.front);
+			}
+			return w;
+		}
+
+		// StateData(15, S2C) — recv :1113-1192. DISCRIMINATED CTF/TC (D-10).
+		// Reproduces the conditional intel-slot layout EXACTLY, including the team-2-first
+		// read order (:1154-1166) and the carrierId + ReadData(11) skip per carried-intel
+		// team. Encode emits carrierId + 11 zero bytes for a carried team so Decode's
+		// ReadData(11) lands correctly and does not over-read into basePos (T-3-03). The
+		// codec does NOT build World teams or the CTF/TC game-mode object (NetClient, Plan 04).
+		StateDataPacket DecodeStateData(NetPacketReader& r) {
+			StateDataPacket p;
+			p.playerId = r.ReadByte();
+			p.fogColor = r.ReadIntColor();
+			p.teamColor[0] = r.ReadIntColor();
+			p.teamColor[1] = r.ReadIntColor();
+			p.teamName[0] = r.ReadString(10);
+			p.teamName[1] = r.ReadString(10);
+			p.mode = r.ReadByte();
+			if (p.mode == 0) { // CTF (CTFGameMode::m_CTF)
+				p.ctfTeam1Score = r.ReadByte();
+				p.ctfTeam2Score = r.ReadByte();
+				p.ctfCaptureLimit = r.ReadByte();
+				p.ctfIntelFlags = r.ReadByte();
+				bool team1HasIntel = (p.ctfIntelFlags & 1) != 0;
+				bool team2HasIntel = (p.ctfIntelFlags & 2) != 0;
+
+				// team-2 intel slot is read FIRST (matches NetClient :1154-1159)
+				if (team2HasIntel) {
+					p.ctfTeam2CarrierId = r.ReadByte();
+					r.ReadData(11);
+				} else {
+					p.ctfTeam1FlagPos = r.ReadVector3();
+				}
+
+				// then the team-1 intel slot (:1161-1166)
+				if (team1HasIntel) {
+					p.ctfTeam1CarrierId = r.ReadByte();
+					r.ReadData(11);
+				} else {
+					p.ctfTeam2FlagPos = r.ReadVector3();
+				}
+
+				p.ctfTeam1BasePos = r.ReadVector3();
+				p.ctfTeam2BasePos = r.ReadVector3();
+			} else { // TC
+				int trNum = r.ReadByte();
+				for (int i = 0; i < trNum; i++) {
+					StateDataPacket::Territory t;
+					t.pos = r.ReadVector3();
+					t.state = r.ReadByte();
+					p.tcTerritories.push_back(t);
+				}
+			}
+			return p;
+		}
+		NetPacketWriter EncodeStateData(const StateDataPacket& p) {
+			NetPacketWriter w(PacketTypeStateData);
+			w.WriteByte(p.playerId);
+			w.WriteColor(p.fogColor);
+			w.WriteColor(p.teamColor[0]);
+			w.WriteColor(p.teamColor[1]);
+			w.WriteString(p.teamName[0], 10);
+			w.WriteString(p.teamName[1], 10);
+			w.WriteByte(p.mode);
+			if (p.mode == 0) { // CTF
+				w.WriteByte(p.ctfTeam1Score);
+				w.WriteByte(p.ctfTeam2Score);
+				w.WriteByte(p.ctfCaptureLimit);
+				w.WriteByte(p.ctfIntelFlags);
+				bool team1HasIntel = (p.ctfIntelFlags & 1) != 0;
+				bool team2HasIntel = (p.ctfIntelFlags & 2) != 0;
+
+				// team-2 intel slot FIRST — carrierId + 11 zero bytes (the ReadData(11) skip)
+				if (team2HasIntel) {
+					w.WriteByte(p.ctfTeam2CarrierId);
+					for (int i = 0; i < 11; i++)
+						w.WriteByte((uint8_t)0);
+				} else {
+					w.WriteVector3(p.ctfTeam1FlagPos);
+				}
+
+				// then the team-1 intel slot
+				if (team1HasIntel) {
+					w.WriteByte(p.ctfTeam1CarrierId);
+					for (int i = 0; i < 11; i++)
+						w.WriteByte((uint8_t)0);
+				} else {
+					w.WriteVector3(p.ctfTeam2FlagPos);
+				}
+
+				w.WriteVector3(p.ctfTeam1BasePos);
+				w.WriteVector3(p.ctfTeam2BasePos);
+			} else { // TC
+				w.WriteByte((uint8_t)p.tcTerritories.size());
+				for (const auto& t : p.tcTerritories) {
+					w.WriteVector3(t.pos);
+					w.WriteByte(t.state);
+				}
+			}
+			return w;
+		}
+
 	} // namespace client
 } // namespace spades

@@ -632,5 +632,92 @@ namespace spades {
 		ExtensionInfoPacket DecodeExtensionInfo(NetPacketReader& r);
 		NetPacketWriter EncodeExtensionInfo(const ExtensionInfoPacket& p);
 
+		// --- Plan 03: the four HARD packets (version-branched / discriminated) ---
+		//
+		// These reproduce the most complex recv layouts in NetClient verbatim. The codec
+		// stays PURE: it returns the decoded wire fields only. The stateful coupling
+		// (savedPlayerPos/Front, World/Player construction, CTF/TC game-mode wiring,
+		// pos.z-=2.4 spawn adjust, idx range-check SPRaise) stays in NetClient and is
+		// rewired in Plan 04 (D-09). WorldUpdate's protocol version is an explicit
+		// FUNCTION PARAMETER (3=0.75 / 4=0.76), never read from state (D-08).
+
+		// WorldUpdate(2, S2C) — VERSION-BRANCHED (RESEARCH Pattern 2; NetClient :797-836).
+		// v3: 24 B/entry, index implicit (idx=i, NOT written/read).
+		// v4: 25 B/entry, leading ReadByte() index (sparse). pos/front are each Vector3.
+		// Entry count on decode = GetLength()/bytesPerEntry (matches NetClient :804).
+		struct WorldUpdateEntry {
+			uint8_t index;
+			Vector3 position;
+			Vector3 front;
+		};
+		struct WorldUpdatePacket {
+			std::vector<WorldUpdateEntry> entries;
+		};
+		WorldUpdatePacket DecodeWorldUpdate(NetPacketReader& r, int protocolVersion);
+		NetPacketWriter EncodeWorldUpdate(const WorldUpdatePacket& p, int protocolVersion);
+
+		// StateData(15, S2C) — DISCRIMINATED CTF/TC (RESEARCH Pattern 3; NetClient :1113-1192).
+		// Fixed head (playerId, fogColor BGR, teamColor[2] BGR, teamName[2] string(10), mode),
+		// then a CTF branch (mode==0) with the conditional intel-slot layout — the team-2
+		// intel slot is read FIRST (D-10) — or a TC branch (mode!=0) with a territory list.
+		// Encode reproduces the SAME conditional byte layout: for a carried-intel team it
+		// emits carrierId + 11 bytes (zeros) so Decode's ReadData(11) does not over-read into
+		// basePos. The 11 skipped bytes are not surfaced in the struct.
+		struct StateDataPacket {
+			uint8_t playerId;
+			IntVector3 fogColor;
+			IntVector3 teamColor[2];
+			std::string teamName[2]; // fixed 10-byte field (WriteString(name,10))
+			uint8_t mode;            // 0=CTF (CTFGameMode::m_CTF), else TC
+			// CTF sub-fields (valid when mode==0):
+			uint8_t ctfTeam1Score;
+			uint8_t ctfTeam2Score;
+			uint8_t ctfCaptureLimit;
+			uint8_t ctfIntelFlags; // bit0=team1.hasIntel, bit1=team2.hasIntel
+			uint8_t ctfTeam1CarrierId; // valid when bit0 set
+			uint8_t ctfTeam2CarrierId; // valid when bit1 set
+			Vector3 ctfTeam1FlagPos;   // valid when bit0 clear
+			Vector3 ctfTeam2FlagPos;   // valid when bit1 clear
+			Vector3 ctfTeam1BasePos;
+			Vector3 ctfTeam2BasePos;
+			// TC sub-fields (valid when mode!=0):
+			struct Territory {
+				Vector3 pos;
+				uint8_t state;
+			};
+			std::vector<Territory> tcTerritories;
+		};
+		StateDataPacket DecodeStateData(NetPacketReader& r);
+		NetPacketWriter EncodeStateData(const StateDataPacket& p);
+
+		// ExistingPlayer(9, S2C recv shape) — RESEARCH row 9, Pitfall 7; NetClient :906-951.
+		// The codec models the RECV (variable-length name via ReadRemainingString) shape;
+		// SendJoin's fixed-16 WriteString(name,16) is a NetClient detail (NOT modeled here).
+		// Codec does NOT touch savedPlayerPos/savedPlayerTeam/World (D-09).
+		struct ExistingPlayerPacket {
+			uint8_t playerId;
+			uint8_t team;
+			uint8_t weapon;
+			uint8_t tool;
+			uint32_t score;
+			IntVector3 color; // BGR on the wire
+			std::string name;
+		};
+		ExistingPlayerPacket DecodeExistingPlayer(NetPacketReader& r);
+		NetPacketWriter EncodeExistingPlayer(const ExistingPlayerPacket& p);
+
+		// CreatePlayer(12, S2C) — RESEARCH row 12; NetClient :993-1051. Encode added for test.
+		// The recv pos.z-=2.4 spawn adjustment is NetClient state, NOT applied in the codec —
+		// the round-trip asserts the RAW wire position.
+		struct CreatePlayerPacket {
+			uint8_t playerId;
+			uint8_t weapon;
+			uint8_t team;
+			Vector3 position;
+			std::string name;
+		};
+		CreatePlayerPacket DecodeCreatePlayer(NetPacketReader& r);
+		NetPacketWriter EncodeCreatePlayer(const CreatePlayerPacket& p);
+
 	} // namespace client
 } // namespace spades

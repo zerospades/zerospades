@@ -579,3 +579,184 @@ TEST_F(ProtocolRoundTripTest, ExtensionInfo) {
 	}
 	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
 }
+
+// ===========================================================================
+// Plan 03 Task 1: the HARD packets — WorldUpdate (version-branched, D-13) and
+// StateData (discriminated CTF/TC, D-10).
+// ===========================================================================
+
+// WorldUpdate v3 (protocol 0.75): 24 B/entry, index IMPLICIT (idx=i). Encode
+// writes NO index byte; Decode assigns index=i by position.
+TEST_F(ProtocolRoundTripTest, WorldUpdate_v3) {
+	WorldUpdatePacket in;
+	in.entries.push_back({0, Vector3{1.5f, -2.5f, 3.5f}, Vector3{0.1f, 0.2f, 0.3f}});
+	in.entries.push_back({1, Vector3{-10.f, 20.f, -30.f}, Vector3{-0.4f, 0.5f, -0.6f}});
+	in.entries.push_back({2, Vector3{100.25f, -200.5f, 300.75f}, Vector3{0.7f, -0.8f, 0.9f}});
+	NetPacketWriter w = EncodeWorldUpdate(in, 3);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeWorldUpdate);
+	WorldUpdatePacket out = DecodeWorldUpdate(r, 3);
+	ASSERT_EQ(out.entries.size(), 3u);
+	for (size_t i = 0; i < in.entries.size(); i++) {
+		EXPECT_EQ(out.entries[i].index, (uint8_t)i); // implicit index by position
+		EXPECT_EQ(F2U(out.entries[i].position.x), F2U(in.entries[i].position.x));
+		EXPECT_EQ(F2U(out.entries[i].position.y), F2U(in.entries[i].position.y));
+		EXPECT_EQ(F2U(out.entries[i].position.z), F2U(in.entries[i].position.z));
+		EXPECT_EQ(F2U(out.entries[i].front.x), F2U(in.entries[i].front.x));
+		EXPECT_EQ(F2U(out.entries[i].front.y), F2U(in.entries[i].front.y));
+		EXPECT_EQ(F2U(out.entries[i].front.z), F2U(in.entries[i].front.z));
+	}
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// WorldUpdate v4 (protocol 0.76): 25 B/entry, leading EXPLICIT ReadByte index
+// (sparse). Non-sequential indices (5,2,9) must survive the round-trip.
+TEST_F(ProtocolRoundTripTest, WorldUpdate_v4) {
+	WorldUpdatePacket in;
+	in.entries.push_back({5, Vector3{1.5f, -2.5f, 3.5f}, Vector3{0.1f, 0.2f, 0.3f}});
+	in.entries.push_back({2, Vector3{-10.f, 20.f, -30.f}, Vector3{-0.4f, 0.5f, -0.6f}});
+	in.entries.push_back({9, Vector3{100.25f, -200.5f, 300.75f}, Vector3{0.7f, -0.8f, 0.9f}});
+	NetPacketWriter w = EncodeWorldUpdate(in, 4);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeWorldUpdate);
+	WorldUpdatePacket out = DecodeWorldUpdate(r, 4);
+	ASSERT_EQ(out.entries.size(), 3u);
+	const uint8_t expectedIdx[3] = {5, 2, 9};
+	for (size_t i = 0; i < in.entries.size(); i++) {
+		EXPECT_EQ(out.entries[i].index, expectedIdx[i]); // explicit index survives
+		EXPECT_EQ(F2U(out.entries[i].position.x), F2U(in.entries[i].position.x));
+		EXPECT_EQ(F2U(out.entries[i].position.y), F2U(in.entries[i].position.y));
+		EXPECT_EQ(F2U(out.entries[i].position.z), F2U(in.entries[i].position.z));
+		EXPECT_EQ(F2U(out.entries[i].front.x), F2U(in.entries[i].front.x));
+		EXPECT_EQ(F2U(out.entries[i].front.y), F2U(in.entries[i].front.y));
+		EXPECT_EQ(F2U(out.entries[i].front.z), F2U(in.entries[i].front.z));
+	}
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// GOLDEN-BYTE SPOT CHECK #3 (T-3-04): proves the v4 layout writes the leading
+// per-entry index byte at position [1] (right after the type tag at [0]). A v3
+// encode (24 B/entry, no index byte) would put the float pos at [1] instead.
+TEST_F(ProtocolRoundTripTest, WorldUpdateV4GoldenBytesIndex) {
+	WorldUpdatePacket in;
+	in.entries.push_back({5, Vector3{1.f, 2.f, 3.f}, Vector3{4.f, 5.f, 6.f}});
+	NetPacketWriter w = EncodeWorldUpdate(in, 4);
+	std::vector<char> bytes = w.GetData();
+	// [0]=type tag(2=WorldUpdate), [1]=leading index byte(5), then 24 B pos+front.
+	ASSERT_EQ(bytes.size(), 1u + 25u); // tag + one 25-byte v4 entry
+	EXPECT_EQ((uint8_t)bytes[0], (uint8_t)PacketTypeWorldUpdate);
+	EXPECT_EQ((uint8_t)bytes[1], 5u); // the per-entry index byte
+}
+
+// StateData CTF (mode==0) with BOTH intel flags set: each carried-intel team
+// emits carrierId + 11 bytes (in the team-2-first order); basePos for both teams
+// must still round-trip, proving the 11-byte skip count is exact (T-3-03).
+TEST_F(ProtocolRoundTripTest, StateData_CTF) {
+	StateDataPacket in{};
+	in.playerId = 7;
+	in.fogColor = MakeIntVector3(11, 22, 33);
+	in.teamColor[0] = MakeIntVector3(40, 50, 60);
+	in.teamColor[1] = MakeIntVector3(70, 80, 90);
+	in.teamName[0] = std::string("Blue");
+	in.teamName[1] = std::string("Green");
+	in.mode = 0; // CTF
+	in.ctfTeam1Score = 3;
+	in.ctfTeam2Score = 5;
+	in.ctfCaptureLimit = 10;
+	in.ctfIntelFlags = 0x3; // both teams carry intel
+	in.ctfTeam1CarrierId = 12;
+	in.ctfTeam2CarrierId = 21;
+	in.ctfTeam1BasePos = Vector3{1.5f, -2.5f, 3.5f};
+	in.ctfTeam2BasePos = Vector3{-4.5f, 5.5f, -6.5f};
+	NetPacketWriter w = EncodeStateData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeStateData);
+	StateDataPacket out = DecodeStateData(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.fogColor.x, in.fogColor.x);
+	EXPECT_EQ(out.fogColor.y, in.fogColor.y);
+	EXPECT_EQ(out.fogColor.z, in.fogColor.z);
+	EXPECT_EQ(out.teamColor[0].x, in.teamColor[0].x);
+	EXPECT_EQ(out.teamColor[0].z, in.teamColor[0].z);
+	EXPECT_EQ(out.teamColor[1].y, in.teamColor[1].y);
+	EXPECT_EQ(out.teamName[0], in.teamName[0]);
+	EXPECT_EQ(out.teamName[1], in.teamName[1]);
+	EXPECT_EQ(out.mode, in.mode);
+	EXPECT_EQ(out.ctfTeam1Score, in.ctfTeam1Score);
+	EXPECT_EQ(out.ctfTeam2Score, in.ctfTeam2Score);
+	EXPECT_EQ(out.ctfCaptureLimit, in.ctfCaptureLimit);
+	EXPECT_EQ(out.ctfIntelFlags, in.ctfIntelFlags);
+	EXPECT_EQ(out.ctfTeam1CarrierId, in.ctfTeam1CarrierId);
+	EXPECT_EQ(out.ctfTeam2CarrierId, in.ctfTeam2CarrierId);
+	// basePos survives the 11-byte carrier-slot skip for BOTH teams (T-3-03).
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.x), F2U(in.ctfTeam1BasePos.x));
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.y), F2U(in.ctfTeam1BasePos.y));
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.z), F2U(in.ctfTeam1BasePos.z));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.x), F2U(in.ctfTeam2BasePos.x));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.y), F2U(in.ctfTeam2BasePos.y));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.z), F2U(in.ctfTeam2BasePos.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// StateData CTF with NO intel flags: both teams' flagPos (Vector3) are read in
+// place of the carrier slots; exercises the else-branches of both conditionals.
+TEST_F(ProtocolRoundTripTest, StateData_CTF_NoIntel) {
+	StateDataPacket in{};
+	in.playerId = 1;
+	in.fogColor = MakeIntVector3(1, 2, 3);
+	in.teamColor[0] = MakeIntVector3(4, 5, 6);
+	in.teamColor[1] = MakeIntVector3(7, 8, 9);
+	in.teamName[0] = std::string("A");
+	in.teamName[1] = std::string("B");
+	in.mode = 0;
+	in.ctfTeam1Score = 0;
+	in.ctfTeam2Score = 0;
+	in.ctfCaptureLimit = 10;
+	in.ctfIntelFlags = 0x0; // neither team carries intel -> flagPos read for both
+	in.ctfTeam1FlagPos = Vector3{10.5f, -11.5f, 12.5f};
+	in.ctfTeam2FlagPos = Vector3{-13.5f, 14.5f, -15.5f};
+	in.ctfTeam1BasePos = Vector3{16.f, 17.f, 18.f};
+	in.ctfTeam2BasePos = Vector3{-19.f, -20.f, -21.f};
+	NetPacketWriter w = EncodeStateData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeStateData);
+	StateDataPacket out = DecodeStateData(r);
+	EXPECT_EQ(out.ctfIntelFlags, 0x0);
+	EXPECT_EQ(F2U(out.ctfTeam1FlagPos.x), F2U(in.ctfTeam1FlagPos.x));
+	EXPECT_EQ(F2U(out.ctfTeam1FlagPos.z), F2U(in.ctfTeam1FlagPos.z));
+	EXPECT_EQ(F2U(out.ctfTeam2FlagPos.y), F2U(in.ctfTeam2FlagPos.y));
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.x), F2U(in.ctfTeam1BasePos.x));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.z), F2U(in.ctfTeam2BasePos.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// StateData TC (mode!=0): territoryCount then per-territory [pos(12B), state(1B)].
+TEST_F(ProtocolRoundTripTest, StateData_TC) {
+	StateDataPacket in{};
+	in.playerId = 4;
+	in.fogColor = MakeIntVector3(31, 32, 33);
+	in.teamColor[0] = MakeIntVector3(34, 35, 36);
+	in.teamColor[1] = MakeIntVector3(37, 38, 39);
+	in.teamName[0] = std::string("Red");
+	in.teamName[1] = std::string("Blue");
+	in.mode = 1; // TC
+	in.tcTerritories.push_back({Vector3{1.f, 2.f, 3.f}, 0});
+	in.tcTerritories.push_back({Vector3{-4.f, 5.f, -6.f}, 1});
+	in.tcTerritories.push_back({Vector3{7.5f, -8.5f, 9.5f}, 2});
+	NetPacketWriter w = EncodeStateData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeStateData);
+	StateDataPacket out = DecodeStateData(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.mode, in.mode);
+	EXPECT_EQ(out.teamName[0], in.teamName[0]);
+	EXPECT_EQ(out.teamName[1], in.teamName[1]);
+	ASSERT_EQ(out.tcTerritories.size(), in.tcTerritories.size());
+	for (size_t i = 0; i < in.tcTerritories.size(); i++) {
+		EXPECT_EQ(F2U(out.tcTerritories[i].pos.x), F2U(in.tcTerritories[i].pos.x));
+		EXPECT_EQ(F2U(out.tcTerritories[i].pos.y), F2U(in.tcTerritories[i].pos.y));
+		EXPECT_EQ(F2U(out.tcTerritories[i].pos.z), F2U(in.tcTerritories[i].pos.z));
+		EXPECT_EQ(out.tcTerritories[i].state, in.tcTerritories[i].state);
+	}
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
