@@ -57,6 +57,41 @@
             "description": "Step-climb suppression: same wall, crouch=true; climb is suppressed, velocity.x zeroed by wall collision."
         },
         {
+            "id": "phys_collision_wall_001",
+            "path": "fixtures/phys_collision_wall_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "BoxClipMove wall collision: player at (256,256,60.5) moving +x into 2-block-tall solid wall at (258,256,60-61); velocity.x zeroed at collision tick (BoxClipMove:1052/1055). Single-block wall would allow step-climb; 2-block wall isolates pure wall-collision path."
+        },
+        {
+            "id": "phys_collision_floor_001",
+            "path": "fixtures/phys_collision_floor_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "BoxClipMove floor collision: player airborne at z=57 with zero velocity falls under gravity to flat-map ground; airborne→false, velocity.z→0 at landing tick (BoxClipMove:1104-1109)."
+        },
+        {
+            "id": "phys_collision_ceiling_001",
+            "path": "fixtures/phys_collision_ceiling_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "BoxClipMove ceiling collision: player at z=55 moving up (vel.z=-0.5) hits ceiling block at (256,256,53); velocity.z zeroed at collision tick (BoxClipMove:1109 else branch)."
+        },
+        {
+            "id": "phys_try_uncrouch_blocked_001",
+            "path": "fixtures/phys_try_uncrouch_blocked_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "TryUncrouch blocked: crouched player at z≈61.4 with solid block at z=60 (head-raise path blocked by position.z-1.35=60.05); crouch-off transition rejected by TryUncrouch; local player reverts to crouch=true (Player.cpp:113-114); position.z unchanged."
+        },
+        {
+            "id": "phys_corpse_movement_001",
+            "path": "fixtures/phys_corpse_movement_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "MoveCorpse path: alive=false player at z=61 with vel=(0.2,0,1.0); gravity accumulation (vz+=0.5*dt/tick); bounce at tick 1 when position crosses z=62 floor (velocity*=0.36 factor, position reverted to oldPos)."
+        },
+        {
             "id": "proto_packet_rt_001",
             "path": "fixtures/proto_packet_rt_001.json",
             "subsystem": "proto",
