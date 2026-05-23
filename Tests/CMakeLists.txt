@@ -4,23 +4,29 @@ include(FetchContent)
 
 # ---------------------------------------------------------------------------
 # GoogleTest 1.17.0 — pinned by URL tarball (not git clone)
-# Threat T-01-01: exact URL + DOWNLOAD_EXTRACT_TIMESTAMP prevent re-download attacks
+# Threat T-01-01: exact URL + URL_HASH SHA256 verify tarball content (supply-chain
+# integrity). DOWNLOAD_EXTRACT_TIMESTAMP only controls CMake timestamp caching; the
+# URL_HASH is what makes a compromised CDN / MITM / stale-content swap fail the build.
+# SHA256 computed from the official v1.17.0.tar.gz release archive.
 # ---------------------------------------------------------------------------
 FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
+    URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)  # Windows MSVC ABI compat
 FetchContent_MakeAvailable(googletest)
 
 # ---------------------------------------------------------------------------
 # nlohmann/json 3.12.0 — vcpkg fallback for offline builds
-# Threat T-01-02: exact URL + DOWNLOAD_EXTRACT_TIMESTAMP
+# Threat T-01-02: exact URL + URL_HASH SHA256 verify tarball content.
+# SHA256 computed from the official v3.12.0 json.tar.xz release archive.
 # ---------------------------------------------------------------------------
 if(DEFINED VCPKG_TARGET_TRIPLET)
     find_package(nlohmann_json CONFIG REQUIRED)
 else()
     FetchContent_Declare(nlohmann_json
         URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+        URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     set(JSON_BuildTests OFF CACHE INTERNAL "")
     FetchContent_MakeAvailable(nlohmann_json)
