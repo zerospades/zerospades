@@ -117,6 +117,8 @@ namespace {
 
 // ===========================================================================
 // DISABLED_ generator tests — run manually once, then commit frozen fixture.
+// PHYS-01 generators (GroundFriction … StepClimbSuppression) and
+// PHYS-02 generators (WallCollision … CorpseMovement) live here.
 // ===========================================================================
 
 // Ground friction: player at (256,256,60.5) with vx=1.0, zero input, 10 ticks.
@@ -468,6 +470,303 @@ TEST_F(PhysicsTestBase, StepClimbSuppression) {
 		ASSERT_NE(opt, nullptr);
 		got_ticks.push_back(SnapshotPlayerTick(*opt, i));
 	}
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++) {
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "expected.ticks[" + std::to_string(i) + "]");
+	}
+}
+
+// ===========================================================================
+// PHYS-02: BoxClipMove collision paths + MoveCorpse path
+// ===========================================================================
+
+// Wall collision: 2-block tall wall at x=258 (z=60,z=61) blocks step-climb.
+// Player at (256,256,60.5) moving +x; velocity.x→0 at collision tick.
+// A single-block wall at z=61 only would allow step-climb (PHYS-01 StepClimb
+// scenario). Two blocks (z=60 and z=61) make the wall unclimbable so
+// BoxClipMove zeros velocity.x instead.
+// 10 ticks: player needs ~7-8 ticks (with step-climb on flat map) to reach x=258.
+TEST(DISABLED_PhysicsGenerate, WallCollision) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// 2-block tall wall: prevents step-climb; only wall-collision path fires.
+	hw.GetWorld().GetMap()->Set(258, 256, 61, true, 0x64ffffff, /*unsafe=*/true);
+	hw.GetWorld().GetMap()->Set(258, 256, 60, true, 0x64ffffff, /*unsafe=*/true);
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 60.5F}, {1.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+
+	nlohmann::json ticks = nlohmann::json::array();
+	for (int i = 0; i < 10; i++) {
+		PlayerInput inp;
+		inp.moveForward = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		ticks.push_back(SnapshotPlayerTick(*opt, i));
+	}
+	WriteFixture("phys_collision_wall_001.json",
+	             BuildFixtureEnvelope("phys_collision_wall_001", ticks));
+}
+
+// Floor collision: player airborne at z=57, zero velocity, falls to flat-map
+// floor at z=62. At landing tick: airborne→false, velocity.z→0.
+// Gravity accelerates vz ~0.016/tick; 30 ticks covers the landing transition.
+TEST(DISABLED_PhysicsGenerate, FloorCollision) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// No extra blocks needed; flat map ground is at z=62.
+	SpawnPlayer(hw, {256.0F, 256.0F, 57.0F}, {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	auto ticks = RunAndCaptureTicks(hw, 30);
+	WriteFixture("phys_collision_floor_001.json",
+	             BuildFixtureEnvelope("phys_collision_floor_001", ticks));
+}
+
+// Ceiling collision: player at (256,256,55.0) moving up (vel.z=-0.5) hits
+// ceiling block at (256,256,53). velocity.z→0 at collision tick.
+// nz = pos.z + offset = 55.9; nz decreases by |vel.z|*f ≈ 0.267 per tick.
+// Ceiling hit fires when nz+m (=nz+1.35) reaches z=53: ~20 ticks.
+TEST(DISABLED_PhysicsGenerate, CeilingCollision) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// Ceiling block at z=53 (above player at z=55).
+	hw.GetWorld().GetMap()->Set(256, 256, 53, true, 0x64ffffff, /*unsafe=*/true);
+	SpawnPlayer(hw, {256.0F, 256.0F, 55.0F}, {0.0F, 0.0F, -0.5F}, {1.0F, 0.0F, 0.0F});
+	auto ticks = RunAndCaptureTicks(hw, 20);
+	WriteFixture("phys_collision_ceiling_001.json",
+	             BuildFixtureEnvelope("phys_collision_ceiling_001", ticks));
+}
+
+// TryUncrouch-blocked: crouched player cannot stand up due to ceiling.
+// TryUncrouch (Player.cpp:1260) has two paths:
+//   1. Airborne: lowers feet if z+2.25 is clear (above head when standing).
+//   2. Head-raise: raises head if z-1.35 is clear (feet position when standing).
+// Both must be blocked. For a grounded player (airborne=false), only path 2 runs.
+// Block the head-raise path: place solid at floor(position.z - 1.35) = floor(z - 1.35).
+// Post-crouch z ≈ 61.4 → z-1.35 = 60.05 → block at integer z=60 blocks it.
+// Also place ceiling block at z=59 for robustness (blocks path 1 if airborne fires).
+// Player starts at (256,256,60.5) on flat-map ground; after SetInput(crouch=true),
+// position.z += 0.9 → 61.4; advance tick 0 to settle.
+// Tick 1: SetInput(crouch=false) → TryUncrouch fails → local player reverts to
+// newInput.crouch=true (Player.cpp:113-114). Position unchanged.
+TEST(DISABLED_PhysicsGenerate, TryUncrouchBlocked) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// Block at z=60 blocks the head-raise check (z-1.35=60.05 → solid at z=60).
+	// Block at z=59 blocks the airborne foot-lower check (z+2.25=63.65 — covered
+	// by flat-map floor, but z=59 is extra insurance for any edge case).
+	hw.GetWorld().GetMap()->Set(256, 256, 60, true, 0x64ffffff, /*unsafe=*/true);
+	hw.GetWorld().GetMap()->Set(256, 256, 59, true, 0x64ffffff, /*unsafe=*/true);
+
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 60.5F}, {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+
+	nlohmann::json ticks = nlohmann::json::array();
+
+	// Tick 0: crouch=true → position.z += 0.9 → 61.4; player settles.
+	{
+		PlayerInput inp;
+		inp.crouch = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		ticks.push_back(SnapshotPlayerTick(*opt, 0));
+	}
+
+	// Tick 1: crouch=false → TryUncrouch: head-raise blocked (z=60 solid).
+	// Local player: SetInput reverts newInput.crouch=true (Player.cpp:113-114).
+	{
+		PlayerInput inp;
+		inp.crouch = false;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		ticks.push_back(SnapshotPlayerTick(*opt, 1));
+	}
+
+	// Tick 2: crouch=true (still crouched; confirm position.z stable).
+	{
+		PlayerInput inp;
+		inp.crouch = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		ticks.push_back(SnapshotPlayerTick(*opt, 2));
+	}
+
+	WriteFixture("phys_try_uncrouch_blocked_001.json",
+	             BuildFixtureEnvelope("phys_try_uncrouch_blocked_001", ticks));
+}
+
+// Corpse movement: player killed immediately after spawn (alive→false).
+// MoveCorpse applies gravity (vel.z += 0.5*dt/tick) and motion
+// (position += velocity * (32*dt)). On floor contact: velocity *= 0.36
+// (bounce factor; position reverts to oldPos). MoveCorpse collision uses
+// ClipWorld (integer block) so position.z must cross integer 62.0 to hit
+// the flat-map floor.
+// Start at z=61.0 with initial vz=1.0 (falling fast); bounce fires tick 2.
+// After bounce: velocity *= 0.36 — speed drops to ~36% of pre-bounce magnitude.
+// SetInput is a no-op for dead players (Player.cpp:101-102).
+// KillType: KillTypeHeadshot (unscoped enum in GameConstants.h).
+TEST(DISABLED_PhysicsGenerate, CorpseMovement) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// Initial vz=1.0 (falling): position.z += 1.0 * (32/60) ≈ 0.533 per tick.
+	// From z=61.0: after tick 1, z ≈ 61.533; after tick 2, z ≈ 62.07 → ClipWorld fires.
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 61.0F}, {0.2F, 0.0F, 1.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+	// Kill the player before any advance — alive→false.
+	p->KilledBy(KillTypeHeadshot, *p, 0);
+
+	auto ticks = RunAndCaptureTicks(hw, 10);
+	WriteFixture("phys_corpse_movement_001.json",
+	             BuildFixtureEnvelope("phys_corpse_movement_001", ticks));
+}
+
+// ===========================================================================
+// PHYS-02 replay tests — load frozen fixture, re-run, compare.
+// ===========================================================================
+
+TEST_F(PhysicsTestBase, WallCollision) {
+	auto fixture = LoadFixtureJson("phys_collision_wall_001.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	hw.GetWorld().GetMap()->Set(258, 256, 61, true, 0x64ffffff, true);
+	hw.GetWorld().GetMap()->Set(258, 256, 60, true, 0x64ffffff, true);
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 60.5F}, {1.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+
+	nlohmann::json got_ticks = nlohmann::json::array();
+	for (int i = 0; i < 10; i++) {
+		PlayerInput inp;
+		inp.moveForward = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		got_ticks.push_back(SnapshotPlayerTick(*opt, i));
+	}
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++) {
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "expected.ticks[" + std::to_string(i) + "]");
+	}
+}
+
+TEST_F(PhysicsTestBase, FloorCollision) {
+	auto fixture = LoadFixtureJson("phys_collision_floor_001.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	SpawnPlayer(hw, {256.0F, 256.0F, 57.0F}, {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	auto got_ticks = RunAndCaptureTicks(hw, 30);
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++) {
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "expected.ticks[" + std::to_string(i) + "]");
+	}
+}
+
+TEST_F(PhysicsTestBase, CeilingCollision) {
+	auto fixture = LoadFixtureJson("phys_collision_ceiling_001.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	hw.GetWorld().GetMap()->Set(256, 256, 53, true, 0x64ffffff, true);
+	SpawnPlayer(hw, {256.0F, 256.0F, 55.0F}, {0.0F, 0.0F, -0.5F}, {1.0F, 0.0F, 0.0F});
+	auto got_ticks = RunAndCaptureTicks(hw, 20);
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++) {
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "expected.ticks[" + std::to_string(i) + "]");
+	}
+}
+
+TEST_F(PhysicsTestBase, TryUncrouchBlocked) {
+	auto fixture = LoadFixtureJson("phys_try_uncrouch_blocked_001.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	hw.GetWorld().GetMap()->Set(256, 256, 60, true, 0x64ffffff, true);
+	hw.GetWorld().GetMap()->Set(256, 256, 59, true, 0x64ffffff, true);
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 60.5F}, {0.0F, 0.0F, 0.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+
+	nlohmann::json got_ticks = nlohmann::json::array();
+
+	// Tick 0: crouch=true.
+	{
+		PlayerInput inp;
+		inp.crouch = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		got_ticks.push_back(SnapshotPlayerTick(*opt, 0));
+	}
+	// Tick 1: crouch=false → TryUncrouch blocked; stays crouched.
+	{
+		PlayerInput inp;
+		inp.crouch = false;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		got_ticks.push_back(SnapshotPlayerTick(*opt, 1));
+	}
+	// Tick 2: crouch=true (confirmed still crouched).
+	{
+		PlayerInput inp;
+		inp.crouch = true;
+		p->SetInput(inp);
+		hw.Advance(1);
+		auto opt = hw.GetWorld().GetPlayer(0);
+		ASSERT_NE(opt, nullptr);
+		got_ticks.push_back(SnapshotPlayerTick(*opt, 2));
+	}
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++) {
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "expected.ticks[" + std::to_string(i) + "]");
+	}
+}
+
+TEST_F(PhysicsTestBase, CorpseMovement) {
+	auto fixture = LoadFixtureJson("phys_corpse_movement_001.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	auto* p =
+	  SpawnPlayer(hw, {256.0F, 256.0F, 61.0F}, {0.2F, 0.0F, 1.0F}, {1.0F, 0.0F, 0.0F});
+	ASSERT_NE(p, nullptr);
+	p->KilledBy(KillTypeHeadshot, *p, 0);
+
+	auto got_ticks = RunAndCaptureTicks(hw, 10);
 
 	ASSERT_EQ(want_ticks.size(), got_ticks.size());
 	for (size_t i = 0; i < want_ticks.size(); i++) {
