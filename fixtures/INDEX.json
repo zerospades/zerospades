@@ -153,6 +153,13 @@
             "subsystem": "proto",
             "behavior": "implementation_detail",
             "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input — the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
+        },
+        {
+            "id": "phys_determinism_golden_001",
+            "path": "fixtures/phys_determinism_golden_001.json",
+            "subsystem": "phys",
+            "behavior": "implementation_detail",
+            "description": "PHYS-03 multi-step determinism golden: 60-tick scripted input sequence (move/jump/crouch/strafe varied per schedule) starting from (256,256,60.5); full per-tick position/velocity/orientation/airborne/wade; re-run 20x in CI produces identical output."
         }
     ]
 }
