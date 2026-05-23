@@ -51,6 +51,7 @@ add_executable(zerospades_tests
     Protocol/ProtocolReplay.cpp
     Protocol/ProtocolReplayUnitTest.cpp
     Protocol/ProtocolGoldenTest.cpp
+    Protocol/ProtocolExtensionTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
