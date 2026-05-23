@@ -106,14 +106,16 @@ if(ZEROSPADES_TESTS)
                      ${CMAKE_BINARY_DIR}/tools/compare_snapshots)
 
     # Smoke: identical file → exit 0 ("PASS")
+    # Use $<TARGET_FILE:> so the test resolves the binary's real (possibly
+    # per-config) path regardless of the test runner's working directory.
     add_test(NAME CompareSnapshotsMatch
-             COMMAND compare_snapshots
+             COMMAND $<TARGET_FILE:compare_snapshots>
                      ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json
                      ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json)
     set_tests_properties(CompareSnapshotsMatch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     # Smoke: wrong arg count → exit 2 (usage error)
     add_test(NAME CompareSnapshotsUsage
-             COMMAND compare_snapshots)
+             COMMAND $<TARGET_FILE:compare_snapshots>)
     set_tests_properties(CompareSnapshotsUsage PROPERTIES WILL_FAIL TRUE)
 endif()
