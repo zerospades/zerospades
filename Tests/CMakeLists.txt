@@ -40,6 +40,7 @@ add_executable(zerospades_tests
     Helpers/MakeFlatMap.cpp
     Helpers/RecordingWorldListener.cpp
     Helpers/HeadlessWorld.cpp
+    Helpers/ToleranceMatchersTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
@@ -55,6 +56,12 @@ target_include_directories(zerospades_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/Sources/ENet/include
 )
 
+# Absolute Tests/ path for the in-process EXPECT_FLOAT_EQ ban guard so its
+# scan does not depend on the test runner's working directory (D-17).
+target_compile_definitions(zerospades_tests PRIVATE
+    TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
 # FP-determinism flags on test binary (same as zerospades_testable)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(zerospades_tests PRIVATE
@@ -66,3 +73,18 @@ endif()
 gtest_discover_tests(zerospades_tests
     PROPERTIES LABELS "harness"
 )
+
+# ---------------------------------------------------------------------------
+# EXPECT_FLOAT_EQ ban (D-17 / SCHE-05 / threat T-02-12)
+# Standalone CTest lint: fails if the banned matcher is *invoked* anywhere under
+# Tests/. The regex matches the banned token immediately followed by optional
+# whitespace then an open paren (the bracket class [(] is used instead of a
+# literal paren so the ban-enforcement code, comments, and grep strings that
+# only name the bare token do not self-trigger). The `! grep ...` inverts
+# grep's exit code — passes (0) only when no invocation is found.
+# Dual coverage with TEST(ToleranceMatchers, NoExpectFloatEqInTestsDir).
+# ---------------------------------------------------------------------------
+add_test(NAME NoExpectFloatEq
+    COMMAND ${CMAKE_COMMAND} -E env
+            sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' ${CMAKE_SOURCE_DIR}/Tests/"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
