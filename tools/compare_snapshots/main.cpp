@@ -28,6 +28,13 @@ using namespace spades::tests; // ToleranceForField + tolerance constants
 // Recursively compare two JSON values, building a dotted/indexed field path.
 // Floats compare within ToleranceForField(path); integers/bools/strings/null
 // compare exactly. Sets anyMismatch=true on any difference and prints a line.
+//
+// SYMMETRIC by design (CR-01): the comparison flags a field present in EITHER
+// snapshot but absent in the other. A key in `a` missing from `b` is reported
+// MISSING; a key in `b` missing from `a` is reported EXTRA. This is essential to
+// the cross-language parity guarantee — a port (`b`) that emits undocumented
+// extra fields, or omits expected ones, must FAIL rather than silently PASS, and
+// the verdict must not depend on argument order.
 static void compareFields(const json& a, const json& b, const std::string& path,
                           bool& anyMismatch) {
 	if (a.is_object() && b.is_object()) {
@@ -39,6 +46,15 @@ static void compareFields(const json& a, const json& b, const std::string& path,
 			}
 			// b.contains(key) verified above → b.at(key) cannot throw (T-02-16).
 			compareFields(va, b.at(key), path + "." + key, anyMismatch);
+		}
+		// Symmetric pass: flag keys present in b but absent in a as EXTRA so a
+		// port emitting undocumented fields cannot slip through unchecked.
+		for (auto& [key, vb] : b.items()) {
+			(void)vb;
+			if (!a.contains(key)) {
+				std::cout << "EXTRA    " << path << "." << key << "\n";
+				anyMismatch = true;
+			}
 		}
 		return;
 	}
@@ -79,7 +95,12 @@ static void compareFields(const json& a, const json& b, const std::string& path,
 
 int main(int argc, char* argv[]) {
 	if (argc != 3) {
-		std::cerr << "usage: compare_snapshots <file_a.json> <file_b.json>\n";
+		std::cerr << "usage: compare_snapshots <baseline.json> <candidate.json>\n"
+		             "  baseline  : the reference/oracle snapshot (file_a)\n"
+		             "  candidate : the snapshot under test, e.g. a port's output (file_b)\n"
+		             "Comparison is symmetric: fields present in only one file are reported\n"
+		             "(MISSING = in baseline, absent in candidate; EXTRA = in candidate,\n"
+		             "absent in baseline). The PASS/FAIL verdict is independent of order.\n";
 		return 2;
 	}
 
