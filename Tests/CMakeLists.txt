@@ -35,6 +35,7 @@ include(GoogleTest)
 # ---------------------------------------------------------------------------
 add_executable(zerospades_tests
     Harness/HeadlessWorldTest.cpp
+    Harness/FPProbeTest.cpp
     Helpers/HitTestDebuggerStub.cpp
     Helpers/MakeFlatMap.cpp
     Helpers/RecordingWorldListener.cpp
