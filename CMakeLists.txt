@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(ZeroSpades)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -274,6 +274,12 @@ endif()
 
 add_subdirectory(Resources)
 add_subdirectory(Sources)
+
+option(ZEROSPADES_TESTS "Build the ZeroSpades test suite" OFF)
+if(ZEROSPADES_TESTS)
+	enable_testing()
+	add_subdirectory(Tests)
+endif()
 
 if(UNIX AND NOT APPLE)
 	# various texts
