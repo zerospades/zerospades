@@ -28,6 +28,7 @@ add_library(zerospades_testable STATIC
 	Client/CTFGameMode.cpp
 	Client/TCGameMode.cpp
 	Client/IGameMode.cpp
+	Client/ProtocolCodec.cpp
 	# HitTestDebugger.cpp excluded: uses SWRenderer -> ConcurrentDispatch -> SDL
 	# GameMapLoader.cpp excluded: Thread.h -> SDL; tests use GameMap::Load() directly
 	# --- Core services (SDL-free subset) ---
@@ -84,6 +85,7 @@ set(TESTABLE_CLIENT_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Client/CTFGameMode.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Client/TCGameMode.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Client/IGameMode.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/ProtocolCodec.cpp
 )
 set(TESTABLE_CORE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/Core/Math.cpp

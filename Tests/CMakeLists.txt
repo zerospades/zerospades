@@ -47,6 +47,7 @@ add_executable(zerospades_tests
     Helpers/RecordingWorldListener.cpp
     Helpers/HeadlessWorld.cpp
     Helpers/ToleranceMatchersTest.cpp
+    Protocol/ProtocolRoundTripTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE

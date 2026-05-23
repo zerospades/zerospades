@@ -22,6 +22,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring> // memcpy (used by the ENet-packet reader ctor)
 #include <string>
 #include <vector>
 
