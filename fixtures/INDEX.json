@@ -20,6 +20,41 @@
             "subsystem": "map",
             "behavior": "implementation_detail",
             "description": "Value-lookup exemplar: IsSolid query at (0,0,62) on flat map returns solid."
+        },
+        {
+            "id": "proto_golden_075_001",
+            "path": "fixtures/proto_golden_075_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "0.75 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v3 (implicit index) -> frozen WorldSnapshot."
+        },
+        {
+            "id": "proto_golden_076_001",
+            "path": "fixtures/proto_golden_076_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "0.76 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v4 (sparse explicit index) -> frozen WorldSnapshot."
+        },
+        {
+            "id": "proto_worldupdate_075_001",
+            "path": "fixtures/proto_worldupdate_075_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "WorldUpdate v0.75 short-branch (24B/entry, implicit index): CreatePlayer x2 -> WorldUpdate v3 repositions both."
+        },
+        {
+            "id": "proto_worldupdate_076_001",
+            "path": "fixtures/proto_worldupdate_076_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "WorldUpdate v0.76 full-branch (25B/entry, explicit per-entry index): CreatePlayer x2 (sparse ids) -> WorldUpdate v4 repositions both."
+        },
+        {
+            "id": "proto_mapstart_001",
+            "path": "fixtures/proto_mapstart_001.json",
+            "subsystem": "proto",
+            "behavior": "protocol_compat",
+            "description": "MapStart packet-roundtrip: single uint32 mapSize, version-independent wire layout (v3/v4 difference is a NetClient send side-effect)."
         }
     ]
 }

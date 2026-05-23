@@ -1,0 +1,79 @@
+{
+    "version": "1.0.0",
+    "id": "proto_worldupdate_076_001",
+    "subsystem": "proto",
+    "behavior": "protocol_compat",
+    "seed": 42,
+    "protocol_version": "0.76",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "comment": "WorldUpdate v0.76 FULL-branch coverage (PROT-04): CreatePlayer x2 (sparse ids 2,7) -> WorldUpdate v4 (25B/entry, EXPLICIT leading per-entry index). No StateData -> localPlayerIndex stays -1, so both players are repositioned. Asserts the explicit per-entry index mapping (the WorldUpdate entry index, not list position, selects the target player). Expected generated once from the C++ oracle and frozen.",
+    "inputs": [
+        {
+            "comment": "CreatePlayer id 2, weapon 2 (shotgun), team 0, raw wire pos {100,110,40}.",
+            "bytes_hex": "0c0202000000c8420000dc42000020425032"
+        },
+        {
+            "comment": "CreatePlayer id 7, weapon 0 (rifle), team 1, raw wire pos {200,210,40}.",
+            "bytes_hex": "0c0700010000484300005243000020425037"
+        },
+        {
+            "comment": "WorldUpdate v4 (explicit leading index): entry idx2 -> p2 {128,64,33}; entry idx7 -> p7 {256,192,35}.",
+            "bytes_hex": "02020000004300008042000004420000803f000000000000000007000080430000404300000c42000000000000803f00000000"
+        }
+    ],
+    "kind": "world_snapshot",
+    "expected": {
+        "players": [
+            {
+                "alive": true,
+                "health": 100,
+                "id": 2,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 128.0,
+                    "y": 64.0,
+                    "z": 33.0
+                },
+                "team_id": 0,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "shotgun"
+            },
+            {
+                "alive": true,
+                "health": 100,
+                "id": 7,
+                "orientation": {
+                    "x": 0.0,
+                    "y": 1.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 256.0,
+                    "y": 192.0,
+                    "z": 35.0
+                },
+                "team_id": 1,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "rifle"
+            }
+        ],
+        "tick": 0
+    }
+}

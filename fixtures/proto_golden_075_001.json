@@ -1,0 +1,86 @@
+{
+    "version": "1.0.0",
+    "id": "proto_golden_075_001",
+    "subsystem": "proto",
+    "behavior": "protocol_compat",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "comment": "0.75 golden sequence (PROT-03/04): StateData(CTF, local id 0) -> ExistingPlayer x2 (ids 1,2) -> WorldUpdate v3 (24B/entry, IMPLICIT index = list position; idx0 local filler, idx1->p1, idx2->p2). Packet order is significant: WorldUpdate follows ExistingPlayer so both non-local alive players are repositioned (NetClient.cpp:514-517). The expected WorldSnapshot was generated ONCE from the C++ codec+fold oracle and frozen (RESEARCH Pitfall 4 / CI-03); the replay test re-folds these bytes and re-compares each run.",
+    "inputs": [
+        {
+            "comment": "StateData CTF, playerId 0 (local), teams Blue/Green, no intel carriers (flagPos for both).",
+            "bytes_hex": "0f00808080ff000000ff00426c7565000000000000477265656e00000000000000000a000000804200008042000000420000e0430000e043000000420000804200006043000000420000e0430000904300000042"
+        },
+        {
+            "comment": "ExistingPlayer id 1, team 0, weapon 0 (rifle), tool 2 (weapon), name Alpha.",
+            "bytes_hex": "0901000002030000001e140a416c706861"
+        },
+        {
+            "comment": "ExistingPlayer id 2, team 1, weapon 1 (smg), tool 1 (block), name Bravo.",
+            "bytes_hex": "0902010101070000003c3228427261766f"
+        },
+        {
+            "comment": "WorldUpdate v3 (implicit index): idx0 local filler {0,0,0}; idx1 p1 {256,256,40}; idx2 p2 {300,200,36}.",
+            "bytes_hex": "0200000000000000000000000000000000000000000000803f0000804300008043000020420000803f0000000000000000000096430000484300001042000000000000803f00000000"
+        }
+    ],
+    "kind": "world_snapshot",
+    "expected": {
+        "game_mode": {
+            "mode": "ctf"
+        },
+        "players": [
+            {
+                "alive": true,
+                "health": 100,
+                "id": 1,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 40.0
+                },
+                "team_id": 0,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "rifle"
+            },
+            {
+                "alive": true,
+                "health": 100,
+                "id": 2,
+                "orientation": {
+                    "x": 0.0,
+                    "y": 1.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 300.0,
+                    "y": 200.0,
+                    "z": 36.0
+                },
+                "team_id": 1,
+                "tool": "block",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "smg"
+            }
+        ],
+        "tick": 0
+    }
+}
