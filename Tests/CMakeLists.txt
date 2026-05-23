@@ -36,6 +36,9 @@ include(GoogleTest)
 add_executable(zerospades_tests
     Harness/PlaceholderTest.cpp
     Helpers/HitTestDebuggerStub.cpp
+    Helpers/MakeFlatMap.cpp
+    Helpers/RecordingWorldListener.cpp
+    Helpers/HeadlessWorld.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
