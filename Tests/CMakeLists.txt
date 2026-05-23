@@ -34,7 +34,7 @@ include(GoogleTest)
 # Placeholder test is replaced by real test files in Plans 02-04.
 # ---------------------------------------------------------------------------
 add_executable(zerospades_tests
-    Harness/PlaceholderTest.cpp
+    Harness/HeadlessWorldTest.cpp
     Helpers/HitTestDebuggerStub.cpp
     Helpers/MakeFlatMap.cpp
     Helpers/RecordingWorldListener.cpp
