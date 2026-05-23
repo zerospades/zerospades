@@ -100,7 +100,8 @@
                 "properties": {
                     "expected": {
                         "type": "object",
-                        "required": ["tick", "map_content_hash", "players"],
+                        "$comment": "map_content_hash is OPTIONAL (not in required): snapshots may omit it, matching the Rust WorldSnapshot map_content_hash: Option<String>. Keeping the Python validator and rust_smoke gates in agreement is required for the portability proof (CR-02).",
+                        "required": ["tick", "players"],
                         "properties": {
                             "tick": {
                                 "type": "integer"
