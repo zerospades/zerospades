@@ -134,3 +134,7 @@ OpenSpades.rc
 
 # vcpkg build artifacts
 vcpkg/
+
+# Python bytecode cache (tools/validate_fixtures.py)
+__pycache__/
+*.pyc
