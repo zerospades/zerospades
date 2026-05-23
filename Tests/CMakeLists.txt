@@ -97,12 +97,16 @@ gtest_discover_tests(zerospades_tests
 # literal paren so the ban-enforcement code, comments, and grep strings that
 # only name the bare token do not self-trigger). The `! grep ...` inverts
 # grep's exit code — passes (0) only when no invocation is found.
-# Dual coverage with TEST(ToleranceMatchers, NoExpectFloatEqInTestsDir).
+# Dual coverage with TEST(ToleranceMatchers, NoExpectFloatEqInTestsDir) which
+# is the authoritative cross-platform guard; this CTest is a POSIX-only
+# belt-and-suspenders check (sh is not available in native Windows MSVC builds).
 # ---------------------------------------------------------------------------
-add_test(NAME NoExpectFloatEq
-    COMMAND ${CMAKE_COMMAND} -E env
-            sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' '${CMAKE_SOURCE_DIR}/Tests/'"
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+if(NOT WIN32)
+    add_test(NAME NoExpectFloatEq
+        COMMAND ${CMAKE_COMMAND} -E env
+                sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' '${CMAKE_SOURCE_DIR}/Tests/'"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
 
 # ---------------------------------------------------------------------------
 # compare_snapshots C++ CLI (SCHE-06, D-19)
