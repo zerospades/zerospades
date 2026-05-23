@@ -750,5 +750,55 @@ namespace spades {
 			return w;
 		}
 
+		// ExistingPlayer(9, S2C recv shape) — recv :910-916. The codec returns the decoded
+		// wire fields ONLY: it does NOT run the weapon/tool validation SPRaise, construct a
+		// Player, read savedPlayerPos, or write savedPlayerTeam (those stay in NetClient,
+		// Plan 04 — D-09). name via ReadRemainingString (variable-length recv shape, Pitfall
+		// 7); SendJoin's fixed-16 WriteString(name,16) is a NetClient detail not modeled here.
+		ExistingPlayerPacket DecodeExistingPlayer(NetPacketReader& r) {
+			ExistingPlayerPacket p;
+			p.playerId = r.ReadByte();
+			p.team = r.ReadByte();
+			p.weapon = r.ReadByte();
+			p.tool = r.ReadByte();
+			p.score = r.ReadInt();
+			p.color = r.ReadIntColor(); // BGR
+			p.name = r.ReadRemainingString();
+			return p;
+		}
+		NetPacketWriter EncodeExistingPlayer(const ExistingPlayerPacket& p) {
+			NetPacketWriter w(PacketTypeExistingPlayer);
+			w.WriteByte(p.playerId);
+			w.WriteByte(p.team);
+			w.WriteByte(p.weapon);
+			w.WriteByte(p.tool);
+			w.WriteInt(p.score);
+			w.WriteColor(p.color);
+			w.WriteString(p.name); // variable-length recv shape (Pitfall 7)
+			return w;
+		}
+
+		// CreatePlayer(12, S2C) — recv :997-1001. The recv pos.z-=2.4 spawn adjustment is
+		// NetClient state and is NOT applied here — the codec returns the RAW wire position
+		// (D-09). Player construction / block-color override / callbacks stay in NetClient.
+		CreatePlayerPacket DecodeCreatePlayer(NetPacketReader& r) {
+			CreatePlayerPacket p;
+			p.playerId = r.ReadByte();
+			p.weapon = r.ReadByte();
+			p.team = r.ReadByte();
+			p.position = r.ReadVector3();
+			p.name = r.ReadRemainingString();
+			return p;
+		}
+		NetPacketWriter EncodeCreatePlayer(const CreatePlayerPacket& p) {
+			NetPacketWriter w(PacketTypeCreatePlayer);
+			w.WriteByte(p.playerId);
+			w.WriteByte(p.weapon);
+			w.WriteByte(p.team);
+			w.WriteVector3(p.position);
+			w.WriteString(p.name);
+			return w;
+		}
+
 	} // namespace client
 } // namespace spades

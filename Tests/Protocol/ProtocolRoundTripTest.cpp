@@ -760,3 +760,61 @@ TEST_F(ProtocolRoundTripTest, StateData_TC) {
 	}
 	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
 }
+
+// ===========================================================================
+// Plan 03 Task 2: ExistingPlayer + CreatePlayer (POD only — no savedPlayer*/
+// pos.z-=2.4 state mutation, D-09). Both end with a ReadRemainingString name.
+// ===========================================================================
+
+// ExistingPlayer recv shape: playerId,team,weapon,tool (bytes), score (uint32),
+// color (BGR), name (variable, <=15 chars, NUL-free per Pitfall 7).
+TEST_F(ProtocolRoundTripTest, ExistingPlayer) {
+	ExistingPlayerPacket in{};
+	in.playerId = 17;
+	in.team = 1;
+	in.weapon = 2; // shotgun
+	in.tool = 3;   // grenade
+	in.score = 0x0BADF00Du;
+	in.color = MakeIntVector3(10, 20, 30); // R=10,G=20,B=30 (catches BGR swap)
+	in.name = std::string("ZeroSpadesPlyr"); // 14 chars, NUL-free
+	NetPacketWriter w = EncodeExistingPlayer(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeExistingPlayer);
+	ExistingPlayerPacket out = DecodeExistingPlayer(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.team, in.team);
+	EXPECT_EQ(out.weapon, in.weapon);
+	EXPECT_EQ(out.tool, in.tool);
+	EXPECT_EQ(out.score, in.score);
+	EXPECT_EQ(out.color.x, in.color.x); // R
+	EXPECT_EQ(out.color.y, in.color.y); // G
+	EXPECT_EQ(out.color.z, in.color.z); // B
+	EXPECT_EQ(out.name, in.name);
+	// NOTE: ReadRemainingString (verbatim reader) does not advance pos on a terminal
+	// read; the name equality proves the full trailing string round-tripped exactly.
+}
+
+// CreatePlayer recv shape: playerId,weapon,team (bytes), position (Vector3),
+// name (variable). The codec does NOT apply pos.z-=2.4 — the RAW wire pos survives.
+TEST_F(ProtocolRoundTripTest, CreatePlayer) {
+	CreatePlayerPacket in{};
+	in.playerId = 23;
+	in.weapon = 1; // SMG
+	in.team = 0;
+	in.position = Vector3{128.5f, -64.25f, 33.75f};
+	in.name = std::string("Spawned_Player1"); // 15 chars, NUL-free
+	NetPacketWriter w = EncodeCreatePlayer(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeCreatePlayer);
+	CreatePlayerPacket out = DecodeCreatePlayer(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.weapon, in.weapon);
+	EXPECT_EQ(out.team, in.team);
+	// Raw wire position — no pos.z-=2.4 adjustment in the codec (D-09).
+	EXPECT_EQ(F2U(out.position.x), F2U(in.position.x));
+	EXPECT_EQ(F2U(out.position.y), F2U(in.position.y));
+	EXPECT_EQ(F2U(out.position.z), F2U(in.position.z));
+	EXPECT_EQ(out.name, in.name);
+	// NOTE: ReadRemainingString does not advance pos (verbatim reader); the name
+	// equality proves the full trailing string round-tripped exactly.
+}
