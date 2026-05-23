@@ -27,7 +27,7 @@
 //   - PhysicsTestBase.PhysDeterminismGolden replays the frozen fixture tick-by-tick
 //     via ExpectSnapshotMatches (tolerance — never EXPECT_FLOAT_EQ).
 //   - PhysicsTestBase.PhysDeterminismRepeat re-runs the identical simulation 20 times
-//     and asserts all runs produce nlohmann::json-equal tick-0 snapshots (bitwise
+//     and asserts all runs produce nlohmann::json-equal full 60-tick sequences (bitwise
 //     determinism proof — no wall-clock, no RNG, no Settings reads in the physics path).
 
 #include <fstream>
@@ -204,14 +204,16 @@ TEST_F(PhysicsTestBase, PhysDeterminismGolden) {
 }
 
 // ===========================================================================
-// Determinism repeat test — 20 identical runs must produce JSON-equal tick-0
-// snapshots (in-process CI-stability proof; no wall-clock, no RNG in physics path).
+// Determinism repeat test — 20 identical runs must produce JSON-equal full
+// 60-tick sequences (in-process CI-stability proof; no wall-clock, no RNG in
+// physics path). Stores the complete ticks array from each run so divergence
+// at any tick (not just tick 0) is caught.
 // ===========================================================================
 
 TEST_F(PhysicsTestBase, PhysDeterminismRepeat) {
 	constexpr int kRuns = 20;
-	std::vector<nlohmann::json> tick0_snapshots;
-	tick0_snapshots.reserve(kRuns);
+	std::vector<nlohmann::json> run_snapshots; // each element is a 60-tick array
+	run_snapshots.reserve(kRuns);
 
 	for (int run = 0; run < kRuns; run++) {
 		auto vxl = MakeFlatMapBytes();
@@ -221,12 +223,12 @@ TEST_F(PhysicsTestBase, PhysDeterminismRepeat) {
 
 		auto ticks = RunDeterminism60Ticks(hw, p);
 		ASSERT_FALSE(ticks.empty()) << "run " << run << ": no ticks produced";
-		tick0_snapshots.push_back(ticks[0]);
+		run_snapshots.push_back(ticks); // store full 60-tick array
 	}
 
-	ASSERT_EQ(kRuns, static_cast<int>(tick0_snapshots.size()));
+	ASSERT_EQ(kRuns, static_cast<int>(run_snapshots.size()));
 	for (int j = 1; j < kRuns; j++) {
-		EXPECT_EQ(tick0_snapshots[0], tick0_snapshots[j])
-		  << "run " << j << " tick-0 snapshot differs from run 0 (determinism failure)";
+		EXPECT_EQ(run_snapshots[0], run_snapshots[j])
+		  << "run " << j << " full tick sequence differs from run 0 (determinism failure)";
 	}
 }
