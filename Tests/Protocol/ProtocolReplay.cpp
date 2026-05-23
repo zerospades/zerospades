@@ -117,7 +117,11 @@ namespace spades {
 						// NetClient.cpp:624 — SetPosition(savedPlayerPos[pId]); position comes
 						// from the accumulator's OWN savedPos, NOT this packet (Pitfall 1).
 						p.position = savedPos[s.playerId];
-						p.orientation = savedFront[s.playerId];
+						// Oracle fidelity (CR-01): ExistingPlayer does NOT set orientation —
+						// only a later WorldUpdate (SetOrientation, :517) does. Until then the
+						// player carries the Player-ctor team default (Player.cpp:56), NOT a
+						// zero from savedFront. A subsequent WorldUpdate overwrites this.
+						p.orientation = MakeVector3((s.team == 1) ? -1.0F : 1.0F, 0.0F, 0.0F);
 						p.alive = true;
 					} break;
 					case PacketTypeCreatePlayer: {
@@ -133,6 +137,10 @@ namespace spades {
 						// CreatePlayer carries no tool; NetClient relies on the Player-ctor
 						// default. Fold convention: "weapon" (A4 — documented, consistent).
 						p.tool = "weapon";
+						// Same oracle fidelity as ExistingPlayer (CR-01): the freshly
+						// constructed Player carries the team-default orientation
+						// (Player.cpp:56) until a WorldUpdate sets it.
+						p.orientation = MakeVector3((s.team == 1) ? -1.0F : 1.0F, 0.0F, 0.0F);
 						p.alive = true;
 					} break;
 					case PacketTypeWorldUpdate: {
