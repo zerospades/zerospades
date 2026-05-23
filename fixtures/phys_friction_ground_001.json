@@ -1,0 +1,17 @@
+{
+    "version": "1.0.0",
+    "id": "phys_friction_ground_001",
+    "subsystem": "phys",
+    "behavior": "implementation_detail",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "inputs": [],
+    "kind": "step_trace",
+    "expected": {
+        "ticks": []
+    }
+}

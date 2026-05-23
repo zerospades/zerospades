@@ -1,11 +1,11 @@
 {
     "fixtures": [
         {
-            "id": "phys_step_trace_001",
-            "path": "fixtures/phys_step_trace_001.json",
+            "id": "phys_friction_ground_001",
+            "path": "fixtures/phys_friction_ground_001.json",
             "subsystem": "phys",
             "behavior": "implementation_detail",
-            "description": "Step-trace exemplar: stationary player on flat map, single tick, zero velocity."
+            "description": "Ground friction step-trace: player on flat map with initial vx=1.0, zero input, 10 ticks; velocity.x decays by f=dt*4+1 per tick."
         },
         {
             "id": "proto_packet_rt_001",

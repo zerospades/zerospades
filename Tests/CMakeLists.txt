@@ -47,12 +47,15 @@ add_executable(zerospades_tests
     Helpers/RecordingWorldListener.cpp
     Helpers/HeadlessWorld.cpp
     Helpers/ToleranceMatchersTest.cpp
+    Helpers/PlayerPhysicsSnapshot.cpp
     Protocol/ProtocolRoundTripTest.cpp
     Protocol/ProtocolReplay.cpp
     Protocol/ProtocolReplayUnitTest.cpp
     Protocol/ProtocolGoldenTest.cpp
     Protocol/ProtocolExtensionTest.cpp
     Protocol/ProtocolMalformedTest.cpp
+    Physics/PhysicsFixtureTest.cpp
+    Physics/PhysicsDeterminismTest.cpp
 )
 
 target_link_libraries(zerospades_tests PRIVATE
@@ -115,8 +118,8 @@ if(ZEROSPADES_TESTS)
     # per-config) path regardless of the test runner's working directory.
     add_test(NAME CompareSnapshotsMatch
              COMMAND $<TARGET_FILE:compare_snapshots>
-                     ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json
-                     ${CMAKE_SOURCE_DIR}/fixtures/phys_step_trace_001.json)
+                     ${CMAKE_SOURCE_DIR}/fixtures/phys_friction_ground_001.json
+                     ${CMAKE_SOURCE_DIR}/fixtures/phys_friction_ground_001.json)
     set_tests_properties(CompareSnapshotsMatch PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
     # Smoke: wrong arg count → exit 2 (usage error)
