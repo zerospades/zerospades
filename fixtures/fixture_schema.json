@@ -1,0 +1,309 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$comment": "ZeroSpades golden-spec fixture envelope v1.0.0. Coordinate convention: Z=0 sky, Z=63 water, AoS left-handed.",
+    "title": "ZeroSpades Fixture",
+    "type": "object",
+    "required": [
+        "version",
+        "id",
+        "behavior",
+        "seed",
+        "protocol_version",
+        "map",
+        "inputs",
+        "kind",
+        "expected"
+    ],
+    "properties": {
+        "version": {
+            "type": "string",
+            "const": "1.0.0"
+        },
+        "id": {
+            "type": "string",
+            "pattern": "^(proto|phys|map|weap|mode)_"
+        },
+        "subsystem": {
+            "type": "string",
+            "enum": ["proto", "phys", "map", "weap", "mode"]
+        },
+        "behavior": {
+            "type": "string",
+            "enum": ["protocol_compat", "implementation_detail", "known_bug_do_not_preserve"]
+        },
+        "seed": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "protocol_version": {
+            "type": "string",
+            "enum": ["0.75", "0.76"]
+        },
+        "map": {
+            "type": "object",
+            "required": ["generator"],
+            "properties": {
+                "generator": {
+                    "type": "string",
+                    "enum": ["flat"]
+                },
+                "ground_z": {
+                    "type": "integer"
+                },
+                "content_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "inputs": {
+            "type": "array"
+        },
+        "config": {
+            "type": "object"
+        },
+        "tolerances": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "number"
+                },
+                "orientation": {
+                    "type": "number"
+                },
+                "grenade": {
+                    "type": "number"
+                },
+                "raycast": {
+                    "type": "number"
+                }
+            }
+        },
+        "kind": {
+            "type": "string",
+            "enum": ["world_snapshot", "step_trace", "value_lookup", "packet_roundtrip"]
+        },
+        "expected": {
+            "type": "object"
+        }
+    },
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "world_snapshot"
+                    }
+                },
+                "required": ["kind"]
+            },
+            "then": {
+                "properties": {
+                    "expected": {
+                        "type": "object",
+                        "required": ["tick", "map_content_hash", "players"],
+                        "properties": {
+                            "tick": {
+                                "type": "integer"
+                            },
+                            "world_time_s": {
+                                "type": "number"
+                            },
+                            "map_content_hash": {
+                                "type": "string"
+                            },
+                            "players": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/$defs/PlayerSnapshot"
+                                }
+                            },
+                            "grenades": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/$defs/GrenadeSnapshot"
+                                }
+                            },
+                            "game_mode": {
+                                "$ref": "#/$defs/GameModeSnapshot"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "step_trace"
+                    }
+                },
+                "required": ["kind"]
+            },
+            "then": {
+                "properties": {
+                    "expected": {
+                        "type": "object",
+                        "required": ["ticks"],
+                        "properties": {
+                            "ticks": {
+                                "type": "array"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "value_lookup"
+                    }
+                },
+                "required": ["kind"]
+            },
+            "then": {
+                "properties": {
+                    "expected": {
+                        "type": "object",
+                        "required": ["value"]
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "packet_roundtrip"
+                    }
+                },
+                "required": ["kind"]
+            },
+            "then": {
+                "properties": {
+                    "expected": {
+                        "type": "object",
+                        "required": ["bytes_hex", "decoded"],
+                        "properties": {
+                            "bytes_hex": {
+                                "type": "string"
+                            },
+                            "decoded": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "$defs": {
+        "Vec3": {
+            "type": "object",
+            "required": ["x", "y", "z"],
+            "properties": {
+                "x": {
+                    "type": "number"
+                },
+                "y": {
+                    "type": "number"
+                },
+                "z": {
+                    "type": "number"
+                }
+            }
+        },
+        "PlayerSnapshot": {
+            "type": "object",
+            "required": [
+                "id",
+                "alive",
+                "position",
+                "velocity",
+                "orientation",
+                "health",
+                "tool",
+                "weapon_type"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "alive": {
+                    "type": "boolean"
+                },
+                "position": {
+                    "$ref": "#/$defs/Vec3"
+                },
+                "velocity": {
+                    "$ref": "#/$defs/Vec3"
+                },
+                "orientation": {
+                    "$ref": "#/$defs/Vec3"
+                },
+                "health": {
+                    "type": "integer"
+                },
+                "tool": {
+                    "type": "string",
+                    "enum": ["spade", "block", "weapon", "grenade"]
+                },
+                "weapon_type": {
+                    "type": "string",
+                    "enum": ["rifle", "smg", "shotgun"]
+                },
+                "team_id": {
+                    "type": "integer"
+                },
+                "grenades": {
+                    "type": "integer"
+                },
+                "blocks": {
+                    "type": "integer"
+                },
+                "airborne": {
+                    "type": "boolean"
+                },
+                "wade": {
+                    "type": "boolean"
+                },
+                "ammo": {
+                    "type": "integer"
+                },
+                "stock": {
+                    "type": "integer"
+                },
+                "is_reloading": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "GrenadeSnapshot": {
+            "type": "object",
+            "required": ["position", "velocity", "fuse_s"],
+            "properties": {
+                "position": {
+                    "$ref": "#/$defs/Vec3"
+                },
+                "velocity": {
+                    "$ref": "#/$defs/Vec3"
+                },
+                "fuse_s": {
+                    "type": "number"
+                }
+            }
+        },
+        "GameModeSnapshot": {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["ctf", "tc"]
+                }
+            }
+        }
+    }
+}
