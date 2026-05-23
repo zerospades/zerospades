@@ -62,6 +62,13 @@
             "subsystem": "proto",
             "behavior": "protocol_compat",
             "description": "ExtensionInfo negotiation (value_lookup): synthetic ExtensionInfo packet advertises {id 0 v1, id 192 v1}; the fold records all advertised extensions per A3 (wire fact, not NetClient's implementedExtensions filter). expected.value is the populated extensions map id->version."
+        },
+        {
+            "id": "proto_malformed_001",
+            "path": "fixtures/proto_malformed_001.json",
+            "subsystem": "proto",
+            "behavior": "implementation_detail",
+            "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input — the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
         }
     ]
 }
