@@ -730,6 +730,71 @@ TEST_F(ProtocolRoundTripTest, StateData_CTF_NoIntel) {
 	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
 }
 
+// StateData CTF with ASYMMETRIC intel: exactly one team carries. Exercises the
+// MIXED branches (one slot reads a carrierId+11-skip, the other reads a flagPos
+// Vector3) and the cross-slot field routing (slot1 gated on team2 bit; slot2 on
+// team1 bit). Round-trip alone can't catch a swap, but it proves the asymmetric
+// paths are self-consistent and consume exactly the right byte count. (CR WR-01)
+TEST_F(ProtocolRoundTripTest, StateData_CTF_Team1Intel) {
+	StateDataPacket in{};
+	in.playerId = 2;
+	in.fogColor = MakeIntVector3(9, 8, 7);
+	in.teamColor[0] = MakeIntVector3(1, 1, 1);
+	in.teamColor[1] = MakeIntVector3(2, 2, 2);
+	in.teamName[0] = std::string("Red");
+	in.teamName[1] = std::string("Blu");
+	in.mode = 0;
+	in.ctfTeam1Score = 1;
+	in.ctfTeam2Score = 2;
+	in.ctfCaptureLimit = 10;
+	in.ctfIntelFlags = 0x1; // team1 carries (slot2=carrier), team2 does not (slot1=flagPos)
+	in.ctfTeam1CarrierId = 42;
+	in.ctfTeam1FlagPos = Vector3{1.25f, -2.25f, 3.25f};
+	in.ctfTeam1BasePos = Vector3{4.f, 5.f, 6.f};
+	in.ctfTeam2BasePos = Vector3{-7.f, -8.f, -9.f};
+	NetPacketWriter w = EncodeStateData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeStateData);
+	StateDataPacket out = DecodeStateData(r);
+	EXPECT_EQ(out.ctfIntelFlags, 0x1);
+	EXPECT_EQ(out.ctfTeam1CarrierId, in.ctfTeam1CarrierId);
+	EXPECT_EQ(F2U(out.ctfTeam1FlagPos.x), F2U(in.ctfTeam1FlagPos.x));
+	EXPECT_EQ(F2U(out.ctfTeam1FlagPos.y), F2U(in.ctfTeam1FlagPos.y));
+	EXPECT_EQ(F2U(out.ctfTeam1FlagPos.z), F2U(in.ctfTeam1FlagPos.z));
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.x), F2U(in.ctfTeam1BasePos.x));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.z), F2U(in.ctfTeam2BasePos.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, StateData_CTF_Team2Intel) {
+	StateDataPacket in{};
+	in.playerId = 3;
+	in.fogColor = MakeIntVector3(3, 3, 3);
+	in.teamColor[0] = MakeIntVector3(4, 4, 4);
+	in.teamColor[1] = MakeIntVector3(5, 5, 5);
+	in.teamName[0] = std::string("X");
+	in.teamName[1] = std::string("Y");
+	in.mode = 0;
+	in.ctfCaptureLimit = 10;
+	in.ctfIntelFlags = 0x2; // team2 carries (slot1=carrier), team1 does not (slot2=flagPos)
+	in.ctfTeam2CarrierId = 99;
+	in.ctfTeam2FlagPos = Vector3{-10.5f, 11.5f, -12.5f};
+	in.ctfTeam1BasePos = Vector3{13.f, 14.f, 15.f};
+	in.ctfTeam2BasePos = Vector3{-16.f, -17.f, -18.f};
+	NetPacketWriter w = EncodeStateData(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeStateData);
+	StateDataPacket out = DecodeStateData(r);
+	EXPECT_EQ(out.ctfIntelFlags, 0x2);
+	EXPECT_EQ(out.ctfTeam2CarrierId, in.ctfTeam2CarrierId);
+	EXPECT_EQ(F2U(out.ctfTeam2FlagPos.x), F2U(in.ctfTeam2FlagPos.x));
+	EXPECT_EQ(F2U(out.ctfTeam2FlagPos.y), F2U(in.ctfTeam2FlagPos.y));
+	EXPECT_EQ(F2U(out.ctfTeam2FlagPos.z), F2U(in.ctfTeam2FlagPos.z));
+	EXPECT_EQ(F2U(out.ctfTeam1BasePos.x), F2U(in.ctfTeam1BasePos.x));
+	EXPECT_EQ(F2U(out.ctfTeam2BasePos.z), F2U(in.ctfTeam2BasePos.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
 // StateData TC (mode!=0): territoryCount then per-territory [pos(12B), state(1B)].
 TEST_F(ProtocolRoundTripTest, StateData_TC) {
 	StateDataPacket in{};
