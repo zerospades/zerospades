@@ -270,7 +270,7 @@ namespace spades {
 						if (type != PacketTypeMapStart)
 							SPRaise("Unexpected packet: %d", type);
 
-						auto mapSize = reader.ReadInt();
+						auto mapSize = DecodeMapStart(reader).mapSize;
 						SPLog("Map size advertised by the server: %lu", (unsigned long)mapSize);
 
 						mapLoader.reset(new GameMapLoader());
@@ -474,13 +474,13 @@ namespace spades {
 						// ignore this now
 						break;
 					}
-					p.RepositionPlayer(r.ReadVector3());
+					p.RepositionPlayer(DecodePositionData(r).position);
 				} break;
 				case PacketTypeOrientationData: {
 					Player& p = GetLocalPlayer();
 
 					// ignore invalid orientation
-					Vector3 o = r.ReadVector3();
+					Vector3 o = DecodeOrientationData(r).orientation;
 					if (o.GetSquaredLength() < 0.01F)
 						break;
 
@@ -488,23 +488,21 @@ namespace spades {
 					p.SetOrientation(o);
 				} break;
 				case PacketTypeWorldUpdate: {
-					int bytesPerEntry = 24;
-					if (protocolVersion == 4)
-						bytesPerEntry++;
-
 					client->MarkWorldUpdate();
 
-					int entries = static_cast<int>(r.GetLength() / bytesPerEntry);
-					for (int i = 0; i < entries; i++) {
-						int idx = i;
+					// Decode the wire entries first (codec is pure, version-param-driven, D-08),
+					// then apply the stateful mutation here (idx range-check, repositioning,
+					// savedPlayer* writes) — the "decode-all-first, then mutate" safe split (D-09).
+					auto s = DecodeWorldUpdate(r, protocolVersion);
+					for (const auto& e : s.entries) {
+						int idx = e.index;
 						if (protocolVersion == 4) {
-							idx = r.ReadByte();
 							if (idx < 0 || idx >= properties->GetMaxNumPlayerSlots())
 								SPRaise("Invalid player ID %d received with WorldUpdate", idx);
 						}
 
-						Vector3 pos = r.ReadVector3();
-						Vector3 front = r.ReadVector3();
+						Vector3 pos = e.position;
+						Vector3 front = e.front;
 
 						{
 							SPAssert(!pos.IsNaN());
@@ -531,8 +529,9 @@ namespace spades {
 					if (!GetWorld())
 						break;
 					{
-						Player& p = GetPlayer(r.ReadByte());
-						PlayerInput inp = ParsePlayerInput(r.ReadByte());
+						auto s = DecodeInputData(r);
+						Player& p = GetPlayer(s.playerId);
+						PlayerInput inp = ParsePlayerInput(s.bits);
 
 						if (&p == GetWorld()->GetLocalPlayer()) {
 							if (inp.jump) // handle "/fly" jump
@@ -548,8 +547,9 @@ namespace spades {
 					if (!GetWorld())
 						break;
 					{
-						Player& p = GetPlayer(r.ReadByte());
-						WeaponInput inp = ParseWeaponInput(r.ReadByte());
+						auto s = DecodeWeaponInput(r);
+						Player& p = GetPlayer(s.playerId);
+						WeaponInput inp = ParseWeaponInput(s.bits);
 
 						if (&p == GetWorld()->GetLocalPlayer())
 							break;
@@ -559,26 +559,24 @@ namespace spades {
 					break;
 				case PacketTypeSetHP: { // Hit Packet is Client-to-Server!
 					Player& p = GetLocalPlayer();
-					int hp = r.ReadByte();
-					int type = r.ReadByte(); // 0=fall, 1=weap
-					Vector3 source = r.ReadVector3();
-					p.SetHP(hp, type ? HurtTypeWeapon : HurtTypeFall, source);
+					auto s = DecodeSetHP(r);
+					int type = s.type; // 0=fall, 1=weap
+					p.SetHP(s.hp, type ? HurtTypeWeapon : HurtTypeFall, s.source);
 				} break;
 				case PacketTypeGrenadePacket:
 					if (!GetWorld())
 						break;
 					{
-						r.ReadByte(); // skip player Id
-						float fuse = r.ReadFloat();
-						Vector3 pos = r.ReadVector3();
-						Vector3 vel = r.ReadVector3();
-						Grenade* g = new Grenade(*GetWorld(), pos, vel, fuse);
+						auto s = DecodeGrenade(r); // playerId is decoded but unused (was skipped)
+						Grenade* g =
+							new Grenade(*GetWorld(), s.position, s.velocity, s.fuse);
 						GetWorld()->AddGrenade(std::unique_ptr<Grenade>{g});
 					}
 					break;
 				case PacketTypeSetTool: {
-					Player& p = GetPlayer(r.ReadByte());
-					int tool = r.ReadByte();
+					auto s = DecodeSetTool(r);
+					Player& p = GetPlayer(s.playerId);
+					int tool = s.tool;
 
 					switch (tool) {
 						case 0: p.SetTool(Player::ToolSpade); break;
@@ -589,24 +587,28 @@ namespace spades {
 					}
 				} break;
 				case PacketTypeSetColour: {
-					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
-					IntVector3 color = r.ReadIntColor();
+					auto s = DecodeSetColour(r);
+					stmp::optional<Player&> p = GetPlayerOrNull(s.playerId);
 					if (p)
-						p->SetHeldBlockColor(color);
+						p->SetHeldBlockColor(s.color);
 					else
-						temporaryPlayerBlockColor = color;
+						temporaryPlayerBlockColor = s.color;
 				} break;
 				case PacketTypeExistingPlayer:
 					if (!GetWorld())
 						break;
 					{
-						int pId = r.ReadByte();
-						int team = r.ReadByte();
-						int weapon = r.ReadByte();
-						int tool = r.ReadByte();
-						int score = r.ReadInt();
-						IntVector3 color = r.ReadIntColor(); // block color
-						std::string name = StripNewlines(TrimSpaces(r.ReadRemainingString()));
+						// Decode the wire fields (codec is pure); keep all the stateful
+						// construction/validation here (D-09). name normalization stays
+						// in NetClient (display normalization, not wire format).
+						auto s = DecodeExistingPlayer(r);
+						int pId = s.playerId;
+						int team = s.team;
+						int weapon = s.weapon;
+						int tool = s.tool;
+						int score = static_cast<int>(s.score);
+						IntVector3 color = s.color; // block color
+						std::string name = StripNewlines(TrimSpaces(s.name));
 
 						WeaponType wType;
 						switch (weapon) {
@@ -649,9 +651,10 @@ namespace spades {
 					if (!GetWorld())
 						SPRaise("No world");
 
-					int type = r.ReadByte();
-					int state = r.ReadByte();
-					Vector3 pos = r.ReadVector3();
+					auto s = DecodeMoveObject(r);
+					int type = s.type;
+					int state = s.state;
+					Vector3 pos = s.position;
 
 					stmp::optional<IGameMode&> mode = GetWorld()->GetMode();
 					if (mode && mode->ModeType() == IGameMode::m_CTF) {
@@ -687,11 +690,14 @@ namespace spades {
 					if (!GetWorld())
 						SPRaise("No world");
 
-					int pId = r.ReadByte();
-					int weapon = r.ReadByte();
-					int team = r.ReadByte();
-					Vector3 pos = r.ReadVector3();
-					std::string name = StripNewlines(TrimSpaces(r.ReadRemainingString()));
+					// Decode the raw wire fields (codec is pure); the pos.z-=2.4 spawn
+					// adjustment + construction + block-color override stay here (D-09).
+					auto s = DecodeCreatePlayer(r);
+					int pId = s.playerId;
+					int weapon = s.weapon;
+					int team = s.team;
+					Vector3 pos = s.position;
+					std::string name = StripNewlines(TrimSpaces(s.name));
 
 					if (pId < 0 || pId >= properties->GetMaxNumPlayerSlots()) {
 						SPLog("Ignoring invalid player ID %d (pyspades bug?: %s)", pId, name.c_str());
@@ -744,9 +750,10 @@ namespace spades {
 					client->PlayerSpawned(pRef);
 				} break;
 				case PacketTypeBlockAction: {
-					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
-					int action = r.ReadByte();
-					IntVector3 pos = r.ReadIntVector3();
+					auto s = DecodeBlockAction(r);
+					stmp::optional<Player&> p = GetPlayerOrNull(s.playerId);
+					int action = s.action;
+					IntVector3 pos = s.position;
 
 					std::vector<IntVector3> cells;
 					if (action == BlockActionCreate) {
@@ -782,11 +789,11 @@ namespace spades {
 					}
 				} break;
 				case PacketTypeBlockLine: {
-					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
+					auto s = DecodeBlockLine(r);
+					stmp::optional<Player&> p = GetPlayerOrNull(s.playerId);
 
-					IntVector3 pos1, pos2;
-					pos1 = r.ReadIntVector3();
-					pos2 = r.ReadIntVector3();
+					IntVector3 pos1 = s.start;
+					IntVector3 pos2 = s.end;
 
 					auto cells = GetWorld()->CubeLine(pos1, pos2, 50);
 					for (const auto& c : cells) {
@@ -807,71 +814,57 @@ namespace spades {
 					if (!GetWorld())
 						break;
 					{
-						// receives my player info.
-						int pId = r.ReadByte();
-						IntVector3 fogColor = r.ReadIntColor();
-
-						IntVector3 teamColors[2];
-						teamColors[0] = r.ReadIntColor();
-						teamColors[1] = r.ReadIntColor();
-
-						std::string teamNames[2];
-						teamNames[0] = r.ReadString(10);
-						teamNames[1] = r.ReadString(10);
+						// receives my player info. Decode the discriminated wire fields
+						// (codec is pure, D-10); build the World teams + CTF/TC game-mode
+						// object here (D-09).
+						auto s = DecodeStateData(r);
 
 						World::Team& t1 = GetWorld()->GetTeam(0);
 						World::Team& t2 = GetWorld()->GetTeam(1);
-						t1.color = teamColors[0];
-						t2.color = teamColors[1];
-						t1.name = teamNames[0];
-						t2.name = teamNames[1];
+						t1.color = s.teamColor[0];
+						t2.color = s.teamColor[1];
+						t1.name = s.teamName[0];
+						t2.name = s.teamName[1];
 
-						GetWorld()->SetFogColor(fogColor);
-						GetWorld()->SetLocalPlayerIndex(pId);
+						GetWorld()->SetFogColor(s.fogColor);
+						GetWorld()->SetLocalPlayerIndex(s.playerId);
 
-						int mode = r.ReadByte();
-						if (mode == CTFGameMode::m_CTF) { // CTF
+						if (s.mode == CTFGameMode::m_CTF) { // CTF
 							auto ctf = stmp::make_unique<CTFGameMode>();
 
 							CTFGameMode::Team& team1 = ctf->GetTeam(0);
 							CTFGameMode::Team& team2 = ctf->GetTeam(1);
 
-							team1.score = r.ReadByte();
-							team2.score = r.ReadByte();
-							ctf->SetCaptureLimit(r.ReadByte());
+							team1.score = s.ctfTeam1Score;
+							team2.score = s.ctfTeam2Score;
+							ctf->SetCaptureLimit(s.ctfCaptureLimit);
 
-							int intelFlags = r.ReadByte();
+							int intelFlags = s.ctfIntelFlags;
 							team1.hasIntel = (intelFlags & 1) != 0;
 							team2.hasIntel = (intelFlags & 2) != 0;
 
-							if (team2.hasIntel) {
-								team2.carrierId = r.ReadByte();
-								r.ReadData(11);
-							} else {
-								team1.flagPos = r.ReadVector3();
-							}
+							if (team2.hasIntel)
+								team2.carrierId = s.ctfTeam2CarrierId;
+							else
+								team1.flagPos = s.ctfTeam1FlagPos;
 
-							if (team1.hasIntel) {
-								team1.carrierId = r.ReadByte();
-								r.ReadData(11);
-							} else {
-								team2.flagPos = r.ReadVector3();
-							}
+							if (team1.hasIntel)
+								team1.carrierId = s.ctfTeam1CarrierId;
+							else
+								team2.flagPos = s.ctfTeam2FlagPos;
 
-							team1.basePos = r.ReadVector3();
-							team2.basePos = r.ReadVector3();
+							team1.basePos = s.ctfTeam1BasePos;
+							team2.basePos = s.ctfTeam2BasePos;
 
 							GetWorld()->SetMode(std::move(ctf));
 						} else { // TC
 							auto tc = stmp::make_unique<TCGameMode>(*GetWorld());
 
-							int trNum = r.ReadByte();
-							for (int i = 0; i < trNum; i++) {
+							for (const auto& terr : s.tcTerritories) {
 								TCGameMode::Territory t{*tc};
-								t.pos = r.ReadVector3();
+								t.pos = terr.pos;
 
-								int state = r.ReadByte();
-								t.ownerTeamId = state;
+								t.ownerTeamId = terr.state;
 								t.progressBasePos = 0.0F;
 								t.progressStartTime = 0.0F;
 								t.progressRate = 0.0F;
@@ -885,10 +878,11 @@ namespace spades {
 					}
 					break;
 				case PacketTypeKillAction: {
-					int victimId = r.ReadByte();
-					int killerId = r.ReadByte();
-					int kt = r.ReadByte();
-					int respawnTime = r.ReadByte();
+					auto s = DecodeKillAction(r);
+					int victimId = s.victimId;
+					int killerId = s.killerId;
+					int kt = s.killType;
+					int respawnTime = s.respawnTime;
 
 					KillType type;
 					switch (kt) {
@@ -916,9 +910,10 @@ namespace spades {
 				} break;
 				case PacketTypeChatMessage: {
 					// might be wrong player id for server message
-					int playerId = r.ReadByte();
-					int type = r.ReadByte();
-					std::string msg = StripNewlines(TrimSpaces(r.ReadRemainingString()));
+					auto s = DecodeChatMessage(r);
+					int playerId = s.playerId;
+					int type = s.type;
+					std::string msg = StripNewlines(TrimSpaces(s.message));
 
 					if (type == ChatTypeSystem) {
 						if (playerId == 255) {
@@ -954,7 +949,7 @@ namespace spades {
 
 					client->SetWorld(NULL);
 
-					auto mapSize = r.ReadInt();
+					auto mapSize = DecodeMapStart(r).mapSize;
 					SPLog("Map size advertised by the server: %lu", (unsigned long)mapSize);
 
 					mapLoader.reset(new GameMapLoader());
@@ -965,7 +960,7 @@ namespace spades {
 				} break;
 				case PacketTypeMapChunk: SPRaise("Unexpected: received Map Chunk while game");
 				case PacketTypePlayerLeft: {
-					int pId = r.ReadByte();
+					int pId = DecodePlayerLeft(r).playerId;
 					Player& p = GetPlayer(pId);
 
 					client->PlayerLeaving(p);
@@ -975,9 +970,10 @@ namespace spades {
 					GetWorld()->SetPlayer(pId, NULL);
 				} break;
 				case PacketTypeTerritoryCapture: {
-					int territoryId = r.ReadByte();
-					bool winning = r.ReadByte() != 0;
-					int state = r.ReadByte();
+					auto s = DecodeTerritoryCapture(r);
+					int territoryId = s.territoryId;
+					bool winning = s.winning != 0;
+					int state = s.state;
 
 					// TODO: This piece is repeated for at least three times
 					stmp::optional<IGameMode&> mode = GetWorld()->GetMode();
@@ -1010,10 +1006,11 @@ namespace spades {
 						client->TeamWon(state);
 				} break;
 				case PacketTypeProgressBar: {
-					int territoryId = r.ReadByte();
-					int capturingTeam = r.ReadByte();
-					int rate = (int8_t)r.ReadByte();
-					float progress = r.ReadFloat();
+					auto s = DecodeProgressBar(r);
+					int territoryId = s.territoryId;
+					int capturingTeam = s.capturingTeam;
+					int rate = s.rate;
+					float progress = s.progress;
 
 					stmp::optional<IGameMode&> mode = GetWorld()->GetMode();
 					if (!mode) {
@@ -1054,7 +1051,8 @@ namespace spades {
 					if (mode->ModeType() != IGameMode::m_CTF)
 						SPRaise("Received PacketTypeIntelCapture in non-CTF gamemode");
 
-					int pId = r.ReadByte();
+					auto s = DecodeIntelCapture(r);
+					int pId = s.playerId;
 					Player& p = GetPlayer(pId);
 					int teamId = p.GetTeamId();
 
@@ -1066,7 +1064,7 @@ namespace spades {
 					client->PlayerCapturedIntel(p);
 					GetWorld()->GetPlayerPersistent(pId).score += 10;
 
-					bool winning = r.ReadByte() != 0;
+					bool winning = s.winning != 0;
 					if (winning) {
 						client->TeamWon(teamId);
 						ctf.ResetIntelHoldingStatus();
@@ -1082,7 +1080,7 @@ namespace spades {
 					if (mode->ModeType() != IGameMode::m_CTF)
 						SPRaise("Received PacketTypeIntelPickup in non-CTF gamemode");
 
-					int pId = r.ReadByte();
+					int pId = DecodeIntelPickup(r).playerId;
 					Player& p = GetPlayer(pId);
 
 					auto& ctf = dynamic_cast<CTFGameMode&>(mode.value());
@@ -1101,26 +1099,33 @@ namespace spades {
 					if (mode->ModeType() != IGameMode::m_CTF)
 						SPRaise("Received PacketTypeIntelDrop in non-CTF gamemode");
 
-					Player& p = GetPlayer(r.ReadByte());
+					auto s = DecodeIntelDrop(r);
+					Player& p = GetPlayer(s.playerId);
 					int teamId = p.GetTeamId();
 
 					auto& ctf = dynamic_cast<CTFGameMode&>(mode.value());
 					ctf.GetTeam(teamId).hasIntel = false;
-					ctf.GetTeam(1 - teamId).flagPos = r.ReadVector3();
+					ctf.GetTeam(1 - teamId).flagPos = s.position;
 					client->PlayerDropIntel(p);
 				} break;
 				case PacketTypeRestock: {
-					r.ReadByte(); // skip player id
+					DecodeRestock(r); // playerId decoded but unused (was skipped)
 					Player& p = GetLocalPlayer();
 					p.Restock();
 				} break;
 				case PacketTypeFogColour: {
 					if (GetWorld()) {
-						r.ReadByte(); // skip alpha value
-						GetWorld()->SetFogColor(r.ReadIntColor());
+						// alpha is decoded but skipped (matches recv); color is BGR.
+						GetWorld()->SetFogColor(DecodeFogColour(r).color);
 					}
 				} break;
 				case PacketTypeWeaponReload: {
+					// KEPT INLINE (deviation): recv reads clip/reserve ONLY for the local
+					// player (conditional on direction), whereas DecodeWeaponReload reads all
+					// 3 bytes unconditionally. Delegating would read 2 bytes the recv path does
+					// not consume for non-local players — a wire-read change. The codec models
+					// the full 3-byte send shape (round-trip tested); the recv stays inline to
+					// preserve byte-identical reads (D-11 safety).
 					Player& p = GetPlayer(r.ReadByte());
 					if (&p != GetLocalPlayerOrNull()) {
 						p.Reload();
@@ -1131,8 +1136,7 @@ namespace spades {
 					}
 				} break;
 				case PacketTypeChangeTeam: {
-					r.ReadByte(); // skip player id
-					r.ReadByte(); // skip team id
+					DecodeChangeTeam(r); // playerId/team decoded but unused (were skipped)
 
 					/*
 						Player& p = GetPlayer(pId);
@@ -1142,8 +1146,7 @@ namespace spades {
 					*/
 				} break;
 				case PacketTypeChangeWeapon: {
-					r.ReadByte(); // skip player id
-					r.ReadByte(); // skip weapon id
+					DecodeChangeWeapon(r); // playerId/weapon decoded but unused (were skipped)
 
 					/*
 						Player& p = GetPlayer(pId);
@@ -1158,14 +1161,14 @@ namespace spades {
 					*/
 				} break;
 				case PacketTypePlayerProperties: {
-					r.ReadByte(); // skip subId
-					int pId = r.ReadByte();
-					int hp = r.ReadByte();
-					int blocks = r.ReadByte();
-					int grenades = r.ReadByte();
-					int clip = r.ReadByte();
-					int reserve = r.ReadByte();
-					int score = r.ReadByte();
+					auto s = DecodePlayerProperties(r); // subId decoded but unused (was skipped)
+					int pId = s.playerId;
+					int hp = s.hp;
+					int blocks = s.blocks;
+					int grenades = s.grenades;
+					int clip = s.clip;
+					int reserve = s.reserve;
+					int score = s.score;
 
 					Player& p = GetPlayer(pId);
 					Weapon& w = p.GetWeapon();
