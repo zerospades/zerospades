@@ -33,6 +33,7 @@
 #include "Grenade.h"
 #include "NetClient.h"
 #include "Player.h"
+#include "ProtocolCodec.h"
 #include "TCGameMode.h"
 #include "Weapon.h"
 #include "World.h"
@@ -46,60 +47,19 @@
 #include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 
-DEFINE_SPADES_SETTING(cg_unicode, "1");
-
 DEFINE_SPADES_SETTING(cg_defaultBlockColorR, "111");
 DEFINE_SPADES_SETTING(cg_defaultBlockColorG, "111");
 DEFINE_SPADES_SETTING(cg_defaultBlockColorB, "111");
+
+// cg_unicode is DEFINEd in ProtocolCodec.cpp (it moved with the string helpers, D-04);
+// reference it here so SendVersionEnhanced can read the SupportsUnicode feature flag.
+SPADES_SETTING(cg_unicode);
 
 namespace spades {
 	namespace client {
 
 		namespace {
-			const char UTFSign = -1;
-
 			enum { BLUE_FLAG = 0, GREEN_FLAG = 1, BLUE_BASE = 2, GREEN_BASE = 3 };
-			enum PacketType {
-				PacketTypePositionData = 0,			// C2S2P
-				PacketTypeOrientationData = 1,		// C2S2P
-				PacketTypeWorldUpdate = 2,			// S2C
-				PacketTypeInputData = 3,			// C2S2P
-				PacketTypeWeaponInput = 4,			// C2S2P
-				PacketTypeHitPacket = 5,			// C2S
-				PacketTypeSetHP = 5,				// S2C
-				PacketTypeGrenadePacket = 6,		// C2S2P
-				PacketTypeSetTool = 7,				// C2S2P
-				PacketTypeSetColour = 8,			// C2S2P
-				PacketTypeExistingPlayer = 9,		// C2S2P
-				PacketTypeShortPlayerData = 10,		// S2C
-				PacketTypeMoveObject = 11,			// S2C
-				PacketTypeCreatePlayer = 12,		// S2C
-				PacketTypeBlockAction = 13,			// C2S2P
-				PacketTypeBlockLine = 14,			// C2S2P
-				PacketTypeStateData = 15,			// S2C
-				PacketTypeKillAction = 16,			// S2C
-				PacketTypeChatMessage = 17,			// C2S2P
-				PacketTypeMapStart = 18,			// S2C
-				PacketTypeMapChunk = 19,			// S2C
-				PacketTypePlayerLeft = 20,			// S2P
-				PacketTypeTerritoryCapture = 21,	// S2P
-				PacketTypeProgressBar = 22,			// S2P
-				PacketTypeIntelCapture = 23,		// S2P
-				PacketTypeIntelPickup = 24,			// S2P
-				PacketTypeIntelDrop = 25,			// S2P
-				PacketTypeRestock = 26,				// S2P
-				PacketTypeFogColour = 27,			// S2C
-				PacketTypeWeaponReload = 28,		// C2S2P
-				PacketTypeChangeTeam = 29,			// C2S2P
-				PacketTypeChangeWeapon = 30,		// C2S2P
-				PacketTypeMapCached = 31,			// S2C
-				PacketTypeHandShakeInit = 31,		// S2C
-				PacketTypeHandShakeReturn = 32,		// C2S
-				PacketTypeVersionGet = 33,			// S2C
-				PacketTypeVersionSend = 34,			// C2S
-				PacketTypeExtensionInfo = 60,
-				PacketTypePlayerProperties = 64,
-			};
 
 			enum class VersionInfoPropertyId : std::uint8_t {
 				ApplicationNameAndVersion = 0,
@@ -115,262 +75,12 @@ namespace spades {
 			ClientFeatureFlags1& operator|=(ClientFeatureFlags1& a, ClientFeatureFlags1 b) {
 				return a = a | b;
 			}
-
-			std::string EncodeString(std::string str) {
-				auto str2 = CP437::Encode(str, -1);
-				if (!cg_unicode)
-					return str2; // ignore fallbacks
-
-				// some fallbacks; always use UTF8
-				if (str2.find(-1) != std::string::npos)
-					str.insert(0, &UTFSign, 1);
-				else
-					str = str2;
-
-				return str;
-			}
-
-			std::string DecodeString(std::string s) {
-				if (s.size() > 0 && s[0] == UTFSign)
-					return s.substr(1);
-
-				return CP437::Decode(s);
-			}
 		} // namespace
 
-		class NetPacketReader {
-			std::vector<char> data;
-			size_t pos;
-
-		public:
-			NetPacketReader(ENetPacket* packet) {
-				SPADES_MARK_FUNCTION();
-
-				data.resize(packet->dataLength);
-				memcpy(data.data(), packet->data, packet->dataLength);
-				enet_packet_destroy(packet);
-				pos = 1;
-			}
-
-			NetPacketReader(const std::vector<char> inData) {
-				data = inData;
-				pos = 1;
-			}
-
-			unsigned int GetTypeRaw() { return static_cast<unsigned int>(data[0]); }
-			PacketType GetType() { return static_cast<PacketType>(GetTypeRaw()); }
-
-			uint32_t ReadInt() {
-				SPADES_MARK_FUNCTION();
-
-				uint32_t value = 0;
-				if (pos + 4 > data.size())
-					SPRaise("Received packet truncated");
-
-				value |= ((uint32_t)(uint8_t)data[pos++]);
-				value |= ((uint32_t)(uint8_t)data[pos++]) << 8;
-				value |= ((uint32_t)(uint8_t)data[pos++]) << 16;
-				value |= ((uint32_t)(uint8_t)data[pos++]) << 24;
-				return value;
-			}
-
-			uint16_t ReadShort() {
-				SPADES_MARK_FUNCTION();
-
-				uint32_t value = 0;
-				if (pos + 2 > data.size())
-					SPRaise("Received packet truncated");
-
-				value |= ((uint32_t)(uint8_t)data[pos++]);
-				value |= ((uint32_t)(uint8_t)data[pos++]) << 8;
-				return (uint16_t)value;
-			}
-
-			uint8_t ReadByte() {
-				SPADES_MARK_FUNCTION();
-
-				if (pos >= data.size())
-					SPRaise("Received packet truncated");
-
-				return (uint8_t)data[pos++];
-			}
-
-			float ReadFloat() {
-				SPADES_MARK_FUNCTION();
-				union {
-					float f;
-					uint32_t v;
-				};
-				v = ReadInt();
-				return f;
-			}
-
-			IntVector3 ReadIntColor() {
-				SPADES_MARK_FUNCTION();
-				IntVector3 col;
-				col.z = ReadByte(); // B
-				col.y = ReadByte(); // G
-				col.x = ReadByte(); // R
-				return col;
-			}
-			IntVector3 ReadIntVector3() {
-				SPADES_MARK_FUNCTION();
-				IntVector3 v;
-				v.x = ReadInt();
-				v.y = ReadInt();
-				v.z = ReadInt();
-				return v;
-			}
-			Vector3 ReadVector3() {
-				SPADES_MARK_FUNCTION();
-				Vector3 v;
-				v.x = ReadFloat();
-				v.y = ReadFloat();
-				v.z = ReadFloat();
-				return v;
-			}
-
-			std::size_t GetLength() { return data.size(); }
-			std::size_t GetPosition() { return pos; }
-			std::size_t GetNumRemainingBytes() { return data.size() - pos; }
-			std::vector<char> GetData() { return data; }
-
-			std::string ReadData(size_t siz) {
-				if (pos + siz > data.size())
-					SPRaise("Received packet truncated");
-
-				std::string s = std::string(data.data() + pos, siz);
-				pos += siz;
-				return s;
-			}
-			std::string ReadRemainingData() {
-				return std::string(data.data() + pos, data.size() - pos);
-			}
-
-			std::string ReadString(size_t siz) {
-				SPADES_MARK_FUNCTION_DEBUG();
-				// convert to C string once so that null-chars are removed
-				return DecodeString(ReadData(siz).c_str());
-			}
-			std::string ReadRemainingString() {
-				SPADES_MARK_FUNCTION_DEBUG();
-				// convert to C string once so that null-chars are removed
-				return DecodeString(ReadRemainingData().c_str());
-			}
-
-			void DumpDebug() {
-#if 1
-				char buf[512];
-				std::string str;
-
-				int bytes = (int)data.size();
-				snprintf(buf, sizeof(buf), "Packet 0x%02x [len=%d]", (int)GetType(), bytes);
-				str += buf;
-
-				if (bytes > 64)
-					bytes = 64;
-				for (int i = 0; i < bytes; i++) {
-					snprintf(buf, sizeof(buf), " %02x", (unsigned int)(unsigned char)data[i]);
-					str += buf;
-				}
-
-				SPLog("%s", str.c_str());
-#endif
-			}
-		};
-
-		class NetPacketWriter {
-			std::vector<char> data;
-
-		public:
-			NetPacketWriter(PacketType type) { data.push_back(type); }
-
-			void WriteByte(uint8_t v) {
-				SPADES_MARK_FUNCTION_DEBUG();
-				data.push_back(v);
-			}
-			void WriteShort(uint16_t v) {
-				SPADES_MARK_FUNCTION_DEBUG();
-				data.push_back((char)(v));
-				data.push_back((char)(v >> 8));
-			}
-			void WriteInt(uint32_t v) {
-				SPADES_MARK_FUNCTION_DEBUG();
-				data.push_back((char)(v));
-				data.push_back((char)(v >> 8));
-				data.push_back((char)(v >> 16));
-				data.push_back((char)(v >> 24));
-			}
-			void WriteFloat(float v) {
-				SPADES_MARK_FUNCTION_DEBUG();
-				union {
-					float f;
-					uint32_t i;
-				};
-				f = v;
-				WriteInt(i);
-			}
-
-			void WriteColor(IntVector3 v) {
-				WriteByte((uint8_t)v.z); // B
-				WriteByte((uint8_t)v.y); // G
-				WriteByte((uint8_t)v.x); // R
-			}
-			void WriteIntVector3(IntVector3 v) {
-				WriteInt((uint32_t)v.x);
-				WriteInt((uint32_t)v.y);
-				WriteInt((uint32_t)v.z);
-			}
-			void WriteVector3(const Vector3& v) {
-				WriteFloat(v.x);
-				WriteFloat(v.y);
-				WriteFloat(v.z);
-			}
-
-			void WriteString(std::string str) {
-				str = EncodeString(str);
-				data.insert(data.end(), str.begin(), str.end());
-			}
-
-			void WriteString(const std::string& str, size_t fillLen) {
-				WriteString(str.substr(0, fillLen));
-				size_t sz = str.size();
-				while (sz < fillLen) {
-					WriteByte((uint8_t)0);
-					sz++;
-				}
-			}
-
-			std::size_t GetPosition() { return data.size(); }
-
-			void Update(std::size_t position, std::uint8_t newValue) {
-				SPADES_MARK_FUNCTION_DEBUG();
-
-				if (position >= data.size()) {
-					SPRaise("Invalid write (%d should be less than %d)",
-						(int)position, (int)data.size());
-				}
-
-				data[position] = static_cast<char>(newValue);
-			}
-
-			void Update(std::size_t position, std::uint32_t newValue) {
-				SPADES_MARK_FUNCTION_DEBUG();
-
-				if (position + 4 > data.size()) {
-					SPRaise("Invalid write (%d should be less than or equal to %d)",
-							(int)(position + 4), (int)data.size());
-				}
-
-				// Assuming the target platform is little endian and supports
-				// unaligned memory access...
-				*reinterpret_cast<std::uint32_t*>(data.data() + position) = newValue;
-			}
-
-			ENetPacket* CreatePacket(int flag = ENET_PACKET_FLAG_RELIABLE) {
-				return enet_packet_create(data.data(), data.size(), flag);
-			}
-		};
+		// NetPacketReader/NetPacketWriter, the PacketType enum, the cg_unicode setting,
+		// and the EncodeString/DecodeString/ParsePlayerInput/ParseWeaponInput helpers now
+		// live in ProtocolCodec.{h,cpp} (D-04). NetClient delegates to them via the codec's
+		// Decode<Name>/Encode<Name> functions while keeping all stateful orchestration here.
 
 		NetClient::NetClient(Client* c) : client(c), host(nullptr), peer(nullptr) {
 			SPADES_MARK_FUNCTION();
@@ -694,25 +404,6 @@ namespace spades {
 			return maybePlayer.value();
 		}
 
-		PlayerInput ParsePlayerInput(uint8_t bits) {
-			PlayerInput inp;
-			inp.moveForward = (bits & (1 << 0)) != 0;
-			inp.moveBackward = (bits & (1 << 1)) != 0;
-			inp.moveLeft = (bits & (1 << 2)) != 0;
-			inp.moveRight = (bits & (1 << 3)) != 0;
-			inp.jump = (bits & (1 << 4)) != 0;
-			inp.crouch = (bits & (1 << 5)) != 0;
-			inp.sneak = (bits & (1 << 6)) != 0;
-			inp.sprint = (bits & (1 << 7)) != 0;
-			return inp;
-		}
-		WeaponInput ParseWeaponInput(uint8_t bits) {
-			WeaponInput inp;
-			inp.primary = ((bits & (1 << 0)) != 0);
-			inp.secondary = ((bits & (1 << 1)) != 0);
-			return inp;
-		}
-
 		std::string NetClient::DisconnectReasonString(uint32_t num) {
 			if (!customKickReasonString.empty())
 				return customKickReasonString;
@@ -733,14 +424,16 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			switch (r.GetType()) {
-				case PacketTypeHandShakeInit: SendHandShakeValid(r.ReadInt()); return true;
+				case PacketTypeHandShakeInit:
+					SendHandShakeValid(DecodeHandShakeInit(r).challenge);
+					return true;
 				case PacketTypeExtensionInfo: HandleExtensionPacket(r); return true;
 				case PacketTypeVersionGet: {
-					if (r.GetNumRemainingBytes() > 0) {
+					auto s = DecodeVersionGet(r);
+					if (!s.propertyIds.empty()) {
 						// Enhanced variant
-						std::set<std::uint8_t> propertyIds;
-						while (r.GetNumRemainingBytes())
-							propertyIds.insert(r.ReadByte());
+						std::set<std::uint8_t> propertyIds(s.propertyIds.begin(),
+														   s.propertyIds.end());
 						SendVersionEnhanced(propertyIds);
 					} else {
 						// Simple variant
@@ -753,10 +446,10 @@ namespace spades {
 		}
 
 		void NetClient::HandleExtensionPacket(spades::client::NetPacketReader& r) {
-			int extCount = r.ReadByte();
-			for (int i = 0; i < extCount; i++) {
-				int extId = r.ReadByte();
-				int extVer = r.ReadByte();
+			auto s = DecodeExtensionInfo(r);
+			for (const auto& e : s.extensions) {
+				int extId = e.id;
+				int extVer = e.version;
 
 				auto got = implementedExtensions.find(extId);
 				if (got == implementedExtensions.end()) {
@@ -1550,16 +1243,18 @@ namespace spades {
 		void NetClient::SendPosition(spades::Vector3 v) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypePositionData);
-			w.WriteVector3(v);
+			PositionDataPacket s;
+			s.position = v;
+			auto w = EncodePositionData(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendOrientation(spades::Vector3 v) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeOrientationData);
-			w.WriteVector3(v);
+			OrientationDataPacket s;
+			s.orientation = v;
+			auto w = EncodeOrientationData(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
@@ -1581,9 +1276,10 @@ namespace spades {
 
 			lastPlayerInput = bits;
 
-			NetPacketWriter w(PacketTypeInputData);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte(bits);
+			InputDataPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.bits = bits;
+			auto w = EncodeInputData(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
@@ -1597,126 +1293,136 @@ namespace spades {
 
 			lastWeaponInput = bits;
 
-			NetPacketWriter w(PacketTypeWeaponInput);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte(bits);
+			WeaponInputPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.bits = bits;
+			auto w = EncodeWeaponInput(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendHit(int targetPlayerId, HitType type) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeHitPacket);
-			w.WriteByte((uint8_t)targetPlayerId);
+			HitPacketPacket s;
+			s.targetId = (uint8_t)targetPlayerId;
 			switch (type) {
-				case HitTypeTorso: w.WriteByte((uint8_t)0); break;
-				case HitTypeHead: w.WriteByte((uint8_t)1); break;
-				case HitTypeArms: w.WriteByte((uint8_t)2); break;
-				case HitTypeLegs: w.WriteByte((uint8_t)3); break;
-				case HitTypeMelee: w.WriteByte((uint8_t)4); break;
+				case HitTypeTorso: s.hitType = 0; break;
+				case HitTypeHead: s.hitType = 1; break;
+				case HitTypeArms: s.hitType = 2; break;
+				case HitTypeLegs: s.hitType = 3; break;
+				case HitTypeMelee: s.hitType = 4; break;
 				default: SPInvalidEnum("type", type);
 			}
+			auto w = EncodeHitPacket(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendGrenade(const Grenade& g) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeGrenadePacket);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteFloat(g.GetFuse());
-			w.WriteVector3(g.GetPosition());
-			w.WriteVector3(g.GetVelocity());
+			GrenadePacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.fuse = g.GetFuse();
+			s.position = g.GetPosition();
+			s.velocity = g.GetVelocity();
+			auto w = EncodeGrenade(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendTool() {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeSetTool);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
+			SetToolPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
 			Player::ToolType type = GetLocalPlayer().GetTool();
 			switch (type) {
-				case Player::ToolSpade: w.WriteByte((uint8_t)0); break;
-				case Player::ToolBlock: w.WriteByte((uint8_t)1); break;
-				case Player::ToolWeapon: w.WriteByte((uint8_t)2); break;
-				case Player::ToolGrenade: w.WriteByte((uint8_t)3); break;
+				case Player::ToolSpade: s.tool = 0; break;
+				case Player::ToolBlock: s.tool = 1; break;
+				case Player::ToolWeapon: s.tool = 2; break;
+				case Player::ToolGrenade: s.tool = 3; break;
 				default: SPInvalidEnum("tool", type);
 			}
+			auto w = EncodeSetTool(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendHeldBlockColor() {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeSetColour);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteColor(GetLocalPlayer().GetBlockColor());
+			SetColourPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.color = GetLocalPlayer().GetBlockColor();
+			auto w = EncodeSetColour(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendBlockAction(spades::IntVector3 v, BlockActionType type) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeBlockAction);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
+			BlockActionPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
 			switch (type) {
-				case BlockActionCreate: w.WriteByte((uint8_t)0); break;
-				case BlockActionTool: w.WriteByte((uint8_t)1); break;
-				case BlockActionDig: w.WriteByte((uint8_t)2); break;
-				case BlockActionGrenade: w.WriteByte((uint8_t)3); break;
+				case BlockActionCreate: s.action = 0; break;
+				case BlockActionTool: s.action = 1; break;
+				case BlockActionDig: s.action = 2; break;
+				case BlockActionGrenade: s.action = 3; break;
 				default: SPInvalidEnum("type", type);
 			}
-			w.WriteIntVector3(v);
+			s.position = v;
+			auto w = EncodeBlockAction(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendBlockLine(spades::IntVector3 v1, spades::IntVector3 v2) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeBlockLine);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteIntVector3(v1);
-			w.WriteIntVector3(v2);
+			BlockLinePacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.start = v1;
+			s.end = v2;
+			auto w = EncodeBlockLine(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendChat(std::string text, bool global) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeChatMessage);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte((uint8_t)(global ? 0 : 1));
-			w.WriteString(text);
-			w.WriteByte((uint8_t)0);
+			ChatMessagePacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.type = (uint8_t)(global ? 0 : 1);
+			s.message = text;
+			auto w = EncodeChatMessage(s); // appends the trailing NUL (matches recv framing)
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendReload() {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeWeaponReload);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte((uint8_t)0); // clip_ammo; not used?
-			w.WriteByte((uint8_t)0); // reserve_ammo; not used?
+			WeaponReloadPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.clip = 0;	   // clip_ammo; not used?
+			s.reserve = 0; // reserve_ammo; not used?
+			auto w = EncodeWeaponReload(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendTeamChange(int team) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeChangeTeam);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte((uint8_t)team);
+			ChangeTeamPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.team = (uint8_t)team;
+			auto w = EncodeChangeTeam(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendWeaponChange(WeaponType wType) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeChangeWeapon);
-			w.WriteByte((uint8_t)GetLocalPlayer().GetId());
-			w.WriteByte((uint8_t)wType);
+			ChangeWeaponPacket s;
+			s.playerId = (uint8_t)GetLocalPlayer().GetId();
+			s.weapon = (uint8_t)wType;
+			auto w = EncodeChangeWeapon(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
@@ -1728,16 +1434,18 @@ namespace spades {
 			// MapCached to indicate whether the map with a given checksum exists in the
 			// cache or not. We didn't implement a local cache, so we always ask the
 			// server to send fresh map data.
-			NetPacketWriter w(PacketTypeMapCached);
-			w.WriteByte((uint8_t)0);
+			MapCachedPacket s;
+			s.cached = 0;
+			auto w = EncodeMapCached(s);
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
 		void NetClient::SendHandShakeValid(int challenge) {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeHandShakeReturn);
-			w.WriteInt((uint32_t)challenge);
+			HandShakeReturnPacket s;
+			s.challenge = (uint32_t)challenge;
+			auto w = EncodeHandShakeReturn(s);
 
 			SPLog("Sending hand shake back.");
 			enet_peer_send(peer, 0, w.CreatePacket());
@@ -1752,12 +1460,13 @@ namespace spades {
 			osInfo.append(" | " ZEROSPADES_VER_STR);
 			osInfo.append(" (" + archInfo + ")");
 
-			NetPacketWriter w(PacketTypeVersionSend);
-			w.WriteByte((uint8_t)'o');
-			w.WriteByte((uint8_t)OPENSPADES_VERSION_MAJOR);
-			w.WriteByte((uint8_t)OPENSPADES_VERSION_MINOR);
-			w.WriteByte((uint8_t)OPENSPADES_VERSION_PATCH);
-			w.WriteString(osInfo);
+			VersionSendPacket s;
+			s.tag = (uint8_t)'o';
+			s.major = (uint8_t)OPENSPADES_VERSION_MAJOR;
+			s.minor = (uint8_t)OPENSPADES_VERSION_MINOR;
+			s.patch = (uint8_t)OPENSPADES_VERSION_PATCH;
+			s.osInfo = osInfo;
+			auto w = EncodeVersionSend(s);
 
 			SPLog("Sending version back.");
 			enet_peer_send(peer, 0, w.CreatePacket());
@@ -1766,12 +1475,14 @@ namespace spades {
 		void NetClient::SendSupportedExtensions() {
 			SPADES_MARK_FUNCTION();
 
-			NetPacketWriter w(PacketTypeExtensionInfo);
-			w.WriteByte(static_cast<uint8_t>(extensions.size()));
+			ExtensionInfoPacket s;
 			for (const auto& i : extensions) {
-				w.WriteByte(static_cast<uint8_t>(i.first));	 // ext id
-				w.WriteByte(static_cast<uint8_t>(i.second)); // ext version
+				ExtensionInfoEntry e;
+				e.id = static_cast<uint8_t>(i.first);		// ext id
+				e.version = static_cast<uint8_t>(i.second); // ext version
+				s.extensions.push_back(e);
 			}
+			auto w = EncodeExtensionInfo(s);
 
 			SPLog("Sending extension support.");
 			enet_peer_send(peer, 0, w.CreatePacket());
