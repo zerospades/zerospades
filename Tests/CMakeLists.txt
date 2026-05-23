@@ -92,7 +92,7 @@ gtest_discover_tests(zerospades_tests
 # ---------------------------------------------------------------------------
 add_test(NAME NoExpectFloatEq
     COMMAND ${CMAKE_COMMAND} -E env
-            sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' ${CMAKE_SOURCE_DIR}/Tests/"
+            sh -c "! grep -rE 'EXPECT_FLOAT_EQ[[:space:]]*[(]' '${CMAKE_SOURCE_DIR}/Tests/'"
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 # ---------------------------------------------------------------------------

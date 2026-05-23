@@ -73,7 +73,11 @@ static void compareFields(const json& a, const json& b, const std::string& path,
 		return;
 	}
 
-	if (a.is_number_float() || b.is_number_float()) {
+	// Tolerance compare only when BOTH sides are numeric. A float-vs-non-numeric
+	// pair (e.g. malformed/untrusted input) must NOT reach get<double>() — that
+	// throws nlohmann::type_error. It falls through to the exact-compare branch
+	// below, which reports the type difference as a MISMATCH without throwing.
+	if ((a.is_number_float() || b.is_number_float()) && a.is_number() && b.is_number()) {
 		const double va = a.get<double>();
 		const double vb = b.get<double>();
 		const double tol = ToleranceForField(path);
