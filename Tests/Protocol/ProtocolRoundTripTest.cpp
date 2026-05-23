@@ -372,4 +372,210 @@ TEST_F(ProtocolRoundTripTest, PlayerProperties) {
 	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
 }
 
-// Per-packet round-trip TESTs added in Plans 02/03
+// ===========================================================================
+// Plan 02 Task 2: game-mode-coupled, string, list, signed-field packet round-trips.
+// ===========================================================================
+
+TEST_F(ProtocolRoundTripTest, MoveObject) {
+	MoveObjectPacket in{2, 1, Vector3{11.f, -22.f, 33.f}}; // type, state, pos
+	NetPacketWriter w = EncodeMoveObject(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeMoveObject);
+	MoveObjectPacket out = DecodeMoveObject(r);
+	EXPECT_EQ(out.type, in.type);
+	EXPECT_EQ(out.state, in.state);
+	EXPECT_EQ(F2U(out.position.x), F2U(in.position.x));
+	EXPECT_EQ(F2U(out.position.y), F2U(in.position.y));
+	EXPECT_EQ(F2U(out.position.z), F2U(in.position.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, ChatMessage) {
+	// CP437-representable distinctive string (cg_unicode pinned via SettingsGuard).
+	ChatMessagePacket in{200, 1, std::string("Hello, ZeroSpades 123!")};
+	NetPacketWriter w = EncodeChatMessage(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeChatMessage);
+	ChatMessagePacket out = DecodeChatMessage(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.type, in.type);
+	EXPECT_EQ(out.message, in.message);
+	// NOTE: ReadRemainingString (the verbatim-moved reader) does NOT advance pos on a
+	// terminal remaining-read, so GetNumRemainingBytes() is not 0 here. The decoded
+	// message equality already proves byte-exactness of the whole tail.
+}
+
+TEST_F(ProtocolRoundTripTest, MapStart) {
+	// Bytes are version-independent (single uint32); covers both protocol 3 and 4.
+	MapStartPacket in{0xCAFEBABEu};
+	NetPacketWriter w = EncodeMapStart(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeMapStart);
+	MapStartPacket out = DecodeMapStart(r);
+	EXPECT_EQ(out.mapSize, in.mapSize);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, MapChunk) {
+	// Raw remaining bytes round-trip exactly (no string normalization).
+	MapChunkPacket in{std::string("\x01\x02\xFE\xFF\x7F\x80", 6)};
+	NetPacketWriter w = EncodeMapChunk(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeMapChunk);
+	MapChunkPacket out = DecodeMapChunk(r);
+	EXPECT_EQ(out.data, in.data);
+	// NOTE: ReadRemainingData does not advance pos (verbatim reader); the data
+	// equality proves the full raw byte tail round-tripped exactly.
+}
+
+TEST_F(ProtocolRoundTripTest, PlayerLeft) {
+	PlayerLeftPacket in{27};
+	NetPacketWriter w = EncodePlayerLeft(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypePlayerLeft);
+	PlayerLeftPacket out = DecodePlayerLeft(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, TerritoryCapture) {
+	TerritoryCapturePacket in{3, 1, 2}; // territoryId, winning, state
+	NetPacketWriter w = EncodeTerritoryCapture(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeTerritoryCapture);
+	TerritoryCapturePacket out = DecodeTerritoryCapture(r);
+	EXPECT_EQ(out.territoryId, in.territoryId);
+	EXPECT_EQ(out.winning, in.winning);
+	EXPECT_EQ(out.state, in.state);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// rate is SIGNED — rate=-7 must survive the byte round-trip (catches uint8 mis-typing).
+TEST_F(ProtocolRoundTripTest, ProgressBar) {
+	ProgressBarPacket in{4, 1, (int8_t)-7, 0.625f};
+	NetPacketWriter w = EncodeProgressBar(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeProgressBar);
+	ProgressBarPacket out = DecodeProgressBar(r);
+	EXPECT_EQ(out.territoryId, in.territoryId);
+	EXPECT_EQ(out.capturingTeam, in.capturingTeam);
+	EXPECT_EQ(out.rate, in.rate);
+	EXPECT_EQ((int)out.rate, -7);
+	EXPECT_EQ(F2U(out.progress), F2U(in.progress));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// GOLDEN-BYTE SPOT CHECK #2 (T-3-02): proves the signed rate byte is emitted as
+// 0xF9 (= -7 reinterpreted as uint8). A round-trip alone would pass even if both
+// Encode and Decode wrongly used an unsigned width; this hardcoded byte catches it.
+TEST_F(ProtocolRoundTripTest, ProgressBarGoldenBytesSignedRate) {
+	ProgressBarPacket in{4, 1, (int8_t)-7, 0.625f};
+	NetPacketWriter w = EncodeProgressBar(in);
+	std::vector<char> bytes = w.GetData();
+	// [0]=type(22), [1]=territoryId(4), [2]=capturingTeam(1), [3]=rate(0xF9), [4..7]=float
+	ASSERT_GE(bytes.size(), 4u);
+	EXPECT_EQ((uint8_t)bytes[0], (uint8_t)PacketTypeProgressBar);
+	EXPECT_EQ((uint8_t)bytes[1], 4u);
+	EXPECT_EQ((uint8_t)bytes[2], 1u);
+	EXPECT_EQ((uint8_t)bytes[3], 0xF9u); // -7 as uint8
+}
+
+TEST_F(ProtocolRoundTripTest, IntelCapture) {
+	IntelCapturePacket in{15, 1}; // playerId, winning
+	NetPacketWriter w = EncodeIntelCapture(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeIntelCapture);
+	IntelCapturePacket out = DecodeIntelCapture(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(out.winning, in.winning);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, IntelPickup) {
+	IntelPickupPacket in{18};
+	NetPacketWriter w = EncodeIntelPickup(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeIntelPickup);
+	IntelPickupPacket out = DecodeIntelPickup(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, IntelDrop) {
+	IntelDropPacket in{9, Vector3{7.5f, -8.5f, 9.5f}};
+	NetPacketWriter w = EncodeIntelDrop(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeIntelDrop);
+	IntelDropPacket out = DecodeIntelDrop(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(F2U(out.position.x), F2U(in.position.x));
+	EXPECT_EQ(F2U(out.position.y), F2U(in.position.y));
+	EXPECT_EQ(F2U(out.position.z), F2U(in.position.z));
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, Restock) {
+	RestockPacket in{13};
+	NetPacketWriter w = EncodeRestock(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeRestock);
+	RestockPacket out = DecodeRestock(r);
+	EXPECT_EQ(out.playerId, in.playerId);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+// recv skips alpha then reads BGR; alpha round-trips as the struct field.
+TEST_F(ProtocolRoundTripTest, FogColour) {
+	FogColourPacket in{128, MakeIntVector3(40, 50, 60)}; // alpha, R=40,G=50,B=60
+	NetPacketWriter w = EncodeFogColour(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeFogColour);
+	FogColourPacket out = DecodeFogColour(r);
+	EXPECT_EQ(out.alpha, in.alpha);
+	EXPECT_EQ(out.color.x, in.color.x); // R
+	EXPECT_EQ(out.color.y, in.color.y); // G
+	EXPECT_EQ(out.color.z, in.color.z); // B
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, VersionGet) {
+	// Enhanced variant: list of property ids round-trips with correct count.
+	VersionGetPacket in;
+	in.propertyIds = {1, 2, 3};
+	NetPacketWriter w = EncodeVersionGet(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeVersionGet);
+	VersionGetPacket out = DecodeVersionGet(r);
+	EXPECT_EQ(out.propertyIds, in.propertyIds);
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
+
+TEST_F(ProtocolRoundTripTest, VersionSend) {
+	VersionSendPacket in{(uint8_t)'o', 1, 2, 3, std::string("Linux x86_64")};
+	NetPacketWriter w = EncodeVersionSend(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeVersionSend);
+	VersionSendPacket out = DecodeVersionSend(r);
+	EXPECT_EQ(out.tag, in.tag);
+	EXPECT_EQ(out.major, in.major);
+	EXPECT_EQ(out.minor, in.minor);
+	EXPECT_EQ(out.patch, in.patch);
+	EXPECT_EQ(out.osInfo, in.osInfo);
+	// NOTE: osInfo via ReadRemainingString does not advance pos (verbatim reader);
+	// the osInfo equality proves the trailing string round-tripped exactly.
+}
+
+TEST_F(ProtocolRoundTripTest, ExtensionInfo) {
+	ExtensionInfoPacket in;
+	in.extensions = {{1, 10}, {2, 20}, {3, 30}}; // 3 {id,version} entries
+	NetPacketWriter w = EncodeExtensionInfo(in);
+	NetPacketReader r = ToReader(w);
+	ASSERT_EQ(r.GetType(), PacketTypeExtensionInfo);
+	ExtensionInfoPacket out = DecodeExtensionInfo(r);
+	ASSERT_EQ(out.extensions.size(), in.extensions.size());
+	for (size_t i = 0; i < in.extensions.size(); i++) {
+		EXPECT_EQ(out.extensions[i].id, in.extensions[i].id);
+		EXPECT_EQ(out.extensions[i].version, in.extensions[i].version);
+	}
+	EXPECT_EQ(r.GetNumRemainingBytes(), 0u);
+}
