@@ -125,6 +125,9 @@ namespace spades {
 		void Flush();
 		/** Return a list of all config variables, sorted by name. */
 		std::vector<std::string> GetAllItemNames();
+		/** Resets all registered settings to their descriptor default values.
+		 *  FOR TEST USE ONLY. */
+		void ResetToDefaults();
 	};
 
 	static inline bool operator==(const std::string& str, Settings::ItemHandle& handle) {

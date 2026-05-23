@@ -262,6 +262,21 @@ namespace spades {
 		return names;
 	}
 
+	void Settings::ResetToDefaults() {
+		SPADES_MARK_FUNCTION();
+		for (auto& kv : items) {
+			Item* item = kv.second;
+			if (item->descriptor) {
+				const std::string& def = item->descriptor->defaultValue;
+				item->string = def;
+				item->value = static_cast<float>(atof(def.c_str()));
+				item->intValue = atoi(def.c_str());
+				item->defaults = true;
+				item->NotifyChange();
+			}
+		}
+	}
+
 	Settings::Item* Settings::GetItem(const std::string& name, const SettingItemDescriptor* desc) {
 		SPADES_MARK_FUNCTION();
 		std::map<std::string, Item*>::iterator it;
