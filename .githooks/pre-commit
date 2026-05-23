@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit — validate staged fixture JSON files before commit.
+#
+# Enable for your clone (one-time, per developer):
+#     git config core.hooksPath .githooks
+#
+# Delegates to tools/validate_fixtures.py, the authoritative fixture gate.
+# CI re-runs the validator over ALL fixtures and never trusts this local hook.
+#
+# No GPL header: this is new tooling, not derived from game source.
+set -euo pipefail
+
+# Collect staged (Added/Copied/Modified) fixture JSON files.
+# "|| true" stops grep's exit-1-on-no-match from tripping set -e.
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep '^fixtures/.*\.json$' || true)
+
+if [ -z "$staged" ]; then
+    # No fixture JSON staged — nothing to validate.
+    exit 0
+fi
+
+echo "validate_fixtures: checking staged files..."
+
+# Pass each staged filename as a separate positional arg to the validator.
+# $staged is intentionally unquoted so word-splitting yields one arg per file.
+# Assumption: fixture filenames contain no whitespace (none are expected in fixtures/).
+# shellcheck disable=SC2086
+python3 tools/validate_fixtures.py $staged
