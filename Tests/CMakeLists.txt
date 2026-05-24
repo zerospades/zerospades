@@ -85,6 +85,8 @@ elseif(MSVC)
     target_compile_options(zerospades_tests PRIVATE /fp:strict)
 endif()
 
+add_subdirectory(Map)
+
 gtest_discover_tests(zerospades_tests
     PROPERTIES LABELS "harness"
 )
