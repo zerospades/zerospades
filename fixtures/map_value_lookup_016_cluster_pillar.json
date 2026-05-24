@@ -1,0 +1,38 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "callback_count": 1,
+            "callbacks": [
+                {
+                    "cells": [
+                        [
+                            10,
+                            10,
+                            59
+                        ],
+                        [
+                            10,
+                            10,
+                            60
+                        ]
+                    ]
+                }
+            ],
+            "destroyed_z": 61,
+            "pillar_x": 10,
+            "pillar_y": 10
+        }
+    },
+    "id": "map_value_lookup_016_cluster_pillar",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}
