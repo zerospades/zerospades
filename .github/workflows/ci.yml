@@ -101,6 +101,24 @@ jobs:
             !${{ runner.workspace }}\**\*.pdb
           if-no-files-found: warn
 
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests `
+            -A x64 `
+            -D CMAKE_BUILD_TYPE=Release `
+            -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
+            -D VCPKG_TARGET_TRIPLET=x64-windows-static `
+            -D CMAKE_CXX_STANDARD=17 `
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests --config Release --parallel 8
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests -C Release --output-on-failure --no-tests=error -j %NUMBER_OF_PROCESSORS%
+
   build-macos-intel:
     name: Build (macOS Intel)
     runs-on: macos-14
