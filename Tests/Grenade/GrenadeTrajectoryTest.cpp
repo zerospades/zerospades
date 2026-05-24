@@ -235,6 +235,37 @@ TEST(DISABLED_GrenadeTrajectoryGenerate, Water) {
 	             BuildGrenadeFixtureEnvelope("weap_step_trace_grenade_water", ticks));
 }
 
+// (c) Fuse countdown -> Explode. Short fuse (0.1s ~= 6 ticks) and small velocity on
+// the flat map, starting well above the z=62 floor so the grenade never bounces
+// before the fuse expires. Per Pitfall 7: on the explode tick Update decrements
+// fuse below 0, calls Explode(), and returns true WITHOUT running MoveGrenade — so
+// the explode tick's position == the prior tick's position (no further motion) and
+// fuse_s has just gone negative. The loop captures up to AND INCLUDING that tick.
+TEST(DISABLED_GrenadeTrajectoryGenerate, Fuse) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	// Start at z=40 (well above the z=62 floor — falls but never reaches the floor
+	// within the ~6-tick fuse window) with a small horizontal velocity.
+	auto grenade = std::make_unique<Grenade>(hw.GetWorld(), Vector3{256.5F, 256.5F, 40.0F},
+	                                         Vector3{0.1F, 0.0F, 0.0F}, 0.1F);
+	Grenade* g = grenade.get();
+	hw.GetWorld().AddGrenade(std::move(grenade));
+
+	nlohmann::json ticks = nlohmann::json::array();
+	for (int i = 0; i < 20; i++) {
+		bool exploded = g->Update(FIXED_DT);
+		ticks.push_back(GrenadeTickObj(*g, i, exploded));
+		if (exploded)
+			break;
+	}
+	// Exactly one Explode/GrenadeExploded must have fired by now.
+	ASSERT_EQ(hw.GetListener().grenadeExplodedCount, 1)
+	  << "fuse never expired (or exploded more than once)";
+	WriteFixture("weap_step_trace_grenade_fuse.json",
+	             BuildGrenadeFixtureEnvelope("weap_step_trace_grenade_fuse", ticks));
+}
+
 // ===========================================================================
 // Replay tests — load the frozen fixture, re-run, compare at GRENADE_TOL.
 // ===========================================================================
@@ -302,4 +333,45 @@ TEST(GrenadeTrajectoryTest, Water) {
 		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
 		                      "grenade.ticks[" + std::to_string(i) + "]");
 	EXPECT_GE(hw.GetListener().grenadeWaterCount, 1);
+}
+
+TEST(GrenadeTrajectoryTest, Fuse) {
+	SettingsGuard guard;
+	auto fixture = LoadGrenadeFixtureJson("weap_step_trace_grenade_fuse.json");
+	const auto& want_ticks = fixture.at("expected").at("ticks");
+
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	auto grenade = std::make_unique<Grenade>(hw.GetWorld(), Vector3{256.5F, 256.5F, 40.0F},
+	                                         Vector3{0.1F, 0.0F, 0.0F}, 0.1F);
+	Grenade* g = grenade.get();
+	hw.GetWorld().AddGrenade(std::move(grenade));
+
+	nlohmann::json got_ticks = nlohmann::json::array();
+	for (int i = 0; i < 20; i++) {
+		bool exploded = g->Update(FIXED_DT);
+		got_ticks.push_back(GrenadeTickObj(*g, i, exploded));
+		if (exploded)
+			break;
+	}
+
+	ASSERT_EQ(want_ticks.size(), got_ticks.size());
+	for (size_t i = 0; i < want_ticks.size(); i++)
+		ExpectSnapshotMatches(want_ticks[i], got_ticks[i],
+		                      "grenade.ticks[" + std::to_string(i) + "]");
+	// Exactly one Explode/GrenadeExploded fired (Pitfall 7).
+	EXPECT_EQ(hw.GetListener().grenadeExplodedCount, 1);
+	// The explode tick (last) reuses the prior tick's position — MoveGrenade skipped.
+	ASSERT_GE(got_ticks.size(), 2u);
+	const auto& last = got_ticks[got_ticks.size() - 1];
+	const auto& prev = got_ticks[got_ticks.size() - 2];
+	EXPECT_TRUE(last.at("exploded").get<bool>());
+	EXPECT_FALSE(prev.at("exploded").get<bool>());
+	EXPECT_NEAR(last["position"]["x"].get<double>(), prev["position"]["x"].get<double>(),
+	            GRENADE_TOL);
+	EXPECT_NEAR(last["position"]["y"].get<double>(), prev["position"]["y"].get<double>(),
+	            GRENADE_TOL);
+	EXPECT_NEAR(last["position"]["z"].get<double>(), prev["position"]["z"].get<double>(),
+	            GRENADE_TOL);
+	EXPECT_LT(last["fuse_s"].get<double>(), 0.0); // fuse went negative on explode
 }

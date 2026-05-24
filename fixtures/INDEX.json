@@ -356,6 +356,13 @@
             "subsystem": "weap",
             "behavior": "implementation_detail",
             "description": "WEAP-03 grenade water landing (step_trace, 2 ticks): grenade crosses integer z>=63 (lp2.z<63 -> lp.z>=63) over a CARVED non-solid column (Set(256,256,62,false)) so MoveGrenade returns -1 and GrenadeDroppedIntoWater fires (not a wall bounce; Pitfall 6 / A2). ClipWorld(256,256,63) verified non-solid before freezing."
+        },
+        {
+            "id": "weap_step_trace_grenade_fuse",
+            "path": "fixtures/weap_step_trace_grenade_fuse.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "WEAP-03 grenade fuse countdown -> Explode (step_trace, 7 ticks): 0.1s fuse decrements by FIXED_DT each tick; on the explode tick Update returns true, calls Explode() (GrenadeExploded fired once) and SKIPS MoveGrenade (Pitfall 7) so the explode tick's position == the prior tick's position while fuse_s has just gone negative. exploded flag flips true on the last tick."
         }
     ]
 }
