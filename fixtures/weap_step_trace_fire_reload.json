@@ -1,0 +1,1586 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "ticks": [
+            {
+                "ammo": 29,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 0,
+                "time_to_next_fire": 0.0833333358168602
+            },
+            {
+                "ammo": 29,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 1,
+                "time_to_next_fire": 0.06666666269302368
+            },
+            {
+                "ammo": 29,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 2,
+                "time_to_next_fire": 0.04999999701976776
+            },
+            {
+                "ammo": 29,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 3,
+                "time_to_next_fire": 0.03333333134651184
+            },
+            {
+                "ammo": 29,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 4,
+                "time_to_next_fire": 0.01666666567325592
+            },
+            {
+                "ammo": 29,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 5,
+                "time_to_next_fire": 0.0
+            },
+            {
+                "ammo": 28,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 6,
+                "time_to_next_fire": 0.0833333358168602
+            },
+            {
+                "ammo": 28,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 7,
+                "time_to_next_fire": 0.06666666269302368
+            },
+            {
+                "ammo": 28,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 8,
+                "time_to_next_fire": 0.04999999701976776
+            },
+            {
+                "ammo": 28,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 9,
+                "time_to_next_fire": 0.03333333134651184
+            },
+            {
+                "ammo": 28,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 10,
+                "time_to_next_fire": 0.01666666567325592
+            },
+            {
+                "ammo": 28,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 11,
+                "time_to_next_fire": 0.0
+            },
+            {
+                "ammo": 27,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 12,
+                "time_to_next_fire": 0.0833333432674408
+            },
+            {
+                "ammo": 27,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 13,
+                "time_to_next_fire": 0.06666667759418488
+            },
+            {
+                "ammo": 27,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 14,
+                "time_to_next_fire": 0.050000011920928955
+            },
+            {
+                "ammo": 27,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 15,
+                "time_to_next_fire": 0.03333333134651184
+            },
+            {
+                "ammo": 27,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 16,
+                "time_to_next_fire": 0.016666650772094727
+            },
+            {
+                "ammo": 27,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 17,
+                "time_to_next_fire": -2.9802322387695313e-08
+            },
+            {
+                "ammo": 26,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 18,
+                "time_to_next_fire": 0.08333328366279602
+            },
+            {
+                "ammo": 26,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 19,
+                "time_to_next_fire": 0.0666666030883789
+            },
+            {
+                "ammo": 26,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 20,
+                "time_to_next_fire": 0.04999992251396179
+            },
+            {
+                "ammo": 26,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 21,
+                "time_to_next_fire": 0.03333324193954468
+            },
+            {
+                "ammo": 26,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 22,
+                "time_to_next_fire": 0.016666561365127563
+            },
+            {
+                "ammo": 26,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 23,
+                "time_to_next_fire": -1.1920928955078125e-07
+            },
+            {
+                "ammo": 25,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 24,
+                "time_to_next_fire": 0.08333319425582886
+            },
+            {
+                "ammo": 25,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 25,
+                "time_to_next_fire": 0.06666651368141174
+            },
+            {
+                "ammo": 25,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 26,
+                "time_to_next_fire": 0.04999983310699463
+            },
+            {
+                "ammo": 25,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 27,
+                "time_to_next_fire": 0.033333152532577515
+            },
+            {
+                "ammo": 25,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 28,
+                "time_to_next_fire": 0.0166664719581604
+            },
+            {
+                "ammo": 25,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 29,
+                "time_to_next_fire": -1.7881393432617188e-07
+            },
+            {
+                "ammo": 24,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 30,
+                "time_to_next_fire": 0.08333319425582886
+            },
+            {
+                "ammo": 24,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 31,
+                "time_to_next_fire": 0.06666654348373413
+            },
+            {
+                "ammo": 24,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 32,
+                "time_to_next_fire": 0.049999892711639404
+            },
+            {
+                "ammo": 24,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 33,
+                "time_to_next_fire": 0.03333324193954468
+            },
+            {
+                "ammo": 24,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 34,
+                "time_to_next_fire": 0.01666659116744995
+            },
+            {
+                "ammo": 24,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 35,
+                "time_to_next_fire": -5.960464477539063e-08
+            },
+            {
+                "ammo": 23,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 36,
+                "time_to_next_fire": 0.08333331346511841
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 37,
+                "time_to_next_fire": 0.06666666269302368
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 38,
+                "time_to_next_fire": 0.050000011920928955
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 39,
+                "time_to_next_fire": 0.03333336114883423
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 40,
+                "time_to_next_fire": 0.016666710376739502
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 41,
+                "time_to_next_fire": 5.960464477539063e-08
+            },
+            {
+                "ammo": 23,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 42,
+                "time_to_next_fire": -0.01666659116744995
+            },
+            {
+                "ammo": 22,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 43,
+                "time_to_next_fire": 0.06666678190231323
+            },
+            {
+                "ammo": 22,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 44,
+                "time_to_next_fire": 0.050000131130218506
+            },
+            {
+                "ammo": 22,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 45,
+                "time_to_next_fire": 0.03333348035812378
+            },
+            {
+                "ammo": 22,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 46,
+                "time_to_next_fire": 0.016666829586029053
+            },
+            {
+                "ammo": 22,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 47,
+                "time_to_next_fire": 1.7881393432617188e-07
+            },
+            {
+                "ammo": 22,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 48,
+                "time_to_next_fire": -0.0166664719581604
+            },
+            {
+                "ammo": 21,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 49,
+                "time_to_next_fire": 0.06666690111160278
+            },
+            {
+                "ammo": 21,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 50,
+                "time_to_next_fire": 0.05000025033950806
+            },
+            {
+                "ammo": 21,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 51,
+                "time_to_next_fire": 0.03333359956741333
+            },
+            {
+                "ammo": 21,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 52,
+                "time_to_next_fire": 0.016666948795318604
+            },
+            {
+                "ammo": 21,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 53,
+                "time_to_next_fire": 2.980232238769531e-07
+            },
+            {
+                "ammo": 21,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 54,
+                "time_to_next_fire": -0.01666635274887085
+            },
+            {
+                "ammo": 20,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 55,
+                "time_to_next_fire": 0.06666702032089233
+            },
+            {
+                "ammo": 20,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 56,
+                "time_to_next_fire": 0.05000036954879761
+            },
+            {
+                "ammo": 20,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 57,
+                "time_to_next_fire": 0.03333371877670288
+            },
+            {
+                "ammo": 20,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 58,
+                "time_to_next_fire": 0.016667068004608154
+            },
+            {
+                "ammo": 20,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 59,
+                "time_to_next_fire": 4.172325134277344e-07
+            },
+            {
+                "ammo": 20,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 60,
+                "time_to_next_fire": -0.016666293144226074
+            },
+            {
+                "ammo": 19,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 61,
+                "time_to_next_fire": 0.06666707992553711
+            },
+            {
+                "ammo": 19,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 62,
+                "time_to_next_fire": 0.05000042915344238
+            },
+            {
+                "ammo": 19,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 63,
+                "time_to_next_fire": 0.033333778381347656
+            },
+            {
+                "ammo": 19,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 64,
+                "time_to_next_fire": 0.01666712760925293
+            },
+            {
+                "ammo": 19,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 65,
+                "time_to_next_fire": 4.76837158203125e-07
+            },
+            {
+                "ammo": 19,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 66,
+                "time_to_next_fire": -0.016666173934936523
+            },
+            {
+                "ammo": 18,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 67,
+                "time_to_next_fire": 0.06666719913482666
+            },
+            {
+                "ammo": 18,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 68,
+                "time_to_next_fire": 0.050000548362731934
+            },
+            {
+                "ammo": 18,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 69,
+                "time_to_next_fire": 0.03333389759063721
+            },
+            {
+                "ammo": 18,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 70,
+                "time_to_next_fire": 0.01666724681854248
+            },
+            {
+                "ammo": 18,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 71,
+                "time_to_next_fire": 5.960464477539063e-07
+            },
+            {
+                "ammo": 18,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 72,
+                "time_to_next_fire": -0.016666054725646973
+            },
+            {
+                "ammo": 17,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 73,
+                "time_to_next_fire": 0.06666731834411621
+            },
+            {
+                "ammo": 17,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 74,
+                "time_to_next_fire": 0.050000667572021484
+            },
+            {
+                "ammo": 17,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 75,
+                "time_to_next_fire": 0.03333401679992676
+            },
+            {
+                "ammo": 17,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 76,
+                "time_to_next_fire": 0.01666736602783203
+            },
+            {
+                "ammo": 17,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 77,
+                "time_to_next_fire": 7.152557373046875e-07
+            },
+            {
+                "ammo": 17,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 78,
+                "time_to_next_fire": -0.016665935516357422
+            },
+            {
+                "ammo": 16,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 79,
+                "time_to_next_fire": 0.06666743755340576
+            },
+            {
+                "ammo": 16,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 80,
+                "time_to_next_fire": 0.050000786781311035
+            },
+            {
+                "ammo": 16,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 81,
+                "time_to_next_fire": 0.03333413600921631
+            },
+            {
+                "ammo": 16,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 82,
+                "time_to_next_fire": 0.016667485237121582
+            },
+            {
+                "ammo": 16,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 83,
+                "time_to_next_fire": 8.344650268554688e-07
+            },
+            {
+                "ammo": 16,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 84,
+                "time_to_next_fire": -0.01666581630706787
+            },
+            {
+                "ammo": 15,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 85,
+                "time_to_next_fire": 0.06666755676269531
+            },
+            {
+                "ammo": 15,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 86,
+                "time_to_next_fire": 0.050000905990600586
+            },
+            {
+                "ammo": 15,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 87,
+                "time_to_next_fire": 0.03333425521850586
+            },
+            {
+                "ammo": 15,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 88,
+                "time_to_next_fire": 0.016667604446411133
+            },
+            {
+                "ammo": 15,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 89,
+                "time_to_next_fire": 9.5367431640625e-07
+            },
+            {
+                "ammo": 15,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 90,
+                "time_to_next_fire": -0.01666569709777832
+            },
+            {
+                "ammo": 14,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 91,
+                "time_to_next_fire": 0.06666767597198486
+            },
+            {
+                "ammo": 14,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 92,
+                "time_to_next_fire": 0.05000102519989014
+            },
+            {
+                "ammo": 14,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 93,
+                "time_to_next_fire": 0.03333437442779541
+            },
+            {
+                "ammo": 14,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 94,
+                "time_to_next_fire": 0.016667723655700684
+            },
+            {
+                "ammo": 14,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 95,
+                "time_to_next_fire": 1.0728836059570313e-06
+            },
+            {
+                "ammo": 14,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 96,
+                "time_to_next_fire": -0.01666557788848877
+            },
+            {
+                "ammo": 13,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 97,
+                "time_to_next_fire": 0.06666779518127441
+            },
+            {
+                "ammo": 13,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 98,
+                "time_to_next_fire": 0.05000114440917969
+            },
+            {
+                "ammo": 13,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 99,
+                "time_to_next_fire": 0.03333449363708496
+            },
+            {
+                "ammo": 13,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 100,
+                "time_to_next_fire": 0.016667842864990234
+            },
+            {
+                "ammo": 13,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 101,
+                "time_to_next_fire": 1.1920928955078125e-06
+            },
+            {
+                "ammo": 13,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 102,
+                "time_to_next_fire": -0.01666545867919922
+            },
+            {
+                "ammo": 12,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 103,
+                "time_to_next_fire": 0.06666791439056396
+            },
+            {
+                "ammo": 12,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 104,
+                "time_to_next_fire": 0.05000126361846924
+            },
+            {
+                "ammo": 12,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 105,
+                "time_to_next_fire": 0.03333461284637451
+            },
+            {
+                "ammo": 12,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 106,
+                "time_to_next_fire": 0.016667962074279785
+            },
+            {
+                "ammo": 12,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 107,
+                "time_to_next_fire": 1.3113021850585938e-06
+            },
+            {
+                "ammo": 12,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 108,
+                "time_to_next_fire": -0.016665339469909668
+            },
+            {
+                "ammo": 11,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 109,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 11,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 110,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 11,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 111,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 11,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 112,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 11,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 113,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 11,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 114,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 10,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 115,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 10,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 116,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 10,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 117,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 10,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 118,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 10,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 119,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 10,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 120,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 9,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 121,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 9,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 122,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 9,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 123,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 9,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 124,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 9,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 125,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 9,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 126,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 8,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 127,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 8,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 128,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 8,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 129,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 8,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 130,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 8,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 131,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 8,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 132,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 7,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 133,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 7,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 134,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 7,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 135,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 7,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 136,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 7,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 137,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 7,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 138,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 6,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 139,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 6,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 140,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 6,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 141,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 6,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 142,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 6,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 143,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 6,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 144,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 5,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 145,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 5,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 146,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 5,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 147,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 5,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 148,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 5,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 149,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 5,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 150,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 4,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 151,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 4,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 152,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 4,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 153,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 4,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 154,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 4,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 155,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 4,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 156,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 3,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 157,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 3,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 158,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 3,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 159,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 3,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 160,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 3,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 161,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 3,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 162,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 2,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 163,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 2,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 164,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 2,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 165,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 2,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 166,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 2,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 167,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 2,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 168,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 1,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 169,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 1,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 170,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 1,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 171,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 1,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 172,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 1,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 173,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 1,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 174,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 0,
+                "fired": true,
+                "reloading": false,
+                "stock": 120,
+                "tick": 175,
+                "time_to_next_fire": 0.06666803359985352
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 176,
+                "time_to_next_fire": 0.05000138282775879
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 177,
+                "time_to_next_fire": 0.03333473205566406
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 178,
+                "time_to_next_fire": 0.016668081283569336
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 179,
+                "time_to_next_fire": 1.430511474609375e-06
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 180,
+                "time_to_next_fire": -0.016665220260620117
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 181,
+                "time_to_next_fire": -0.033331871032714844
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 182,
+                "time_to_next_fire": -0.04999852180480957
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 183,
+                "time_to_next_fire": -0.0666651725769043
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 184,
+                "time_to_next_fire": -0.08333182334899902
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 185,
+                "time_to_next_fire": -0.09999847412109375
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 186,
+                "time_to_next_fire": -0.11666512489318848
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 187,
+                "time_to_next_fire": -0.1333317756652832
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 188,
+                "time_to_next_fire": -0.14999842643737793
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 189,
+                "time_to_next_fire": -0.16666507720947266
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 190,
+                "time_to_next_fire": -0.18333172798156738
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": false,
+                "stock": 120,
+                "tick": 191,
+                "time_to_next_fire": -0.1999983787536621
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": true,
+                "stock": 120,
+                "tick": 192,
+                "time_to_next_fire": -0.21666502952575684
+            },
+            {
+                "ammo": 0,
+                "fired": false,
+                "reloading": true,
+                "stock": 120,
+                "tick": 193,
+                "time_to_next_fire": -0.23333168029785156
+            },
+            {
+                "ammo": 30,
+                "fired": false,
+                "reloading": false,
+                "stock": 90,
+                "tick": 194,
+                "time_to_next_fire": -0.23333168029785156
+            },
+            {
+                "ammo": 30,
+                "fired": false,
+                "reloading": false,
+                "stock": 90,
+                "tick": 195,
+                "time_to_next_fire": -0.2499983310699463
+            }
+        ]
+    },
+    "id": "weap_step_trace_fire_reload",
+    "inputs": [],
+    "kind": "step_trace",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "weap",
+    "version": "1.0.0"
+}

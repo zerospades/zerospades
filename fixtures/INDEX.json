@@ -335,6 +335,13 @@
             "subsystem": "weap",
             "behavior": "implementation_detail",
             "description": "Spread/recoil modifier RULES + base GetSpread()/GetRecoil() vectors for all 6 variants (value_lookup, NOT a fired-shot trace). Spread: aim x0.5, crouch x0.5 (not shotgun). Recoil: walking-not-aiming x2, airborne x2, crouch x0.5."
+        },
+        {
+            "id": "weap_step_trace_fire_reload",
+            "path": "fixtures/weap_step_trace_fire_reload.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "WEAP-02 SMG v0.75 fire/ammo/reload state machine (step_trace, 196 ticks). Captures every tick of a full cycle: fire-allowed ticks at the 6-tick GetDelay cadence (ammo decrements), intervening rate-gate-suppressed ticks (ammo stable), empty-clip dry-fire ticks (fired=false, ammo=0), Reload start (reloading=true), and ReloadDone (reloading=false, ammo restored to clip). Local player (SetLocalPlayerIndex) so empty-clip blocks fire."
         }
     ]
 }
