@@ -520,3 +520,230 @@ the unit-level companion to the `world_snapshot` packet fold.
 
 The packets the current `packet_roundtrip` and proto `world_snapshot` fixtures use, and how
 to decode each from the bytes alone, are specified next in §4.
+
+---
+
+## 4. Packet Wire-Format & `decoded` Conventions (CONTRACT-04)
+
+This section specifies the Ace of Spades 0.75/0.76 server-to-client wire format precisely
+enough that a port can **decode every packet in the current corpus from the bytes alone** and
+emit a `decoded` object whose keys match the recorded fixtures. The wire is the same for both
+protocol versions except where noted (only WorldUpdate differs).
+
+### 4.1 Primitive Encodings and Byte Order
+
+All multi-byte integers are **little-endian** (least-significant byte first). The primitives a
+decoder needs:
+
+| Primitive | Size | Encoding |
+|-----------|------|----------|
+| **Byte** | 1 byte | An unsigned 8-bit value. |
+| **Short** | 2 bytes | An unsigned 16-bit value, **little-endian**. |
+| **Int** | 4 bytes | An unsigned 32-bit value, **little-endian** (byte 0 is bits 0–7, byte 3 is bits 24–31). |
+| **Float** | 4 bytes | An IEEE-754 single-precision float, **little-endian** — the same 4 bytes as an Int, **bit-reinterpreted** as a float (read the 4 little-endian bytes into a 32-bit word, then reinterpret that word's bits as a float). |
+| **IntColor** | 3 bytes | A color in **B, G, R order on the wire** (blue byte first, then green, then red). A decoder reading three bytes assigns them blue, green, red in that order. |
+| **Vector3** | 12 bytes | Three consecutive **Floats** in `x, y, z` order (12 bytes total). Coordinates follow the Z convention of §0.2; an orientation Vector3 is a view/facing unit vector. |
+| **String(n)** | n bytes | A fixed-length `n`-byte text field (used for the two 10-byte team names). |
+| **RemainingString** | variable | All bytes from the current read position to the end of the packet, as text (used for trailing player names). |
+
+**Packet framing.** Every packet is `[ type tag : 1 byte ] [ body … ]`. **Byte 0 is the
+packet-type tag** (its numeric id, see §4.2). **The body begins at byte offset 1.** A decoder
+reads the tag, dispatches on it, and decodes the body starting at offset 1. (Packet length is
+known from the transport frame; some packets — notably WorldUpdate — derive their element
+count from the total length rather than from an explicit count field.)
+
+### 4.2 Packet-Type Id Table
+
+The full set of packet-type tags. A port needs only the **6 in-corpus packets** (marked
+**in corpus**) for the current fixtures; the rest are listed so the id space is unambiguous,
+and gain per-field tables when they enter the corpus in a later phase.
+
+| Packet | Dec | Hex | In corpus |
+|--------|-----|-----|-----------|
+| PositionData | 0 | `0x00` | |
+| OrientationData | 1 | `0x01` | |
+| **WorldUpdate** | **2** | **`0x02`** | **yes** |
+| InputData | 3 | `0x03` | |
+| WeaponInput | 4 | `0x04` | |
+| HitPacket (client→server) / SetHP (server→client) | 5 | `0x05` | (dual-use ordinal: direction selects meaning) |
+| GrenadePacket | 6 | `0x06` | |
+| SetTool | 7 | `0x07` | |
+| SetColour | 8 | `0x08` | |
+| **ExistingPlayer** | **9** | **`0x09`** | **yes** |
+| ShortPlayerData | 10 | `0x0a` | |
+| MoveObject | 11 | `0x0b` | |
+| **CreatePlayer** | **12** | **`0x0c`** | **yes** |
+| BlockAction | 13 | `0x0d` | |
+| BlockLine | 14 | `0x0e` | |
+| **StateData** | **15** | **`0x0f`** | **yes** |
+| KillAction | 16 | `0x10` | |
+| ChatMessage | 17 | `0x11` | |
+| **MapStart** | **18** | **`0x12`** | **yes** |
+| MapChunk | 19 | `0x13` | |
+| PlayerLeft | 20 | `0x14` | |
+| TerritoryCapture | 21 | `0x15` | |
+| ProgressBar | 22 | `0x16` | |
+| IntelCapture | 23 | `0x17` | |
+| IntelPickup | 24 | `0x18` | |
+| IntelDrop | 25 | `0x19` | |
+| Restock | 26 | `0x1a` | |
+| FogColour | 27 | `0x1b` | |
+| WeaponReload | 28 | `0x1c` | |
+| ChangeTeam | 29 | `0x1d` | |
+| ChangeWeapon | 30 | `0x1e` | |
+| MapCached / HandShakeInit | 31 | `0x1f` | (dual-use ordinal) |
+| HandShakeReturn | 32 | `0x20` | |
+| VersionGet | 33 | `0x21` | |
+| VersionSend | 34 | `0x22` | |
+| **ExtensionInfo** | **60** | **`0x3c`** | **yes** |
+| PlayerProperties | 64 | `0x40` | |
+
+> Ordinals 5 and 31 are reused for two packets each: the meaning is selected by transport
+> direction (client→server vs server→client). Neither pair is in the current corpus.
+
+### 4.3 Per-Field Decode Tables (the 6 in-corpus packets)
+
+Each table lists the body fields **in wire order** starting at byte offset 1. Decode them
+sequentially; the next field begins where the previous one ended.
+
+#### 4.3.1 WorldUpdate — tag `0x02` (2) — **version-dependent**
+
+WorldUpdate is the **only** in-corpus packet whose layout depends on `protocol_version`. It
+has **no explicit entry-count field**; the number of entries is derived from the packet
+length. Let `bytes_per_entry = 24` for protocol `0.75` and `25` for protocol `0.76`. Then:
+
+> `entries = floor(total_packet_length / bytes_per_entry)`
+
+(`total_packet_length` includes the 1-byte tag; integer division absorbs the `+1` so the
+result equals the number of entries the encoder emitted.)
+
+Each entry, in order:
+
+| Protocol `0.75` (24-byte entry) | Protocol `0.76` (25-byte entry) |
+|----------------------------------|----------------------------------|
+| `index` is **implicit** = the entry's list position `i` (0,1,2,…) — no byte on the wire | `index` is **explicit**: a leading **Byte** read first |
+| `position`: Vector3 (12 bytes) | `position`: Vector3 (12 bytes) |
+| `front`: Vector3 (12 bytes) | `front`: Vector3 (12 bytes) |
+
+`index` selects which player the entry targets (see the WorldUpdate fold rule in §3.4).
+`front` is the player's orientation/facing unit vector. **Encoding** reverses this exactly: in
+`0.76` write the index Byte first, then the two Vector3s; in `0.75` write only the two
+Vector3s (the index is positional).
+
+#### 4.3.2 ExistingPlayer — tag `0x09` (9) — version-independent
+
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | `playerId` | Byte | |
+| 2 | `team` | Byte | team index |
+| 3 | `weapon` | Byte | `0`=rifle, `1`=smg, `2`=shotgun |
+| 4 | `tool` | Byte | `0`=spade, `1`=block, `2`=weapon, `3`=grenade |
+| 5 | `score` | Int | |
+| 6 | `color` | IntColor | block color, B,G,R on the wire |
+| 7 | `name` | RemainingString | the player name fills the rest of the packet |
+
+ExistingPlayer carries **no position** — when folded, the player's position comes from the
+accumulator's `saved_pos` (§3.4).
+
+#### 4.3.3 CreatePlayer — tag `0x0c` (12) — version-independent
+
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | `playerId` | Byte | |
+| 2 | `weapon` | Byte | weapon id (see §3.4.1) |
+| 3 | `team` | Byte | team index |
+| 4 | `position` | Vector3 | the **raw wire** spawn position |
+| 5 | `name` | RemainingString | trailing player name |
+
+The decoded position is the **raw wire value**. The spawn-height adjustment `z = z − 2.4` is a
+**fold-time** effect (§3.4), not part of the decode — a `packet_roundtrip` of CreatePlayer
+must round-trip the raw position unchanged.
+
+#### 4.3.4 StateData — tag `0x0f` (15) — version-independent, mode-discriminated
+
+The head is fixed; the tail depends on the game `mode`:
+
+**Head (always):**
+
+| # | Field | Type |
+|---|-------|------|
+| 1 | `playerId` | Byte |
+| 2 | `fogColor` | IntColor |
+| 3 | `teamColor[0]` | IntColor |
+| 4 | `teamColor[1]` | IntColor |
+| 5 | `teamName[0]` | String(10) |
+| 6 | `teamName[1]` | String(10) |
+| 7 | `mode` | Byte |
+
+**If `mode == 0` (Capture the Flag):**
+
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 8 | `team1Score` | Byte | |
+| 9 | `team2Score` | Byte | |
+| 10 | `captureLimit` | Byte | |
+| 11 | `intelFlags` | Byte | **bit 0** set = team 1 holds intel; **bit 1** set = team 2 holds intel |
+| 12 | **team-2 intel slot (read FIRST)** | — | if team 2 holds intel: a carrier `Byte` then **11 skipped bytes**; otherwise a flag-position Vector3 |
+| 13 | **team-1 intel slot (read second)** | — | if team 1 holds intel: a carrier `Byte` then **11 skipped bytes**; otherwise a flag-position Vector3 |
+| 14 | `team1BasePos` | Vector3 | |
+| 15 | `team2BasePos` | Vector3 | |
+
+The team-2 intel slot is read **before** the team-1 slot — this read order is part of the wire
+contract. The 11-skipped-byte filler keeps a carried-intel slot the same width whether or not
+a flag position is present (the encoder writes the carrier id plus 11 zero bytes), so the
+following base-position Vector3s land at a fixed offset.
+
+**If `mode != 0` (Territory Control):**
+
+| # | Field | Type |
+|---|-------|------|
+| 8 | `territoryCount` | Byte |
+| 9… | `territoryCount` × `{ pos: Vector3, state: Byte }` | each territory: a 12-byte position then a 1-byte state |
+
+#### 4.3.5 MapStart — tag `0x12` (18) — version-independent
+
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | `mapSize` | Int | the compressed map size in bytes |
+
+MapStart is **wire-version-independent**: the size is always a single Int regardless of
+protocol version. (Any "0.75 vs 0.76 map handling" difference lives in the send-side client
+logic, not in this received packet's bytes.) The fixtures record this with a `decoded` key
+`wire_version_independent: true`.
+
+#### 4.3.6 ExtensionInfo — tag `0x3c` (60) — version-independent
+
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | `count` | Byte | number of advertised extensions |
+| 2… | `count` × `{ id: Byte, version: Byte }` | each entry: an extension id then its version |
+
+A decoder reads `count`, then that many `(id, version)` Byte pairs. **All** advertised
+entries are recorded (see the `proto.extensionInfo` operation in §3.5.1).
+
+### 4.4 The `decoded` Friendly-Naming Convention
+
+A packet's `decoded` object (in a `packet_roundtrip` fixture's `expected`) does **not** use raw
+wire field names. It uses **human-friendly keys**, and a port's decoder must emit **exactly
+these keys** — because §1's compare is symmetric, an extra or missing key is a failure.
+
+The conventions, derived from the real fixtures:
+
+- **`packet_type`** is always present: a **PascalCase string** naming the packet (e.g.
+  `"WorldUpdate"`, `"MapStart"`). It is not a wire field — it is the friendly name of the
+  decoded packet.
+- **Domain fields are renamed to `snake_case`** for clarity, and often summarized rather than
+  transcribed one-to-one from the wire. Observed examples in the corpus:
+  - WorldUpdate → `{ "packet_type": "WorldUpdate", "player_count": <n> }` — `player_count`
+    is the entry count (a friendly summary), not a raw wire field.
+  - MapStart → `{ "packet_type": "MapStart", "map_size": <int>, "wire_version_independent":
+    true }` — the wire `mapSize` Int becomes `map_size`.
+- **Explanatory keys are documentation, not wire data.** Keys like `wire_version_independent`
+  and `note` describe a fact about the packet; they have no corresponding bytes. A port must
+  still emit them to match (they are part of the recorded `decoded` object), but it must not
+  invent additional ones.
+
+A port that emits raw wire names (e.g. `mapSize` instead of `map_size`) — or that adds wire
+fields the fixture's `decoded` omits, or omits ones it includes — will **fail** the symmetric
+comparison. The `decoded` object is a deliberately curated, friendly projection of the wire,
+and the fixture is the authority on which keys it contains.
