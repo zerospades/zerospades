@@ -149,6 +149,24 @@ jobs:
           path: ${{ runner.workspace }}/zerospades.mk/bin
           if-no-files-found: warn
 
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+            -D VCPKG_TARGET_TRIPLET=x64-osx \
+            -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests -j$(sysctl -n hw.ncpu)
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests --output-on-failure --no-tests=error -j$(sysctl -n hw.ncpu)
+
   build-macos-arm:
     name: Build (macOS Apple Silicon)
     runs-on: macos-14
@@ -242,7 +260,9 @@ jobs:
             libogg-dev \
             libopus-dev \
             libopusfile-dev \
-            zlib1g-dev
+            zlib1g-dev \
+            gcovr \
+            python3-jsonschema
 
       - name: Build application
         run: |
@@ -259,3 +279,18 @@ jobs:
           name: zerospades-linux-ubuntu
           path: build/bin/
           if-no-files-found: warn
+
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests -j$(nproc)
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests --output-on-failure --no-tests=error -j$(nproc)
