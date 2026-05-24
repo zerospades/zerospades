@@ -197,11 +197,39 @@
             "description": "MAP-01 IsSurface: isolated solid block (all 6 faces air) returns true; same block fully surrounded by solids on all 6 faces returns false."
         },
         {
-            "id": "map_value_lookup_003_raycast",
-            "path": "fixtures/map_value_lookup_003_raycast.json",
+            "id": "map_value_lookup_006_raycast_hit",
+            "path": "fixtures/map_value_lookup_006_raycast_hit.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-02 raycast and collision: CastRay2 hit/miss/startSolid edge case, ClipBox z==63→62 remap, ClipWorld z>=63 stricter boundary — result object {hit, startSolid, hitPos, hitBlock, normal, stepCount}. Placeholder: populated by Plan 03."
+            "description": "MAP-02 CastRay2 hit: ray from (198.5,200.5,50.5) dir +x hits solid block at (200,200,50); validates hit=true, startSolid=false, hitPos, hitBlock=(-1,0,0) normal, stepCount."
+        },
+        {
+            "id": "map_value_lookup_007_raycast_miss",
+            "path": "fixtures/map_value_lookup_007_raycast_miss.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-02 CastRay2 miss: ray from (100.5,100.5,30.5) dir -z (upward) with 50 maxSteps finds no solid; validates hit=false."
+        },
+        {
+            "id": "map_value_lookup_008_raycast_startsolid",
+            "path": "fixtures/map_value_lookup_008_raycast_startsolid.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-02 CastRay2 startSolid: ray origin (50.5,50.5,50.5) inside solid block at (50,50,50); validates hit=true, startSolid=true, hitPos≈origin, stepCount=0."
+        },
+        {
+            "id": "map_value_lookup_009_clip_box",
+            "path": "fixtures/map_value_lookup_009_clip_box.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-02 ClipBox z-boundary: z<0→false, z=30(air)→false, z=62(ground)→true, z=63(remap to 62)→true, z=64(>=DefaultDepth)→true; XY out-of-bounds→true (clipped)."
+        },
+        {
+            "id": "map_value_lookup_010_clip_world",
+            "path": "fixtures/map_value_lookup_010_clip_world.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-02 ClipWorld z-boundary: z<0→false, z=30(air)→false, z=62(ground)→true, z=63(remap to 62)→true, z=64→true; XY out-of-bounds→false (not clipped — key difference from ClipBox)."
         },
         {
             "id": "map_value_lookup_004_block_action",
