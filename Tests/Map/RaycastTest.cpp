@@ -36,9 +36,9 @@
 //   ClipWorld        — z-boundary semantics: z<0 not clipped; z>=64 clipped (same remap)
 //                      XY out-of-bounds differs: ClipBox → true, ClipWorld → false
 //
-// stepCount: RayCastResult has no stepCount field; we track it by counting loop
-// iterations separately using the same algorithm so the fixture captures a
-// consistent value from the oracle run.
+// stepCount: stored in fixtures as an informational field only (not replay-asserted).
+// CountRaySteps is a hand-rolled DDA reimplementation; asserting it against itself
+// in replay is a tautology. DDA correctness is covered by hitBlock/normal/hitPos.
 //
 // Per 06-PATTERNS.md Tolerance Matching:
 //   RAYCAST_TOL (1e-6) for hitPos vectors (float values).
@@ -416,9 +416,9 @@ TEST_F(MapTestBase, RaycastFixture_Hit) {
 	EXPECT_EQ(result.normal.y, nm.at(1).get<int>());
 	EXPECT_EQ(result.normal.z, nm.at(2).get<int>());
 
-	// stepCount — exact
-	int stepCount = CountRaySteps(map, v0, dir, 100);
-	EXPECT_EQ(stepCount, val.at("stepCount").get<int>());
+	// stepCount is stored as informational only — not asserted in replay
+	// (CountRaySteps is a hand-rolled DDA reimplementation; asserting it against
+	//  itself is a tautology. hitBlock/normal/hitPos assertions cover DDA correctness.)
 }
 
 // RaycastFixture_Miss: replay CastRay2 miss scenario.
@@ -485,9 +485,7 @@ TEST_F(MapTestBase, RaycastFixture_StartSolid) {
 	EXPECT_EQ(result.hitBlock.y, hb.at(1).get<int>());
 	EXPECT_EQ(result.hitBlock.z, hb.at(2).get<int>());
 
-	// stepCount — exact (should be 0 for startSolid)
-	int stepCount = CountRaySteps(map, v0, dir, 100);
-	EXPECT_EQ(stepCount, val.at("stepCount").get<int>());
+	// stepCount is stored as informational only — not asserted in replay.
 }
 
 // RaycastFixture_ClipBox: replay ClipBox z-boundary tests.
