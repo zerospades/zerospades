@@ -263,6 +263,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: true
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -312,3 +313,37 @@ jobs:
         env:
           GTEST_SHUFFLE: "1"
         run: ctest --test-dir build-tests --output-on-failure --no-tests=error -j$(nproc)
+
+      - name: Order-independence proof (3 seeds x 2 layers)
+        run: sh tools/shuffle_check.sh build-tests
+
+      - name: Validate fixture schema + INDEX
+        run: python3 tools/validate_fixtures.py fixtures
+
+      - name: Fixture-immutability guard
+        run: |
+          set -euo pipefail
+          # Resolve the base ref per event type (base_ref/head_ref are PR-only).
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            TITLE="${{ github.event.pull_request.title }}"
+          else
+            BASE="${{ github.event.before }}"
+            TITLE="$(git log -1 --pretty=%B)"
+          fi
+          # Did any committed fixture change vs the base ref?
+          CHANGED=$(git diff --name-only "$BASE" HEAD -- fixtures/ || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No fixture changes — OK."
+            exit 0
+          fi
+          echo "Fixtures changed:"; echo "$CHANGED"
+          # Opt-in token gates deliberate updates (CI-03 / D-09).
+          if printf '%s' "$TITLE" | grep -q '\[update-fixtures\]'; then
+            echo "OK: [update-fixtures] token present — deliberate fixture update."
+            exit 0
+          fi
+          echo "ERROR: fixtures/ changed without an [update-fixtures] token." >&2
+          echo "Fixtures are committed golden data (CI-03). To update them deliberately," >&2
+          echo "add [update-fixtures] to the PR title and justify the change in the PR body." >&2
+          exit 1
