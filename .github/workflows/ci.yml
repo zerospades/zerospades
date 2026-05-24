@@ -321,24 +321,67 @@ jobs:
         run: python3 tools/validate_fixtures.py fixtures
 
       - name: Fixture-immutability guard
+        env:
+          # WR-04: PR title is attacker-controlled. Route it through env: so the
+          # runner sets it as a literal shell variable (never parsed as script).
+          # Never interpolate ${{ github.event.pull_request.title }} into run:.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
           # Resolve the base ref per event type (base_ref/head_ref are PR-only).
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
-            TITLE="${{ github.event.pull_request.title }}"
+            TITLE="$PR_TITLE"
           else
             BASE="${{ github.event.before }}"
             TITLE="$(git log -1 --pretty=%B)"
           fi
-          # Did any committed fixture change vs the base ref?
-          CHANGED=$(git diff --name-only "$BASE" HEAD -- fixtures/ || true)
+
+          # WR-01/WR-03: ensure BASE is a real, reachable commit. The all-zeros
+          # SHA is git's sentinel for "no prior ref" (first push of a new branch,
+          # branch creation, some force-pushes). It is NOT "no changes" — treating
+          # it as such would false-pass an untokened fixture change. So resolve a
+          # reliable base instead: fetch the default branch and use the merge-base.
+          ZERO_SHA="0000000000000000000000000000000000000000"
+          if [ "$BASE" = "$ZERO_SHA" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "Base '$BASE' is the zero-SHA or not present locally; resolving a reliable base." >&2
+            # Best-effort: try to fetch the named base ref directly (covers PR base.sha
+            # not yet in the local object DB, e.g. fork / cross-repo PRs).
+            if [ "$BASE" != "$ZERO_SHA" ]; then
+              git fetch --no-tags --depth=1 origin "$BASE" 2>/dev/null || true
+            fi
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              # Fall back to merge-base with the default branch.
+              if [ -z "${DEFAULT_BRANCH:-}" ]; then
+                echo "ERROR: no default branch available to resolve a fixture-diff base." >&2
+                echo "Refusing to certify fixture immutability without a reliable base (fail closed)." >&2
+                exit 1
+              fi
+              git fetch --no-tags origin "$DEFAULT_BRANCH" 2>/dev/null || true
+              if ! BASE="$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null)" || [ -z "$BASE" ]; then
+                echo "ERROR: could not resolve a merge-base with origin/$DEFAULT_BRANCH." >&2
+                echo "Refusing to certify fixture immutability without a reliable base (fail closed)." >&2
+                exit 1
+              fi
+              echo "Using merge-base with origin/$DEFAULT_BRANCH as diff base: $BASE" >&2
+            fi
+          fi
+
+          # WR-02: fail closed. Separate "git diff failed" (error) from "no output"
+          # (genuinely no fixture changes). A diff error must NOT become a silent
+          # pass — a guard protecting golden data fails closed, not open.
+          if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- fixtures/); then
+            echo "ERROR: git diff against base '$BASE' failed — refusing to certify fixture immutability." >&2
+            exit 1
+          fi
           if [ -z "$CHANGED" ]; then
             echo "No fixture changes — OK."
             exit 0
           fi
           echo "Fixtures changed:"; echo "$CHANGED"
           # Opt-in token gates deliberate updates (CI-03 / D-09).
+          # IN-01: grep -q no-match (exit 1) is consumed by 'if'; safe under set -e/pipefail.
           if printf '%s' "$TITLE" | grep -q '\[update-fixtures\]'; then
             echo "OK: [update-fixtures] token present — deliberate fixture update."
             exit 0
