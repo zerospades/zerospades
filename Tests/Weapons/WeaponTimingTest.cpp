@@ -89,15 +89,29 @@ namespace {
 		};
 	}
 
+	// Result of the scripted sequence: the captured ticks[] plus the actual
+	// clip size of the weapon under test (GetClipSize()). The clip size is
+	// reported explicitly so the reload-done cross-check asserts against the
+	// real GetClipSize() rather than inferring "full clip" from the max ammo
+	// observed (WR-04). Inferring max-ammo holds only for a weapon whose
+	// ReloadDone fills the clip in one step (SMG); reporting GetClipSize()
+	// directly makes the SMG-specific invariant explicit and stops a future
+	// slow-reload variant (shotgun) from silently breaking the cross-check.
+	struct FireReloadSequence {
+		nlohmann::json ticks;
+		int clip;
+	};
+
 	// Run the scripted SMG (v075) fire/empty/dry-fire/reload/done sequence,
 	// capturing one snapshot per FrameNext call. Identical in the generator and
 	// the replay so the comparison is non-tautological (the oracle is re-run, the
-	// frozen JSON is only the expected output). Returns the ticks[] array.
+	// frozen JSON is only the expected output). Returns the ticks[] array plus the
+	// weapon's GetClipSize().
 	//
 	// The clip is emptied at the natural 6-tick cadence; once empty we capture a
 	// few dry-fire ticks, then Reload(), a couple reloading ticks, ReloadDone(),
 	// and a final post-reload tick.
-	nlohmann::json RunFireReloadSequence() {
+	FireReloadSequence RunFireReloadSequence() {
 		HeadlessWorld hw(42, MakeFlatMapBytes());
 		auto p = std::make_unique<client::Player>(hw.GetWorld(), 0, SMG_WEAPON, 0);
 		hw.GetWorld().SetPlayer(0, std::move(p));
@@ -143,7 +157,7 @@ namespace {
 			ticks.push_back(SnapshotWeaponTick(w, tick++, fired));
 		}
 
-		return ticks;
+		return FireReloadSequence{ticks, clip};
 	}
 
 } // namespace
@@ -154,9 +168,9 @@ namespace {
 
 TEST(DISABLED_WeaponTimingGenerate, FireReload) {
 	SettingsGuard guard;
-	nlohmann::json ticks = RunFireReloadSequence();
+	FireReloadSequence seq = RunFireReloadSequence();
 	auto j = BuildWeaponFixtureEnvelope("weap_step_trace_fire_reload", "0.75", "step_trace");
-	j["expected"]["ticks"] = ticks;
+	j["expected"]["ticks"] = seq.ticks;
 	WriteWeaponFixture("weap_step_trace_fire_reload.json", j);
 }
 
@@ -168,7 +182,8 @@ TEST_F(WeaponTestBase, FireReload) {
 	nlohmann::json j = LoadFixtureJson("weap_step_trace_fire_reload.json");
 	const auto& want = j.at("expected").at("ticks");
 
-	nlohmann::json got = RunFireReloadSequence();
+	FireReloadSequence seq = RunFireReloadSequence();
+	const nlohmann::json& got = seq.ticks;
 
 	ASSERT_EQ(want.size(), got.size()) << "tick count mismatch";
 	for (size_t i = 0; i < want.size(); i++)
@@ -179,15 +194,20 @@ TEST_F(WeaponTestBase, FireReload) {
 	// actually contains a fire-allowed tick (ammo decremented), a rate-gate
 	// suppressed tick (fired==false while ammo>0), an empty-clip dry-fire tick
 	// (fired==false, ammo==0), and a reload-done tick (reloading false, ammo
-	// restored to a full clip).
+	// restored to the weapon's full clip).
+	//
+	// WR-04: the reload-done check asserts ammo == the weapon's actual
+	// GetClipSize() (seq.clip), NOT a clip inferred from the max ammo observed.
+	// Inferring max-ammo == full-clip only holds for a one-step ReloadDone (SMG);
+	// reading GetClipSize() directly makes the SMG-specific invariant explicit so
+	// a future slow-reload variant (shotgun) would fail loudly rather than
+	// silently mis-detecting the reload-done tick.
+	const int clip = seq.clip; // == w.GetClipSize() for the weapon under test (SMG: 30)
 	bool sawFire = false, sawRateGate = false, sawDryFire = false, sawReloadDone = false;
-	int clip = 0;
 	for (const auto& t : want) {
 		int ammo = t.at("ammo").get<int>();
 		bool fired = t.at("fired").get<bool>();
 		bool reloading = t.at("reloading").get<bool>();
-		if (ammo > clip)
-			clip = ammo; // the full clip size is the max ammo observed
 		if (fired)
 			sawFire = true;
 		if (!fired && ammo > 0 && !reloading)
