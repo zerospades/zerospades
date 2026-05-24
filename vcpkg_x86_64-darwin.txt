@@ -4,3 +4,4 @@ opus
 libogg
 sdl2
 sdl2-image[libjpeg-turbo]
+nlohmann-json
