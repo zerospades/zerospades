@@ -34,6 +34,7 @@
 #include "MakeFlatMap.h"
 #include "PlayerPhysicsSnapshot.h"
 #include "SettingsGuard.h"
+#include "SnapshotCompare.h"
 #include "ToleranceMatchers.h"
 
 namespace spades {
@@ -52,47 +53,8 @@ namespace spades {
 			return j;
 		}
 
-		// Recursively walk the frozen expected JSON and assert got matches. Numeric
-		// fields use EXPECT_NEAR with the per-field tolerance (ToleranceForField on the
-		// dotted path); everything else is an exact EXPECT_EQ. This is the in-process
-		// analogue of tools/compare_snapshots and never uses the banned EXPECT_FLOAT_EQ.
-		// Copied verbatim from ProtocolGoldenTest.cpp:84-119.
-		inline void ExpectSnapshotMatches(const nlohmann::json& want, const nlohmann::json& got,
-		                                  const std::string& path) {
-			if (want.is_object()) {
-				ASSERT_TRUE(got.is_object()) << "at " << path << ": expected object";
-				for (auto& [key, wv] : want.items()) {
-					ASSERT_TRUE(got.contains(key)) << "at " << path << ": missing key '" << key << "'";
-					ExpectSnapshotMatches(wv, got.at(key), path + "." + key);
-				}
-				// Symmetric: flag extra keys the candidate emitted but the oracle did not.
-				for (auto& [key, gv] : got.items()) {
-					(void)gv;
-					EXPECT_TRUE(want.contains(key))
-					  << "at " << path << ": unexpected extra key '" << key << "'";
-				}
-				return;
-			}
-			if (want.is_array()) {
-				ASSERT_TRUE(got.is_array()) << "at " << path << ": expected array";
-				ASSERT_EQ(want.size(), got.size()) << "at " << path << ": array size mismatch";
-				for (size_t i = 0; i < want.size(); i++)
-					ExpectSnapshotMatches(want[i], got[i], path + "[" + std::to_string(i) + "]");
-				return;
-			}
-			// Floats: per-field absolute tolerance (positions 1e-4, orientation 1e-5).
-			// Integers must NOT be widened to float compare — they compare exactly so a
-			// frozen integer field (id/health/team_id) catches any drift.
-			if (want.is_number_float() || got.is_number_float()) {
-				ASSERT_TRUE(want.is_number() && got.is_number())
-				  << "at " << path << ": expected numeric";
-				EXPECT_NEAR(want.get<double>(), got.get<double>(), ToleranceForField(path))
-				  << "at " << path;
-				return;
-			}
-			// Integers, bools, strings, null: exact.
-			EXPECT_EQ(want, got) << "at " << path;
-		}
+		// ExpectSnapshotMatches is provided by SnapshotCompare.h (WR-02: single source of
+		// truth — formerly duplicated here and in the Weapon/GameMode/Grenade bases).
 
 		/**
 		 * GoogleTest fixture base for all physics step-trace tests.
