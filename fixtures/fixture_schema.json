@@ -228,7 +228,7 @@
             "then": {
                 "properties": {
                     "inputs": {
-                        "$comment": "PORT-04 (D-09): packet_roundtrip has no driving inputs — the expected.bytes_hex IS the stimulus (decode -> expected.decoded; re-encode -> bytes). inputs is a permissive array (always empty). No array-minimum constraint (Pitfall 1).",
+                        "$comment": "PORT-04 (D-09): packet_roundtrip's canonical stimulus is expected.bytes_hex (decode -> expected.decoded; re-encode -> bytes). inputs is a permissive array, normally empty; proto_malformed_001 records its source bytes as inputs[0].bytes_hex plus a comment (equal to expected.bytes_hex). No array-minimum constraint (Pitfall 1).",
                         "type": "array"
                     },
                     "expected": {

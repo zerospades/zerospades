@@ -507,8 +507,13 @@ real fixtures use.
 A `packet_roundtrip` pins the **wire encoding of a single packet** in both directions — it is
 the unit-level companion to the `world_snapshot` packet fold.
 
-- **`inputs`** is the empty array `[]`. The **stimulus is the `bytes_hex` field inside
-  `expected`**, not `inputs`.
+- **`inputs`** is normally the empty array `[]`, and the **canonical stimulus is the
+  `bytes_hex` field inside `expected`**, not `inputs`. The schema permits a non-empty
+  `inputs`: one corpus fixture (`proto_malformed_001`, a deliberately-truncated StateData whose
+  decode is expected to be rejected) records its source bytes as `inputs[0].bytes_hex` together
+  with an explanatory `comment`, and that value equals `expected.bytes_hex`. A port must always
+  treat `expected.bytes_hex` as the stimulus; an `inputs[].bytes_hex`, when present, is
+  informational and equal to it.
 - **`expected`** is an object with two keys:
   - **`bytes_hex`** — the packet's exact bytes as a lowercase hex string (the first byte is
     the packet-type tag; see §4).
