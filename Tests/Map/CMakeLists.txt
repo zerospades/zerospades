@@ -24,3 +24,9 @@
 target_sources(zerospades_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/BlockStateTest.cpp
 )
+
+# Wave 2 — Plan 03: MAP-02 raycast/collision fixtures (CastRay2 hit/miss/startSolid,
+# ClipBox/ClipWorld z-boundary semantics).
+target_sources(zerospades_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/RaycastTest.cpp
+)
