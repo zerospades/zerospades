@@ -58,8 +58,33 @@
         "inputs": {
             "type": "array"
         },
+        "api": {
+            "$comment": "PORT-04 (D-11): optional structured engine-operation block exercised by value_lookup fixtures. NOT in the top-level required[] — non-value_lookup fixtures (and current empty value_lookups) omit it. 'op' is an OPEN dotted string (e.g. map.castRay, physics.getEyePosition); the closed op registry lives in CONTRACT.md, not the schema, so adding ops across phases does not churn the schema.",
+            "type": "object",
+            "required": ["op", "args"],
+            "properties": {
+                "op": {
+                    "type": "string"
+                },
+                "args": {
+                    "type": "object"
+                }
+            }
+        },
         "config": {
-            "type": "object"
+            "$comment": "PORT-04 (D-09/D-10): formalized additively. No required keys — zero fixtures carry a config block today (A2 VERIFIED), so any formalization is forward-only and Phase 12 populates it. Descriptive optional spawn/setup fields; additional properties tolerated.",
+            "type": "object",
+            "properties": {
+                "spawn": {
+                    "type": "object"
+                },
+                "players": {
+                    "type": "array"
+                },
+                "time_limit_s": {
+                    "type": "number"
+                }
+            }
         },
         "tolerances": {
             "type": "object",
@@ -98,6 +123,13 @@
             },
             "then": {
                 "properties": {
+                    "inputs": {
+                        "$comment": "PORT-04 (D-09): world_snapshot inputs are OPTIONALLY a packet byte sequence folded to produce the snapshot. No array-minimum constraint (Pitfall 1): 4 of 6 world_snapshots carry bytes_hex packet records, 2 (mode_world_snapshot_ctf/tc) are inputs:[] directly-constructed states — both must validate. Phase 12 embeds setup for the empty ones.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/$defs/PacketInput"
+                        }
+                    },
                     "expected": {
                         "type": "object",
                         "$comment": "map_content_hash is OPTIONAL (not in required): snapshots may omit it, matching the Rust WorldSnapshot map_content_hash: Option<String>. Keeping the Python validator and rust_smoke gates in agreement is required for the portability proof (CR-02).",
@@ -143,6 +175,13 @@
             },
             "then": {
                 "properties": {
+                    "inputs": {
+                        "$comment": "PORT-04 (D-09): step_trace inputs are a per-tick input schedule (the schedule currently trapped in C++ test code). No array-minimum constraint (Pitfall 1): the 18 step_trace fixtures are all inputs:[] today; Phase 12 populates the per-tick records.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/$defs/StepTraceInput"
+                        }
+                    },
                     "expected": {
                         "type": "object",
                         "required": ["ticks"],
@@ -166,6 +205,10 @@
             },
             "then": {
                 "properties": {
+                    "inputs": {
+                        "$comment": "PORT-04 (D-09): value_lookup is driven by the top-level api block (op + args), so inputs is a permissive array (typically empty). No array-minimum constraint (Pitfall 1).",
+                        "type": "array"
+                    },
                     "expected": {
                         "type": "object",
                         "required": ["value"]
@@ -184,6 +227,10 @@
             },
             "then": {
                 "properties": {
+                    "inputs": {
+                        "$comment": "PORT-04 (D-09): packet_roundtrip has no driving inputs — the expected.bytes_hex IS the stimulus (decode -> expected.decoded; re-encode -> bytes). inputs is a permissive array (always empty). No array-minimum constraint (Pitfall 1).",
+                        "type": "array"
+                    },
                     "expected": {
                         "type": "object",
                         "required": ["bytes_hex", "decoded"],
@@ -213,6 +260,64 @@
                 },
                 "z": {
                     "type": "number"
+                }
+            }
+        },
+        "StepTraceInput": {
+            "$comment": "PORT-04 (D-09/D-10): per-tick input record for step_trace fixtures. Descriptive Rust-friendly fields, ALL optional (NO required[]) so the array's items constraint is satisfied vacuously by today's inputs:[] fixtures and Phase 12 can populate any subset. Additional properties tolerated for forward-compat.",
+            "type": "object",
+            "properties": {
+                "tick": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "move_forward": {
+                    "type": "boolean"
+                },
+                "move_back": {
+                    "type": "boolean"
+                },
+                "move_left": {
+                    "type": "boolean"
+                },
+                "move_right": {
+                    "type": "boolean"
+                },
+                "jump": {
+                    "type": "boolean"
+                },
+                "crouch": {
+                    "type": "boolean"
+                },
+                "sprint": {
+                    "type": "boolean"
+                },
+                "sneak": {
+                    "type": "boolean"
+                },
+                "primary_fire": {
+                    "type": "boolean"
+                },
+                "secondary_fire": {
+                    "type": "boolean"
+                },
+                "reload": {
+                    "type": "boolean"
+                },
+                "orientation": {
+                    "$ref": "#/$defs/Vec3"
+                }
+            }
+        },
+        "PacketInput": {
+            "$comment": "PORT-04 (D-09): a packet record in a world_snapshot input sequence. bytes_hex is the wire-encoded packet (optional so a non-bytes input form stays permissive); comment is documentation. NO required[] so inputs:[] world_snapshots validate vacuously; additional properties tolerated.",
+            "type": "object",
+            "properties": {
+                "bytes_hex": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
                 }
             }
         },
