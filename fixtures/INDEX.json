@@ -284,49 +284,49 @@
       "id": "weap_value_lookup_rifle_075",
       "path": "fixtures/weap_value_lookup_rifle_075.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "Rifle v0.75 (RifleWeapon3): damage Head=100/Torso=49/Arms=33/Legs=33/Block=50, spread=0.006, pellets=1, delay=0.5s, clip=10, stock=50, reload=2.5s. HitTypeMelee unhandled (documented, not asserted)."
     },
     {
       "id": "weap_value_lookup_smg_075",
       "path": "fixtures/weap_value_lookup_smg_075.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "SMG v0.75 (SMGWeapon3): damage Head=75/Torso=29/Arms=18/Legs=18/Block=34, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=120, reload=2.5s. Block 34 differs from v076 (26)."
     },
     {
       "id": "weap_value_lookup_shotgun_075",
       "path": "fixtures/weap_value_lookup_shotgun_075.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "Shotgun v0.75 (ShotgunWeapon3): damage Head=37/Torso=27/Arms=16/Legs=16/Block=34, spread=0.024, pellets=8, delay=1.0s, clip=6, stock=48, reload=0.5s, reload_slow=true."
     },
     {
       "id": "weap_value_lookup_rifle_076",
       "path": "fixtures/weap_value_lookup_rifle_076.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "Rifle v0.76 (RifleWeapon4): damage Head=250/Torso=60/Arms=50/Legs=50/Block=50, spread=0.004, pellets=1, delay=0.6s, clip=8, stock=48, reload=2.5s. Head/clip differ from v075 (100/10). Source comment mislabels table '0.75' \u2014 frozen as the client oracle returns it (Pitfall 2)."
     },
     {
       "id": "weap_value_lookup_smg_076",
       "path": "fixtures/weap_value_lookup_smg_076.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "SMG v0.76 (SMGWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=26, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=150, reload=2.5s. Block 26 differs from v075 (34)."
     },
     {
       "id": "weap_value_lookup_shotgun_076",
       "path": "fixtures/weap_value_lookup_shotgun_076.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "Shotgun v0.76 (ShotgunWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=34, spread=0.036, pellets=8, delay=0.8s, clip=8, stock=48, reload=0.4s, reload_slow=true."
     },
     {
       "id": "weap_value_lookup_modifiers",
       "path": "fixtures/weap_value_lookup_modifiers.json",
       "subsystem": "weap",
-      "behavior": "implementation_detail",
+      "behavior": "protocol_compat",
       "description": "Spread/recoil modifier RULES + base GetSpread()/GetRecoil() vectors for all 6 variants (value_lookup, NOT a fired-shot trace). Spread: aim x0.5, crouch x0.5 (not shotgun). Recoil: walking-not-aiming x2, airborne x2, crouch x0.5."
     },
     {

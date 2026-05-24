@@ -1,5 +1,5 @@
 {
-    "behavior": "implementation_detail",
+    "behavior": "protocol_compat",
     "expected": {
         "value": {
             "base_075": {
