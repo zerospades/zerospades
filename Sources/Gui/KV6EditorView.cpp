@@ -1292,6 +1292,13 @@ namespace spades {
 				Vector4 ec = MakeVector4(0.1F, 0.1F, 0.12F, 0.8F);
 				for (int e = 0; e < 4; e++)
 					DrawLine2D(q[e], q[(e + 1) % 4], 1.0F, ec);
+				// 3x3 grid: the inner lines mark the edge/corner (bevel) click zones.
+				Vector2 e1 = q[1] - q[0], e2 = q[3] - q[0];
+				Vector4 gc = MakeVector4(0.1F, 0.1F, 0.12F, 0.5F);
+				DrawLine2D(q[0] + e1 * 0.34F, q[0] + e1 * 0.34F + e2, 1.0F, gc);
+				DrawLine2D(q[0] + e1 * 0.66F, q[0] + e1 * 0.66F + e2, 1.0F, gc);
+				DrawLine2D(q[0] + e2 * 0.34F, q[0] + e2 * 0.34F + e1, 1.0F, gc);
+				DrawLine2D(q[0] + e2 * 0.66F, q[0] + e2 * 0.66F + e1, 1.0F, gc);
 				Vector2 ctr = (q[0] + q[1] + q[2] + q[3]) * 0.25F;
 				float ls = 0.75F;
 				Vector2 ts = font.Measure(f.label);
