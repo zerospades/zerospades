@@ -333,15 +333,14 @@ TEST_F(MapTestBase, ClusterFixture_Pillar) {
 
 	auto& listener = hw.GetListener();
 
-	// Verify callback count
+	// Verify callback count — ASSERT so loop below doesn't run on mismatch
 	int expectedCount = val.at("callback_count").get<int>();
-	EXPECT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
+	ASSERT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
 
 	// Verify per-callback cell sets (unordered comparison via set<tuple>)
 	const auto& fixtureCallbacks = val.at("callbacks");
-	for (size_t i = 0;
-	     i < std::min(listener.allBlocksFell.size(), fixtureCallbacks.size());
-	     i++) {
+	ASSERT_EQ(fixtureCallbacks.size(), static_cast<size_t>(expectedCount));
+	for (size_t i = 0; i < listener.allBlocksFell.size(); i++) {
 		std::set<std::tuple<int, int, int>> actualSet, expectedSet;
 		for (const auto& cell : listener.allBlocksFell[i])
 			actualSet.insert({cell.x, cell.y, cell.z});
@@ -381,15 +380,14 @@ TEST_F(MapTestBase, ClusterFixture_Connected) {
 
 	auto& listener = hw.GetListener();
 
-	// Verify callback count
+	// Verify callback count — ASSERT so loop below doesn't run on mismatch
 	int expectedCount = val.at("callback_count").get<int>();
-	EXPECT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
+	ASSERT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
 
 	// Verify per-callback cell sets
 	const auto& fixtureCallbacks = val.at("callbacks");
-	for (size_t i = 0;
-	     i < std::min(listener.allBlocksFell.size(), fixtureCallbacks.size());
-	     i++) {
+	ASSERT_EQ(fixtureCallbacks.size(), static_cast<size_t>(expectedCount));
+	for (size_t i = 0; i < listener.allBlocksFell.size(); i++) {
 		std::set<std::tuple<int, int, int>> actualSet, expectedSet;
 		for (const auto& cell : listener.allBlocksFell[i])
 			actualSet.insert({cell.x, cell.y, cell.z});
@@ -435,15 +433,14 @@ TEST_F(MapTestBase, ClusterFixture_TwoIsolated) {
 
 	auto& listener = hw.GetListener();
 
-	// Verify callback count (2 separate callbacks, not 1 merged)
+	// Verify callback count (2 separate callbacks, not 1 merged) — ASSERT to halt on mismatch
 	int expectedCount = val.at("callback_count").get<int>();
-	EXPECT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
+	ASSERT_EQ(static_cast<int>(listener.allBlocksFell.size()), expectedCount);
 
 	// Verify per-callback cell sets (unordered comparison per 06-RESEARCH.md Risk 3)
 	const auto& fixtureCallbacks = val.at("callbacks");
-	for (size_t i = 0;
-	     i < std::min(listener.allBlocksFell.size(), fixtureCallbacks.size());
-	     i++) {
+	ASSERT_EQ(fixtureCallbacks.size(), static_cast<size_t>(expectedCount));
+	for (size_t i = 0; i < listener.allBlocksFell.size(); i++) {
 		std::set<std::tuple<int, int, int>> actualSet, expectedSet;
 		for (const auto& cell : listener.allBlocksFell[i])
 			actualSet.insert({cell.x, cell.y, cell.z});
