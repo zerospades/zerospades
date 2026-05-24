@@ -1,0 +1,68 @@
+{
+    "behavior": "protocol_compat",
+    "expected": {
+        "game_mode": {
+            "mode": "tc"
+        },
+        "players": [
+            {
+                "alive": true,
+                "health": 100,
+                "id": 1,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "team_id": 0,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "rifle"
+            },
+            {
+                "alive": true,
+                "health": 100,
+                "id": 2,
+                "orientation": {
+                    "x": -1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "team_id": 1,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "smg"
+            }
+        ],
+        "tick": 0
+    },
+    "id": "mode_world_snapshot_tc",
+    "inputs": [],
+    "kind": "world_snapshot",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "mode",
+    "version": "1.0.0"
+}

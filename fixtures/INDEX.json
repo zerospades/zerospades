@@ -377,6 +377,20 @@
       "subsystem": "mode",
       "behavior": "protocol_compat",
       "description": "MODE-03 CTF world golden (world_snapshot): a full CTF packet sequence (StateData mode=0 + two ExistingPlayers + IntelPickup) folded once through ProtocolReplay and frozen via WorldSnapshot::ToJson(). Carries game_mode.mode == \"ctf\" and the id-ascending players[] array."
+    },
+    {
+      "id": "mode_value_lookup_tc_progress",
+      "path": "fixtures/mode_value_lookup_tc_progress.json",
+      "subsystem": "mode",
+      "behavior": "implementation_detail",
+      "description": "MODE-02 TC progress (value_lookup): pinned-clock Territory::GetProgress() characterization. A TCGameMode is constructed directly, SetMode onto a HeadlessWorld, advanced 120 ticks (World.time=2.0s) with progressBasePos=0.2 / progressRate=0.15 (rate 3 * TC_CAPTURE_RATE 0.05) / progressStartTime=0 so GetProgress lands MID-RANGE (~0.5, not the [0,1] clamp), exercising the linear progressBasePos+progressRate*dt formula (TCGameMode.cpp:40-48). A second value block captures the post-TerritoryCapture reset (ownerTeamId=state, progressRate=0, capturingTeamId=-1) folded from a TerritoryCapture packet."
+    },
+    {
+      "id": "mode_world_snapshot_tc",
+      "path": "fixtures/mode_world_snapshot_tc.json",
+      "subsystem": "mode",
+      "behavior": "protocol_compat",
+      "description": "MODE-03 TC world golden (world_snapshot): a full TC packet sequence (StateData mode=1 + two ExistingPlayers + TerritoryCapture) folded once through ProtocolReplay and frozen via WorldSnapshot::ToJson(). Carries game_mode.mode == \"tc\" and the id-ascending players[] array."
     }
   ]
 }
