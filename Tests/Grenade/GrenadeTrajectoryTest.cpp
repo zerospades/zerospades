@@ -60,6 +60,7 @@
 #include "HeadlessWorld.h"
 #include "MakeFlatMap.h"
 #include "SettingsGuard.h"
+#include "SnapshotCompare.h" // WR-02: shared ExpectSnapshotMatches (hoisted from here)
 #include "ToleranceMatchers.h"
 
 using namespace spades;
@@ -69,11 +70,13 @@ using namespace spades::client;
 namespace {
 
 	// ---------------------------------------------------------------------------
-	// LoadFixtureJson / ExpectSnapshotMatches: self-contained copies. Tests/Physics
-	// is not on the Tests/Grenade include path (only Tests/Helpers + Sources are —
+	// LoadGrenadeFixtureJson: self-contained loader. Tests/Physics is not on the
+	// Tests/Grenade include path (only Tests/Helpers + Sources are —
 	// Tests/CMakeLists.txt target_include_directories), so PhysicsTestBase.h is
-	// unreachable. Behaviour identical to PhysicsTestBase.h:45-95 / the inlined copy
-	// in Tests/Weapons/WeaponTestBase.h (07-02 Rule-3 precedent).
+	// unreachable. The ExpectSnapshotMatches comparator was hoisted to
+	// Tests/Helpers/SnapshotCompare.h (WR-02): it is on the include path and is
+	// pulled in via the include above. `using namespace spades::tests;` makes the
+	// unqualified ExpectSnapshotMatches(...) calls below resolve to it.
 	// ---------------------------------------------------------------------------
 	nlohmann::json LoadGrenadeFixtureJson(const std::string& name) {
 		std::string path = std::string(TESTS_DIR) + "/../fixtures/" + name;
@@ -83,38 +86,6 @@ namespace {
 		nlohmann::json j;
 		f >> j;
 		return j;
-	}
-
-	void ExpectSnapshotMatches(const nlohmann::json& want, const nlohmann::json& got,
-	                           const std::string& path) {
-		if (want.is_object()) {
-			ASSERT_TRUE(got.is_object()) << "at " << path << ": expected object";
-			for (auto& [key, wv] : want.items()) {
-				ASSERT_TRUE(got.contains(key)) << "at " << path << ": missing key '" << key << "'";
-				ExpectSnapshotMatches(wv, got.at(key), path + "." + key);
-			}
-			for (auto& [key, gv] : got.items()) {
-				(void)gv;
-				EXPECT_TRUE(want.contains(key))
-				  << "at " << path << ": unexpected extra key '" << key << "'";
-			}
-			return;
-		}
-		if (want.is_array()) {
-			ASSERT_TRUE(got.is_array()) << "at " << path << ": expected array";
-			ASSERT_EQ(want.size(), got.size()) << "at " << path << ": array size mismatch";
-			for (size_t i = 0; i < want.size(); i++)
-				ExpectSnapshotMatches(want[i], got[i], path + "[" + std::to_string(i) + "]");
-			return;
-		}
-		if (want.is_number_float() || got.is_number_float()) {
-			ASSERT_TRUE(want.is_number() && got.is_number())
-			  << "at " << path << ": expected numeric";
-			EXPECT_NEAR(want.get<double>(), got.get<double>(), ToleranceForField(path))
-			  << "at " << path;
-			return;
-		}
-		EXPECT_EQ(want, got) << "at " << path;
 	}
 
 	void WriteFixture(const std::string& name, const nlohmann::json& j) {

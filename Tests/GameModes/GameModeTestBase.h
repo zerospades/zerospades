@@ -29,49 +29,16 @@
 #include <Core/Exception.h>
 
 #include "SettingsGuard.h"
+#include "SnapshotCompare.h" // WR-02: shared ExpectSnapshotMatches (hoisted from here)
 #include "ToleranceMatchers.h"
 
 namespace spades {
 	namespace tests {
 
-		// Recursive int-exact / float-tolerance snapshot compare. Identical in
-		// behavior to PhysicsTestBase.h's ExpectSnapshotMatches, inlined here
-		// because Tests/Physics is not on the Tests/GameModes include path (only
-		// Tests/Helpers + Sources are; same Rule-3 precedent as WeaponTestBase.h).
-		// Floats use EXPECT_NEAR with the per-field tolerance (ToleranceForField on
-		// the dotted path); everything else is an exact EXPECT_EQ. Never uses the
-		// banned EXPECT_FLOAT_EQ. Flags both missing and extra keys (symmetric).
-		inline void ExpectSnapshotMatches(const nlohmann::json& want, const nlohmann::json& got,
-		                                  const std::string& path) {
-			if (want.is_object()) {
-				ASSERT_TRUE(got.is_object()) << "at " << path << ": expected object";
-				for (auto& [key, wv] : want.items()) {
-					ASSERT_TRUE(got.contains(key)) << "at " << path << ": missing key '" << key << "'";
-					ExpectSnapshotMatches(wv, got.at(key), path + "." + key);
-				}
-				for (auto& [key, gv] : got.items()) {
-					(void)gv;
-					EXPECT_TRUE(want.contains(key))
-					  << "at " << path << ": unexpected extra key '" << key << "'";
-				}
-				return;
-			}
-			if (want.is_array()) {
-				ASSERT_TRUE(got.is_array()) << "at " << path << ": expected array";
-				ASSERT_EQ(want.size(), got.size()) << "at " << path << ": array size mismatch";
-				for (size_t i = 0; i < want.size(); i++)
-					ExpectSnapshotMatches(want[i], got[i], path + "[" + std::to_string(i) + "]");
-				return;
-			}
-			if (want.is_number_float() || got.is_number_float()) {
-				ASSERT_TRUE(want.is_number() && got.is_number())
-				  << "at " << path << ": expected numeric";
-				EXPECT_NEAR(want.get<double>(), got.get<double>(), ToleranceForField(path))
-				  << "at " << path;
-				return;
-			}
-			EXPECT_EQ(want, got) << "at " << path;
-		}
+		// WR-02: ExpectSnapshotMatches now lives in Tests/Helpers/SnapshotCompare.h
+		// (included above) — the per-base copy was removed to kill the four-way
+		// duplication. It is still in this namespace, so TEST_F(GameModeTestBase, ...)
+		// bodies call it unqualified exactly as before.
 
 		// Resolve fixtures/<name> via the compile-time TESTS_DIR (= Tests/ source dir,
 		// defined in Tests/CMakeLists.txt). Fixtures live at ${TESTS_DIR}/../fixtures/.
