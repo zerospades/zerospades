@@ -74,6 +74,11 @@ struct Fixture {
     inputs: Vec<serde_json::Value>,
     config: Option<serde_json::Value>,
     tolerances: Option<serde_json::Value>,
+    // PORT-04 (D-15): optional structured engine-operation block exercised by
+    // value_lookup fixtures (schema v1.1.0). Deserialize-only / opaque Value —
+    // the genuine per-op typing is Phase 15. Option<> keeps non-value_lookup
+    // fixtures (and current empty value_lookups, which lack `api`) parsing.
+    api: Option<serde_json::Value>,
     #[serde(flatten)]
     expected: Expected,
 }
