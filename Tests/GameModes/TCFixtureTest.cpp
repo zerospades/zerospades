@@ -131,8 +131,16 @@ namespace {
 		return snap.territories.at(kCaptureTerritoryId);
 	}
 
-	// The fixed TC world-golden sequence: StateData(TC) + two ExistingPlayers +
-	// TerritoryCapture.
+	// The fixed TC world-golden sequence: StateData(TC) + two ExistingPlayers.
+	//
+	// WR-03: WorldSnapshot::ToJson() serializes only tick/players[]/
+	// game_mode.mode — territory state is intentionally NOT emitted (the frozen
+	// mode_world_snapshot_tc.json has no territories key). A TerritoryCapture
+	// packet would therefore be inert for what THIS golden proves (game_mode=="tc"
+	// + players), so it is deliberately omitted here — a packet that asserts
+	// nothing does not belong in the golden's sequence. TerritoryCapture folding
+	// is characterized directly by TCPinnedProgress / FoldCaptureReset, which read
+	// the territory struct rather than the serialized JSON.
 	void PushTcWorldSequence(std::vector<std::vector<char>>& packets) {
 		StateDataPacket sd{};
 		sd.playerId = 0;
@@ -164,12 +172,6 @@ namespace {
 		p2.color = MakeIntVector3(0, 0, 0);
 		p2.name = "BlueOne";
 		Push(packets, EncodeExistingPlayer(p2));
-
-		TerritoryCapturePacket tcap{};
-		tcap.territoryId = 0;
-		tcap.winning = 0;
-		tcap.state = 0; // captured by team 0
-		Push(packets, EncodeTerritoryCapture(tcap));
 	}
 
 } // namespace
