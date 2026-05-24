@@ -62,6 +62,37 @@ namespace spades {
 			int localPlayerIndex = -1;
 			std::map<uint8_t, uint8_t> extensions;
 
+			// --- Game-mode + persistent state (Phase 7, CR-02 + MODE-01/02) ---
+			// These members are read DIRECTLY by value_lookup tests; they are NOT
+			// serialized into ToJson() (which stays schema-conformant: only
+			// tick/players[]/game_mode.mode). This mirrors how localPlayerIndex and
+			// extensions above are fold members consumed by tests but not all emitted.
+
+			// Persistent per-player score, keyed by player id. Mirrors the oracle's
+			// World::GetPlayerPersistent(id).score (NetClient.cpp:909 killer++,
+			// :967 leave→0, :1065 intel-capture +10).
+			std::map<uint8_t, int> persistentScore;
+
+			// CTF team state, indexed [0..1]. Field-name parallel to CTFGameMode::Team
+			// (CTFGameMode.h:33-39): score / hasIntel / carrierId / flagPos.
+			unsigned int ctfScore[2] = {0, 0};
+			bool ctfHasIntel[2] = {false, false};
+			unsigned int ctfCarrierId[2] = {0, 0};
+			spades::Vector3 ctfFlagPos[2]{};
+
+			// TC territory state. Field-name parallel to TCGameMode::Territory
+			// (TCGameMode.h:35-54): ownerTeamId / capturingTeamId / progressBasePos /
+			// progressRate / progressStartTime. GetProgress() = progressBasePos +
+			// progressRate * (time - progressStartTime), clamped [0,1] (TCGameMode.cpp).
+			struct TerritoryState {
+				int ownerTeamId = 2; // 2 = neutral (TCGameMode.h:40)
+				int capturingTeamId = -1;
+				float progressBasePos = 0.0F;
+				float progressRate = 0.0F;
+				float progressStartTime = 0.0F;
+			};
+			std::vector<TerritoryState> territories;
+
 			nlohmann::json ToJson() const;
 		};
 

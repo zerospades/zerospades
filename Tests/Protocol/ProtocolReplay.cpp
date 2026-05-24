@@ -22,6 +22,7 @@
 
 #include <array>
 
+#include <Client/GameConstants.h> // TC_CAPTURE_RATE (=0.05F)
 #include <Core/Exception.h>
 
 using namespace spades::client;
@@ -175,6 +176,126 @@ namespace spades {
 						// world_snapshot field. Decoded here for coverage / byte advance.
 						DecodeMapStart(r);
 					} break;
+					case PacketTypeKillAction: {
+						// NetClient.cpp:880-910. The oracle's Player::KilledBy sets the victim
+						// alive=false, health=0 (NetClient.cpp:907 → Player.cpp KilledBy).
+						auto s = DecodeKillAction(r);
+						int victimId = s.victimId;
+						int killerId = s.killerId;
+						int kt = s.killType;
+						// NetClient.cpp:888-897 — killType 0..6 → KillType. We only need the
+						// self-kill remap below; the exact KillType value is not stored, but the
+						// kt switch is reproduced so out-of-range input SPRaises like the oracle.
+						switch (kt) {
+							case 0: // KillTypeWeapon
+							case 1: // KillTypeHeadshot
+							case 2: // KillTypeMelee
+							case 3: // KillTypeGrenade
+							case 4: // KillTypeFall
+							case 5: // KillTypeTeamChange
+							case 6: // KillTypeClassChange
+								break;
+							default: SPRaise("Invalid kill type %d", kt);
+						}
+						// NetClient.cpp:898-903 — Fall(4)/TeamChange(5)/ClassChange(6) are
+						// self-kills: killerId is remapped to victimId.
+						if (kt == 4 || kt == 5 || kt == 6)
+							killerId = victimId;
+						// NetClient.cpp:905-907 — victim.KilledBy → alive=false (health=0 at
+						// ToJson per OQ-2). We model only the alive flag here.
+						snap.players[victimId].alive = false;
+						// NetClient.cpp:908-909 — killer persistent score++ ONLY when the kill
+						// is not a self-kill (Pitfall 8: prevents over-counting Fall/etc).
+						if (killerId != victimId)
+							snap.persistentScore[killerId]++;
+					} break;
+					case PacketTypePlayerLeft: {
+						// NetClient.cpp:962-971 — GetPlayerPersistent(pId).score = 0;
+						// savedPlayerTeam[pId] = -1; SetPlayer(pId, NULL) removes the slot.
+						// CR-02 / Pitfall 9: erase the player so a subsequent WorldUpdate for
+						// the same index does NOT resurrect it (the WorldUpdate branch above
+						// gates on players.find(index) != end(), so erasure is sufficient).
+						int pId = DecodePlayerLeft(r).playerId;
+						snap.persistentScore[pId] = 0; // :967
+						snap.players.erase(pId);       // :970 SetPlayer(pId, NULL)
+					} break;
+					case PacketTypeIntelPickup: {
+						// NetClient.cpp:1073-1091 — team(of p).hasIntel = true; carrierId = pId.
+						// Divergence: the oracle SPRaises in non-CTF mode (:1080-1081); the fold
+						// tracks CTF state unconditionally because tests feed only correct-mode
+						// sequences for the value_lookup path (D-01 logical accumulator).
+						int pId = DecodeIntelPickup(r).playerId;
+						int teamId = snap.players.count(pId) ? snap.players[pId].teamId : 0;
+						if (teamId >= 0 && teamId < 2) {
+							snap.ctfHasIntel[teamId] = true;  // :1088
+							snap.ctfCarrierId[teamId] = pId;  // :1089
+						}
+					} break;
+					case PacketTypeIntelCapture: {
+						// NetClient.cpp:1041-1072 — team(of p).score++; team.hasIntel=false;
+						// GetPlayerPersistent(pId).score += 10; if winning ResetIntelHoldingStatus
+						// (zeroes BOTH team scores and clears BOTH hasIntel — CTFGameMode.cpp:48-54).
+						auto s = DecodeIntelCapture(r);
+						int pId = s.playerId;
+						int teamId = snap.players.count(pId) ? snap.players[pId].teamId : 0;
+						if (teamId >= 0 && teamId < 2) {
+							snap.ctfScore[teamId]++;          // :1061
+							snap.ctfHasIntel[teamId] = false; // :1062
+						}
+						snap.persistentScore[pId] += 10; // :1065
+						if (s.winning != 0) {                 // :1067-1071 winning capture
+							// ResetIntelHoldingStatus(true): zero both scores + clear both intel.
+							snap.ctfScore[0] = 0;
+							snap.ctfScore[1] = 0;
+							snap.ctfHasIntel[0] = false;
+							snap.ctfHasIntel[1] = false;
+						}
+					} break;
+					case PacketTypeIntelDrop: {
+						// NetClient.cpp:1092-1110 — team(teamId).hasIntel=false;
+						// team(1-teamId).flagPos = s.position.
+						auto s = DecodeIntelDrop(r);
+						int pId = s.playerId;
+						int teamId = snap.players.count(pId) ? snap.players[pId].teamId : 0;
+						if (teamId >= 0 && teamId < 2) {
+							snap.ctfHasIntel[teamId] = false;       // :1107
+							snap.ctfFlagPos[1 - teamId] = s.position; // :1108
+						}
+					} break;
+					case PacketTypeTerritoryCapture: {
+						// NetClient.cpp:972-1007 — territory.ownerTeamId = state;
+						// progressBasePos/Rate/StartTime = 0; capturingTeamId = -1.
+						// Divergence: oracle SPRaises in non-TC mode / on bad territoryId; the
+						// fold grows the territory vector on demand (tests feed valid ids).
+						auto s = DecodeTerritoryCapture(r);
+						int tid = s.territoryId;
+						if ((size_t)tid >= snap.territories.size())
+							snap.territories.resize(tid + 1);
+						WorldSnapshot::TerritoryState& t = snap.territories[tid];
+						t.ownerTeamId = s.state;     // :999
+						t.progressBasePos = 0.0F;    // :1000
+						t.progressRate = 0.0F;       // :1001
+						t.progressStartTime = 0.0F;  // :1002
+						t.capturingTeamId = -1;      // :1003
+					} break;
+					case PacketTypeProgressBar: {
+						// NetClient.cpp:1008-1040 — progressBasePos = progress;
+						// progressRate = (float)rate * TC_CAPTURE_RATE; capturingTeamId =
+						// capturingTeam; progressStartTime = GetWorld()->GetTime().
+						// Divergence: the fold has no World clock — progressStartTime is set to
+						// 0 (logical) so GetProgress() in a test is read against a pinned World
+						// time supplied by the test, not the fold. rate is SIGNED (int8_t,
+						// ProtocolCodec.h:562) so the sign math is carried by rate's sign.
+						auto s = DecodeProgressBar(r);
+						int tid = s.territoryId;
+						if ((size_t)tid >= snap.territories.size())
+							snap.territories.resize(tid + 1);
+						WorldSnapshot::TerritoryState& t = snap.territories[tid];
+						t.progressBasePos = s.progress;                       // :1036
+						t.progressRate = (float)s.rate * TC_CAPTURE_RATE;     // :1037
+						t.progressStartTime = 0.0F;                           // :1038 (no clock)
+						t.capturingTeamId = s.capturingTeam;                  // :1039
+					} break;
 					default: break; // ignore packet types outside the golden fold scope
 				}
 			}
@@ -195,11 +316,13 @@ namespace spades {
 				pj["id"] = p.id;
 				pj["alive"] = p.alive;
 				pj["position"] = {{"x", p.position.x}, {"y", p.position.y}, {"z", p.position.z}};
-				// A1 fold constants — protocol carries no velocity/health (Pitfall 3 / Q5).
+				// A1 fold constant — protocol carries no velocity (Pitfall 3 / Q5).
 				pj["velocity"] = {{"x", 0.0}, {"y", 0.0}, {"z", 0.0}};
 				pj["orientation"] =
 				  {{"x", p.orientation.x}, {"y", p.orientation.y}, {"z", p.orientation.z}};
-				pj["health"] = 100;
+				// OQ-2 (Phase 7): dead players emit health=0, revising the Phase-4 constant 100.
+				// The oracle's Player::KilledBy sets health=0 (NetClient.cpp:907 KillAction).
+				pj["health"] = p.alive ? 100 : 0;
 				pj["tool"] = p.tool;
 				pj["weapon_type"] = p.weaponType;
 				pj["team_id"] = p.teamId;
