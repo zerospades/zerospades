@@ -1,0 +1,33 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "caseA_has_neighbors": false,
+            "caseA_x": 10,
+            "caseA_y": 10,
+            "caseA_z": 10,
+            "caseB_has_neighbors": true,
+            "caseB_neighbor_x": 11,
+            "caseB_neighbor_y": 10,
+            "caseB_neighbor_z": 10,
+            "caseC_diagonal_x": 21,
+            "caseC_diagonal_y": 21,
+            "caseC_diagonal_z": 20,
+            "caseC_has_neighbors": false,
+            "caseC_x": 20,
+            "caseC_y": 20,
+            "caseC_z": 20
+        }
+    },
+    "id": "map_value_lookup_004_has_neighbors",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}

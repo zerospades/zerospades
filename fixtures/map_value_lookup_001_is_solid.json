@@ -1,0 +1,26 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "query_air_x": 256,
+            "query_air_y": 256,
+            "query_air_z": 30,
+            "query_solid_x": 256,
+            "query_solid_y": 256,
+            "query_solid_z": 62,
+            "solid_at_air": false,
+            "solid_at_ground": true
+        }
+    },
+    "id": "map_value_lookup_001_is_solid",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}

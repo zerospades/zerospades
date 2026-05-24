@@ -1,0 +1,26 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "caseA_is_surface": true,
+            "caseA_x": 30,
+            "caseA_y": 30,
+            "caseA_z": 30,
+            "caseB_is_surface": false,
+            "caseB_x": 30,
+            "caseB_y": 30,
+            "caseB_z": 30
+        }
+    },
+    "id": "map_value_lookup_005_is_surface",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}

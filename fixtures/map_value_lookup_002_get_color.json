@@ -1,0 +1,24 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "color_got": 1694466112,
+            "color_set": 1694466112,
+            "health_byte": 100,
+            "x": 100,
+            "y": 100,
+            "z": 40
+        }
+    },
+    "id": "map_value_lookup_002_get_color",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}
