@@ -54,6 +54,7 @@
 
 #include <Client/GameMap.h>
 #include <Client/World.h>
+#include <Core/Exception.h>
 #include <Core/Math.h>
 
 #include "HeadlessWorld.h"
@@ -94,7 +95,8 @@ namespace {
 	void WriteFixture(const std::string& name, const nlohmann::json& j) {
 		std::string path = std::string(TESTS_DIR) + "/../fixtures/" + name;
 		std::ofstream f(path);
-		ASSERT_TRUE(f.is_open()) << "Cannot open for write: " << path;
+		if (!f.is_open())
+			SPRaise("WriteFixture: cannot open for write: %s", path.c_str());
 		f << j.dump(4) << "\n";
 	}
 
