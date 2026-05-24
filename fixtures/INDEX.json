@@ -232,18 +232,60 @@
             "description": "MAP-02 ClipWorld z-boundary: z<0→false, z=30(air)→false, z=62(ground)→true, z=63(remap to 62)→true, z=64→true; XY out-of-bounds→false (not clipped — key difference from ClipBox)."
         },
         {
-            "id": "map_value_lookup_004_block_action",
-            "path": "fixtures/map_value_lookup_004_block_action.json",
+            "id": "map_value_lookup_011_block_action_create",
+            "path": "fixtures/map_value_lookup_011_block_action_create.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-03 block actions: CreateBlock/Tool/Dig/Grenade post-action solid+color state snapshot via World::ApplyBlockActions; non-overlapping actions only. Placeholder: populated by Plan 03."
+            "description": "MAP-03 CreateBlock post-state: World::CreateBlock({256,256,61}, {255,128,64}) + Advance applies block via mapWrapper->AddBlock; IsSolid=true, color includes health byte (0x64 in high byte) and jitter-modified RGB."
         },
         {
-            "id": "map_value_lookup_005_cluster",
-            "path": "fixtures/map_value_lookup_005_cluster.json",
+            "id": "map_value_lookup_012_block_action_tool",
+            "path": "fixtures/map_value_lookup_012_block_action_tool.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-04 falling-cluster detection: BlocksFell multi-callback scenarios (load-bearing destroy, connected-component stays, two isolated clusters → separate callbacks); callback count + per-cluster cell sets verified via RecordingWorldListener::allBlocksFell. Placeholder: populated by Plan 04."
+            "description": "MAP-03 BlockActionTool post-state: DestroyBlock on single cell at (100,100,61); IsSolid=false after Advance (mapWrapper->RemoveBlocks removes the block)."
+        },
+        {
+            "id": "map_value_lookup_013_block_action_dig",
+            "path": "fixtures/map_value_lookup_013_block_action_dig.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-03 BlockActionDig post-state: DestroyBlock on 3 cells (center_z-1, center_z, center_z+1) at (150,150); all three IsSolid=false after Advance."
+        },
+        {
+            "id": "map_value_lookup_014_block_action_grenade",
+            "path": "fixtures/map_value_lookup_014_block_action_grenade.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-03 BlockActionGrenade post-state: DestroyBlock on 27-cell 3x3x3 cube centered at (200,200,30); all 27 cells IsSolid=false after Advance."
+        },
+        {
+            "id": "map_value_lookup_015_cubeline",
+            "path": "fixtures/map_value_lookup_015_cubeline.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-05 CubeLine Bresenham-3D cell list: three orientations — axis-aligned +x (100,100,30)→(105,100,30), XY-diagonal (100,100,30)→(105,105,30), 3D-diagonal (100,100,30)→(104,103,32); exact order-sensitive cell list captured."
+        },
+        {
+            "id": "map_value_lookup_016_cluster_pillar",
+            "path": "fixtures/map_value_lookup_016_cluster_pillar.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-04 Cluster pillar: CreateBlock pillar at (10,10) z=61,60,59; destroy base z=61; 1 BlocksFell callback with 2 floating cells (z=59 and z=60)."
+        },
+        {
+            "id": "map_value_lookup_017_cluster_connected",
+            "path": "fixtures/map_value_lookup_017_cluster_connected.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-04 Cluster connected: CreateBlock at (20,20) z=61 (anchored to ground) and z=60; destroy z=61; 1 BlocksFell callback with 1 floating cell (z=60)."
+        },
+        {
+            "id": "map_value_lookup_018_cluster_two_isolated",
+            "path": "fixtures/map_value_lookup_018_cluster_two_isolated.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-04 Cluster two isolated: two separate pillars at (10,10) and (50,50) z=61,60; destroy both bases z=61 simultaneously; 2 separate BlocksFell callbacks (NOT merged) each with 1 floating cell — critical Rust port parity test."
         }
     ]
 }
