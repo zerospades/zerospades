@@ -347,3 +347,31 @@ jobs:
           echo "Fixtures are committed golden data (CI-03). To update them deliberately," >&2
           echo "add [update-fixtures] to the PR title and justify the change in the PR body." >&2
           exit 1
+
+      - name: Configure coverage build (separate dir, never the gating build)
+        run: |
+          cmake -S . -B build-cov \
+            -D CMAKE_BUILD_TYPE=Debug \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON \
+            -D CMAKE_CXX_FLAGS="--coverage -O0" \
+            -D CMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build + run for coverage
+        run: |
+          cmake --build build-cov --target zerospades_tests -j$(nproc)
+          ctest --test-dir build-cov --no-tests=error -j$(nproc) || true   # informational: never gates
+
+      - name: gcovr report (HTML + Cobertura)
+        run: |
+          mkdir -p coverage
+          gcovr -r . --filter 'Sources/Client/' --filter 'Sources/Core/' \
+            --html-details coverage/index.html --html-title "ZeroSpades coverage" \
+            --cobertura coverage/cobertura.xml
+
+      - name: Upload coverage (informational, no gate)
+        uses: actions/upload-artifact@v7
+        with:
+          name: zerospades-coverage
+          path: coverage/
+          if-no-files-found: warn
