@@ -46,6 +46,8 @@ namespace spades {
 
 			int playerFiredCount = 0;
 			int grenadeExplodedCount = 0;
+			int grenadeWaterCount = 0;   // GrenadeDroppedIntoWater fired (WEAP-03b water landing)
+			int grenadeBouncedCount = 0; // GrenadeBounced fired (WEAP-03a explicit bounce assertion)
 			int killCount = 0;
 
 			// --- Player movement / state (no-ops) ---
@@ -77,8 +79,8 @@ namespace spades {
 			                    IntVector3 /*normal*/) override {}
 			void AddBulletTracer(client::Player& /*player*/, Vector3 /*muzzlePos*/,
 			                     Vector3 /*hitPos*/) override {}
-			void GrenadeBounced(const client::Grenade&) override {}
-			void GrenadeDroppedIntoWater(const client::Grenade&) override {}
+			void GrenadeBounced(const client::Grenade&) override { ++grenadeBouncedCount; }
+			void GrenadeDroppedIntoWater(const client::Grenade&) override { ++grenadeWaterCount; }
 
 			// --- Local player events (no-ops) ---
 			void LocalPlayerBlockAction(IntVector3,
