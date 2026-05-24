@@ -20,6 +20,8 @@
                 }
             ],
             "destroyed_z": 61,
+            "floating_z_1": 60,
+            "floating_z_2": 59,
             "pillar_x": 10,
             "pillar_y": 10
         }

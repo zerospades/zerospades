@@ -181,11 +181,15 @@ TEST(DISABLED_ClusterGenerate, Pillar) {
 	auto& listener = hw.GetListener();
 
 	// Capture fixture
+	// floating_z_1 and floating_z_2 are stored explicitly so an independent
+	// runner (e.g. Rust) can reconstruct the pillar geometry from JSON alone.
 	auto j = BuildFixtureEnvelope("map_value_lookup_016_cluster_pillar");
 	j["expected"]["value"] = {
 	    {"pillar_x", px},
 	    {"pillar_y", py},
 	    {"destroyed_z", 61},
+	    {"floating_z_1", 60}, // destroyedZ - 1
+	    {"floating_z_2", 59}, // destroyedZ - 2
 	    {"callback_count", static_cast<int>(listener.allBlocksFell.size())},
 	    {"callbacks", CaptureCallbacks(listener.allBlocksFell)},
 	};
@@ -312,11 +316,13 @@ TEST_F(MapTestBase, ClusterFixture_Pillar) {
 	int px = val.at("pillar_x").get<int>();
 	int py = val.at("pillar_y").get<int>();
 	int destroyedZ = val.at("destroyed_z").get<int>();
+	int floatingZ1 = val.at("floating_z_1").get<int>();
+	int floatingZ2 = val.at("floating_z_2").get<int>();
 
-	// Replay step 1: place pillar (destroyed_z, destroyed_z-1, destroyed_z-2)
-	world.CreateBlock(IntVector3{px, py, destroyedZ},     kBlockColor);
-	world.CreateBlock(IntVector3{px, py, destroyedZ - 1}, kBlockColor);
-	world.CreateBlock(IntVector3{px, py, destroyedZ - 2}, kBlockColor);
+	// Replay step 1: place pillar from fixture coordinates (all three z-levels)
+	world.CreateBlock(IntVector3{px, py, destroyedZ},  kBlockColor);
+	world.CreateBlock(IntVector3{px, py, floatingZ1},  kBlockColor);
+	world.CreateBlock(IntVector3{px, py, floatingZ2},  kBlockColor);
 	hw.Advance(1);
 
 	// Replay step 2: destroy base
