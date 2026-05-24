@@ -33,21 +33,61 @@ set -eu
 BUILD="${1:-build}"
 BINARY="$BUILD/Tests/zerospades_tests"
 
-# Validate the test binary exists and is executable BEFORE the seed loop.
+# Validate the test binary is present (a build smoke-check). This proves a
+# single file exists+executable; it does NOT prove any ctest entries are
+# registered — test *registration* is verified by the discovery precheck below
+# (WR-03 / IN-01).
 if [ ! -x "$BINARY" ]; then
     echo "ERROR: test binary not found at $BINARY — build the zerospades_tests target first" >&2
     exit 1
 fi
 
+# Vacuous-run precheck (WR-03): ctest exits 0 on "No tests were found!!!" and the
+# gtest binary exits 0 on a zero-match filter, so the per-run `if ! cmd` guards
+# below catch a FAILING run but not an EMPTY one. Assert a non-zero discovered
+# test count first, so a stale/empty CTestTestfile.cmake, undiscovered tests, or
+# a structurally-valid-but-wrong $BUILD can never certify "OK: 6/6" on nothing.
+# `set -e` would abort on a failed `ctest -N`; capturing into a var with the
+# assignment isolated keeps the script from exiting before our own diagnostic.
+TEST_COUNT=$(ctest --test-dir "$BUILD" -N 2>/dev/null | sed -n 's/^Total Tests: //p') || TEST_COUNT=""
+if [ -z "$TEST_COUNT" ] || [ "$TEST_COUNT" -eq 0 ] 2>/dev/null; then
+    echo "ERROR: ctest discovered 0 tests in $BUILD — nothing to shuffle (refusing to certify a vacuous run)" >&2
+    exit 1
+fi
+echo "Discovered $TEST_COUNT ctest entries in $BUILD"
+
 for SEED in 111 222 333; do
     # Layer 1 — corpus-scale launch-order shuffle (the real leaked-singleton proof).
-    if ! ctest --test-dir "$BUILD" --schedule-random --schedule-random-seed "$SEED" --output-on-failure; then
+    # Capture output so we can fail loudly on a vacuous "No tests were found" run
+    # that ctest reports with exit 0 (WR-03), in addition to the exit-code guard.
+    L1_OUT=$(ctest --test-dir "$BUILD" --schedule-random --schedule-random-seed "$SEED" --output-on-failure 2>&1) || {
+        printf '%s\n' "$L1_OUT" >&2
         echo "ERROR: seed $SEED layer 1 (ctest --schedule-random) FAILED" >&2
         exit 1
+    }
+    printf '%s\n' "$L1_OUT"
+    if printf '%s' "$L1_OUT" | grep -q "No tests were found"; then
+        echo "ERROR: seed $SEED layer 1 ran 0 tests (ctest reported 'No tests were found')" >&2
+        exit 1
     fi
-    # Layer 2 — within-binary suite shuffle (literal SC-4).
-    if ! "$BINARY" --gtest_shuffle --gtest_random_seed="$SEED"; then
+    # Layer 2 — within-binary suite shuffle (literal SC-4). The bundled gtest
+    # exits 0 on a zero-match run (and does NOT support --gtest_fail_if_no_test_selected;
+    # passing an unknown flag would just print usage and exit 0 — another vacuous
+    # pass), so instead of an unsupported flag we assert the gtest summary reports
+    # a passed count > 0. A zero run prints "[  PASSED  ] 0 tests." / "0 tests from
+    # 0 test suites ran"; matching either fails the run loudly (WR-03).
+    L2_OUT=$("$BINARY" --gtest_shuffle --gtest_random_seed="$SEED" 2>&1) || {
+        printf '%s\n' "$L2_OUT" >&2
         echo "ERROR: seed $SEED layer 2 (--gtest_shuffle) FAILED" >&2
+        exit 1
+    }
+    printf '%s\n' "$L2_OUT"
+    if printf '%s' "$L2_OUT" | grep -Eq '\[  PASSED  \] 0 tests|0 tests from 0 test suites ran'; then
+        echo "ERROR: seed $SEED layer 2 ran 0 tests (gtest reported a zero passed-count)" >&2
+        exit 1
+    fi
+    if ! printf '%s' "$L2_OUT" | grep -Eq '\[  PASSED  \] [1-9][0-9]* tests?\.'; then
+        echo "ERROR: seed $SEED layer 2 produced no '[  PASSED  ] N tests' summary — refusing to certify" >&2
         exit 1
     fi
     echo "PASS: seed $SEED (layer 1 ctest --schedule-random + layer 2 --gtest_shuffle)"
