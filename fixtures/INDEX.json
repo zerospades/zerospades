@@ -162,11 +162,39 @@
             "description": "PHYS-03 multi-step determinism golden: 60-tick scripted input sequence (move/jump/crouch/strafe varied per schedule) starting from (256,256,60.5); full per-tick position/velocity/orientation/airborne/wade; re-run 20x in CI produces identical output."
         },
         {
-            "id": "map_value_lookup_002_block_state",
-            "path": "fixtures/map_value_lookup_002_block_state.json",
+            "id": "map_value_lookup_001_is_solid",
+            "path": "fixtures/map_value_lookup_001_is_solid.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-01 block state queries: IsSolid, GetColor (0xHHBBGGRR incl. health byte), GetSolidMap bitmask, HasNeighbors (6-face), IsSurface — flat map with procedurally placed blocks. Placeholder: populated by Plan 02."
+            "description": "MAP-01 IsSolid: flat map ground at z=62 is solid; z=30 (air) is not. Two in-bounds queries characterize solid vs. non-solid return values."
+        },
+        {
+            "id": "map_value_lookup_002_get_color",
+            "path": "fixtures/map_value_lookup_002_get_color.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-01 GetColor: color round-trip with health byte — Set(100,100,40,true,0x64FF8040) then GetColor returns the full 32-bit value including health=100 (0x64) in the high byte (0xHHBBGGRR format)."
+        },
+        {
+            "id": "map_value_lookup_003_get_solid_map",
+            "path": "fixtures/map_value_lookup_003_get_solid_map.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-01 GetSolidMap: column (100,100) with blocks placed at z=60,61 plus flat-map ground at z=62; GetSolidMap returns the uint64 bitmask with bits 60,61,62 set."
+        },
+        {
+            "id": "map_value_lookup_004_has_neighbors",
+            "path": "fixtures/map_value_lookup_004_has_neighbors.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-01 HasNeighbors: 6-face adjacency — isolated block returns false; block with +x neighbor returns true; block with diagonal-only neighbor (Risk 1 corner case) returns false confirming 6-face not 26-face."
+        },
+        {
+            "id": "map_value_lookup_005_is_surface",
+            "path": "fixtures/map_value_lookup_005_is_surface.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-01 IsSurface: isolated solid block (all 6 faces air) returns true; same block fully surrounded by solids on all 6 faces returns false."
         },
         {
             "id": "map_value_lookup_003_raycast",
