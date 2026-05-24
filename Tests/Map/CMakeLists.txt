@@ -30,3 +30,18 @@ target_sources(zerospades_tests PRIVATE
 target_sources(zerospades_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/RaycastTest.cpp
 )
+
+# Wave 3 — Plan 04: MAP-03 block-action fixtures (Create/Tool/Dig/Grenade post-state).
+target_sources(zerospades_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlockActionTest.cpp
+)
+
+# Wave 3 — Plan 04: MAP-05 CubeLine/BlockLine fixtures (Bresenham-3D cell list).
+target_sources(zerospades_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlockLineTest.cpp
+)
+
+# Wave 3 — Plan 04: MAP-04 cluster/BlocksFell fixtures (multi-callback detection).
+target_sources(zerospades_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/ClusterTest.cpp
+)
