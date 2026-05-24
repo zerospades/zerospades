@@ -1,0 +1,26 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "x": 100,
+            "xy_oob_clipped": true,
+            "y": 100,
+            "z_30_clipped": false,
+            "z_62_clipped": true,
+            "z_63_clipped": true,
+            "z_64_clipped": true,
+            "z_neg1_clipped": false
+        }
+    },
+    "id": "map_value_lookup_009_clip_box",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}

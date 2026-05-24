@@ -1,0 +1,45 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "block_x": 200,
+            "block_y": 200,
+            "block_z": 50,
+            "hit": true,
+            "hitBlock": [
+                200,
+                200,
+                50
+            ],
+            "hitPos": [
+                200.0,
+                200.5,
+                50.5
+            ],
+            "normal": [
+                -1,
+                0,
+                0
+            ],
+            "ray_dx": 1.0,
+            "ray_dy": 0.0,
+            "ray_dz": 0.0,
+            "ray_ox": 198.5,
+            "ray_oy": 200.5,
+            "ray_oz": 50.5,
+            "startSolid": false,
+            "stepCount": 2
+        }
+    },
+    "id": "map_value_lookup_006_raycast_hit",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.0.0"
+}
