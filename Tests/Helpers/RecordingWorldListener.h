@@ -36,6 +36,14 @@ namespace spades {
 		struct RecordingWorldListener : public client::IWorldListener {
 			// Recorded event counters / data
 			std::vector<IntVector3> lastBlocksFell;
+
+			// All BlocksFell invocations in order (one entry per cluster callback).
+			// Use this for multi-cluster fixture assertions that need to verify
+			// callback count AND per-cluster cell sets independently.
+			// lastBlocksFell is kept for backwards-compat (single-cluster tests).
+			std::vector<std::vector<IntVector3>> allBlocksFell;
+			int blocksFellCallCount = 0;
+
 			int playerFiredCount = 0;
 			int grenadeExplodedCount = 0;
 			int killCount = 0;

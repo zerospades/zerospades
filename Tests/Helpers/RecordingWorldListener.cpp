@@ -24,7 +24,9 @@ namespace spades {
 	namespace tests {
 
 		void RecordingWorldListener::BlocksFell(std::vector<IntVector3> blocks) {
-			lastBlocksFell = std::move(blocks);
+			lastBlocksFell = blocks;           // keep for single-cluster compat
+			allBlocksFell.push_back(blocks);   // append for multi-cluster fixtures
+			++blocksFellCallCount;
 		}
 
 	} // namespace tests
