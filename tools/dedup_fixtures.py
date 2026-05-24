@@ -50,7 +50,13 @@ import pathlib
 import argparse
 import hashlib
 
-FIXTURES_DIR = pathlib.Path("fixtures")
+# Anchor to the repo root via the script location (tools/<script> and fixtures/
+# are siblings under the repo root) so the scan is NOT silently CWD-dependent
+# (WR-02). Run from any directory, the tool always audits the repo's fixtures/.
+# When invoked from the repo root this resolves identically to the prior
+# CWD-relative Path("fixtures"), preserving the verified happy-path behavior.
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+FIXTURES_DIR = REPO_ROOT / "fixtures"
 INDEX_PATH = FIXTURES_DIR / "INDEX.json"
 
 # Non-fixture JSON files that live in fixtures/ and must be excluded from scans.
