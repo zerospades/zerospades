@@ -19,9 +19,8 @@
 # by the parent so CMake processes it on every configure.
 # ---------------------------------------------------------------------------
 
-# (Wave 1+ plans will add lines like:)
-#   target_sources(zerospades_tests PRIVATE
-#       ${CMAKE_CURRENT_SOURCE_DIR}/BlockStateTest.cpp
-#       ${CMAKE_CURRENT_SOURCE_DIR}/RaycastTest.cpp
-#       ...
-#   )
+# Wave 1 — Plan 02: MAP-01 block state fixtures (IsSolid, GetColor, GetSolidMap,
+# HasNeighbors, IsSurface).
+target_sources(zerospades_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/BlockStateTest.cpp
+)
