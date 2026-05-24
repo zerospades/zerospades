@@ -246,6 +246,17 @@ def main(argv=None):
         p for p in sorted(FIXTURES_DIR.glob("*.json")) if p.name not in NON_FIXTURE_FILES
     ]
 
+    # Vacuous-pass guard (WR-01): a dedup / behavior-consistency gate that
+    # scanned NOTHING must not certify success. An empty scope means a missing
+    # or mis-scoped corpus (glob drift, wrong root) — treat it as a hard error
+    # so CI fails loudly instead of green-on-nothing.
+    if not fixture_paths:
+        print(
+            f"ERROR: no fixtures found in {FIXTURES_DIR} — nothing to audit",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     records, scan_errors = scan_fixtures(fixture_paths)
     collision_info, collision_errors = check_collisions(records)
     behavior_errors, audited_count = check_behavior_consistency(records)
