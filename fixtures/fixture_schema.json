@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$comment": "ZeroSpades golden-spec fixture envelope v1.0.0. Coordinate convention: Z=0 sky, Z=63 water, AoS left-handed.",
+    "$comment": "ZeroSpades golden-spec fixture envelope v1.1.0. Coordinate convention: Z=0 sky, Z=63 water, AoS left-handed.",
     "title": "ZeroSpades Fixture",
     "type": "object",
     "required": [
@@ -17,7 +17,7 @@
     "properties": {
         "version": {
             "type": "string",
-            "const": "1.0.0"
+            "const": "1.1.0"
         },
         "id": {
             "type": "string",

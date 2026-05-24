@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "id": "proto_worldupdate_076_001",
     "subsystem": "proto",
     "behavior": "protocol_compat",

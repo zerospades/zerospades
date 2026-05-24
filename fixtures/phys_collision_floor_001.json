@@ -644,5 +644,5 @@
     "protocol_version": "0.75",
     "seed": 42,
     "subsystem": "phys",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }

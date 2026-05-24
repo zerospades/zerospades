@@ -35,7 +35,7 @@ a convenience, never the source of truth.
 ## Fixture Schema
 
 The frozen envelope contract lives at [`fixture_schema.json`](fixture_schema.json), pinned to
-schema **version `1.0.0`**. Every fixture must declare `"version": "1.0.0"` and validate
+schema **version `1.1.0`**. Every fixture must declare `"version": "1.1.0"` and validate
 against this schema. The `kind` field discriminates the shape of the `expected` object
 (`world_snapshot` | `step_trace` | `value_lookup` | `packet_roundtrip`).
 
