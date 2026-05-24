@@ -123,6 +123,10 @@ namespace {
 		float invY = (dir.y != 0.0F) ? 1.0F / fabsf(dir.y) : dir.y;
 		float invZ = (dir.z != 0.0F) ? 1.0F / fabsf(dir.z) : dir.z;
 
+		// Mirror oracle invariant: direction must not be a zero vector.
+		// CastRay2 SPAssert-aborts on zero dir; CountRaySteps must do the same.
+		SPAssert(invX != 0.0F || invY != 0.0F || invZ != 0.0F);
+
 		for (int i = 0; i < maxSteps; i++) {
 			IntVector3 nextBlock;
 			int hasNextBlock = 0;
