@@ -299,3 +299,224 @@ orientation_tol=1e-5
 grenade_tol=1e-3
 raycast_tol=1e-6
 ```
+
+---
+
+## 3. Per-Kind Replay Semantics (CONTRACT-03)
+
+§1 told a port *how to compare* two `expected` objects. This section tells it *how to
+produce* the candidate `expected` object in the first place: for each `kind`, what the
+`inputs` mean, how to construct the initial world state, how to drive the simulation,
+which engine operation to invoke, and how the result maps onto the `expected` object the
+oracle froze. A port that follows §3 produces a candidate snapshot; §1 then judges it.
+
+### 3.1 The Envelope
+
+Every fixture is a flat JSON object with these top-level keys:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `version` | string | Schema version. The current corpus is `"1.1.0"`. Not part of the compared output. |
+| `id` | string | Unique fixture identifier. Its prefix (`phys_`, `map_`, `weap_`, `mode_`, `proto_`) names the subsystem. |
+| `subsystem` | string | One of `phys`, `map`, `weap`, `mode`, `proto`. Mirrors the `id` prefix. |
+| `behavior` | string | A human label for the behavior under test (e.g. `protocol_compat`, `implementation_detail`). Documentation only. |
+| `seed` | integer | The RNG seed the oracle ran under. The whole corpus uses `42` (see §5). |
+| `protocol_version` | string | The Ace of Spades wire protocol the fixture assumes — `"0.75"` or `"0.76"`. Selects the WorldUpdate entry layout (§4) and is otherwise informational. |
+| `map` | object | The initial voxel map. Currently always `{ "generator": "flat", "ground_z": 62 }` (see §3.2). |
+| `inputs` | array | The per-kind stimulus. Its meaning is defined per kind below. For 49 of the 55 current fixtures it is the empty array `[]`. |
+| `kind` | string | The discriminator: `step_trace`, `world_snapshot`, `value_lookup`, or `packet_roundtrip`. Selects everything in this section. |
+| `expected` | object | The recorded oracle output — the only subtree §1 compares. |
+| `api` | object (optional) | Present only on `value_lookup` fixtures that name the operation they exercise: `{ "op": "<dotted.string>", "args": { … } }` (see §3.5). Absent on every other kind, and absent on the current `value_lookup` corpus whose operation is implied by `id` (a future migration populates it). |
+| `comment` | string (optional) | Free-form authoring note. Documentation only, never compared. |
+
+### 3.2 Initial State Construction
+
+Before any replay, a port builds the starting world from the `map` block:
+
+- `generator: "flat"` means a **flat, fully-solid ground plane**. Every voxel column is
+  **solid from `ground_z` down to the bottom of the world** (`z = 63`, the water line; see
+  §0.2) and **air above** `ground_z`. With `ground_z = 62`, columns `z = 62` and `z = 63`
+  are solid and everything from `z = 0` to `z = 61` is air. The horizontal extent is the
+  standard playing field of 512 by 512 columns.
+- Block colors on the flat ground take the engine's default ground color unless a fixture's
+  operation explicitly paints a block (see the block-action operations in §3.5).
+
+**Spawn / actor setup is not yet embedded.** The current corpus records outputs only; the
+per-tick input schedule and the actor/spawn setup that produced them live outside the
+fixture (which is why 49 fixtures carry `inputs: []`). A later migration will embed that
+setup into the `inputs`/`api` blocks this contract already types; until then a port
+reproduces a fixture's *output* by constructing the same scenario the fixture's `behavior`
+and `id` describe. The replay **rules** below are stable regardless of when the inputs are
+embedded.
+
+### 3.3 Kind: `step_trace`
+
+A `step_trace` records the evolution of a single subsystem over a run of fixed-timestep
+ticks (weapon firing/reload cadence, grenade trajectories, player physics).
+
+- **`inputs`** is a **per-tick input schedule**: an ordered array of per-tick records, one
+  describing the controls applied on each simulation tick (e.g. fire/reload/move/jump
+  flags). (Currently empty in the corpus; the schedule that produced a trace is implied by
+  the fixture's `behavior` until embedded.)
+- **Initial state** is built per §3.2, then the subsystem-under-test actor is created (e.g.
+  a player holding a rifle, a thrown grenade).
+- **The tick-driving loop** advances the simulation in fixed steps of `dt = 1/60 s` (§0.3).
+  On each tick the port applies that tick's scheduled input, advances the subsystem by one
+  `dt`, and records the subsystem's observable state.
+- **`expected`** is an object with a single key **`ticks`**, an array with **one record per
+  tick**, in tick order. Each record's fields are subsystem-specific. For a weapon trace the
+  per-tick record carries `tick` (the integer tick index), `ammo`, `stock`, `fired`
+  (whether a shot was emitted this tick), `reloading`, and `time_to_next_fire` (a float
+  countdown — note it goes negative once fire is ready and the trigger is released).
+- **Comparison:** `ticks` is an array, so §1.4 applies — the candidate must produce the
+  **same number of ticks** and each tick record is compared field-by-field. Float fields
+  like `time_to_next_fire` use the position-default tolerance `1e-4` (§2); a grenade trace's
+  `fuse`-named fields use the grenade tolerance `1e-3`.
+
+### 3.4 Kind: `world_snapshot`
+
+A `world_snapshot` records the **full multi-player world state at a single tick**. There are
+**two distinct production paths**, and a port must support both:
+
+**Path A — packet fold (4 of the 6 current world_snapshots).** Here `inputs` is a
+**non-empty ordered array of packet records**, each `{ "bytes_hex": "<hex>", "comment": … }`.
+The hex string is one server-to-client packet on the wire (§4). The port decodes each packet
+in order and **folds** it into an accumulating world state; the final accumulator, serialized,
+is the snapshot. The fold is deterministic and packet-order-significant. Its rules — which a
+port must reproduce exactly — are:
+
+A fold accumulator holds, per player index `0..255`: a `saved_pos` 3-vector, a `saved_front`
+3-vector (both initialized to `{0,0,0}`), and the live player records keyed by integer id in
+an **id-ascending ordered map**. It also holds a `local_player_index` (initialized to a
+sentinel "none", i.e. `-1`).
+
+- **StateData** (the game-mode/setup packet): sets `local_player_index` to the packet's
+  player id, and establishes the game mode (CTF or TC). In the fold it does **not** create
+  players; it marks which index is "local" (the local player is never repositioned by a
+  later WorldUpdate, per the rule below).
+- **ExistingPlayer**: creates (or updates) the player with the packet's id. Critically, the
+  new player's **position is taken from the accumulator's own `saved_pos[id]`, NOT from the
+  ExistingPlayer packet** (the packet carries team/weapon/tool/score/color/name, no
+  position). The player is marked **alive**. Its orientation is **left at zero** until a
+  later WorldUpdate sets it. Team, tool, and weapon come from the packet (see the field
+  mappings in §3.4.1).
+- **CreatePlayer**: creates the player with the packet's id at the packet's raw wire
+  position **with `z` decreased by `2.4`** (the spawn-height adjustment: `pos_z = wire_z −
+  2.4`). The player is marked **alive**. A subsequent WorldUpdate for the same index will
+  overwrite this position.
+- **WorldUpdate**: for **every entry** in the packet, the fold writes `saved_pos[index] =
+  entry.position` and `saved_front[index] = entry.front` **unconditionally** (even for
+  indices with no live player). It then **repositions** the live player at that index **only
+  if** that player **exists, is alive, and is not the local player** — in which case it sets
+  that player's `position = entry.position` and `orientation = entry.front`. (Entries are
+  indexed per §4's WorldUpdate layout: implicit list-position index in the 0.75 layout,
+  explicit leading per-entry index byte in the 0.76 layout.)
+- **PlayerLeft**: **erases** the player with the packet's id from the accumulator. Because it
+  is erased, a later WorldUpdate for that same index writes `saved_pos`/`saved_front` but
+  finds no live player to reposition — **the player is not resurrected.**
+- A player's emitted **velocity is always the fold constant `{0,0,0}`** — the protocol carries
+  no velocity, so the snapshot reports zero. A player's emitted **health is `100` while alive
+  and `0` once dead.**
+
+**Path B — directly-constructed snapshot (2 of the 6 current world_snapshots).** Here
+`inputs` is the **empty array** `[]`. The snapshot is not produced by folding packets; it is
+a game-mode scenario constructed directly (the two examples are a freshly-set-up CTF world
+and a freshly-set-up TC world). A port reproduces the scenario the fixture's `behavior`
+describes and serializes it with the **same player record shape** as Path A. (A future
+migration embeds the explicit construction steps; the output shape is identical to Path A.)
+
+**`expected`** for either path is an object with:
+
+- **`tick`** — the integer tick the snapshot was taken at (`0` for a pure packet fold, which
+  runs no simulation ticks).
+- **`players`** — an array of player records (see §3.4.1), emitted in **id-ascending order**.
+- **`game_mode`** — present only when a mode was established (e.g. `{ "mode": "ctf" }`);
+  omitted otherwise. (Because §1's object rule is symmetric, a port must emit `game_mode`
+  exactly when the oracle did — no more, no less.)
+
+#### 3.4.1 Player Record Shape
+
+Each element of `players` is an object with exactly these keys:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `id` | integer | The player's id. |
+| `alive` | boolean | Whether the player is alive in this snapshot. |
+| `position` | object `{x,y,z}` | World position (float vector; see §0.2 for the Z convention). |
+| `velocity` | object `{x,y,z}` | Always `{0,0,0}` for a packet fold (the wire carries no velocity). |
+| `orientation` | object `{x,y,z}` | View / facing unit vector. Zero until a WorldUpdate sets it; compared with the tight orientation tolerance `1e-5` (§2). |
+| `health` | integer | `100` while alive, `0` once dead. |
+| `tool` | string | The held tool, mapped to a friendly string: `block`, `weapon`, `spade`, or `grenade`. |
+| `weapon_type` | string | The held weapon, mapped to a friendly string: `rifle`, `smg`, or `shotgun`. |
+| `team_id` | integer | The player's team index. |
+
+The wire encodes `tool` and `weapon` as small integers; the snapshot emits the **friendly
+string** (e.g. weapon `0` → `"rifle"`, weapon `1` → `"smg"`, weapon `2` → `"shotgun"`; tool
+`0` → `"spade"`, `1` → `"block"`, `2` → `"weapon"`, `3` → `"grenade"`). A port's decoder
+must emit the same friendly strings or the symmetric compare fails.
+
+### 3.5 Kind: `value_lookup`
+
+A `value_lookup` records the result of invoking **one engine query/operation** against a
+constructed state and reading back a value. It is the broadest kind (it covers map queries,
+raycasts, block actions, weapon stat tables, and game-mode progress reads).
+
+- **The operation** is named by an **`api` block**: `{ "op": "<dotted.string>", "args": { …
+  } }`. `op` is a dotted operation name (an open string, not a closed enum — the registry
+  below is the semantic source of truth); `args` is the operation's argument object.
+- **`inputs`** is usually the empty array `[]` (the operation and its args fully specify the
+  query). A few `proto`-subsystem `value_lookup` fixtures instead carry a `bytes_hex` packet
+  in `inputs` whose decoded effect *is* the looked-up value (see ExtensionInfo below).
+- **Initial state** is built per §3.2; some operations then mutate it (e.g. a block action
+  paints or removes a voxel) before the value is read.
+- **`expected`** is an object with a single key **`value`** holding the operation's result —
+  a scalar, an object, or a nested structure depending on the operation.
+
+#### 3.5.1 Operation Registry
+
+The table below maps each operation exercised by the **current** `value_lookup` corpus to its
+meaning, its arguments, and how `expected.value` is produced. Operation names are dotted
+and namespaced by subsystem (`map.*`, `physics.*`, `weapon.*`, `mode.*`, `proto.*`). The
+registry grows as later phases add operations; `op` stays an open string so the schema never
+needs a new enum.
+
+| `op` | Meaning | Args (conceptual) | How `expected.value` is produced |
+|------|---------|-------------------|-----------------------------------|
+| `map.isSolid` | Is a voxel solid? | a solid coordinate and an air coordinate | reports the boolean solidity at each probed coordinate (e.g. solid at ground `z`, air above). |
+| `map.getColor` | Read/write a block color | a block coordinate; a color to set | sets a block color, reads it back, and reports the packed color integer (and the stored color/health byte). |
+| `map.getSolidMap` | The per-column solidity bitmask | a column `x,y` | reports the column's 64-bit solidity word (decimal + hex) and which of the ground bits (60/61/62) are set. |
+| `map.checkNeighbors` | Does a voxel have solid 6-neighbors? | several probe coordinates | reports the boolean neighbor-presence for each probed case. |
+| `map.isSurface` | Is a voxel a surface (solid with exposed face)? | probe coordinates | reports the boolean surface flag per case. |
+| `map.castRay` | Hit-scan a ray through the voxel world | ray origin `o` and direction `d`, max step count | reports `hit`, the hit block coordinate (`hitBlock` / `block_x/y/z`), the hit position (`hitPos`), the face `normal`, `startSolid`, and `stepCount`. Raycast fields use the tight `1e-6` tolerance (§2). A miss reports `hit:false` and the ray parameters only. |
+| `map.clipBox` / `map.clipWorld` | Out-of-bounds / world clipping test | probe coordinates incl. out-of-range `z` | reports per-probe booleans for whether each coordinate is clipped (out of bounds, below `0`, at/below the water line). |
+| `map.blockAction` | Apply a build/destroy/grenade block edit | the action center and kind (create / tool-destroy / dig / grenade) | mutates the map then reports solidity (and color) at and around the affected voxels; the grenade variant reports the destroyed `cells`. |
+| `map.cubeLine` | The voxel line between two points | two endpoints `v1`,`v2`, a max length | reports the ordered list of `cells` on the line and the count. |
+| `map.clusterize` | Floating-block cluster detection after a destroy | a pillar/structure setup and a destroyed voxel | reports which disconnected clusters fall (the `callbacks` / `callback_count` and the floating-`z` columns). |
+| `weapon.getStats` | A weapon's stat table for a protocol | weapon kind + protocol version | reports `clip`, `stock`, `delay_s`, `reload_s`, `reload_slow`, `pellets`, `spread`, per-hit-zone `damage` (head/torso/arms/legs/block), and the `weapon`/`protocol` labels. (Melee damage is unhandled by the client — it returns `0` / asserts; see the `melee_note` field.) |
+| `weapon.getModifiers` | Aim/crouch spread and recoil modifier rules | none / protocol | reports the base spread per protocol and the `spread_rules` / `recoil_rules` describing how aiming and crouching scale them. |
+| `mode.ctfState` | Capture-the-Flag state after a scripted sequence | a sequence of pickup/drop/capture events | reports, per sampled step, each team's score, intel-held flag, flag position, and carrier id. |
+| `mode.tcProgress` | Territory-Control capture progress | a pinned world time and a reset case | reports the territory's `progress`, `progress_rate`, `progress_base_pos`, `progress_start_time`, owner/capturing team ids, evaluated at the pinned time. |
+| `proto.extensionInfo` | The advertised protocol-extension map | an ExtensionInfo packet in `inputs` (`bytes_hex`) | decodes the ExtensionInfo packet and reports the map of advertised `extension id → version` (keyed by the id as a string). **All** advertised entries are recorded. |
+
+A port implements an operation by name, runs it against the §3.2 state with the given args,
+and serializes its result under `expected.value` using the same field names the table and the
+real fixtures use.
+
+### 3.6 Kind: `packet_roundtrip`
+
+A `packet_roundtrip` pins the **wire encoding of a single packet** in both directions — it is
+the unit-level companion to the `world_snapshot` packet fold.
+
+- **`inputs`** is the empty array `[]`. The **stimulus is the `bytes_hex` field inside
+  `expected`**, not `inputs`.
+- **`expected`** is an object with two keys:
+  - **`bytes_hex`** — the packet's exact bytes as a lowercase hex string (the first byte is
+    the packet-type tag; see §4).
+  - **`decoded`** — the friendly decoded form of those bytes (see §4's `decoded` convention).
+- **The contract is bidirectional:** a port must (a) **decode** `bytes_hex` and produce a
+  `decoded` object that matches the recorded one field-for-field (§1 symmetric compare), and
+  (b) **re-encode** that decoded form and reproduce **the same `bytes_hex`** byte string.
+  Round-trip stability (`encode(decode(bytes)) == bytes`) is the invariant.
+
+The packets the current `packet_roundtrip` and proto `world_snapshot` fixtures use, and how
+to decode each from the bytes alone, are specified next in §4.
