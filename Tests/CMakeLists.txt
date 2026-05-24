@@ -47,6 +47,7 @@ add_executable(zerospades_tests
     Helpers/RecordingWorldListener.cpp
     Helpers/HeadlessWorld.cpp
     Helpers/ToleranceMatchersTest.cpp
+    Helpers/ContractDriftTest.cpp
     Helpers/PlayerPhysicsSnapshot.cpp
     Helpers/GrenadeSnapshot.cpp
     Protocol/ProtocolRoundTripTest.cpp
@@ -74,8 +75,11 @@ target_include_directories(zerospades_tests PRIVATE
 
 # Absolute Tests/ path for the in-process EXPECT_FLOAT_EQ ban guard so its
 # scan does not depend on the test runner's working directory (D-17).
+# CONTRACT_PATH is the absolute path to the portable contract; ContractDriftTest
+# reads its §2 tolerance block and asserts it matches the oracle constants (D-06).
 target_compile_definitions(zerospades_tests PRIVATE
     TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    CONTRACT_PATH="${CMAKE_SOURCE_DIR}/fixtures/CONTRACT.md"
 )
 
 # FP-determinism flags on test binary (same as zerospades_testable)
