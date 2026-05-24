@@ -201,13 +201,27 @@ namespace spades {
 						// self-kills: killerId is remapped to victimId.
 						if (kt == 4 || kt == 5 || kt == 6)
 							killerId = victimId;
+						// WR-01: the oracle resolves the victim via NetClient::GetPlayer,
+						// which SPRaises for an out-of-range id or a null player slot
+						// (NetClient.cpp). Mirror that here instead of letting
+						// std::map::operator[] default-construct a phantom victim — a
+						// Rust port reading "mirrors NetClient" must reproduce the throw.
 						// NetClient.cpp:905-907 — victim.KilledBy → alive=false (health=0 at
 						// ToJson per OQ-2). We model only the alive flag here.
-						snap.players[victimId].alive = false;
+						auto victimIt = snap.players.find(victimId);
+						if (victimIt == snap.players.end())
+							SPRaise("KillAction for unknown player id %d", victimId);
+						victimIt->second.alive = false;
 						// NetClient.cpp:908-909 — killer persistent score++ ONLY when the kill
 						// is not a self-kill (Pitfall 8: prevents over-counting Fall/etc).
-						if (killerId != victimId)
+						// The killer is also resolved via GetPlayer in the oracle (:908), so a
+						// non-self killer id that is unknown SPRaises here too. (Self-kills
+						// short-circuit: killerId == victimId, already validated above.)
+						if (killerId != victimId) {
+							if (snap.players.find(killerId) == snap.players.end())
+								SPRaise("KillAction for unknown killer id %d", killerId);
 							snap.persistentScore[killerId]++;
+						}
 					} break;
 					case PacketTypePlayerLeft: {
 						// NetClient.cpp:962-971 — GetPlayerPersistent(pId).score = 0;
