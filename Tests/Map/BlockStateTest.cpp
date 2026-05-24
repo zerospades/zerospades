@@ -58,36 +58,18 @@ using namespace spades::client;
 
 namespace {
 
-	// ---------------------------------------------------------------------------
-	// BuildFixtureEnvelope: assemble the full fixture JSON envelope for map
-	// value_lookup fixtures.  Mirrors PhysicsFixtureTest BuildFixtureEnvelope
-	// but uses subsystem="map" and kind="value_lookup".
-	// ---------------------------------------------------------------------------
-	nlohmann::json BuildFixtureEnvelope(const std::string& id) {
-		nlohmann::json j;
-		j["version"] = "1.0.0";
-		j["id"] = id;
-		j["subsystem"] = "map";
-		j["behavior"] = "implementation_detail";
-		j["seed"] = 42;
-		j["protocol_version"] = "0.75";
-		j["map"] = {{"generator", "flat"}, {"ground_z", 62}};
-		j["inputs"] = nlohmann::json::array();
-		j["kind"] = "value_lookup";
-		j["expected"] = {{"value", nlohmann::json::object()}};
-		return j;
-	}
+	// Aliases for the shared helpers in MapTestBase.h (BuildMapFixtureEnvelope /
+	// WriteMapFixture).  Using file-local aliases keeps the generator test bodies
+	// unchanged while eliminating the duplicate definitions across translation units.
+	using spades::tests::BuildMapFixtureEnvelope;
+	using spades::tests::WriteMapFixture;
 
-	// ---------------------------------------------------------------------------
-	// WriteFixture: serialize fixture JSON to fixtures/ directory.
-	// Path resolved via TESTS_DIR compile-time constant (Tests/CMakeLists.txt).
-	// ---------------------------------------------------------------------------
-	void WriteFixture(const std::string& name, const nlohmann::json& j) {
-		std::string path = std::string(TESTS_DIR) + "/../fixtures/" + name;
-		std::ofstream f(path);
-		if (!f.is_open())
-			SPRaise("WriteFixture: cannot open for write: %s", path.c_str());
-		f << j.dump(4) << "\n";
+	// Local shorthands to preserve call-site readability.
+	inline nlohmann::json BuildFixtureEnvelope(const std::string& id) {
+		return BuildMapFixtureEnvelope(id);
+	}
+	inline void WriteFixture(const std::string& name, const nlohmann::json& j) {
+		WriteMapFixture(name, j);
 	}
 
 } // namespace

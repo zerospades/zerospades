@@ -51,6 +51,38 @@ namespace spades {
 		}
 
 		/**
+		 * Assemble the standard fixture JSON envelope for map value_lookup fixtures.
+		 * Shared across all Tests/Map/ generator tests to prevent schema drift.
+		 */
+		inline nlohmann::json BuildMapFixtureEnvelope(const std::string& id) {
+			nlohmann::json j;
+			j["version"] = "1.0.0";
+			j["id"] = id;
+			j["subsystem"] = "map";
+			j["behavior"] = "implementation_detail";
+			j["seed"] = 42;
+			j["protocol_version"] = "0.75";
+			j["map"] = {{"generator", "flat"}, {"ground_z", 62}};
+			j["inputs"] = nlohmann::json::array();
+			j["kind"] = "value_lookup";
+			j["expected"] = {{"value", nlohmann::json::object()}};
+			return j;
+		}
+
+		/**
+		 * Serialize fixture JSON to the fixtures/ directory.
+		 * Path resolved via TESTS_DIR compile-time constant (Tests/CMakeLists.txt).
+		 * Throws on I/O failure so generator TEST bodies abort loudly.
+		 */
+		inline void WriteMapFixture(const std::string& name, const nlohmann::json& j) {
+			std::string path = std::string(TESTS_DIR) + "/../fixtures/" + name;
+			std::ofstream f(path);
+			if (!f.is_open())
+				SPRaise("WriteMapFixture: cannot open for write: %s", path.c_str());
+			f << j.dump(4) << "\n";
+		}
+
+		/**
 		 * GoogleTest fixture base for all map/block/raycast/cluster tests.
 		 *
 		 * Provides: SettingsGuard isolation (HARN-04), LoadMapFixtureJson,
