@@ -48,6 +48,7 @@ add_executable(zerospades_tests
     Helpers/HeadlessWorld.cpp
     Helpers/ToleranceMatchersTest.cpp
     Helpers/PlayerPhysicsSnapshot.cpp
+    Helpers/GrenadeSnapshot.cpp
     Protocol/ProtocolRoundTripTest.cpp
     Protocol/ProtocolReplay.cpp
     Protocol/ProtocolReplayUnitTest.cpp
@@ -86,6 +87,9 @@ elseif(MSVC)
 endif()
 
 add_subdirectory(Map)
+add_subdirectory(Weapons)
+add_subdirectory(Grenade)
+add_subdirectory(GameModes)
 
 gtest_discover_tests(zerospades_tests
     PROPERTIES LABELS "harness"

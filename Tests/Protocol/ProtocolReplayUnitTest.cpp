@@ -406,7 +406,9 @@ TEST_F(ProtocolReplayUnitTest, ToJsonEmitsSchemaShapeAndSortedPlayers) {
 			EXPECT_TRUE(pj["velocity"].contains(axis));
 			EXPECT_TRUE(pj["orientation"].contains(axis));
 		}
-		// A1 fold constants.
+		// A1 fold constants. All players in this fixture are alive, so health=100
+		// still holds; the OQ-2 dead-player health=0 path is characterized in
+		// Tests/GameModes/KillLeaveFoldTest.cpp (DeadPlayerSerializesHealthZero).
 		EXPECT_EQ(pj["health"].get<int>(), 100);
 		EXPECT_EQ(pj["velocity"]["x"].get<double>(), 0.0);
 		EXPECT_EQ(pj["velocity"]["y"].get<double>(), 0.0);
