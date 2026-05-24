@@ -1,368 +1,382 @@
 {
-    "fixtures": [
-        {
-            "id": "phys_friction_ground_001",
-            "path": "fixtures/phys_friction_ground_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Ground friction step-trace: player on flat map with initial vx=1.0, zero input, 10 ticks; velocity.x decays by f=dt*4+1 per tick."
-        },
-        {
-            "id": "phys_friction_air_001",
-            "path": "fixtures/phys_friction_air_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Air friction: player airborne at z=32 with vx=1.0, zero input, 5 ticks; velocity.x decays by f=dt+1 per tick."
-        },
-        {
-            "id": "phys_friction_wade_001",
-            "path": "fixtures/phys_friction_wade_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Wade friction: player at z=62.5 with vx=1.0, zero input, 10 ticks; position.z>61 triggers wade=true and f=dt*6+1 per tick."
-        },
-        {
-            "id": "phys_jump_001",
-            "path": "fixtures/phys_jump_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Jump vz=-0.36: player on flat ground, jump=true tick 0, 3 ticks; tick-0 velocity.z=-0.36 characterizes PlayerJump constant."
-        },
-        {
-            "id": "phys_jump_cooldown_001",
-            "path": "fixtures/phys_jump_cooldown_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Jump cooldown listener gate: jump tick 0, release tick 1, re-jump tick 2; velocity.z=-0.36 at both jumps; characterizes that cooldown only gates PlayerJumped listener, not vz assignment."
-        },
-        {
-            "id": "phys_crouch_offset_001",
-            "path": "fixtures/phys_crouch_offset_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Crouch offset 0.9: player standing, crouch=true tick 0; position.z increases by 0.9 on crouch-down transition."
-        },
-        {
-            "id": "phys_step_climb_001",
-            "path": "fixtures/phys_step_climb_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Step-climb: 1-block wall at (258,256,61), player at (256,256,60.5) moving +x; climb fires, velocity.x/y halved, player rises."
-        },
-        {
-            "id": "phys_step_climb_suppression_001",
-            "path": "fixtures/phys_step_climb_suppression_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "Step-climb suppression: same wall, crouch=true; climb is suppressed, velocity.x zeroed by wall collision."
-        },
-        {
-            "id": "phys_collision_wall_001",
-            "path": "fixtures/phys_collision_wall_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "BoxClipMove wall collision: player at (256,256,60.5) moving +x into 2-block-tall solid wall at (258,256,60-61); velocity.x zeroed at collision tick (BoxClipMove:1052/1055). Single-block wall would allow step-climb; 2-block wall isolates pure wall-collision path."
-        },
-        {
-            "id": "phys_collision_floor_001",
-            "path": "fixtures/phys_collision_floor_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "BoxClipMove floor collision: player airborne at z=57 with zero velocity falls under gravity to flat-map ground; airborne\u2192false, velocity.z\u21920 at landing tick (BoxClipMove:1104-1109)."
-        },
-        {
-            "id": "phys_collision_ceiling_001",
-            "path": "fixtures/phys_collision_ceiling_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "BoxClipMove ceiling collision: player at z=55 moving up (vel.z=-0.5) hits ceiling block at (256,256,53); velocity.z zeroed at collision tick (BoxClipMove:1109 else branch)."
-        },
-        {
-            "id": "phys_try_uncrouch_blocked_001",
-            "path": "fixtures/phys_try_uncrouch_blocked_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "TryUncrouch blocked: crouched player at z\u224861.4 with solid block at z=60 (head-raise path blocked by position.z-1.35=60.05); crouch-off transition rejected by TryUncrouch; local player reverts to crouch=true (Player.cpp:113-114); position.z unchanged."
-        },
-        {
-            "id": "phys_corpse_movement_001",
-            "path": "fixtures/phys_corpse_movement_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "MoveCorpse path: alive=false player at z=61 with vel=(0.2,0,1.0); gravity accumulation (vz+=0.5*dt/tick); bounce at tick 1 when position crosses z=62 floor (velocity*=0.36 factor, position reverted to oldPos)."
-        },
-        {
-            "id": "proto_packet_rt_001",
-            "path": "fixtures/proto_packet_rt_001.json",
-            "subsystem": "proto",
-            "behavior": "implementation_detail",
-            "description": "Packet-roundtrip exemplar: empty WorldUpdate (player_count 0) hex-encoded."
-        },
-        {
-            "id": "map_value_lookup_001",
-            "path": "fixtures/map_value_lookup_001.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "Value-lookup exemplar: IsSolid query at (0,0,62) on flat map returns solid."
-        },
-        {
-            "id": "proto_golden_075_001",
-            "path": "fixtures/proto_golden_075_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "0.75 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v3 (implicit index) -> frozen WorldSnapshot."
-        },
-        {
-            "id": "proto_golden_076_001",
-            "path": "fixtures/proto_golden_076_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "0.76 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v4 (sparse explicit index) -> frozen WorldSnapshot."
-        },
-        {
-            "id": "proto_worldupdate_075_001",
-            "path": "fixtures/proto_worldupdate_075_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "WorldUpdate v0.75 short-branch (24B/entry, implicit index): CreatePlayer x2 -> WorldUpdate v3 repositions both."
-        },
-        {
-            "id": "proto_worldupdate_076_001",
-            "path": "fixtures/proto_worldupdate_076_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "WorldUpdate v0.76 full-branch (25B/entry, explicit per-entry index): CreatePlayer x2 (sparse ids) -> WorldUpdate v4 repositions both."
-        },
-        {
-            "id": "proto_mapstart_001",
-            "path": "fixtures/proto_mapstart_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "MapStart packet-roundtrip: single uint32 mapSize, version-independent wire layout (v3/v4 difference is a NetClient send side-effect)."
-        },
-        {
-            "id": "proto_ext_075_001",
-            "path": "fixtures/proto_ext_075_001.json",
-            "subsystem": "proto",
-            "behavior": "protocol_compat",
-            "description": "ExtensionInfo negotiation (value_lookup): synthetic ExtensionInfo packet advertises {id 0 v1, id 192 v1}; the fold records all advertised extensions per A3 (wire fact, not NetClient's implementedExtensions filter). expected.value is the populated extensions map id->version."
-        },
-        {
-            "id": "proto_malformed_001",
-            "path": "fixtures/proto_malformed_001.json",
-            "subsystem": "proto",
-            "behavior": "implementation_detail",
-            "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input \u2014 the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
-        },
-        {
-            "id": "phys_determinism_golden_001",
-            "path": "fixtures/phys_determinism_golden_001.json",
-            "subsystem": "phys",
-            "behavior": "implementation_detail",
-            "description": "PHYS-03 multi-step determinism golden: 60-tick scripted input sequence (move/jump/crouch/strafe varied per schedule) starting from (256,256,60.5); full per-tick position/velocity/orientation/airborne/wade; re-run 20x in CI produces identical output."
-        },
-        {
-            "id": "map_value_lookup_001_is_solid",
-            "path": "fixtures/map_value_lookup_001_is_solid.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-01 IsSolid: flat map ground at z=62 is solid; z=30 (air) is not. Two in-bounds queries characterize solid vs. non-solid return values."
-        },
-        {
-            "id": "map_value_lookup_002_get_color",
-            "path": "fixtures/map_value_lookup_002_get_color.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-01 GetColor: color round-trip with health byte \u2014 Set(100,100,40,true,0x64FF8040) then GetColor returns the full 32-bit value including health=100 (0x64) in the high byte (0xHHBBGGRR format)."
-        },
-        {
-            "id": "map_value_lookup_003_get_solid_map",
-            "path": "fixtures/map_value_lookup_003_get_solid_map.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-01 GetSolidMap: column (100,100) with blocks placed at z=60,61 plus flat-map ground at z=62; GetSolidMap returns the uint64 bitmask with bits 60,61,62 set."
-        },
-        {
-            "id": "map_value_lookup_004_has_neighbors",
-            "path": "fixtures/map_value_lookup_004_has_neighbors.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-01 HasNeighbors: 6-face adjacency \u2014 isolated block returns false; block with +x neighbor returns true; block with diagonal-only neighbor (Risk 1 corner case) returns false confirming 6-face not 26-face."
-        },
-        {
-            "id": "map_value_lookup_005_is_surface",
-            "path": "fixtures/map_value_lookup_005_is_surface.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-01 IsSurface: isolated solid block (all 6 faces air) returns true; same block fully surrounded by solids on all 6 faces returns false."
-        },
-        {
-            "id": "map_value_lookup_006_raycast_hit",
-            "path": "fixtures/map_value_lookup_006_raycast_hit.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-02 CastRay2 hit: ray from (198.5,200.5,50.5) dir +x hits solid block at (200,200,50); validates hit=true, startSolid=false, hitPos, hitBlock=(-1,0,0) normal, stepCount."
-        },
-        {
-            "id": "map_value_lookup_007_raycast_miss",
-            "path": "fixtures/map_value_lookup_007_raycast_miss.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-02 CastRay2 miss: ray from (100.5,100.5,30.5) dir -z (upward) with 50 maxSteps finds no solid; validates hit=false."
-        },
-        {
-            "id": "map_value_lookup_008_raycast_startsolid",
-            "path": "fixtures/map_value_lookup_008_raycast_startsolid.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-02 CastRay2 startSolid: ray origin (50.5,50.5,50.5) inside solid block at (50,50,50); validates hit=true, startSolid=true, hitPos\u2248origin, stepCount=0."
-        },
-        {
-            "id": "map_value_lookup_009_clip_box",
-            "path": "fixtures/map_value_lookup_009_clip_box.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-02 ClipBox z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64(>=DefaultDepth)\u2192true; XY out-of-bounds\u2192true (clipped)."
-        },
-        {
-            "id": "map_value_lookup_010_clip_world",
-            "path": "fixtures/map_value_lookup_010_clip_world.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-02 ClipWorld z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64\u2192true; XY out-of-bounds\u2192false (not clipped \u2014 key difference from ClipBox)."
-        },
-        {
-            "id": "map_value_lookup_011_block_action_create",
-            "path": "fixtures/map_value_lookup_011_block_action_create.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-03 CreateBlock post-state: World::CreateBlock({256,256,61}, {255,128,64}) + Advance applies block via mapWrapper->AddBlock; IsSolid=true, color includes health byte (0x64 in high byte) and jitter-modified RGB."
-        },
-        {
-            "id": "map_value_lookup_012_block_action_tool",
-            "path": "fixtures/map_value_lookup_012_block_action_tool.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-03 BlockActionTool post-state: DestroyBlock on single cell at (100,100,61); IsSolid=false after Advance (mapWrapper->RemoveBlocks removes the block)."
-        },
-        {
-            "id": "map_value_lookup_013_block_action_dig",
-            "path": "fixtures/map_value_lookup_013_block_action_dig.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-03 BlockActionDig post-state: DestroyBlock on 3 cells (center_z-1, center_z, center_z+1) at (150,150); all three IsSolid=false after Advance."
-        },
-        {
-            "id": "map_value_lookup_014_block_action_grenade",
-            "path": "fixtures/map_value_lookup_014_block_action_grenade.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-03 BlockActionGrenade post-state: DestroyBlock on 27-cell 3x3x3 cube centered at (200,200,30); all 27 cells IsSolid=false after Advance."
-        },
-        {
-            "id": "map_value_lookup_015_cubeline",
-            "path": "fixtures/map_value_lookup_015_cubeline.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-05 CubeLine Bresenham-3D cell list: three orientations \u2014 axis-aligned +x (100,100,30)\u2192(105,100,30), XY-diagonal (100,100,30)\u2192(105,105,30), 3D-diagonal (100,100,30)\u2192(104,103,32); exact order-sensitive cell list captured."
-        },
-        {
-            "id": "map_value_lookup_016_cluster_pillar",
-            "path": "fixtures/map_value_lookup_016_cluster_pillar.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-04 Cluster pillar: CreateBlock pillar at (10,10) z=61,60,59; destroy base z=61; 1 BlocksFell callback with 2 floating cells (z=59 and z=60)."
-        },
-        {
-            "id": "map_value_lookup_017_cluster_connected",
-            "path": "fixtures/map_value_lookup_017_cluster_connected.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-04 Cluster connected: CreateBlock at (20,20) z=61 (anchored to ground) and z=60; destroy z=61; 1 BlocksFell callback with 1 floating cell (z=60)."
-        },
-        {
-            "id": "map_value_lookup_018_cluster_two_isolated",
-            "path": "fixtures/map_value_lookup_018_cluster_two_isolated.json",
-            "subsystem": "map",
-            "behavior": "implementation_detail",
-            "description": "MAP-04 Cluster two isolated: two separate pillars at (10,10) and (50,50) z=61,60; destroy both bases z=61 simultaneously; 2 separate BlocksFell callbacks (NOT merged) each with 1 floating cell \u2014 critical Rust port parity test."
-        },
-        {
-            "id": "weap_value_lookup_rifle_075",
-            "path": "fixtures/weap_value_lookup_rifle_075.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "Rifle v0.75 (RifleWeapon3): damage Head=100/Torso=49/Arms=33/Legs=33/Block=50, spread=0.006, pellets=1, delay=0.5s, clip=10, stock=50, reload=2.5s. HitTypeMelee unhandled (documented, not asserted)."
-        },
-        {
-            "id": "weap_value_lookup_smg_075",
-            "path": "fixtures/weap_value_lookup_smg_075.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "SMG v0.75 (SMGWeapon3): damage Head=75/Torso=29/Arms=18/Legs=18/Block=34, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=120, reload=2.5s. Block 34 differs from v076 (26)."
-        },
-        {
-            "id": "weap_value_lookup_shotgun_075",
-            "path": "fixtures/weap_value_lookup_shotgun_075.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "Shotgun v0.75 (ShotgunWeapon3): damage Head=37/Torso=27/Arms=16/Legs=16/Block=34, spread=0.024, pellets=8, delay=1.0s, clip=6, stock=48, reload=0.5s, reload_slow=true."
-        },
-        {
-            "id": "weap_value_lookup_rifle_076",
-            "path": "fixtures/weap_value_lookup_rifle_076.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "Rifle v0.76 (RifleWeapon4): damage Head=250/Torso=60/Arms=50/Legs=50/Block=50, spread=0.004, pellets=1, delay=0.6s, clip=8, stock=48, reload=2.5s. Head/clip differ from v075 (100/10). Source comment mislabels table '0.75' \u2014 frozen as the client oracle returns it (Pitfall 2)."
-        },
-        {
-            "id": "weap_value_lookup_smg_076",
-            "path": "fixtures/weap_value_lookup_smg_076.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "SMG v0.76 (SMGWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=26, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=150, reload=2.5s. Block 26 differs from v075 (34)."
-        },
-        {
-            "id": "weap_value_lookup_shotgun_076",
-            "path": "fixtures/weap_value_lookup_shotgun_076.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "Shotgun v0.76 (ShotgunWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=34, spread=0.036, pellets=8, delay=0.8s, clip=8, stock=48, reload=0.4s, reload_slow=true."
-        },
-        {
-            "id": "weap_value_lookup_modifiers",
-            "path": "fixtures/weap_value_lookup_modifiers.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "Spread/recoil modifier RULES + base GetSpread()/GetRecoil() vectors for all 6 variants (value_lookup, NOT a fired-shot trace). Spread: aim x0.5, crouch x0.5 (not shotgun). Recoil: walking-not-aiming x2, airborne x2, crouch x0.5."
-        },
-        {
-            "id": "weap_step_trace_fire_reload",
-            "path": "fixtures/weap_step_trace_fire_reload.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "WEAP-02 SMG v0.75 fire/ammo/reload state machine (step_trace, 196 ticks). Captures every tick of a full cycle: fire-allowed ticks at the 6-tick GetDelay cadence (ammo decrements), intervening rate-gate-suppressed ticks (ammo stable), empty-clip dry-fire ticks (fired=false, ammo=0), Reload start (reloading=true), and ReloadDone (reloading=false, ammo restored to clip). Local player (SetLocalPlayerIndex) so empty-clip blocks fire."
-        },
-        {
-            "id": "weap_step_trace_grenade_bounce",
-            "path": "fixtures/weap_step_trace_grenade_bounce.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "WEAP-03 grenade trajectory (step_trace, 40 ticks): gravity (vel.z += dt), x32 motion scale, a wall (x-axis) bounce off a 2-block wall at x=258, then repeated floor (z-axis) bounces off the z=62 flat-map ground. Every tick captured (Nyquist) so per-axis velocity reflection and the x0.36 bounce friction are visible across pre/post-bounce ticks. Fuse 5.0 (no explode during the trajectory)."
-        },
-        {
-            "id": "weap_step_trace_grenade_water",
-            "path": "fixtures/weap_step_trace_grenade_water.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "WEAP-03 grenade water landing (step_trace, 2 ticks): grenade crosses integer z>=63 (lp2.z<63 -> lp.z>=63) over a CARVED non-solid column (Set(256,256,62,false)) so MoveGrenade returns -1 and GrenadeDroppedIntoWater fires (not a wall bounce; Pitfall 6 / A2). ClipWorld(256,256,63) verified non-solid before freezing."
-        },
-        {
-            "id": "weap_step_trace_grenade_fuse",
-            "path": "fixtures/weap_step_trace_grenade_fuse.json",
-            "subsystem": "weap",
-            "behavior": "implementation_detail",
-            "description": "WEAP-03 grenade fuse countdown -> Explode (step_trace, 7 ticks): 0.1s fuse decrements by FIXED_DT each tick; on the explode tick Update returns true, calls Explode() (GrenadeExploded fired once) and SKIPS MoveGrenade (Pitfall 7) so the explode tick's position == the prior tick's position while fuse_s has just gone negative. exploded flag flips true on the last tick."
-        }
-    ]
+  "fixtures": [
+    {
+      "id": "phys_friction_ground_001",
+      "path": "fixtures/phys_friction_ground_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Ground friction step-trace: player on flat map with initial vx=1.0, zero input, 10 ticks; velocity.x decays by f=dt*4+1 per tick."
+    },
+    {
+      "id": "phys_friction_air_001",
+      "path": "fixtures/phys_friction_air_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Air friction: player airborne at z=32 with vx=1.0, zero input, 5 ticks; velocity.x decays by f=dt+1 per tick."
+    },
+    {
+      "id": "phys_friction_wade_001",
+      "path": "fixtures/phys_friction_wade_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Wade friction: player at z=62.5 with vx=1.0, zero input, 10 ticks; position.z>61 triggers wade=true and f=dt*6+1 per tick."
+    },
+    {
+      "id": "phys_jump_001",
+      "path": "fixtures/phys_jump_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Jump vz=-0.36: player on flat ground, jump=true tick 0, 3 ticks; tick-0 velocity.z=-0.36 characterizes PlayerJump constant."
+    },
+    {
+      "id": "phys_jump_cooldown_001",
+      "path": "fixtures/phys_jump_cooldown_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Jump cooldown listener gate: jump tick 0, release tick 1, re-jump tick 2; velocity.z=-0.36 at both jumps; characterizes that cooldown only gates PlayerJumped listener, not vz assignment."
+    },
+    {
+      "id": "phys_crouch_offset_001",
+      "path": "fixtures/phys_crouch_offset_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Crouch offset 0.9: player standing, crouch=true tick 0; position.z increases by 0.9 on crouch-down transition."
+    },
+    {
+      "id": "phys_step_climb_001",
+      "path": "fixtures/phys_step_climb_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Step-climb: 1-block wall at (258,256,61), player at (256,256,60.5) moving +x; climb fires, velocity.x/y halved, player rises."
+    },
+    {
+      "id": "phys_step_climb_suppression_001",
+      "path": "fixtures/phys_step_climb_suppression_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "Step-climb suppression: same wall, crouch=true; climb is suppressed, velocity.x zeroed by wall collision."
+    },
+    {
+      "id": "phys_collision_wall_001",
+      "path": "fixtures/phys_collision_wall_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "BoxClipMove wall collision: player at (256,256,60.5) moving +x into 2-block-tall solid wall at (258,256,60-61); velocity.x zeroed at collision tick (BoxClipMove:1052/1055). Single-block wall would allow step-climb; 2-block wall isolates pure wall-collision path."
+    },
+    {
+      "id": "phys_collision_floor_001",
+      "path": "fixtures/phys_collision_floor_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "BoxClipMove floor collision: player airborne at z=57 with zero velocity falls under gravity to flat-map ground; airborne\u2192false, velocity.z\u21920 at landing tick (BoxClipMove:1104-1109)."
+    },
+    {
+      "id": "phys_collision_ceiling_001",
+      "path": "fixtures/phys_collision_ceiling_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "BoxClipMove ceiling collision: player at z=55 moving up (vel.z=-0.5) hits ceiling block at (256,256,53); velocity.z zeroed at collision tick (BoxClipMove:1109 else branch)."
+    },
+    {
+      "id": "phys_try_uncrouch_blocked_001",
+      "path": "fixtures/phys_try_uncrouch_blocked_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "TryUncrouch blocked: crouched player at z\u224861.4 with solid block at z=60 (head-raise path blocked by position.z-1.35=60.05); crouch-off transition rejected by TryUncrouch; local player reverts to crouch=true (Player.cpp:113-114); position.z unchanged."
+    },
+    {
+      "id": "phys_corpse_movement_001",
+      "path": "fixtures/phys_corpse_movement_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "MoveCorpse path: alive=false player at z=61 with vel=(0.2,0,1.0); gravity accumulation (vz+=0.5*dt/tick); bounce at tick 1 when position crosses z=62 floor (velocity*=0.36 factor, position reverted to oldPos)."
+    },
+    {
+      "id": "proto_packet_rt_001",
+      "path": "fixtures/proto_packet_rt_001.json",
+      "subsystem": "proto",
+      "behavior": "implementation_detail",
+      "description": "Packet-roundtrip exemplar: empty WorldUpdate (player_count 0) hex-encoded."
+    },
+    {
+      "id": "map_value_lookup_001",
+      "path": "fixtures/map_value_lookup_001.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "Value-lookup exemplar: IsSolid query at (0,0,62) on flat map returns solid."
+    },
+    {
+      "id": "proto_golden_075_001",
+      "path": "fixtures/proto_golden_075_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "0.75 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v3 (implicit index) -> frozen WorldSnapshot."
+    },
+    {
+      "id": "proto_golden_076_001",
+      "path": "fixtures/proto_golden_076_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "0.76 golden sequence: StateData(CTF) -> ExistingPlayer x2 -> WorldUpdate v4 (sparse explicit index) -> frozen WorldSnapshot."
+    },
+    {
+      "id": "proto_worldupdate_075_001",
+      "path": "fixtures/proto_worldupdate_075_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "WorldUpdate v0.75 short-branch (24B/entry, implicit index): CreatePlayer x2 -> WorldUpdate v3 repositions both."
+    },
+    {
+      "id": "proto_worldupdate_076_001",
+      "path": "fixtures/proto_worldupdate_076_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "WorldUpdate v0.76 full-branch (25B/entry, explicit per-entry index): CreatePlayer x2 (sparse ids) -> WorldUpdate v4 repositions both."
+    },
+    {
+      "id": "proto_mapstart_001",
+      "path": "fixtures/proto_mapstart_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "MapStart packet-roundtrip: single uint32 mapSize, version-independent wire layout (v3/v4 difference is a NetClient send side-effect)."
+    },
+    {
+      "id": "proto_ext_075_001",
+      "path": "fixtures/proto_ext_075_001.json",
+      "subsystem": "proto",
+      "behavior": "protocol_compat",
+      "description": "ExtensionInfo negotiation (value_lookup): synthetic ExtensionInfo packet advertises {id 0 v1, id 192 v1}; the fold records all advertised extensions per A3 (wire fact, not NetClient's implementedExtensions filter). expected.value is the populated extensions map id->version."
+    },
+    {
+      "id": "proto_malformed_001",
+      "path": "fixtures/proto_malformed_001.json",
+      "subsystem": "proto",
+      "behavior": "implementation_detail",
+      "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input \u2014 the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
+    },
+    {
+      "id": "phys_determinism_golden_001",
+      "path": "fixtures/phys_determinism_golden_001.json",
+      "subsystem": "phys",
+      "behavior": "implementation_detail",
+      "description": "PHYS-03 multi-step determinism golden: 60-tick scripted input sequence (move/jump/crouch/strafe varied per schedule) starting from (256,256,60.5); full per-tick position/velocity/orientation/airborne/wade; re-run 20x in CI produces identical output."
+    },
+    {
+      "id": "map_value_lookup_001_is_solid",
+      "path": "fixtures/map_value_lookup_001_is_solid.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-01 IsSolid: flat map ground at z=62 is solid; z=30 (air) is not. Two in-bounds queries characterize solid vs. non-solid return values."
+    },
+    {
+      "id": "map_value_lookup_002_get_color",
+      "path": "fixtures/map_value_lookup_002_get_color.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-01 GetColor: color round-trip with health byte \u2014 Set(100,100,40,true,0x64FF8040) then GetColor returns the full 32-bit value including health=100 (0x64) in the high byte (0xHHBBGGRR format)."
+    },
+    {
+      "id": "map_value_lookup_003_get_solid_map",
+      "path": "fixtures/map_value_lookup_003_get_solid_map.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-01 GetSolidMap: column (100,100) with blocks placed at z=60,61 plus flat-map ground at z=62; GetSolidMap returns the uint64 bitmask with bits 60,61,62 set."
+    },
+    {
+      "id": "map_value_lookup_004_has_neighbors",
+      "path": "fixtures/map_value_lookup_004_has_neighbors.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-01 HasNeighbors: 6-face adjacency \u2014 isolated block returns false; block with +x neighbor returns true; block with diagonal-only neighbor (Risk 1 corner case) returns false confirming 6-face not 26-face."
+    },
+    {
+      "id": "map_value_lookup_005_is_surface",
+      "path": "fixtures/map_value_lookup_005_is_surface.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-01 IsSurface: isolated solid block (all 6 faces air) returns true; same block fully surrounded by solids on all 6 faces returns false."
+    },
+    {
+      "id": "map_value_lookup_006_raycast_hit",
+      "path": "fixtures/map_value_lookup_006_raycast_hit.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-02 CastRay2 hit: ray from (198.5,200.5,50.5) dir +x hits solid block at (200,200,50); validates hit=true, startSolid=false, hitPos, hitBlock=(-1,0,0) normal, stepCount."
+    },
+    {
+      "id": "map_value_lookup_007_raycast_miss",
+      "path": "fixtures/map_value_lookup_007_raycast_miss.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-02 CastRay2 miss: ray from (100.5,100.5,30.5) dir -z (upward) with 50 maxSteps finds no solid; validates hit=false."
+    },
+    {
+      "id": "map_value_lookup_008_raycast_startsolid",
+      "path": "fixtures/map_value_lookup_008_raycast_startsolid.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-02 CastRay2 startSolid: ray origin (50.5,50.5,50.5) inside solid block at (50,50,50); validates hit=true, startSolid=true, hitPos\u2248origin, stepCount=0."
+    },
+    {
+      "id": "map_value_lookup_009_clip_box",
+      "path": "fixtures/map_value_lookup_009_clip_box.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-02 ClipBox z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64(>=DefaultDepth)\u2192true; XY out-of-bounds\u2192true (clipped)."
+    },
+    {
+      "id": "map_value_lookup_010_clip_world",
+      "path": "fixtures/map_value_lookup_010_clip_world.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-02 ClipWorld z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64\u2192true; XY out-of-bounds\u2192false (not clipped \u2014 key difference from ClipBox)."
+    },
+    {
+      "id": "map_value_lookup_011_block_action_create",
+      "path": "fixtures/map_value_lookup_011_block_action_create.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-03 CreateBlock post-state: World::CreateBlock({256,256,61}, {255,128,64}) + Advance applies block via mapWrapper->AddBlock; IsSolid=true, color includes health byte (0x64 in high byte) and jitter-modified RGB."
+    },
+    {
+      "id": "map_value_lookup_012_block_action_tool",
+      "path": "fixtures/map_value_lookup_012_block_action_tool.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-03 BlockActionTool post-state: DestroyBlock on single cell at (100,100,61); IsSolid=false after Advance (mapWrapper->RemoveBlocks removes the block)."
+    },
+    {
+      "id": "map_value_lookup_013_block_action_dig",
+      "path": "fixtures/map_value_lookup_013_block_action_dig.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-03 BlockActionDig post-state: DestroyBlock on 3 cells (center_z-1, center_z, center_z+1) at (150,150); all three IsSolid=false after Advance."
+    },
+    {
+      "id": "map_value_lookup_014_block_action_grenade",
+      "path": "fixtures/map_value_lookup_014_block_action_grenade.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-03 BlockActionGrenade post-state: DestroyBlock on 27-cell 3x3x3 cube centered at (200,200,30); all 27 cells IsSolid=false after Advance."
+    },
+    {
+      "id": "map_value_lookup_015_cubeline",
+      "path": "fixtures/map_value_lookup_015_cubeline.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-05 CubeLine Bresenham-3D cell list: three orientations \u2014 axis-aligned +x (100,100,30)\u2192(105,100,30), XY-diagonal (100,100,30)\u2192(105,105,30), 3D-diagonal (100,100,30)\u2192(104,103,32); exact order-sensitive cell list captured."
+    },
+    {
+      "id": "map_value_lookup_016_cluster_pillar",
+      "path": "fixtures/map_value_lookup_016_cluster_pillar.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-04 Cluster pillar: CreateBlock pillar at (10,10) z=61,60,59; destroy base z=61; 1 BlocksFell callback with 2 floating cells (z=59 and z=60)."
+    },
+    {
+      "id": "map_value_lookup_017_cluster_connected",
+      "path": "fixtures/map_value_lookup_017_cluster_connected.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-04 Cluster connected: CreateBlock at (20,20) z=61 (anchored to ground) and z=60; destroy z=61; 1 BlocksFell callback with 1 floating cell (z=60)."
+    },
+    {
+      "id": "map_value_lookup_018_cluster_two_isolated",
+      "path": "fixtures/map_value_lookup_018_cluster_two_isolated.json",
+      "subsystem": "map",
+      "behavior": "implementation_detail",
+      "description": "MAP-04 Cluster two isolated: two separate pillars at (10,10) and (50,50) z=61,60; destroy both bases z=61 simultaneously; 2 separate BlocksFell callbacks (NOT merged) each with 1 floating cell \u2014 critical Rust port parity test."
+    },
+    {
+      "id": "weap_value_lookup_rifle_075",
+      "path": "fixtures/weap_value_lookup_rifle_075.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "Rifle v0.75 (RifleWeapon3): damage Head=100/Torso=49/Arms=33/Legs=33/Block=50, spread=0.006, pellets=1, delay=0.5s, clip=10, stock=50, reload=2.5s. HitTypeMelee unhandled (documented, not asserted)."
+    },
+    {
+      "id": "weap_value_lookup_smg_075",
+      "path": "fixtures/weap_value_lookup_smg_075.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "SMG v0.75 (SMGWeapon3): damage Head=75/Torso=29/Arms=18/Legs=18/Block=34, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=120, reload=2.5s. Block 34 differs from v076 (26)."
+    },
+    {
+      "id": "weap_value_lookup_shotgun_075",
+      "path": "fixtures/weap_value_lookup_shotgun_075.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "Shotgun v0.75 (ShotgunWeapon3): damage Head=37/Torso=27/Arms=16/Legs=16/Block=34, spread=0.024, pellets=8, delay=1.0s, clip=6, stock=48, reload=0.5s, reload_slow=true."
+    },
+    {
+      "id": "weap_value_lookup_rifle_076",
+      "path": "fixtures/weap_value_lookup_rifle_076.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "Rifle v0.76 (RifleWeapon4): damage Head=250/Torso=60/Arms=50/Legs=50/Block=50, spread=0.004, pellets=1, delay=0.6s, clip=8, stock=48, reload=2.5s. Head/clip differ from v075 (100/10). Source comment mislabels table '0.75' \u2014 frozen as the client oracle returns it (Pitfall 2)."
+    },
+    {
+      "id": "weap_value_lookup_smg_076",
+      "path": "fixtures/weap_value_lookup_smg_076.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "SMG v0.76 (SMGWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=26, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=150, reload=2.5s. Block 26 differs from v075 (34)."
+    },
+    {
+      "id": "weap_value_lookup_shotgun_076",
+      "path": "fixtures/weap_value_lookup_shotgun_076.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "Shotgun v0.76 (ShotgunWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=34, spread=0.036, pellets=8, delay=0.8s, clip=8, stock=48, reload=0.4s, reload_slow=true."
+    },
+    {
+      "id": "weap_value_lookup_modifiers",
+      "path": "fixtures/weap_value_lookup_modifiers.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "Spread/recoil modifier RULES + base GetSpread()/GetRecoil() vectors for all 6 variants (value_lookup, NOT a fired-shot trace). Spread: aim x0.5, crouch x0.5 (not shotgun). Recoil: walking-not-aiming x2, airborne x2, crouch x0.5."
+    },
+    {
+      "id": "weap_step_trace_fire_reload",
+      "path": "fixtures/weap_step_trace_fire_reload.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "WEAP-02 SMG v0.75 fire/ammo/reload state machine (step_trace, 196 ticks). Captures every tick of a full cycle: fire-allowed ticks at the 6-tick GetDelay cadence (ammo decrements), intervening rate-gate-suppressed ticks (ammo stable), empty-clip dry-fire ticks (fired=false, ammo=0), Reload start (reloading=true), and ReloadDone (reloading=false, ammo restored to clip). Local player (SetLocalPlayerIndex) so empty-clip blocks fire."
+    },
+    {
+      "id": "weap_step_trace_grenade_bounce",
+      "path": "fixtures/weap_step_trace_grenade_bounce.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "WEAP-03 grenade trajectory (step_trace, 40 ticks): gravity (vel.z += dt), x32 motion scale, a wall (x-axis) bounce off a 2-block wall at x=258, then repeated floor (z-axis) bounces off the z=62 flat-map ground. Every tick captured (Nyquist) so per-axis velocity reflection and the x0.36 bounce friction are visible across pre/post-bounce ticks. Fuse 5.0 (no explode during the trajectory)."
+    },
+    {
+      "id": "weap_step_trace_grenade_water",
+      "path": "fixtures/weap_step_trace_grenade_water.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "WEAP-03 grenade water landing (step_trace, 2 ticks): grenade crosses integer z>=63 (lp2.z<63 -> lp.z>=63) over a CARVED non-solid column (Set(256,256,62,false)) so MoveGrenade returns -1 and GrenadeDroppedIntoWater fires (not a wall bounce; Pitfall 6 / A2). ClipWorld(256,256,63) verified non-solid before freezing."
+    },
+    {
+      "id": "weap_step_trace_grenade_fuse",
+      "path": "fixtures/weap_step_trace_grenade_fuse.json",
+      "subsystem": "weap",
+      "behavior": "implementation_detail",
+      "description": "WEAP-03 grenade fuse countdown -> Explode (step_trace, 7 ticks): 0.1s fuse decrements by FIXED_DT each tick; on the explode tick Update returns true, calls Explode() (GrenadeExploded fired once) and SKIPS MoveGrenade (Pitfall 7) so the explode tick's position == the prior tick's position while fuse_s has just gone negative. exploded flag flips true on the last tick."
+    },
+    {
+      "id": "mode_value_lookup_ctf_sequence",
+      "path": "fixtures/mode_value_lookup_ctf_sequence.json",
+      "subsystem": "mode",
+      "behavior": "implementation_detail",
+      "description": "MODE-01 CTF intel state (value_lookup): per-packet samples of the CTF team state folded after EACH packet in the scripted sequence pickup(1)->drop(1,pos)->pickup(1)->capture(1,winning=0). Proves hasIntel toggles, carrierId is set on pickup, the opposing team flagPos is set on drop, team score++ and carrier persistentScore+=10 on a non-winning capture (Nyquist per-packet sampling; CTF state read directly off WorldSnapshot ctf* members, no GameModeSnapshot schema change per OQ-1)."
+    },
+    {
+      "id": "mode_world_snapshot_ctf",
+      "path": "fixtures/mode_world_snapshot_ctf.json",
+      "subsystem": "mode",
+      "behavior": "protocol_compat",
+      "description": "MODE-03 CTF world golden (world_snapshot): a full CTF packet sequence (StateData mode=0 + two ExistingPlayers + IntelPickup) folded once through ProtocolReplay and frozen via WorldSnapshot::ToJson(). Carries game_mode.mode == \"ctf\" and the id-ascending players[] array."
+    }
+  ]
 }

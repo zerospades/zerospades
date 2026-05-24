@@ -1,0 +1,102 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "carrier_id": 1,
+            "carrier_team": 0,
+            "samples": [
+                {
+                    "after": "pickup1",
+                    "carrier_persistent": 0,
+                    "team0_carrier": 1,
+                    "team0_flag": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "team0_hasIntel": true,
+                    "team0_score": 0,
+                    "team1_carrier": 0,
+                    "team1_flag": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "team1_hasIntel": false,
+                    "team1_score": 0
+                },
+                {
+                    "after": "drop1",
+                    "carrier_persistent": 0,
+                    "team0_carrier": 1,
+                    "team0_flag": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "team0_hasIntel": false,
+                    "team0_score": 0,
+                    "team1_carrier": 0,
+                    "team1_flag": {
+                        "x": 200.0,
+                        "y": 150.0,
+                        "z": 40.0
+                    },
+                    "team1_hasIntel": false,
+                    "team1_score": 0
+                },
+                {
+                    "after": "pickup2",
+                    "carrier_persistent": 0,
+                    "team0_carrier": 1,
+                    "team0_flag": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "team0_hasIntel": true,
+                    "team0_score": 0,
+                    "team1_carrier": 0,
+                    "team1_flag": {
+                        "x": 200.0,
+                        "y": 150.0,
+                        "z": 40.0
+                    },
+                    "team1_hasIntel": false,
+                    "team1_score": 0
+                },
+                {
+                    "after": "capture1",
+                    "carrier_persistent": 10,
+                    "team0_carrier": 1,
+                    "team0_flag": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "team0_hasIntel": false,
+                    "team0_score": 1,
+                    "team1_carrier": 0,
+                    "team1_flag": {
+                        "x": 200.0,
+                        "y": 150.0,
+                        "z": 40.0
+                    },
+                    "team1_hasIntel": false,
+                    "team1_score": 0
+                }
+            ]
+        }
+    },
+    "id": "mode_value_lookup_ctf_sequence",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "mode",
+    "version": "1.0.0"
+}
