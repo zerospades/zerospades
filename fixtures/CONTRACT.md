@@ -747,3 +747,86 @@ A port that emits raw wire names (e.g. `mapSize` instead of `map_size`) — or t
 fields the fixture's `decoded` omits, or omits ones it includes — will **fail** the symmetric
 comparison. The `decoded` object is a deliberately curated, friendly projection of the wire,
 and the fixture is the authority on which keys it contains.
+
+---
+
+## 5. Non-Portability Boundary (CONTRACT-05)
+
+Not every behavior of the oracle can be reproduced bit-for-bit by an independent
+implementation, and the corpus is designed around that fact. This section states **exactly
+what a port is not expected to match bit-for-bit, and why** — so a porter does not waste
+effort chasing differences the contract deliberately tolerates or excludes, and does not
+mistake an expected non-determinism for a parity bug.
+
+### 5.1 The RNG / Random-Sampling Boundary (uncharacterized)
+
+The oracle draws pseudo-random numbers from a **thread-local xoroshiro128+ generator** seeded
+per run. The single behavior that depends on this generator is **weapon spread**: when a shot
+fires, each pellet's direction is perturbed on each axis by the difference of **two uniform
+integer draws in `[0, 32767]`** scaled by the weapon's spread constant (which is itself halved
+when aiming, and halved again when crouching for non-shotgun weapons).
+
+This spread is the **deliberately uncharacterized boundary**: **no fixture pins the
+spread-perturbed pellet direction.** A port is **not** expected to reproduce the oracle's
+exact pellet trajectories, because matching them would require bit-identical reproduction of a
+specific RNG algorithm's stream — an implementation detail, not a behavioral contract. The
+weapon `value_lookup` fixtures characterize the *deterministic* weapon facts (clip, stock,
+fire delay, reload time, per-zone damage, the spread **constant** and how aim/crouch scale it)
+but stop at the boundary where the RNG draw enters. Statistical characterization of the spread
+distribution is explicitly out of scope for this corpus.
+
+### 5.2 Transcendental Float Operations (tolerance, not exact)
+
+Player orientation is produced by **transcendental floating-point functions** — `atan2` to
+recover yaw and pitch from a facing vector, and `cos`/`sin` to rebuild the unit facing vector
+from those angles (spelled `atan2f`/`cosf`/`sinf` in single precision). These library math
+functions are **not guaranteed to return bit-identical results across math-library
+implementations, compilers, or CPUs**: the last few ULPs of a `cos`/`sin`/`atan2` result
+legitimately differ between platforms.
+
+This is precisely why **orientation fields use the tight `ORIENTATION_TOL = 1e-5`** and are
+**dispatched first** in the tolerance order (§2). Orientation is *not* compared bit-exact; it
+is compared within a small absolute tolerance that absorbs cross-platform transcendental drift
+while still catching any genuine behavioral divergence. A port computing orientation with its
+own platform's math library will land within `1e-5` of the oracle and pass — that tolerance is
+the contract that makes transcendental-derived fields portable.
+
+### 5.3 The Seed Convention
+
+Every fixture declares a **`seed`** (an integer). **The entire current corpus uses `seed:
+42`**, the default. The seed sets the deterministic generator state at the start of a replay,
+so that any path which *does* consult the generator (within a fixture that pins such a path —
+none do today, by §5.1) would be reproducible given the same seed and the same algorithm. A
+port seeds its own generator from the fixture's `seed` at replay start. Because the only
+RNG-dependent behavior (spread, §5.1) is uncharacterized, the seed is currently a
+forward-looking determinism guarantee rather than a value any fixture's `expected` depends on.
+
+### 5.4 What *Is* Comparable
+
+Everything outside the §5.1 boundary is comparable, and the corpus is built so that it is:
+
+- The simulation runs at a **fixed timestep** (`dt = 1/60 s`, §0.3) with no wall-clock or
+  thread-scheduling nondeterminism, so a replay is reproducible step-for-step.
+- Numeric outputs are compared within **per-field absolute tolerances** (§2), which absorb the
+  benign float drift of §5.2 (orientation at `1e-5`, raycasts at `1e-6`, grenade trajectories
+  at `1e-3`, everything else at `1e-4`) without admitting real divergence.
+- Integers, booleans, strings, and structure are compared **exactly** (§1).
+
+In short: **fixed-timestep determinism plus per-field tolerance makes the entire corpus
+bit-portable except for the single, explicitly-excluded uniform-RNG spread path.** A port that
+honors the seed, runs at the fixed timestep, decodes the wire per §4, replays per §3, and
+compares per §1 and §2 will prove behavioral parity with the oracle — no human playtesting
+required.
+
+---
+
+## Appendix: Schema Reference
+
+The machine-readable companion to this contract is the JSON Schema **`fixture_schema.json`**,
+co-located in this directory at schema version **`1.1.0`**. It formally types the envelope
+(§3.1), the per-kind `inputs` records, the optional `api` block (§3.5), the `map` block, and
+the per-kind `expected` shapes. Where this prose and the schema describe the same structure,
+they are intended to agree; the schema is the structural validator and this document is the
+semantic source of truth (notably for the tolerance table of §2, the operation registry of
+§3.5.1, the wire-format of §4, and the non-portability boundary of §5). Every fixture in the
+corpus validates against `fixture_schema.json` at version `1.1.0`.
