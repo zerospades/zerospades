@@ -117,7 +117,7 @@ jobs:
       - name: Run tests (shuffled)
         env:
           GTEST_SHUFFLE: "1"
-        run: ctest --test-dir build-tests -C Release --output-on-failure --no-tests=error -j %NUMBER_OF_PROCESSORS%
+        run: ctest --test-dir build-tests -C Release --output-on-failure --no-tests=error -j $env:NUMBER_OF_PROCESSORS
 
   build-macos-intel:
     name: Build (macOS Intel)
