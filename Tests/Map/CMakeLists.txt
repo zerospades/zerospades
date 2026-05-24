@@ -13,10 +13,6 @@
 #   Map/BlockActionTest.cpp  — MAP-03 (CreateBlock, DestroyBlock, post-action snapshot)
 #   Map/ClusterTest.cpp      — MAP-04 (BlocksFell multi-callback, 3 cluster scenarios)
 #   Map/BlockLineTest.cpp    — MAP-05 (CubeLine cell list + post-fill solid state)
-#
-# This file is intentionally empty of target_sources calls until Wave 1 plans
-# populate the test files above.  The subdirectory is included unconditionally
-# by the parent so CMake processes it on every configure.
 # ---------------------------------------------------------------------------
 
 # Wave 1 — Plan 02: MAP-01 block state fixtures (IsSolid, GetColor, GetSolidMap,
