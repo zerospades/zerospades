@@ -1,0 +1,63 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "base_075": {
+                "rifle": {
+                    "recoil_x": 9.999999747378752e-05,
+                    "recoil_y": 0.05000000074505806,
+                    "spread": 0.006000000052154064
+                },
+                "shotgun": {
+                    "recoil_x": 0.00019999999494757503,
+                    "recoil_y": 0.10000000149011612,
+                    "spread": 0.024000000208616257
+                },
+                "smg": {
+                    "recoil_x": 4.999999873689376e-05,
+                    "recoil_y": 0.012500000186264515,
+                    "spread": 0.012000000104308128
+                }
+            },
+            "base_076": {
+                "rifle": {
+                    "recoil_x": 0.00019999999494757503,
+                    "recoil_y": 0.07500000298023224,
+                    "spread": 0.004000000189989805
+                },
+                "shotgun": {
+                    "recoil_x": 0.00019999999494757503,
+                    "recoil_y": 0.07500000298023224,
+                    "spread": 0.035999998450279236
+                },
+                "smg": {
+                    "recoil_x": 4.999999873689376e-05,
+                    "recoil_y": 0.012500000186264515,
+                    "spread": 0.012000000104308128
+                }
+            },
+            "note": "Spread/recoil modifiers are characterized as pure constant RULES + base vectors (value_lookup). Recoil is NOT a fired-shot trace: Player::FireWeapon reads cg_classicWeaponRecoil and world.GetTimeMS(), which are config- and tick-dependent (RESEARCH Pitfalls 3/4).",
+            "recoil_rules": {
+                "airborne_multiplier": 2.0,
+                "crouch_multiplier": 0.5,
+                "walking_not_aiming_multiplier": 2.0
+            },
+            "spread_rules": {
+                "aim_multiplier": 0.5,
+                "crouch_applies_to_shotgun": false,
+                "crouch_multiplier": 0.5
+            }
+        }
+    },
+    "id": "weap_value_lookup_modifiers",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "weap",
+    "version": "1.0.0"
+}

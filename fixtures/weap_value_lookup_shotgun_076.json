@@ -1,0 +1,35 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "clip": 8,
+            "damage": {
+                "arms": 20,
+                "block": 34,
+                "head": 60,
+                "legs": 20,
+                "torso": 40
+            },
+            "delay_s": 0.800000011920929,
+            "melee_note": "HitTypeMelee is unhandled by GetDamage (default: SPAssert(false); return 0). Melee damage is server-authoritative; the client never queries it. A port should assert in debug / return 0 in release.",
+            "pellets": 8,
+            "protocol": "0.76",
+            "reload_s": 0.4000000059604645,
+            "reload_slow": true,
+            "spread": 0.035999998450279236,
+            "stock": 48,
+            "weapon": "shotgun"
+        }
+    },
+    "id": "weap_value_lookup_shotgun_076",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.76",
+    "seed": 42,
+    "subsystem": "weap",
+    "version": "1.0.0"
+}

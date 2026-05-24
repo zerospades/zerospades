@@ -68,7 +68,7 @@
             "path": "fixtures/phys_collision_floor_001.json",
             "subsystem": "phys",
             "behavior": "implementation_detail",
-            "description": "BoxClipMove floor collision: player airborne at z=57 with zero velocity falls under gravity to flat-map ground; airborne→false, velocity.z→0 at landing tick (BoxClipMove:1104-1109)."
+            "description": "BoxClipMove floor collision: player airborne at z=57 with zero velocity falls under gravity to flat-map ground; airborne\u2192false, velocity.z\u21920 at landing tick (BoxClipMove:1104-1109)."
         },
         {
             "id": "phys_collision_ceiling_001",
@@ -82,7 +82,7 @@
             "path": "fixtures/phys_try_uncrouch_blocked_001.json",
             "subsystem": "phys",
             "behavior": "implementation_detail",
-            "description": "TryUncrouch blocked: crouched player at z≈61.4 with solid block at z=60 (head-raise path blocked by position.z-1.35=60.05); crouch-off transition rejected by TryUncrouch; local player reverts to crouch=true (Player.cpp:113-114); position.z unchanged."
+            "description": "TryUncrouch blocked: crouched player at z\u224861.4 with solid block at z=60 (head-raise path blocked by position.z-1.35=60.05); crouch-off transition rejected by TryUncrouch; local player reverts to crouch=true (Player.cpp:113-114); position.z unchanged."
         },
         {
             "id": "phys_corpse_movement_001",
@@ -152,7 +152,7 @@
             "path": "fixtures/proto_malformed_001.json",
             "subsystem": "proto",
             "behavior": "implementation_detail",
-            "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input — the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
+            "description": "Documented truncated StateData (tag+playerId only); rejection asserted by ProtocolMalformedTest (the fixture is corpus documentation of the malformed input \u2014 the runtime SPRaise is the C++ EXPECT_THROW test, PROT-06)."
         },
         {
             "id": "phys_determinism_golden_001",
@@ -173,7 +173,7 @@
             "path": "fixtures/map_value_lookup_002_get_color.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-01 GetColor: color round-trip with health byte — Set(100,100,40,true,0x64FF8040) then GetColor returns the full 32-bit value including health=100 (0x64) in the high byte (0xHHBBGGRR format)."
+            "description": "MAP-01 GetColor: color round-trip with health byte \u2014 Set(100,100,40,true,0x64FF8040) then GetColor returns the full 32-bit value including health=100 (0x64) in the high byte (0xHHBBGGRR format)."
         },
         {
             "id": "map_value_lookup_003_get_solid_map",
@@ -187,7 +187,7 @@
             "path": "fixtures/map_value_lookup_004_has_neighbors.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-01 HasNeighbors: 6-face adjacency — isolated block returns false; block with +x neighbor returns true; block with diagonal-only neighbor (Risk 1 corner case) returns false confirming 6-face not 26-face."
+            "description": "MAP-01 HasNeighbors: 6-face adjacency \u2014 isolated block returns false; block with +x neighbor returns true; block with diagonal-only neighbor (Risk 1 corner case) returns false confirming 6-face not 26-face."
         },
         {
             "id": "map_value_lookup_005_is_surface",
@@ -215,21 +215,21 @@
             "path": "fixtures/map_value_lookup_008_raycast_startsolid.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-02 CastRay2 startSolid: ray origin (50.5,50.5,50.5) inside solid block at (50,50,50); validates hit=true, startSolid=true, hitPos≈origin, stepCount=0."
+            "description": "MAP-02 CastRay2 startSolid: ray origin (50.5,50.5,50.5) inside solid block at (50,50,50); validates hit=true, startSolid=true, hitPos\u2248origin, stepCount=0."
         },
         {
             "id": "map_value_lookup_009_clip_box",
             "path": "fixtures/map_value_lookup_009_clip_box.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-02 ClipBox z-boundary: z<0→false, z=30(air)→false, z=62(ground)→true, z=63(remap to 62)→true, z=64(>=DefaultDepth)→true; XY out-of-bounds→true (clipped)."
+            "description": "MAP-02 ClipBox z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64(>=DefaultDepth)\u2192true; XY out-of-bounds\u2192true (clipped)."
         },
         {
             "id": "map_value_lookup_010_clip_world",
             "path": "fixtures/map_value_lookup_010_clip_world.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-02 ClipWorld z-boundary: z<0→false, z=30(air)→false, z=62(ground)→true, z=63(remap to 62)→true, z=64→true; XY out-of-bounds→false (not clipped — key difference from ClipBox)."
+            "description": "MAP-02 ClipWorld z-boundary: z<0\u2192false, z=30(air)\u2192false, z=62(ground)\u2192true, z=63(remap to 62)\u2192true, z=64\u2192true; XY out-of-bounds\u2192false (not clipped \u2014 key difference from ClipBox)."
         },
         {
             "id": "map_value_lookup_011_block_action_create",
@@ -264,7 +264,7 @@
             "path": "fixtures/map_value_lookup_015_cubeline.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-05 CubeLine Bresenham-3D cell list: three orientations — axis-aligned +x (100,100,30)→(105,100,30), XY-diagonal (100,100,30)→(105,105,30), 3D-diagonal (100,100,30)→(104,103,32); exact order-sensitive cell list captured."
+            "description": "MAP-05 CubeLine Bresenham-3D cell list: three orientations \u2014 axis-aligned +x (100,100,30)\u2192(105,100,30), XY-diagonal (100,100,30)\u2192(105,105,30), 3D-diagonal (100,100,30)\u2192(104,103,32); exact order-sensitive cell list captured."
         },
         {
             "id": "map_value_lookup_016_cluster_pillar",
@@ -285,7 +285,56 @@
             "path": "fixtures/map_value_lookup_018_cluster_two_isolated.json",
             "subsystem": "map",
             "behavior": "implementation_detail",
-            "description": "MAP-04 Cluster two isolated: two separate pillars at (10,10) and (50,50) z=61,60; destroy both bases z=61 simultaneously; 2 separate BlocksFell callbacks (NOT merged) each with 1 floating cell — critical Rust port parity test."
+            "description": "MAP-04 Cluster two isolated: two separate pillars at (10,10) and (50,50) z=61,60; destroy both bases z=61 simultaneously; 2 separate BlocksFell callbacks (NOT merged) each with 1 floating cell \u2014 critical Rust port parity test."
+        },
+        {
+            "id": "weap_value_lookup_rifle_075",
+            "path": "fixtures/weap_value_lookup_rifle_075.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "Rifle v0.75 (RifleWeapon3): damage Head=100/Torso=49/Arms=33/Legs=33/Block=50, spread=0.006, pellets=1, delay=0.5s, clip=10, stock=50, reload=2.5s. HitTypeMelee unhandled (documented, not asserted)."
+        },
+        {
+            "id": "weap_value_lookup_smg_075",
+            "path": "fixtures/weap_value_lookup_smg_075.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "SMG v0.75 (SMGWeapon3): damage Head=75/Torso=29/Arms=18/Legs=18/Block=34, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=120, reload=2.5s. Block 34 differs from v076 (26)."
+        },
+        {
+            "id": "weap_value_lookup_shotgun_075",
+            "path": "fixtures/weap_value_lookup_shotgun_075.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "Shotgun v0.75 (ShotgunWeapon3): damage Head=37/Torso=27/Arms=16/Legs=16/Block=34, spread=0.024, pellets=8, delay=1.0s, clip=6, stock=48, reload=0.5s, reload_slow=true."
+        },
+        {
+            "id": "weap_value_lookup_rifle_076",
+            "path": "fixtures/weap_value_lookup_rifle_076.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "Rifle v0.76 (RifleWeapon4): damage Head=250/Torso=60/Arms=50/Legs=50/Block=50, spread=0.004, pellets=1, delay=0.6s, clip=8, stock=48, reload=2.5s. Head/clip differ from v075 (100/10). Source comment mislabels table '0.75' \u2014 frozen as the client oracle returns it (Pitfall 2)."
+        },
+        {
+            "id": "weap_value_lookup_smg_076",
+            "path": "fixtures/weap_value_lookup_smg_076.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "SMG v0.76 (SMGWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=26, spread=0.012, pellets=1, delay=0.1s, clip=30, stock=150, reload=2.5s. Block 26 differs from v075 (34)."
+        },
+        {
+            "id": "weap_value_lookup_shotgun_076",
+            "path": "fixtures/weap_value_lookup_shotgun_076.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "Shotgun v0.76 (ShotgunWeapon4): damage Head=60/Torso=40/Arms=20/Legs=20/Block=34, spread=0.036, pellets=8, delay=0.8s, clip=8, stock=48, reload=0.4s, reload_slow=true."
+        },
+        {
+            "id": "weap_value_lookup_modifiers",
+            "path": "fixtures/weap_value_lookup_modifiers.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "Spread/recoil modifier RULES + base GetSpread()/GetRecoil() vectors for all 6 variants (value_lookup, NOT a fired-shot trace). Spread: aim x0.5, crouch x0.5 (not shotgun). Recoil: walking-not-aiming x2, airborne x2, crouch x0.5."
         }
     ]
 }
