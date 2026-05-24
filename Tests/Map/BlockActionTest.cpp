@@ -161,9 +161,13 @@ TEST(DISABLED_BlockActionGenerate, Tool) {
 	auto& world = hw.GetWorld();
 	auto& map = *world.GetMap();
 
-	// Place a block first (flat map has z=62 solid; use z=61)
+	// Place a block first via CreateBlock+Advance so the GameMapWrapper link
+	// structure is properly updated (per ClusterTest.cpp IMPORTANT comment).
+	// Direct map.Set() does not update wrapper link state.
 	const IntVector3 pos{100, 100, 61};
-	map.Set(pos.x, pos.y, pos.z, true, 0xFF808080U);
+	const IntVector3 rgbGray{128, 128, 128};
+	world.CreateBlock(pos, rgbGray);
+	hw.Advance(1);
 
 	// Precondition: position is solid before action
 	ASSERT_TRUE(map.IsSolid(pos.x, pos.y, pos.z));
@@ -205,10 +209,13 @@ TEST(DISABLED_BlockActionGenerate, Dig) {
 	// Use center at z=31 to safely avoid boundary: z=30, 31, 32 all < 62 and in air.
 	const int centerX = 150, centerY = 150, centerZ = 31;
 
-	// Place all 3 blocks so we can verify destruction
-	map.Set(centerX, centerY, centerZ - 1, true, 0xFFFFFFFFU);
-	map.Set(centerX, centerY, centerZ,     true, 0xFFFFFFFFU);
-	map.Set(centerX, centerY, centerZ + 1, true, 0xFFFFFFFFU);
+	// Place all 3 blocks via CreateBlock+Advance so the GameMapWrapper link
+	// structure is properly updated (per ClusterTest.cpp IMPORTANT comment).
+	const IntVector3 rgbWhite{255, 255, 255};
+	world.CreateBlock(IntVector3{centerX, centerY, centerZ - 1}, rgbWhite);
+	world.CreateBlock(IntVector3{centerX, centerY, centerZ},     rgbWhite);
+	world.CreateBlock(IntVector3{centerX, centerY, centerZ + 1}, rgbWhite);
+	hw.Advance(1);
 
 	// Preconditions
 	ASSERT_TRUE(map.IsSolid(centerX, centerY, centerZ - 1));
@@ -348,8 +355,10 @@ TEST_F(MapTestBase, BlockActionFixture_Tool) {
 	int y = val.at("y").get<int>();
 	int z = val.at("z").get<int>();
 
-	// Replay: place block then destroy (tool = single cell)
-	map.Set(x, y, z, true, 0xFF808080U);
+	// Replay: place block via CreateBlock+Advance (ensures wrapper link state)
+	const IntVector3 rgbGray{128, 128, 128};
+	world.CreateBlock(IntVector3{x, y, z}, rgbGray);
+	hw.Advance(1);
 
 	std::vector<IntVector3> cells;
 	cells.push_back(IntVector3{x, y, z});
@@ -375,10 +384,12 @@ TEST_F(MapTestBase, BlockActionFixture_Dig) {
 	int cy = val.at("center_y").get<int>();
 	int cz = val.at("center_z").get<int>();
 
-	// Replay: place 3 blocks then destroy
-	map.Set(cx, cy, cz - 1, true, 0xFFFFFFFFU);
-	map.Set(cx, cy, cz,     true, 0xFFFFFFFFU);
-	map.Set(cx, cy, cz + 1, true, 0xFFFFFFFFU);
+	// Replay: place 3 blocks via CreateBlock+Advance (ensures wrapper link state)
+	const IntVector3 rgbWhite{255, 255, 255};
+	world.CreateBlock(IntVector3{cx, cy, cz - 1}, rgbWhite);
+	world.CreateBlock(IntVector3{cx, cy, cz},     rgbWhite);
+	world.CreateBlock(IntVector3{cx, cy, cz + 1}, rgbWhite);
+	hw.Advance(1);
 
 	std::vector<IntVector3> cells;
 	cells.push_back(IntVector3{cx, cy, cz - 1});
