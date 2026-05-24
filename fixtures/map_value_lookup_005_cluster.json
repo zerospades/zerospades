@@ -1,0 +1,20 @@
+{
+    "version": "1.0.0",
+    "id": "map_value_lookup_005_cluster",
+    "subsystem": "map",
+    "behavior": "implementation_detail",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "inputs": [],
+    "kind": "value_lookup",
+    "expected": {
+        "value": {
+            "placeholder": true,
+            "note": "MAP-04 cluster fixture — populated by Plan 04 generator (BlocksFell multi-callback, allBlocksFell cell sets)"
+        }
+    }
+}

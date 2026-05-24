@@ -160,6 +160,34 @@
             "subsystem": "phys",
             "behavior": "implementation_detail",
             "description": "PHYS-03 multi-step determinism golden: 60-tick scripted input sequence (move/jump/crouch/strafe varied per schedule) starting from (256,256,60.5); full per-tick position/velocity/orientation/airborne/wade; re-run 20x in CI produces identical output."
+        },
+        {
+            "id": "map_value_lookup_002_block_state",
+            "path": "fixtures/map_value_lookup_002_block_state.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-01 block state queries: IsSolid, GetColor (0xHHBBGGRR incl. health byte), GetSolidMap bitmask, HasNeighbors (6-face), IsSurface — flat map with procedurally placed blocks. Placeholder: populated by Plan 02."
+        },
+        {
+            "id": "map_value_lookup_003_raycast",
+            "path": "fixtures/map_value_lookup_003_raycast.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-02 raycast and collision: CastRay2 hit/miss/startSolid edge case, ClipBox z==63→62 remap, ClipWorld z>=63 stricter boundary — result object {hit, startSolid, hitPos, hitBlock, normal, stepCount}. Placeholder: populated by Plan 03."
+        },
+        {
+            "id": "map_value_lookup_004_block_action",
+            "path": "fixtures/map_value_lookup_004_block_action.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-03 block actions: CreateBlock/Tool/Dig/Grenade post-action solid+color state snapshot via World::ApplyBlockActions; non-overlapping actions only. Placeholder: populated by Plan 03."
+        },
+        {
+            "id": "map_value_lookup_005_cluster",
+            "path": "fixtures/map_value_lookup_005_cluster.json",
+            "subsystem": "map",
+            "behavior": "implementation_detail",
+            "description": "MAP-04 falling-cluster detection: BlocksFell multi-callback scenarios (load-bearing destroy, connected-component stays, two isolated clusters → separate callbacks); callback count + per-cluster cell sets verified via RecordingWorldListener::allBlocksFell. Placeholder: populated by Plan 04."
         }
     ]
 }
