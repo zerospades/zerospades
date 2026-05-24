@@ -238,3 +238,64 @@ The walk produces:
 Because at least one difference was emitted, the verdict is **FAIL** (exit code `1`).
 Had the candidate matched the baseline exactly (only the within-tolerance `position.x`
 perturbation), the verdict would be **PASS** (exit code `0`).
+
+---
+
+## 2. Tolerance Table (CONTRACT-02)
+
+The numeric rule (§1.5) compares floating-point fields within a **per-field absolute
+tolerance** chosen from the field's dotted path. This section is the canonical,
+portable source of those tolerances. It is self-contained: a port implements the table
+and the dispatch below verbatim, with no reference to any external source.
+
+### 2.1 The Four Tolerance Constants
+
+| Constant | Value | Applies to |
+|----------|-------|------------|
+| Position (default) | `1e-4` | Positions, velocities, and every field not matched by a more specific rule below. This is the fallback tolerance. |
+| Orientation | `1e-5` | Orientation / view-direction unit vectors. Tightest non-zero tolerance because orientation is produced by transcendental float ops (see §5) and must round-trip closely. |
+| Grenade | `1e-3` | Grenade trajectory fields and fuse timers. Loosest tolerance — grenade physics accumulates more float drift over a trajectory. |
+| Raycast | `1e-6` | Raycast / hit-scan results. Effectively exact within float noise — raycasts resolve to discrete voxel coordinates. |
+
+### 2.2 Dispatch Order (substring match on the dotted path, first match wins)
+
+To pick the tolerance for a field, test its **dotted path** (the same path built during
+the walk, e.g. `expected.player.orientation.x`) for the substrings below **in this
+exact order** and return the tolerance of the **first** substring that occurs anywhere
+in the path. If none occurs, return the position default.
+
+1. path contains `orientation` → **`1e-5`** (orientation)
+2. path contains `fuse` → **`1e-3`** (grenade)
+3. path contains `grenade` → **`1e-3`** (grenade)
+4. path contains `raycast` → **`1e-6`** (raycast)
+5. otherwise (no match) → **`1e-4`** (position default)
+
+The dispatch is a **substring** test, not an exact field-name match: a path like
+`expected.player.orientation.x` matches rule 1 because the substring `orientation`
+occurs in it, even though the leaf field name is `x`. Order matters because a path can
+contain more than one keyword; the first rule that matches wins. (For example, both
+`fuse` and `grenade` map to the same `1e-3` value, so their relative order is
+immaterial in practice, but the order is fixed here for an unambiguous specification.)
+
+### 2.3 Pin Note
+
+These four values mirror the tolerance constants embedded in the current C++ oracle.
+They are **frozen for this milestone**; a later phase (TOL-01) may re-derive them
+empirically and revise the table. When that happens, the machine-readable block below
+and the oracle's constants are updated together — the drift-guard in §2.4 fails the
+build if the two ever disagree.
+
+### 2.4 Machine-Readable Drift-Guard Block
+
+The fenced block below is the **drift-guard source of truth**: an automated test
+parses these four `name=value` pairs and asserts they equal the oracle's tolerance
+constants. Editing a value here without updating the oracle (or vice versa) fails the
+build, keeping the portable table and the running implementation in lockstep. The keys
+are exactly `position_tol`, `orientation_tol`, `grenade_tol`, and `raycast_tol`.
+
+```text
+position_tol=1e-4
+orientation_tol=1e-5
+grenade_tol=1e-3
+raycast_tol=1e-6
+```
