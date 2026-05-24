@@ -1,0 +1,48 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "ticks": [
+            {
+                "exploded": false,
+                "fuse_s": 4.983333110809326,
+                "position": {
+                    "x": 256.5,
+                    "y": 256.5,
+                    "z": 62.828887939453125
+                },
+                "tick": 0,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.6166666746139526
+                }
+            },
+            {
+                "exploded": false,
+                "fuse_s": 4.966666221618652,
+                "position": {
+                    "x": 256.5,
+                    "y": 256.5,
+                    "z": 63.166664123535156
+                },
+                "tick": 1,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.6333333253860474
+                }
+            }
+        ]
+    },
+    "id": "weap_step_trace_grenade_water",
+    "inputs": [],
+    "kind": "step_trace",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "weap",
+    "version": "1.0.0"
+}

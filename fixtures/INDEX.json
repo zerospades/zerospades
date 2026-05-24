@@ -342,6 +342,20 @@
             "subsystem": "weap",
             "behavior": "implementation_detail",
             "description": "WEAP-02 SMG v0.75 fire/ammo/reload state machine (step_trace, 196 ticks). Captures every tick of a full cycle: fire-allowed ticks at the 6-tick GetDelay cadence (ammo decrements), intervening rate-gate-suppressed ticks (ammo stable), empty-clip dry-fire ticks (fired=false, ammo=0), Reload start (reloading=true), and ReloadDone (reloading=false, ammo restored to clip). Local player (SetLocalPlayerIndex) so empty-clip blocks fire."
+        },
+        {
+            "id": "weap_step_trace_grenade_bounce",
+            "path": "fixtures/weap_step_trace_grenade_bounce.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "WEAP-03 grenade trajectory (step_trace, 40 ticks): gravity (vel.z += dt), x32 motion scale, a wall (x-axis) bounce off a 2-block wall at x=258, then repeated floor (z-axis) bounces off the z=62 flat-map ground. Every tick captured (Nyquist) so per-axis velocity reflection and the x0.36 bounce friction are visible across pre/post-bounce ticks. Fuse 5.0 (no explode during the trajectory)."
+        },
+        {
+            "id": "weap_step_trace_grenade_water",
+            "path": "fixtures/weap_step_trace_grenade_water.json",
+            "subsystem": "weap",
+            "behavior": "implementation_detail",
+            "description": "WEAP-03 grenade water landing (step_trace, 2 ticks): grenade crosses integer z>=63 (lp2.z<63 -> lp.z>=63) over a CARVED non-solid column (Set(256,256,62,false)) so MoveGrenade returns -1 and GrenadeDroppedIntoWater fires (not a wall bounce; Pitfall 6 / A2). ClipWorld(256,256,63) verified non-solid before freezing."
         }
     ]
 }
