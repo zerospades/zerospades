@@ -1271,9 +1271,6 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawNaviCube() {
-			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.40F));
-			FillRect(gizCx - gizR - 12.0F, gizCy - gizR - 12.0F, (gizR + 12.0F) * 2.0F,
-			         (gizR + 12.0F) * 2.0F);
 			client::IFont& font = fontManager->GetGuiFont();
 			int hover = NaviCubeFaceAt(cursor);
 			for (int i = 0; i < 6; i++) {
