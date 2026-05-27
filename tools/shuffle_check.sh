@@ -56,15 +56,30 @@ if [ -z "$TEST_COUNT" ] || [ "$TEST_COUNT" -eq 0 ] 2>/dev/null; then
 fi
 echo "Discovered $TEST_COUNT ctest entries in $BUILD"
 
+if ctest --help 2>/dev/null | grep -q 'schedule-random-seed'; then
+    CTEST_HAS_RANDOM_SEED=1
+else
+    CTEST_HAS_RANDOM_SEED=0
+    echo "INFO: ctest lacks --schedule-random-seed; using unseeded --schedule-random fallback" >&2
+fi
+
 for SEED in 111 222 333; do
     # Layer 1 — corpus-scale launch-order shuffle (the real leaked-singleton proof).
     # Capture output so we can fail loudly on a vacuous "No tests were found" run
     # that ctest reports with exit 0 (WR-03), in addition to the exit-code guard.
-    L1_OUT=$(ctest --test-dir "$BUILD" --schedule-random --schedule-random-seed "$SEED" --output-on-failure 2>&1) || {
-        printf '%s\n' "$L1_OUT" >&2
-        echo "ERROR: seed $SEED layer 1 (ctest --schedule-random) FAILED" >&2
-        exit 1
-    }
+    if [ "$CTEST_HAS_RANDOM_SEED" -eq 1 ]; then
+        L1_OUT=$(ctest --test-dir "$BUILD" --schedule-random --schedule-random-seed "$SEED" --output-on-failure 2>&1) || {
+            printf '%s\n' "$L1_OUT" >&2
+            echo "ERROR: seed $SEED layer 1 (ctest --schedule-random) FAILED" >&2
+            exit 1
+        }
+    else
+        L1_OUT=$(ctest --test-dir "$BUILD" --schedule-random --output-on-failure 2>&1) || {
+            printf '%s\n' "$L1_OUT" >&2
+            echo "ERROR: seed $SEED layer 1 (ctest --schedule-random, unseeded fallback) FAILED" >&2
+            exit 1
+        }
+    fi
     printf '%s\n' "$L1_OUT"
     if printf '%s' "$L1_OUT" | grep -q "No tests were found"; then
         echo "ERROR: seed $SEED layer 1 ran 0 tests (ctest reported 'No tests were found')" >&2
@@ -90,7 +105,11 @@ for SEED in 111 222 333; do
         echo "ERROR: seed $SEED layer 2 produced no '[  PASSED  ] N tests' summary — refusing to certify" >&2
         exit 1
     fi
-    echo "PASS: seed $SEED (layer 1 ctest --schedule-random + layer 2 --gtest_shuffle)"
+    if [ "$CTEST_HAS_RANDOM_SEED" -eq 1 ]; then
+        echo "PASS: seed $SEED (layer 1 ctest --schedule-random + layer 2 --gtest_shuffle)"
+    else
+        echo "PASS: seed $SEED (layer 1 ctest --schedule-random unseeded fallback + layer 2 --gtest_shuffle)"
+    fi
 done
 
 echo "OK: 6/6 runs passed (3 seeds x 2 layers)"
