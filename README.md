@@ -34,8 +34,38 @@ Some of the most important changes are:
 * Customizable HUD position and color.
 * Customizable crosshair & scope.
 * Same fog tint/color as the classic client (openspades applies a [bluish tint](https://github.com/yvt/openspades/blob/v0.1.3/Resources/Shaders/Fog.vs#L27) to the fog).
+* Demo recording compatible with [aos_replay](https://github.com/BR-/aos_replay) format.
 
 -- And a lot of other things that I forgot to mention here.
+
+## Demo Recording & Playback
+
+ZeroSpades supports recording and playing back gameplay demos using a format compatible with [aos_replay](https://github.com/BR-/aos_replay).
+
+### Recording
+
+Record gameplay from the command line:
+
+```bash
+# Record demos to mydemo_1.dem, mydemo_2.dem, etc. (one per game/map)
+openspades aos://server:port --record mydemo
+```
+
+Demos are saved with a numeric suffix for each game joined during the session.
+
+### Playback
+
+Play back demos directly in ZeroSpades:
+
+```bash
+# Play a demo file
+openspades /path/to/demo.dem
+
+# Or with the explicit flag
+openspades --replay /path/to/demo.dem
+```
+
+Demos can also be played back using the external [aos_replay](https://github.com/BR-/aos_replay) tool.
 
 ## How to Build/Install?
 See the [OpenSpades Building&Installing Guide](https://github.com/yvt/openspades#how-to-buildinstall)

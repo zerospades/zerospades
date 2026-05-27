@@ -118,6 +118,10 @@ namespace spades {
 					  asMETHOD(gui::StartupScreenHelper, BrowseUserDirectory), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
+					  "StartupScreenHelper", "bool BrowseDemosDirectory()",
+					  asMETHOD(gui::StartupScreenHelper, BrowseDemosDirectory), asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod(
 					  "StartupScreenHelper", "bool OpenLinkInBrowser(const string&in)",
 					  asMETHOD(gui::StartupScreenHelper, OpenLinkInBrowser), asCALL_THISCALL);
 					manager->CheckError(r);

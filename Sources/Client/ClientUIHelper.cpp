@@ -15,11 +15,12 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
 #include "ClientUIHelper.h"
+#include "Client.h"
 #include "ClientUI.h"
 
 namespace spades {
@@ -29,31 +30,37 @@ namespace spades {
 		void ClientUIHelper::ClientUIDestroyed() { ui = NULL; }
 
 		void ClientUIHelper::SayGlobal(const std::string& text) {
-			if (!ui)
-				return;
+			if (!ui) return;
 			ui->SendChat(text, true);
 		}
 
 		void ClientUIHelper::SayTeam(const std::string& text) {
-			if (!ui)
-				return;
+			if (!ui) return;
 			ui->SendChat(text, false);
 		}
 
+		void ClientUIHelper::EnterChatLogWindow() {
+			if (!ui) return;
+			ui->EnterChatLogWindow();
+		}
+
 		void ClientUIHelper::AlertNotice(const std::string& text) {
-			if (!ui)
-				return;
+			if (!ui) return;
 			ui->AlertNotice(text);
 		}
+
 		void ClientUIHelper::AlertWarning(const std::string& text) {
-			if (!ui)
-				return;
+			if (!ui) return;
 			ui->AlertWarning(text);
 		}
+
 		void ClientUIHelper::AlertError(const std::string& text) {
-			if (!ui)
-				return;
+			if (!ui) return;
 			ui->AlertError(text);
+		}
+
+		bool ClientUIHelper::IsDemoMode() const {
+			return ui && ui->client && ui->client->IsDemoMode();
 		}
 	} // namespace client
 } // namespace spades

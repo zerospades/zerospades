@@ -94,4 +94,12 @@ namespace spades {
 		return mAddress;
 	}
 
+	std::string ServerAddress::GetIPString() const {
+		ENetAddress addr = GetENetAddress();
+		char buf[64];
+		if (enet_address_get_host_ip(&addr, buf, sizeof(buf)) == 0)
+			return buf;
+		return StripProtocol(mAddress);
+	}
+
 }; // namespace spades

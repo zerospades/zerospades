@@ -15,7 +15,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -38,10 +38,13 @@ namespace spades {
 
 			void SayGlobal(const std::string&);
 			void SayTeam(const std::string&);
+			void EnterChatLogWindow();
 
 			void AlertNotice(const std::string&);
 			void AlertWarning(const std::string&);
 			void AlertError(const std::string&);
+
+			bool IsDemoMode() const;
 		};
 	} // namespace client
 } // namespace spades

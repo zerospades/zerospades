@@ -29,6 +29,6 @@ namespace spades {
 		void Reset();
 
 		/** @return elapsed time in seconds */
-		double GetTime();
+		double GetTime() const;
 	};
 }

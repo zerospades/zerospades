@@ -229,6 +229,8 @@ namespace spades {
 				weapon->SetShooting(newInput.primary);
 			} else if (tool == ToolWeapon) {
 				// non-local weapon player: no local simulation needed
+			} else if (tool == ToolGrenade) {
+				// non-local grenade player: no local simulation needed
 			} else {
 				SPAssert(false);
 			}

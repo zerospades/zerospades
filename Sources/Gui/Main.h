@@ -30,4 +30,5 @@ namespace spades {
 
 	void StartClient(const ServerAddress&);
 	void StartMainScreen();
+	void StartDemoReplay(const std::string& demoPath);
 } // namespace spades

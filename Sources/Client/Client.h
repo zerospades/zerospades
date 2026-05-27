@@ -29,6 +29,9 @@
 #include <unordered_map>
 
 #include "ClientCameraMode.h"
+#include "DemoNetClient.h"
+#include "INetClient.h"
+#include "NetClient.h"
 #include "ILocalEntity.h"
 #include "IRenderer.h"
 #include "IWorldListener.h"
@@ -70,6 +73,7 @@ namespace spades {
 		class ClientPlayer;
 		class BloodMarks;
 		class ClientUI;
+		class PieMenuView;
 
 		class Client : public IWorldListener, public gui::View {
 			friend class ScoreboardView;
@@ -104,6 +108,18 @@ namespace spades {
 			FPSCounter upsCounter;
 
 			std::unique_ptr<NetClient> net;
+			std::unique_ptr<DemoNetClient> demoNet;
+			INetClient* activeNet; // points to net.get() or demoNet.get(), never null after DoInit
+			std::string demoFilePath;
+
+			// Seek-key hold state.
+			// While a seek key is held, SeekPreview() advances demoSeekPendingTime so
+			// the HUD stays responsive.  The full world-replay Seek() fires only on
+			// key release, avoiding one expensive reset/replay per repeat tick.
+			bool demoSeekForwardHeld = false;
+			bool demoSeekBackwardHeld = false;
+			float demoSeekRepeatTimer = 0.0f;   // accumulates dt between preview steps
+			float demoSeekPendingTime = 0.0f;   // target time to commit on key release
 			std::string playerName;
 			std::unique_ptr<IStream> logStream;
 
@@ -143,6 +159,9 @@ namespace spades {
 			// chat
 			std::unique_ptr<ChatWindow> chatWindow;
 			std::unique_ptr<ChatWindow> killfeedWindow;
+
+			// pie menu
+			std::unique_ptr<PieMenuView> pieMenuView;
 
 			// player state
 			PlayerInput playerInput;
@@ -421,7 +440,7 @@ namespace spades {
 			std::vector<Handle<IAudioChunk>> killSounds;
 			void LoadKillSounds();
 
-			void UpdateWorld(float dt);
+			void UpdateWorld(float dt, float gameplayDt);
 			void UpdateLocalSpectator(float dt);
 			void UpdateLocalPlayer(float dt);
 			void UpdateAutoFocus(float dt);
@@ -460,6 +479,8 @@ namespace spades {
 			void DrawBlockPaletteHUD(float y);
 			void DrawAlivePlayersCount();
 			void DrawPlayingTime();
+			void DrawRecordingIndicator();
+			void DrawDemoPlaybackHUD();
 			void DrawHurtSprites();
 			void DrawScreenEffect(bool hurt, float fadeTime = 0.35F);
 			void DrawAlert();
@@ -481,6 +502,8 @@ namespace spades {
 			std::string ScreenShotPath();
 			void TakeScreenShot(bool sceneOnly, bool scoreboardOnly = false);
 
+			std::string BuildDemoContext();
+
 			std::string MapShotPath();
 			void TakeMapShot();
 
@@ -491,7 +514,12 @@ namespace spades {
 
 		public:
 			Client(Handle<IRenderer>, Handle<IAudioDevice>,
-				const ServerAddress& host, Handle<FontManager>);
+				const ServerAddress& host, Handle<FontManager>,
+				const std::string& demoPath = "");
+
+			bool IsDemoMode() const { return demoNet != nullptr; }
+			DemoNetClient* GetDemoNetClient() { return demoNet.get(); }
+			void ReloadDemo();
 
 			void RunFrame(float dt) override;
 			void RunFrameLate(float dt) override;
@@ -511,6 +539,20 @@ namespace spades {
 
 			void SetWorld(World*);
 			World* GetWorld() const { return world.get(); }
+
+			// Snapshot of all view-related state, used to preserve camera across demo seeks
+			struct ViewState {
+				bool followEnabled;
+				bool followFirstPerson;
+				int followedPlayerId;
+				Vector3 freePosition;
+				Vector3 freeVelocity;
+				float yaw;
+				float pitch;
+				float worldSetTime;
+			};
+			ViewState SaveViewState() const;
+			void RestoreViewState(const ViewState&);
 			void AddLocalEntity(std::unique_ptr<ILocalEntity>&& ent) {
 				localEntities.emplace_back(std::move(ent));
 			}

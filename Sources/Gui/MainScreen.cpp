@@ -370,5 +370,17 @@ namespace spades {
 			}
 			return "";
 		}
+
+		std::string MainScreen::PlayDemo(const std::string& demoPath) {
+			try {
+				subview = Handle<client::Client>::New(&*renderer, &*audioDevice,
+				              ServerAddress(), fontManager, demoPath)
+				            .Cast<View>();
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error starting demo playback: %s", ex.what());
+				return ex.what();
+			}
+			return "";
+		}
 	} // namespace gui
 } // namespace spades

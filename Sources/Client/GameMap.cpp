@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 #include "GameMap.h"
@@ -51,6 +52,13 @@ namespace spades {
 			}
 		}
 		GameMap::~GameMap() { SPADES_MARK_FUNCTION(); }
+
+		Handle<GameMap> GameMap::Clone() const {
+			Handle<GameMap> copy{new GameMap(NoInit{})};
+			memcpy(copy->solidMap, solidMap, sizeof(solidMap));
+			memcpy(copy->colorMap, colorMap, sizeof(colorMap));
+			return copy;
+		}
 
 		void GameMap::AddListener(spades::client::IGameMapListener* l) {
 			std::lock_guard<std::mutex> _guard{listenersMutex};

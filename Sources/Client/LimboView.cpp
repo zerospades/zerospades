@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -198,6 +198,7 @@ namespace spades {
 
 			Vector4 color = MakeVector4(1, 1, 1, 1);
 			Vector4 shadowColor = MakeVector4(0, 0, 0, 0.4F);
+			Vector4 hotkeyColor = MakeVector4(1, 1, 1, 0.6F);
 
 			{
 				auto str = _Tr("Client", "Select Team:");
@@ -244,14 +245,35 @@ namespace spades {
 
 				renderer.SetColorAlphaPremultiplied(fillColor * 0.8F);
 				renderer.DrawOutlinedRect(item.rect.GetMinX(), item.rect.GetMinY(),
-				                          item.rect.GetMaxX(), item.rect.GetMaxY());
+										  item.rect.GetMaxX(), item.rect.GetMaxY());
 
 				if (item.type == MenuSpawn || item.type == MenuClose) {
 					Vector2 size = font.Measure(item.text);
 					Vector2 pos = item.rect.min;
 					pos.x += (item.rect.GetWidth() - size.x) * 0.5F;
 					pos.y += (item.rect.GetHeight() - size.y) * 0.5F;
-					font.DrawShadow(item.text, pos, 1.0F, color, shadowColor);
+
+					if (item.type == MenuClose) {
+						font.DrawShadow(item.text, pos, 1.0F, color, shadowColor);
+
+						// draw hotkey hint
+						std::string hotKeyText = _Tr("Client", "[Esc]");
+						Vector2 hotKeySize = font.Measure(hotKeyText);
+						Vector2 hotKeyPos = {item.rect.GetMinX() - hotKeySize.x - 5.0F, pos.y};
+						font.DrawShadow(hotKeyText, hotKeyPos, 1.0F, hotkeyColor, shadowColor);
+					} else if (item.type == MenuSpawn) {
+						Vector2 padPos = item.rect.min + MakeVector2(8.0F, 8.0F);
+						Vector2 padSize = MakeVector2(item.rect.GetWidth() - 16.0F, item.rect.GetHeight() - 16.0F);
+						Vector2 txtSize = font.Measure(item.text);
+						Vector2 txtPos = {padPos.x, padPos.y + (padSize.y - txtSize.y) * 0.5F};
+						font.DrawShadow(item.text, txtPos, 1.0F, color, shadowColor);
+
+						// draw hotkey hint
+						std::string hotKeyText = _Tr("Client", "[1, 2, 3]");
+						Vector2 hotKeySize = font.Measure(hotKeyText);
+						Vector2 hotKeyPos = {padPos.x + padSize.x - hotKeySize.x, padPos.y + (padSize.y - hotKeySize.y) * 0.5F};
+						font.DrawShadow(hotKeyText, hotKeyPos, 1.0F, hotkeyColor, shadowColor);
+					}
 				} else {
 					std::string str = item.text;
 					if (item.type == MenuTeam1)
@@ -265,10 +287,11 @@ namespace spades {
 					pos.y += (item.rect.GetHeight() - size.y) * 0.5F;
 					font.DrawShadow(str, pos, 1.0F, color, shadowColor);
 
+					// draw hotkey hint
 					if (index > 0) {
 						str = Format("[{0}]", index);
 						pos.x = (item.rect.GetMaxX() - 5.0F) - font.Measure(str).x;
-						font.DrawShadow(str, pos, 1.0F, MakeVector4(1, 1, 1, 0.6F), shadowColor);
+						font.DrawShadow(str, pos, 1.0F, hotkeyColor, shadowColor);
 					}
 				}
 			}

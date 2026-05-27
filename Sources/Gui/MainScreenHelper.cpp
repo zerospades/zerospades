@@ -22,13 +22,17 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <cstdint>
 #include <memory>
+#include <sys/stat.h>
 
 #include <curl/curl.h>
 #include <json/json.h>
 
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
+#include <Client/DemoRecorder.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Settings.h>
@@ -39,6 +43,9 @@
 DEFINE_SPADES_SETTING(cl_serverListUrl, "http://services.buildandshoot.com/serverlist.json");
 
 namespace spades {
+	extern std::string g_pendingMapName;
+	extern std::string g_pendingServerName;
+
 	namespace {
 		struct CURLEasyDeleter {
 			void operator()(CURL *ptr) const { curl_easy_cleanup(ptr); }
@@ -406,9 +413,22 @@ namespace spades {
 			return result.get().ping.value_or(-1);
 		}
 
-		std::string MainScreenHelper::ConnectServer(std::string hostname, int protocolVersion) {
+		std::string MainScreenHelper::ConnectServer(std::string hostname, int protocolVersion,
+		                                             std::string mapName) {
 			if (mainScreen == NULL) {
 				return "mainScreen == NULL";
+			}
+			g_pendingMapName = mapName;
+			g_pendingServerName = hostname; // fallback: use address as server name
+			if (result) {
+				for (const auto& item : result->list) {
+					if (item->GetAddress() == hostname) {
+						g_pendingServerName = item->GetName(); // prefer human-readable name
+						if (g_pendingMapName.empty())
+							g_pendingMapName = item->GetMapName(); // resolve from cached list
+						break;
+					}
+				}
 			}
 			return mainScreen->Connect(ServerAddress(
 			  hostname, protocolVersion == 3 ? ProtocolVersion::v075 : ProtocolVersion::v076));
@@ -418,6 +438,34 @@ namespace spades {
 			if (result == NULL)
 				return "";
 			return result->message;
+		}
+
+		CScriptArray *MainScreenHelper::GetDemoList() {
+			auto recordings = client::DemoRecorder::ListRecordings();
+			asIScriptEngine *eng = ScriptManager::GetInstance()->GetEngine();
+			asITypeInfo *t = eng->GetTypeInfoByDecl("array<string>");
+			SPAssert(t != NULL);
+			CScriptArray *arr = CScriptArray::Create(t, static_cast<asUINT>(recordings.size()));
+			for (size_t i = 0; i < recordings.size(); i++)
+				arr->SetValue((asUINT)i, &recordings[i]);
+			return arr;
+		}
+
+		int64_t MainScreenHelper::GetDemoFileSize(std::string filename) {
+			struct stat st;
+			if (stat(filename.c_str(), &st) == 0)
+				return static_cast<int64_t>(st.st_size);
+			return -1;
+		}
+
+		std::string MainScreenHelper::PlayDemo(std::string filename) {
+			if (mainScreen == NULL)
+				return "mainScreen == NULL";
+			return mainScreen->PlayDemo(filename);
+		}
+
+		bool MainScreenHelper::DeleteDemo(std::string filename) {
+			return std::remove(filename.c_str()) == 0;
 		}
 
 		std::string MainScreenHelper::GetPendingErrorMessage() {

@@ -21,6 +21,8 @@
 
 #include "Client.h"
 
+#include <cstdio>
+
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 
@@ -34,6 +36,7 @@
 #include "LimboView.h"
 #include "MapView.h"
 #include "PaletteView.h"
+#include "PieMenuView.h"
 
 #include "GameMap.h"
 #include "Weapon.h"
@@ -75,6 +78,7 @@ DEFINE_SPADES_SETTING(cg_keySneak, "v");
 DEFINE_SPADES_SETTING(cg_keyCaptureColor, "e");
 DEFINE_SPADES_SETTING(cg_keyGlobalChat, "t");
 DEFINE_SPADES_SETTING(cg_keyTeamChat, "y");
+DEFINE_SPADES_SETTING(cg_keyChatLog, "j");
 DEFINE_SPADES_SETTING(cg_keyZoomChatLog, "h");
 DEFINE_SPADES_SETTING(cg_keyChangeMapScale, "m");
 DEFINE_SPADES_SETTING(cg_keyToggleMapZoom, "n");
@@ -88,6 +92,9 @@ DEFINE_SPADES_SETTING(cg_keySaveMap, "8");
 
 DEFINE_SPADES_SETTING(cg_switchToolByWheel, "1");
 DEFINE_SPADES_SETTING(cg_debugCorpse, "0");
+DEFINE_SPADES_SETTING(cg_keySpawnCorpse, "p");
+
+DEFINE_SPADES_SETTING(cg_keyPieMenu, "MiddleMouseButton");
 
 SPADES_SETTING(cg_manualFocus);
 DEFINE_SPADES_SETTING(cg_keyAutoFocus, "MiddleMouseButton");
@@ -95,6 +102,14 @@ DEFINE_SPADES_SETTING(cg_keyAutoFocus, "MiddleMouseButton");
 DEFINE_SPADES_SETTING(cg_keyToggleSpectatorNames, "z");
 DEFINE_SPADES_SETTING(cg_keySpectatorZoom, "e");
 DEFINE_SPADES_SETTING(cg_keyStaffSpectating, "f5");
+DEFINE_SPADES_SETTING(cg_keyDemoPlayPause, "P");
+DEFINE_SPADES_SETTING(cg_keyDemoSeekForward, "Right");
+DEFINE_SPADES_SETTING(cg_keyDemoSeekBackward, "Left");
+DEFINE_SPADES_SETTING(cg_keyDemoRecord, "F9");
+DEFINE_SPADES_SETTING(cg_keyDemoSpeedUp, ".");
+DEFINE_SPADES_SETTING(cg_keyDemoSlowDown, ",");
+SPADES_SETTING(cg_demoMaxFiles);
+SPADES_SETTING(cg_demoAutoPrune);
 
 SPADES_SETTING(s_volume);
 DEFINE_SPADES_SETTING(cg_keyVolumeUp, "+");
@@ -137,6 +152,11 @@ namespace spades {
 
 			if (IsLimboViewActive()) {
 				limbo->MouseEvent(x, y);
+				return;
+			}
+
+			if (pieMenuView && pieMenuView->IsOpen()) {
+				pieMenuView->HandleMouseDelta(x, y);
 				return;
 			}
 
@@ -375,6 +395,10 @@ namespace spades {
 				}
 
 				if (IsLimboViewActive()) {
+					if ((CheckKey(cg_keyLimbo, name) && down) && HasLocalPlayer()) {
+						inGameLimbo = false;
+						return;
+					}
 					if (down)
 						limbo->KeyEvent(name);
 					return;
@@ -383,6 +407,256 @@ namespace spades {
 				auto cameraMode = GetCameraMode();
 
 				stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
+
+				// In demo mode, we're always spectating without a local player
+				if (IsDemoMode()) {
+					// Allow screenshot / mapshot keys during playback — they don't
+					// require a local player and are commonly used to capture demos.
+					if (CheckKey(cg_keySceneshot, name) && down) {
+						TakeScreenShot(true);
+						return;
+					}
+					if (CheckKey(cg_keyScreenshot, name) && down) {
+						TakeScreenShot(false);
+						return;
+					}
+					if (CheckKey(cg_keySaveMap, name) && down) {
+						TakeMapShot();
+						return;
+					}
+
+					// Toggle ESP boxes (same surface as the staff-spectate toggle in live).
+					if (CheckKey(cg_keyStaffSpectating, name) && down) {
+						staffSpectating = !staffSpectating;
+						Handle<IAudioChunk> c =
+						  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+						audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+						return;
+					}
+
+					// Handle demo playback controls (play/pause)
+					if (CheckKey(cg_keyDemoPlayPause, name) && down) {
+						if (demoNet) {
+							if (demoNet->IsFinished()) {
+								// Demo finished - reload from file to reset world state
+								ReloadDemo();
+							} else {
+								// Toggle pause
+								demoNet->TogglePause();
+							}
+						}
+						return;
+					}
+
+					// Handle demo seeking (arrow keys).
+					//
+					// While a seek key is held we only call SeekPreview(), which updates the
+					// displayed playback position cheaply (no world reset/replay). RunFrame
+					// advances the pending target on each repeat tick.  The full Seek() —
+					// which resets and replays the world — fires once on key release so the
+					// expensive operation happens at most once per key press.
+					if (CheckKey(cg_keyDemoSeekForward, name)) {
+						if (demoNet) {
+							if (down) {
+								float duration = demoNet->GetDuration();
+								float target = std::min(duration, demoNet->GetTime() + 5.0f);
+								if (target > demoNet->GetTime()) {
+									demoSeekForwardHeld = true;
+									demoSeekRepeatTimer = 0.0f;
+									demoSeekPendingTime = target;
+									demoNet->SeekPreview(demoSeekPendingTime);
+								}
+							} else {
+								demoSeekForwardHeld = false;
+								demoNet->Seek(demoSeekPendingTime);
+							}
+						}
+						return;
+					}
+					if (CheckKey(cg_keyDemoSeekBackward, name)) {
+						if (demoNet) {
+							if (down) {
+								float target = std::max(0.0f, demoNet->GetTime() - 5.0f);
+								if (target < demoNet->GetTime()) {
+									demoSeekBackwardHeld = true;
+									demoSeekRepeatTimer = 0.0f;
+									demoSeekPendingTime = target;
+									demoNet->SeekPreview(demoSeekPendingTime);
+								}
+							} else {
+								demoSeekBackwardHeld = false;
+								demoNet->Seek(demoSeekPendingTime);
+							}
+						}
+						return;
+					}
+
+					// Speed control: step through preset multipliers
+					static const float speedSteps[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f};
+					static const int numSpeedSteps = 5;
+					if (CheckKey(cg_keyDemoSpeedUp, name) && down) {
+						if (demoNet) {
+							float cur = demoNet->GetSpeed();
+							for (int i = 0; i < numSpeedSteps - 1; i++) {
+								if (cur < speedSteps[i] * 1.1f) {
+									demoNet->SetSpeed(speedSteps[i + 1]);
+									break;
+								}
+							}
+						}
+						return;
+					}
+					if (CheckKey(cg_keyDemoSlowDown, name) && down) {
+						if (demoNet) {
+							float cur = demoNet->GetSpeed();
+							for (int i = numSpeedSteps - 1; i > 0; i--) {
+								if (cur > speedSteps[i] * 0.9f) {
+									demoNet->SetSpeed(speedSteps[i - 1]);
+									break;
+								}
+							}
+						}
+						return;
+					}
+
+					// Handle demo spectator controls
+					if (cameraMode == ClientCameraMode::Free) {
+						if (CheckKey(cg_keyAttack, name)) {
+							if (down) {
+								// reset zoom
+								if (spectatorZoom) {
+									spectatorZoom = false;
+									spectatorZoomState = 0.0F;
+								}
+								// Start following the recorded player
+								if (demoNet)
+									followedPlayerId = demoNet->GetRecordedLocalPlayerId();
+								FollowNextPlayer(false);
+							}
+							return;
+						} else if (CheckKey(cg_keyAltAttack, name)) {
+							if (down) {
+								// reset zoom
+								if (spectatorZoom) {
+									spectatorZoom = false;
+									spectatorZoomState = 0.0F;
+								}
+								// Start following the recorded player
+								if (demoNet)
+									followedPlayerId = demoNet->GetRecordedLocalPlayerId();
+								FollowNextPlayer(true);
+							}
+							return;
+						} else if (CheckKey(cg_keyToggleSpectatorNames, name) && down) {
+							spectatorPlayerNames = !spectatorPlayerNames;
+							Handle<IAudioChunk> c =
+							  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+							audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+							return;
+						} else if (CheckKey(cg_keySpectatorZoom, name)) {
+							spectatorZoom = down;
+							return;
+						}
+					} else if (cameraMode == ClientCameraMode::FirstPersonFollow ||
+					           cameraMode == ClientCameraMode::ThirdPersonFollow) {
+						if (CheckKey(cg_keyAttack, name)) {
+							if (down) {
+								if (spectatorZoom) {
+									spectatorZoom = false;
+									spectatorZoomState = 0.0F;
+								}
+								FollowNextPlayer(false);
+							}
+							return;
+						} else if (CheckKey(cg_keyAltAttack, name)) {
+							if (down) {
+								if (spectatorZoom) {
+									spectatorZoom = false;
+									spectatorZoomState = 0.0F;
+								}
+								FollowNextPlayer(true);
+							}
+							return;
+						} else if (CheckKey(cg_keyJump, name)) {
+							auto maybeTarget = world->GetPlayer(GetCameraTargetPlayerId());
+							if (down && maybeTarget && maybeTarget->IsAlive())
+								followCameraState.firstPerson = !followCameraState.firstPerson;
+							return;
+						} else if (CheckKey(cg_keyReloadWeapon, name) && followCameraState.enabled) {
+							if (down) {
+								playerInput.jump = PlayerInput().jump;
+								if (spectatorZoom) {
+									spectatorZoom = false;
+									spectatorZoomState = 0.0F;
+								}
+								followCameraState.enabled = false;
+							}
+							return;
+						} else if (CheckKey(cg_keyToggleSpectatorNames, name) && down) {
+							spectatorPlayerNames = !spectatorPlayerNames;
+							Handle<IAudioChunk> c =
+							  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+							audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+							return;
+						}
+					}
+
+					// Handle movement for demo spectator free camera
+					if (CheckKey(cg_keyMoveLeft, name)) {
+						playerInput.moveLeft = down;
+						keypadInput.left = down;
+						playerInput.moveRight = down ? false : keypadInput.right;
+					} else if (CheckKey(cg_keyMoveRight, name)) {
+						playerInput.moveRight = down;
+						keypadInput.right = down;
+						playerInput.moveLeft = down ? false : keypadInput.left;
+					} else if (CheckKey(cg_keyMoveForward, name)) {
+						playerInput.moveForward = down;
+						keypadInput.forward = down;
+						playerInput.moveBackward = down ? false : keypadInput.backward;
+					} else if (CheckKey(cg_keyMoveBackward, name)) {
+						playerInput.moveBackward = down;
+						keypadInput.backward = down;
+						playerInput.moveForward = down ? false : keypadInput.forward;
+					} else if (CheckKey(cg_keyCrouch, name)) {
+						playerInput.crouch = down;
+					} else if (CheckKey(cg_keySprint, name)) {
+						playerInput.sprint = down;
+					} else if (CheckKey(cg_keyJump, name)) {
+						playerInput.jump = down;
+					}
+
+					// Handle map controls in demo mode
+					if (CheckKey(cg_keyChangeMapScale, name) && down) {
+						if (!largeMapView->IsZoomed()) {
+							renderer->UpdateFlatGameMap();
+							mapView->SwitchScale();
+							Handle<IAudioChunk> c =
+							  audioDevice->RegisterSound("Sounds/Misc/SwitchMapZoom.opus");
+							audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+						}
+					} else if (CheckKey(cg_keyToggleMapZoom, name)) {
+						if (down || cg_holdMapZoom) {
+							bool zoomed = largeMapView->IsZoomed();
+							zoomed = !zoomed;
+							if (cg_holdMapZoom)
+								zoomed = down;
+
+							renderer->UpdateFlatGameMap();
+							largeMapView->SetZoom(zoomed);
+							Handle<IAudioChunk> c = zoomed
+								? audioDevice->RegisterSound("Sounds/Misc/OpenMap.opus")
+								: audioDevice->RegisterSound("Sounds/Misc/CloseMap.opus");
+							audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+						}
+					} else if (CheckKey(cg_keyScoreboard, name)) {
+						scoreboardVisible = down;
+					} else if (CheckKey(cg_keyZoomChatLog, name)) {
+						chatWindow->SetExpanded(down);
+					}
+					return;
+				}
+
 				if (!maybePlayer)
 					return;
 
@@ -391,7 +665,45 @@ namespace spades {
 				bool localPlayerIsAlive = p.IsAlive();
 				bool localPlayerIsSpectator = p.IsSpectator();
 				bool localPlayerIsSpectating = localPlayerIsSpectator || staffSpectating;
-				bool isStaff = net ? net->GetGameProperties()->isStaff : false;
+				bool isStaff = activeNet->GetGameProperties()->isStaff;
+
+				// Pie menu: hold to open, release to commit.
+				// Aim at a teammate to send a DM; otherwise broadcast on team chat.
+				if (CheckKey(cg_keyPieMenu, name) && localPlayerIsAlive && !localPlayerIsSpectating) {
+					if (down && !pieMenuView->IsOpen()) {
+						auto hot = HotTrackedPlayer();
+						if (hot) {
+							Player& target = std::get<0>(*hot);
+							pieMenuView->Open(PieMenuView::Variant::Player, target.GetId());
+						} else {
+							pieMenuView->Open(PieMenuView::Variant::World);
+						}
+						weapInput = WeaponInput();
+					} else if (!down && pieMenuView->IsOpen()) {
+						PieMenuView::Variant v = pieMenuView->GetVariant();
+						int targetId = pieMenuView->GetTargetPlayerId();
+						const auto& labels = pieMenuView->GetLabels();
+						int sel = pieMenuView->Close();
+						if (sel >= 0 && sel < PieMenuView::kSliceCount && net) {
+							const std::string& msg = labels[static_cast<size_t>(sel)];
+							if (v == PieMenuView::Variant::Player && targetId >= 0) {
+								char cmd[128];
+								std::snprintf(cmd, sizeof(cmd), "/pm #%d %s",
+								              targetId, msg.c_str());
+								net->SendChat(cmd, false);
+							} else if (v == PieMenuView::Variant::World) {
+								net->SendChat(msg, false);
+							}
+						}
+					}
+					return;
+				}
+
+				// Swallow attack inputs while the pie menu is open
+				if (pieMenuView->IsOpen()) {
+					if (CheckKey(cg_keyAttack, name) || CheckKey(cg_keyAltAttack, name))
+						return;
+				}
 
 				switch (cameraMode) {
 					case ClientCameraMode::None:
@@ -437,7 +749,8 @@ namespace spades {
 							}
 							return;
 						} else if (CheckKey(cg_keyJump, name) && cameraMode != ClientCameraMode::Free) {
-							if (down && GetCameraTargetPlayer().IsAlive())
+							auto maybeTarget = world->GetPlayer(GetCameraTargetPlayerId());
+							if (down && maybeTarget && maybeTarget->IsAlive())
 								followCameraState.firstPerson = !followCameraState.firstPerson;
 							return;
 						} else if (CheckKey(cg_keyReloadWeapon, name)
@@ -461,6 +774,28 @@ namespace spades {
 					}
 				}
 
+				// demo record toggle â accessible for both players and spectators
+				if (CheckKey(cg_keyDemoRecord, name) && down && !IsDemoMode()) {
+					if (net->IsDemoRecording()) {
+						net->StopDemoRecording();
+						ShowAlert(_Tr("Client", "Recording stopped"), AlertType::Notice);
+					} else {
+						if (net->StartDemoRecording("", BuildDemoContext())) {
+							if ((int)cg_demoAutoPrune != 0) {
+								int maxDemos = (int)cg_demoMaxFiles;
+								if (maxDemos >= 1)
+									DemoRecorder::PruneOldRecordings(static_cast<size_t>(maxDemos));
+							}
+							SPLog("Demo recording started: %s", net->GetDemoFilename().c_str());
+							ShowAlert(_Tr("Client", "Recording demo"), AlertType::Notice);
+						} else {
+							ShowAlert(_Tr("Client", "Failed to start demo recording"),
+							          AlertType::Error);
+						}
+					}
+					return;
+				}
+
 				// player is not spectating
 				if (!localPlayerIsSpectating) {
 					// hit debugger zoom can be toggled when dead
@@ -480,7 +815,7 @@ namespace spades {
 								return;
 						}
 
-						if (name == "P" && down && cg_debugCorpse) {
+						if (CheckKey(cg_keySpawnCorpse, name) && down && cg_debugCorpse) {
 							auto corp = stmp::make_unique<Corpse>(*renderer, *map, p);
 							corp->AddImpulse(p.GetFront() * 32.0F);
 							corpses.emplace_back(std::move(corp));
@@ -585,6 +920,9 @@ namespace spades {
 					scriptedUI->SetIgnored(name);
 				} else if (CheckKey(cg_keyTeamChat, name) && down) {
 					scriptedUI->EnterTeamChatWindow();
+					scriptedUI->SetIgnored(name);
+				} else if (CheckKey(cg_keyChatLog, name) && down) {
+					scriptedUI->EnterChatLogWindow();
 					scriptedUI->SetIgnored(name);
 				} else if (CheckKey(cg_keyZoomChatLog, name)) {
 					chatWindow->SetExpanded(down);

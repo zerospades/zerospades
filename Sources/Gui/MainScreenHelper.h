@@ -106,10 +106,15 @@ namespace spades {
 			CScriptArray *GetServerList(std::string sortKey, bool descending);
 			std::string GetServerListQueryMessage();
 			int GetServerPing(std::string address);
-			std::string ConnectServer(std::string hostname, int protocolVersion);
+			std::string ConnectServer(std::string hostname, int protocolVersion, std::string mapName = "");
 			std::string GetPendingErrorMessage();
 
 			std::string GetCredits();
+
+		CScriptArray *GetDemoList();
+		std::string PlayDemo(std::string filename);
+		int64_t GetDemoFileSize(std::string filename);
+		bool DeleteDemo(std::string filename);
 		};
 	}
 }

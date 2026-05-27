@@ -354,7 +354,7 @@ namespace spades {
 			return w;
 		}
 
-		// PlayerProperties(64, S2C) — recv :1468-1475 (8 bytes). Encode added for test.
+		// PlayerProperties(64, S2C) — recv score is a 32-bit int. Encode added for test.
 		PlayerPropertiesPacket DecodePlayerProperties(NetPacketReader& r) {
 			PlayerPropertiesPacket p;
 			p.subId = r.ReadByte();
@@ -364,7 +364,7 @@ namespace spades {
 			p.grenades = r.ReadByte();
 			p.clip = r.ReadByte();
 			p.reserve = r.ReadByte();
-			p.score = r.ReadByte();
+			p.score = r.ReadInt();
 			return p;
 		}
 		NetPacketWriter EncodePlayerProperties(const PlayerPropertiesPacket& p) {
@@ -376,7 +376,7 @@ namespace spades {
 			w.WriteByte(p.grenades);
 			w.WriteByte(p.clip);
 			w.WriteByte(p.reserve);
-			w.WriteByte(p.score);
+			w.WriteInt(p.score);
 			return w;
 		}
 

@@ -48,6 +48,10 @@ namespace spades {
 		private spades::ui::UIElement@ sayButton1;
 		private spades::ui::UIElement@ sayButton2;
 
+		private ConfigItem cg_keyGlobalChat("cg_keyGlobalChat");
+		private ConfigItem cg_keyTeamChat("cg_keyTeamChat");
+		private ConfigItem cg_keyChatLog("cg_keyChatLog");
+
 		ChatLogWindow(ClientUI@ ui) {
 			super(ui.manager);
 			@this.ui = ui;
@@ -74,7 +78,7 @@ namespace spades {
 				label.Bounds = AABB2(0.0F, ContentsTop - 13.0F, Size.x, ContentsHeight + 27.0F);
 				AddChild(label);
 			}
-			
+
 			{
 				spades::ui::Button button(Manager);
 				button.Caption = _Tr("Client", "Close");
@@ -150,11 +154,11 @@ namespace spades {
 				return;
 			}
 
-			if (IsEnabled and (key == "Escape"))
+			if (IsEnabled and (EqualsIgnoringCase(key, cg_keyChatLog.StringValue) or key == "Escape"))
 				Close();
-			else if (IsEnabled and (key == "Y"))
+			else if (IsEnabled and EqualsIgnoringCase(key, cg_keyTeamChat.StringValue))
 				OnTeamChat(this);
-			else if (IsEnabled and (key == "T"))
+			else if (IsEnabled and EqualsIgnoringCase(key, cg_keyGlobalChat.StringValue))
 				OnGlobalChat(this);
 			else
 				UIElement::HotKey(key);

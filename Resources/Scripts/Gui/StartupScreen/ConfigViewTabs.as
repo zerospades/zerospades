@@ -633,6 +633,12 @@ namespace spades {
 		StartupScreenUI@ ui;
 		StartupScreenHelper@ helper;
 		StartupScreenLocaleEditor@ editLocale;
+		private spades::ui::CheckBox@ buttonAutoRecord;
+		private spades::ui::CheckBox@ buttonAutoPrune;
+		private spades::ui::Field@ fieldMaxDemos;
+		private ConfigItem cg_demoAutoRecord("cg_demoAutoRecord");
+		private ConfigItem cg_demoAutoPrune("cg_demoAutoPrune");
+		private ConfigItem cg_demoMaxFiles("cg_demoMaxFiles");
 
 		StartupScreenGenericTab(StartupScreenUI@ ui, Vector2 size) {
 			super(ui.manager);
@@ -673,9 +679,84 @@ namespace spades {
 				@button.Activated = spades::ui::EventHandler(this.OnBrowseUserDirectoryPressed);
 				AddChild(button);
 			}
+
+			AddLabel(0.0F, 108.0F, 24.0F, _Tr("StartupScreen", "Demo Recording"));
+			{
+				spades::ui::CheckBox chk(Manager);
+				chk.Caption = _Tr("StartupScreen", "Automatically record every game");
+				chk.Bounds = AABB2(160.0F, 108.0F, 350.0F, 24.0F);
+				@chk.Activated = spades::ui::EventHandler(this.OnAutoRecordChanged);
+				AddChild(chk);
+				@buttonAutoRecord = chk;
+			}
+
+			AddLabel(0.0F, 138.0F, 24.0F, _Tr("StartupScreen", "Auto-delete old demos"));
+			{
+				spades::ui::CheckBox chk(Manager);
+				chk.Caption = _Tr("StartupScreen", "Delete oldest demos when limit is reached");
+				chk.Bounds = AABB2(160.0F, 138.0F, 350.0F, 24.0F);
+				@chk.Activated = spades::ui::EventHandler(this.OnAutoPruneChanged);
+				AddChild(chk);
+				@buttonAutoPrune = chk;
+			}
+
+			AddLabel(0.0F, 168.0F, 24.0F, _Tr("StartupScreen", "Max stored demos"));
+			{
+				spades::ui::Field fld(Manager);
+				fld.Bounds = AABB2(160.0F, 168.0F, 80.0F, 24.0F);
+				fld.DenyNonAscii = true;
+				@fld.Changed = spades::ui::EventHandler(this.OnMaxDemosChanged);
+				AddChild(fld);
+				@fieldMaxDemos = fld;
+			}
+
+			AddLabel(0.0F, 204.0F, 30.0F, _Tr("StartupScreen", "Demos Folder"));
+			{
+				spades::ui::Button button(Manager);
+				string osType = helper.OperatingSystemType;
+				if (osType == "Windows") {
+					button.Caption = _Tr("StartupScreen", "Open Demos Folder in Explorer");
+				} else if (osType == "Mac") {
+					button.Caption = _Tr("StartupScreen", "Reveal Demos Folder in Finder");
+				} else {
+					button.Caption = _Tr("StartupScreen", "Browse Demos Folder");
+				}
+				button.Bounds = AABB2(160.0F, 204.0F, 350.0F, 30.0F);
+				@button.Activated = spades::ui::EventHandler(this.OnBrowseDemosFolderPressed);
+				AddChild(button);
+			}
 		}
 
-		void LoadConfig() { editLocale.LoadConfig(); }
+		void LoadConfig() {
+			editLocale.LoadConfig();
+			buttonAutoRecord.Toggled = cg_demoAutoRecord.IntValue != 0;
+			buttonAutoPrune.Toggled = cg_demoAutoPrune.IntValue != 0;
+			fieldMaxDemos.Text = cg_demoMaxFiles.StringValue;
+		}
+
+		private void OnAutoRecordChanged(spades::ui::UIElement@) {
+			cg_demoAutoRecord.IntValue = buttonAutoRecord.Toggled ? 1 : 0;
+		}
+
+		private void OnAutoPruneChanged(spades::ui::UIElement@) {
+			cg_demoAutoPrune.IntValue = buttonAutoPrune.Toggled ? 1 : 0;
+		}
+
+		private void OnMaxDemosChanged(spades::ui::UIElement@) {
+			int v = ParseInt(fieldMaxDemos.Text);
+			if (v >= 1)
+				cg_demoMaxFiles.IntValue = v;
+		}
+
+		private void OnBrowseDemosFolderPressed(spades::ui::UIElement@) {
+			if (helper.BrowseDemosDirectory())
+				return;
+
+			string msg = _Tr("StartupScreen",
+							 "An unknown error has occurred while opening the demos directory.");
+			AlertScreen al(Parent, msg, 100.0F);
+			al.Run();
+		}
 
 		private void OnBrowseUserDirectoryPressed(spades::ui::UIElement@) {
 			if (helper.BrowseUserDirectory())

@@ -74,7 +74,7 @@ namespace spades {
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
-					  "MainScreenHelper", "string ConnectServer(string, int)",
+					  "MainScreenHelper", "string ConnectServer(string, int, string)",
 					  asMETHOD(gui::MainScreenHelper, ConnectServer), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
@@ -83,6 +83,22 @@ namespace spades {
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("MainScreenHelper", "string get_Credits() property",
 					                              asMETHOD(gui::MainScreenHelper, GetCredits),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("MainScreenHelper", "array<string>@ GetDemoList()",
+					                              asMETHOD(gui::MainScreenHelper, GetDemoList),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("MainScreenHelper", "string PlayDemo(string)",
+					                              asMETHOD(gui::MainScreenHelper, PlayDemo),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("MainScreenHelper", "int64 GetDemoFileSize(string)",
+					                              asMETHOD(gui::MainScreenHelper, GetDemoFileSize),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("MainScreenHelper", "bool DeleteDemo(string)",
+					                              asMETHOD(gui::MainScreenHelper, DeleteDemo),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(

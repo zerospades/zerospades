@@ -913,12 +913,16 @@ namespace spades {
 					};
 
 					r = eng->RegisterGlobalFunction(
+					  "bool EqualsIgnoringCase(const string&in, const string&in)",
+					  asFUNCTION(EqualsIgnoringCase), asCALL_CDECL);
+					manager->CheckError(r);
+					r = eng->RegisterGlobalFunction(
 					  "string Replace(const string&in, const string& in, const string&in)",
 					  asFUNCTION(Replace), asCALL_CDECL);
 					manager->CheckError(r);
-
 					r = eng->RegisterGlobalFunction("string StripNewlines(const string&in)",
 								asFUNCTION(StripNewlines), asCALL_CDECL);
+
 
 					r = eng->RegisterGlobalFunction("string TrimSpaces(const string&in)",
 													asFUNCTION(TrimSpaces), asCALL_CDECL);

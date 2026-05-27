@@ -140,3 +140,6 @@ vcpkg/
 # Python bytecode cache (tools/validate_fixtures.py)
 __pycache__/
 *.pyc
+
+# Demo recordings
+*.dem

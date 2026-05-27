@@ -356,7 +356,7 @@ TEST_F(ProtocolRoundTripTest, HandShakeReturn) {
 }
 
 TEST_F(ProtocolRoundTripTest, PlayerProperties) {
-	PlayerPropertiesPacket in{1, 2, 100, 50, 3, 8, 40, 250};
+	PlayerPropertiesPacket in{1, 2, 100, 50, 3, 8, 40, 0x0BADF00Du};
 	NetPacketWriter w = EncodePlayerProperties(in);
 	NetPacketReader r = ToReader(w);
 	ASSERT_EQ(r.GetType(), PacketTypePlayerProperties);

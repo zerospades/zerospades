@@ -45,6 +45,7 @@
 #include "LimboView.h"
 #include "MapView.h"
 #include "PaletteView.h"
+#include "PieMenuView.h"
 #include "ScoreboardView.h"
 #include "TCProgressView.h"
 
@@ -63,6 +64,13 @@ SPADES_SETTING(cg_keyAltAttack);
 SPADES_SETTING(cg_keyCrouch);
 SPADES_SETTING(cg_keyLimbo);
 SPADES_SETTING(cg_keyToggleSpectatorNames);
+SPADES_SETTING(cg_keyStaffSpectating);
+SPADES_SETTING(cg_keyDemoPlayPause);
+SPADES_SETTING(cg_keyDemoSeekForward);
+SPADES_SETTING(cg_keyDemoSeekBackward);
+SPADES_SETTING(cg_keyDemoRecord);
+SPADES_SETTING(cg_keyDemoSpeedUp);
+SPADES_SETTING(cg_keyDemoSlowDown);
 DEFINE_SPADES_SETTING(cg_screenshotFormat, "jpeg");
 DEFINE_SPADES_SETTING(cg_stats, "0");
 DEFINE_SPADES_SETTING(cg_statsSmallFont, "0");
@@ -248,6 +256,122 @@ namespace spades {
 			Vector2 size = font.Measure(str);
 			Vector2 pos = (MakeVector2(sw, sh) - 16.0F) - size;
 			font.DrawShadow(str, pos, 1.0F, MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.5));
+		}
+
+		void Client::DrawDemoPlaybackHUD() {
+			if (!IsDemoMode() || !demoNet)
+				return;
+
+			float sw = renderer->ScreenWidth();
+			float sh = renderer->ScreenHeight();
+
+			float duration = demoNet->GetDuration();
+			float cur = demoNet->GetTime();
+			float progress = (duration > 0.0f) ? (cur / duration) : 0.0f;
+
+			IFont& font = fontManager->GetGuiFont();
+
+			// --- progress bar geometry ---
+			// Reserve a strip below the bar so it sits above the bottom-anchored
+			// FPS/stats line (DrawStats with cg_stats == 1) instead of overlapping it.
+			// When cg_hudPlayerCount == 2 the alive-count team bar also anchors at the
+			// bottom-center, so lift the demo HUD above it as well.
+			const float barH = 4.0F;
+			const float margin = 8.0F;
+			float bottomReserve = font.Measure("X").y + 4.0F;
+			if ((int)cg_hudPlayerCount == 2)
+				bottomReserve += 48.0F; // clears the 40px team bar plus padding
+			const float barY = sh - margin - barH - bottomReserve;
+			const float barW = sw - 2.0F * margin;
+
+			// background
+			renderer->SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.5F));
+			renderer->DrawFilledRect(margin, barY, margin + barW, barY + barH);
+
+			// filled portion
+			bool isPaused = demoNet->IsPaused();
+			Vector4 barColor = isPaused
+				? MakeVector4(0.7F, 0.7F, 0.7F, 1)
+				: MakeVector4(0.2F, 0.8F, 1.0F, 1);
+			renderer->SetColorAlphaPremultiplied(barColor);
+			renderer->DrawFilledRect(margin, barY, margin + barW * progress, barY + barH);
+
+			// --- time labels ---
+			auto fmtTime = [](float t) -> std::string {
+				int mins = static_cast<int>(t) / 60;
+				int secs = static_cast<int>(t) % 60;
+				char buf[16];
+				snprintf(buf, sizeof(buf), "%d:%02d", mins, secs);
+				return buf;
+			};
+
+			std::string curStr = fmtTime(cur);
+			std::string durStr = fmtTime(duration);
+
+			Vector4 white = MakeVector4(1, 1, 1, 1);
+			Vector4 shadow = MakeVector4(0, 0, 0, 0.5F);
+
+			float textY = barY - font.Measure(curStr).y - 4.0F;
+
+			// current time (left)
+			font.DrawShadow(curStr, MakeVector2(margin, textY), 1.0F, white, shadow);
+
+			// duration (right)
+			Vector2 durSize = font.Measure(durStr);
+			font.DrawShadow(durStr, MakeVector2(margin + barW - durSize.x, textY), 1.0F, white, shadow);
+
+			// speed indicator (center)
+			char speedBuf[16];
+			float spd = demoNet->GetSpeed();
+			if (spd == 1.0f)
+				snprintf(speedBuf, sizeof(speedBuf), "%.0fx", spd);
+			else
+				snprintf(speedBuf, sizeof(speedBuf), "%.2gx", spd);
+			std::string speedStr = isPaused
+				? std::string("|| ") + speedBuf
+				: std::string("> ") + speedBuf;
+			Vector2 speedSize = font.Measure(speedStr);
+			font.DrawShadow(speedStr, MakeVector2((sw - speedSize.x) * 0.5F, textY), 1.0F,
+				isPaused ? MakeVector4(0.8F, 0.8F, 0.8F, 1) : white, shadow);
+		}
+
+		void Client::DrawRecordingIndicator() {
+			if (!net || !net->IsDemoRecording())
+				return;
+
+			float sw = renderer->ScreenWidth();
+
+			float recTime = net->GetDemoRecordingTime();
+			int mins = static_cast<int>(recTime) / 60;
+			int secs = static_cast<int>(recTime) % 60;
+			char timeBuf[16];
+			snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", mins, secs);
+
+			IFont& font = fontManager->GetGuiFont();
+
+			// Blinking red dot: visible 0.6 s, hidden 0.4 s
+			bool dotVisible = fmodf(time, 1.0F) < 0.6F;
+
+			std::string label = std::string(dotVisible ? "\xe2\x97\x8f " : "  ") + "REC " + timeBuf;
+
+			Vector2 size = font.Measure(label);
+
+			// Place top-right, just below the minimap, to avoid overlapping it or
+			// the centered playing-time clock. Mirror the minimap's y offset for
+			// the stats bar, then add the minimap height and a gap.
+			const float margin = 8.0F;
+			float minimapY = margin;
+			const int statsMode = cg_stats;
+			if (statsMode == 2 || (statsMode >= 3 && scoreboardVisible))
+				minimapY += cg_statsSmallFont ? 10.0F : 20.0F;
+			float minimapSize = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
+			// Align with the minimap top, placed to its left
+			float y = minimapY;
+			float x = sw - margin - minimapSize - margin - size.x;
+
+			Vector4 red = MakeVector4(1, 0.15F, 0.15F, 1);
+			Vector4 shadow = MakeVector4(0, 0, 0, 0.5F);
+			font.DrawShadow(label, MakeVector2(x, y), 1.0F, red, shadow);
 		}
 
 		void Client::DrawPlayingTime() {
@@ -470,11 +594,15 @@ namespace spades {
 			float fade = (sqrtf(dist) - fadeStart) / (fadeEnd - fadeStart);
 			float alpha = Clamp(1.0F - fade, 0.1F, 1.0F);
 
-			dir = dir.Normalize();
-
-			// do map raycast
+			// camera coincides with the player's eye (e.g. mid-spectator-switch);
+			// skip the raycast since direction is undefined
 			GameMap::RayCastResult mapResult;
-			mapResult = map->CastRay2(eye, dir, 256);
+			if (dir.GetSquaredLength() < 1.0e-6F) {
+				mapResult.hit = false;
+			} else {
+				dir = dir.Normalize();
+				mapResult = map->CastRay2(eye, dir, 256);
+			}
 
 			if (dist > FOG_DISTANCE_SQ) {
 				playerColor = MakeVector4(1, 0.75, 0, 1);
@@ -607,7 +735,11 @@ namespace spades {
 			auto cameraMode = GetCameraMode();
 			bool isFollowingNonLocal = FollowsNonLocalPlayer(cameraMode);
 
-			auto& focusPlayer = GetCameraTargetPlayer();
+			int focusPlayerId = GetCameraTargetPlayerId();
+			stmp::optional<Player&> maybeFocusPlayer;
+			if (focusPlayerId >= 0
+			 && static_cast<size_t>(focusPlayerId) < world->GetNumPlayerSlots())
+				maybeFocusPlayer = world->GetPlayer(static_cast<unsigned int>(focusPlayerId));
 
 			for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
 				auto maybePlayer = world->GetPlayer(static_cast<unsigned int>(i));
@@ -619,7 +751,7 @@ namespace spades {
 					continue; // don't draw dead players or spectators
 
 				// dont draw the focused player name when following non-local players
-				if (&p == &focusPlayer && isFollowingNonLocal)
+				if (maybeFocusPlayer && &p == &maybeFocusPlayer.value() && isFollowingNonLocal)
 					continue;
 
 				// Do not draw a player with an invalid state
@@ -629,7 +761,8 @@ namespace spades {
 				const auto& color = GetPlayerColor(p);
 				if (staffSpectating)
 					DrawPlayerBox(p, color);
-				DrawPlayerName(p, color);
+				if (spectatorPlayerNames)
+					DrawPlayerName(p, color);
 			}
 		}
 
@@ -1228,7 +1361,7 @@ namespace spades {
 			addLine(_Tr("Client", "Melee Kills: {0}", meleeKills));
 			addLine(_Tr("Client", "Grenade Kills: {0}", grenadeKills));
 
-			if (cg_playerStatsShowPlacedBlocks && !net->GetGameProperties()->isGameModeArena)
+			if (cg_playerStatsShowPlacedBlocks && !activeNet->GetGameProperties()->isGameModeArena)
 				addLine(_Tr("Client", "Blocks Placed: {0}", placedBlocks));
 		}
 
@@ -1339,9 +1472,11 @@ namespace spades {
 			float sw = renderer->ScreenWidth();
 			float sh = renderer->ScreenHeight();
 
-			Player& p = world->GetLocalPlayer().value();
+			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 
-			bool localPlayerIsSpectator = p.IsSpectator() || staffSpectating;
+			// In demo mode there's no local player, treat as spectator
+			bool localPlayerIsSpectator = IsDemoMode() || staffSpectating ||
+				(maybePlayer && maybePlayer->IsSpectator());
 
 			float x = sw - 8.0F;
 			float minY = sh * 0.5F;
@@ -1368,10 +1503,11 @@ namespace spades {
 			auto cameraMode = GetCameraMode();
 
 			int playerId = GetCameraTargetPlayerId();
-			auto& camTarget = world->GetPlayer(playerId).value();
+			auto maybeCamTarget = world->GetPlayer(playerId);
 
 			// Help messages (make sure to synchronize these with the keyboard input handler)
-			if (FollowsNonLocalPlayer(cameraMode)) {
+			if (FollowsNonLocalPlayer(cameraMode) && maybeCamTarget) {
+				Player& camTarget = maybeCamTarget.value();
 				if (HasTargetPlayer(cameraMode)) {
 					addLine(_Tr("Client", "Following {0} [#{1}]",
 						world->GetPlayerName(playerId), playerId));
@@ -1391,7 +1527,7 @@ namespace spades {
 
 				if (localPlayerIsSpectator)
 					addLine(_Tr("Client", "[{0}] Unfollow", TrKey(cg_keyReloadWeapon)));
-			} else {
+			} else if (!FollowsNonLocalPlayer(cameraMode)) {
 				addLine(_Tr("Client", "[{0}/{1}] Follow a player",
 					TrKey(cg_keyAttack), TrKey(cg_keyAltAttack)));
 			}
@@ -1400,14 +1536,34 @@ namespace spades {
 				addLine(_Tr("Client", "[{0}/{1}] Go up/down",
 					TrKey(cg_keyJump), TrKey(cg_keyCrouch)));
 
-			if (localPlayerIsSpectator)
+			if (localPlayerIsSpectator) {
 				addLine(_Tr("Client", "[{0}] Toggle player names",
 					TrKey(cg_keyToggleSpectatorNames)));
+				bool isStaff = activeNet && activeNet->GetGameProperties()->isStaff;
+				if (isStaff || IsDemoMode())
+					addLine(_Tr("Client", "[{0}] Toggle ESP",
+						TrKey(cg_keyStaffSpectating)));
+			}
 
 			y += lh * 0.5F;
 
-			if (!inGameLimbo)
+			if (IsDemoMode()) {
+				// Demo playback controls
+				std::string pauseLabel = (demoNet && demoNet->IsPaused())
+					? _Tr("Client", "[{0}] Resume", TrKey(cg_keyDemoPlayPause))
+					: _Tr("Client", "[{0}] Pause", TrKey(cg_keyDemoPlayPause));
+				addLine(pauseLabel);
+				addLine(_Tr("Client", "[{0}/{1}] Seek +/-5s",
+					TrKey(cg_keyDemoSeekForward), TrKey(cg_keyDemoSeekBackward)));
+
+				char speedBuf[16];
+				float spd = demoNet ? demoNet->GetSpeed() : 1.0f;
+				snprintf(speedBuf, sizeof(speedBuf), "%.2gx", spd);
+				addLine(_Tr("Client", "[{0}/{1}] Speed: {2}",
+					TrKey(cg_keyDemoSlowDown), TrKey(cg_keyDemoSpeedUp), std::string(speedBuf)));
+			} else if (!inGameLimbo) {
 				addLine(_Tr("Client", "[{0}] Select Team/Weapon", TrKey(cg_keyLimbo)));
+			}
 		}
 
 		void Client::DrawBlockPaletteHUD(float winY) {
@@ -1639,18 +1795,61 @@ namespace spades {
 					DrawPlayingTime();
 				}
 
+				if (pieMenuView && pieMenuView->IsOpen())
+					pieMenuView->Draw();
+
 				// --- end "player is there" render
 			} else {
-				// world exists, but no local player: not joined
+				// world exists, but no local player: not joined (or demo mode)
 
-				scoreboard->Draw();
-				DrawPlayingTime();
+				if (IsDemoMode() && shouldDrawHUD) {
+					// Draw spectator HUD elements in demo mode.
+					// Boxes always render (staff use); names follow the toggle.
+					DrawPubOVL();
+
+					tcView->Draw();
+
+					if (cg_hudPlayerCount)
+						DrawAlivePlayersCount();
+
+					// Draw map
+					bool largeMap = largeMapView->IsZoomed();
+					if (!largeMap)
+						mapView->Draw();
+
+					// When following a player in first-person, draw their weapon
+					// skin's 2D layer (crosshair / iron sights / scope).
+					if (IsFirstPerson(GetCameraMode())) {
+						int targetId = GetCameraTargetPlayerId();
+						auto maybeTarget = world->GetPlayer(targetId);
+						if (maybeTarget && maybeTarget->IsAlive())
+							clientPlayers[targetId]->Draw2D();
+					}
+
+					DrawSpectateHUD();
+
+					chatWindow->Draw();
+					killfeedWindow->Draw();
+
+					// Large map view should come in front
+					if (largeMap)
+						largeMapView->Draw();
+				}
+
+				// In demo mode, only show scoreboard when toggled
+				if (!IsDemoMode() || scoreboardVisible) {
+					scoreboard->Draw();
+					DrawPlayingTime();
+				}
 				centerMessageView->Draw();
 				DrawAlert();
 			}
 
 			if (cg_stats && shouldDrawHUD)
 				DrawStats();
+
+			DrawDemoPlaybackHUD();
+			DrawRecordingIndicator();
 
 			// draw limbo view (above everything)
 			if (IsLimboViewActive() && !scriptedUI->NeedsInput())
@@ -1676,7 +1875,8 @@ namespace spades {
 			renderer->DrawImage(nullptr, AABB2(prgBarX, prgBarY, prgBarW, prgBarH));
 
 			// draw progress bar
-			if (net->GetStatus() == NetClientStatusReceivingMap) {
+			NetClientStatus status = activeNet->GetStatus();
+			if (status == NetClientStatusReceivingMap) {
 				float progress = mapReceivingProgressSmoothed;
 				float prgBarMaxWidth = prgBarW * progress;
 
@@ -1699,7 +1899,7 @@ namespace spades {
 			}
 
 			// draw net status
-			auto statusStr = net->GetStatusString();
+			auto statusStr = activeNet->GetStatusString();
 			IFont& font = fontManager->GetGuiFont();
 			Vector2 size = font.Measure(statusStr);
 			Vector2 pos = MakeVector2((sw - size.x) * 0.5F, (prgBarY - 10.0F) - size.y);
@@ -1740,21 +1940,21 @@ namespace spades {
 				}
 			}
 
-			if (net) {
-				auto ping = net->GetPing();
+			if (!IsDemoMode()) {
+				auto ping = activeNet->GetPing();
 				snprintf(buf, sizeof(buf), ", ping: %dms", ping);
 				str += buf;
 
-				auto upbps = net->GetUplinkBps() / 1000;
-				auto downbps = net->GetDownlinkBps() / 1000;
+				auto upbps = activeNet->GetUplinkBps() / 1000;
+				auto downbps = activeNet->GetDownlinkBps() / 1000;
 				snprintf(buf, sizeof(buf), ", up/down: %.02f/%.02fkbps", upbps, downbps);
 				str += buf;
 
-				auto loss = net->GetPacketLoss() * 100.0F;
+				auto loss = activeNet->GetPacketLoss() * 100.0F;
 				snprintf(buf, sizeof(buf), ", loss: %.0f%%", loss);
 				str += buf;
 
-				auto throttle = net->GetPacketThrottle();
+				auto throttle = activeNet->GetPacketThrottle();
 				auto choke = (1.0F - throttle) * 100.0F;
 				snprintf(buf, sizeof(buf), ", choke: %.0f%%", choke);
 				str += buf;

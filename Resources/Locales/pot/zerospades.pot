@@ -108,7 +108,7 @@ msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:91
 msgctxt "Client"
-msgid "{0} captured an neutral territory"
+msgid "{0} captured a neutral territory"
 msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:99
@@ -118,7 +118,7 @@ msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:101
 msgctxt "Client"
-msgid "{0} captured an Neutral Territory"
+msgid "{0} captured a Neutral Territory"
 msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:127
@@ -128,7 +128,7 @@ msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:134
 msgctxt "Client"
-msgid "{0} captured {1}'s Intel."
+msgid "{0} captured {1}'s Intel"
 msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:158
@@ -138,7 +138,7 @@ msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:165
 msgctxt "Client"
-msgid "{0} picked up {1}'s Intel."
+msgid "{0} picked up {1}'s Intel"
 msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:183
@@ -161,6 +161,18 @@ msgstr ""
 #: Sources/Client/Client_NetHandler.cpp:264
 msgctxt "Client"
 msgid "{0} joined {1} team"
+msgstr ""
+
+msgctxt "Client"
+msgid "You captured {0}'s Intel"
+msgstr ""
+
+msgctxt "Client"
+msgid "You picked up {0}'s Intel"
+msgstr ""
+
+msgctxt "Client"
+msgid "You dropped {0}'s Intel"
 msgstr ""
 
 #: Sources/Client/Client_NetHandler.cpp:294
@@ -969,6 +981,10 @@ msgctxt "Preferences"
 msgid "Team Chat"
 msgstr ""
 
+msgctxt "Preferences"
+msgid "Chat Log"
+msgstr ""
+
 #: Resources/Scripts/Gui/Preferences.as:714
 msgctxt "Preferences"
 msgid "Limbo Menu"
@@ -1360,6 +1376,10 @@ msgid ""
 "4x"
 msgstr ""
 
+msgctxt "StartupScreen"
+msgid "Graphics Settings"
+msgstr ""
+
 #: Resources/Scripts/Gui/StartupScreen.as:1486
 msgctxt "StartupScreen"
 msgid "Audio Settings"
@@ -1564,7 +1584,14 @@ msgctxt "Client"
 msgid "Welcome to the server, {0}!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:906
+msgctxt "Client"
+msgid "You are now a spectator"
+msgstr ""
+
+msgctxt "Client"
+msgid "You joined {0} team"
+msgstr ""
+
 msgctxt "Client"
 msgid "You have killed {0}"
 msgstr ""
@@ -1582,11 +1609,6 @@ msgstr ""
 #: Resources/Scripts/Gui/MainScreen/MainMenu.as:250
 msgctxt "MainScreen"
 msgid "Ping"
-msgstr ""
-
-#: Resources/Scripts/Gui/Preferences.as:56
-msgctxt "Preferences"
-msgid "Graphics Settings"
 msgstr ""
 
 #: Resources/Scripts/Gui/Preferences.as:605

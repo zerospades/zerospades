@@ -35,6 +35,7 @@
 #include "Runner.h"
 #include "SplashWindow.h"
 #include <Client/Client.h>
+#include <Client/DemoRecorder.h>
 #include <Client/Fonts.h>
 #include <Client/GameMap.h>
 #include <Core/ConcurrentDispatch.h>
@@ -173,17 +174,33 @@ namespace {
 } // namespace
 #endif
 
+namespace spades {
+	std::string g_pendingMapName;
+	std::string g_pendingServerName;
+}
+
 namespace {
 	bool g_autoconnect = false;
 	std::string g_autoconnectHostName;
 	spades::ProtocolVersion g_autoconnectProtocolVersion = spades::ProtocolVersion::v075;
 
+	bool g_replayDemo = false;
+	std::string g_replayDemoPath;
+
 	bool g_printVersion = false;
 	bool g_printHelp = false;
 
 	void printHelp(char* binaryName) {
-		printf("usage: %s [server_address] [v=protocol_version] [-h|--help] [-v|--version] \n",
-			   binaryName);
+		printf("usage: %s [server_address] [v=protocol_version] [--replay demo.dem] [-h|--help] [-v|--version]\n",
+		       binaryName);
+		printf("  server_address       aos:// server address to connect to\n");
+		printf("  v=0.75 or v=0.76     protocol version (default: 0.75)\n");
+		printf("  --replay FILE        play back a demo recording\n");
+		printf("  -r FILE              play back a demo recording (short form)\n");
+		printf("  -h, --help           show this help message\n");
+		printf("  -v, --version        show version information\n");
+		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
+		printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
 	}
 
 	std::regex const hostNameRegex{"aos://.*"};
@@ -213,6 +230,14 @@ namespace {
 				g_printHelp = true;
 				return ++i;
 			}
+			if (!strcasecmp(a, "--replay") || !strcasecmp(a, "-r")) {
+				if (i + 1 < argc) {
+					g_replayDemo = true;
+					g_replayDemoPath = argv[++i];
+					return ++i;
+				}
+				return 0;
+			}
 		}
 
 		return 0;
@@ -239,6 +264,27 @@ namespace spades {
 			ConcreteRunner(const spades::ServerAddress& addr) : addr(addr) {}
 		};
 		ConcreteRunner runner(addr);
+		runner.RunProtected();
+	}
+
+	void StartDemoReplay(const std::string& demoPath) {
+		class DemoRunner : public spades::gui::Runner {
+			std::string demoPath;
+
+		protected:
+			spades::gui::View* CreateView(spades::client::IRenderer* renderer,
+			                              spades::client::IAudioDevice* audio) override {
+				auto fontManager = Handle<client::FontManager>::New(renderer);
+				auto innerView = Handle<client::Client>::New(
+				    renderer, audio, ServerAddress(), fontManager, demoPath);
+				return new spades::gui::ConsoleScreen(renderer, audio, fontManager,
+				                                      std::move(innerView).Cast<gui::View>());
+			}
+
+		public:
+			DemoRunner(const std::string& path) : demoPath(path) {}
+		};
+		DemoRunner runner(demoPath);
 		runner.RunProtected();
 	}
 	void StartMainScreen() {
@@ -445,6 +491,9 @@ int main(int argc, char** argv) {
 
 #endif
 
+		// Set the demos base directory now that g_userResourceDirectory is final.
+		spades::client::DemoRecorder::SetBaseDirectory(spades::g_userResourceDirectory);
+
 		// start log output to SystemMessages.log
 		try {
 			spades::StartLog();
@@ -587,7 +636,12 @@ int main(int argc, char** argv) {
 		pumpEvents();
 
 		// everything is now ready!
-		if (!g_autoconnect) {
+		if (g_replayDemo) {
+			splashWindow.reset();
+
+			SPLog("Starting demo replay: %s", g_replayDemoPath.c_str());
+			spades::StartDemoReplay(g_replayDemoPath);
+		} else if (!g_autoconnect) {
 			if (!((int)cl_showStartupWindow != 0 || splashWindow->IsStartupScreenRequested())) {
 				splashWindow.reset();
 

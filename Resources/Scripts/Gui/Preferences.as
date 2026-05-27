@@ -1379,10 +1379,10 @@ namespace spades {
 
 			float width = (FieldWidth - (labels.length - 1)) / labels.length;
 			for (uint i = 0; i < labels.length; ++i) {
-				ViewmodelPositionPresetButton btn(Parent.Manager, labels[i], caption, xs[i], ys[i], zs[i]);
-				btn.Bounds = AABB2(FieldX + float(i) * (width + 1.0F), 2.0F, width, 28.0F);
-				btn.Enable = enabled;
-				container.AddChild(btn);
+				ViewmodelPositionPresetButton button(Parent.Manager, labels[i], caption, xs[i], ys[i], zs[i]);
+				button.Bounds = AABB2(FieldX + float(i) * (width + 1.0F), 2.0F, width, 28.0F);
+				button.Enable = enabled;
+				container.AddChild(button);
 			}
 		}
 
@@ -1401,12 +1401,13 @@ namespace spades {
 						   array<int> = {1, -1, 0}, enabled);
 		}
 
-		void AddButtonField(string caption, string btnCaption, spades::ui::EventHandler@ handler) {
+		void AddButtonField(string caption, string btnCaption, spades::ui::EventHandler@ handler, bool enabled = true) {
 			spades::ui::UIElement@ container = CreateBasicLabel(caption);
 
 			spades::ui::SimpleButton button(Parent.Manager);
 			button.Caption = btnCaption;
 			button.Bounds = AABB2(FieldX, 4.0F, FieldWidth, 24.0F);
+			button.Enable = enabled;
 			@button.Activated = handler;
 			container.AddChild(button);
 		}
@@ -1609,7 +1610,7 @@ namespace spades {
 			layouter.AddRGBSlider(_Tr("Preferences", "Custom Color"),
 			array<string> = { "cg_hudColorR", "cg_hudColorG", "cg_hudColorB"});
 			layouter.AddButtonField(_Tr("Preferences", "HUD Edge Positions"),
-				_Tr("Preferences", "Edit"), spades::ui::EventHandler(this.OnEditHUDClicked));
+				_Tr("Preferences", "Edit"), spades::ui::EventHandler(this.OnEditHUDClicked), options.GameActive);
 			layouter.AddChoiceField(_Tr("Preferences", "HUD Ammo Style"), "cg_hudAmmoStyle",
 									array<string> = {_Tr("Preferences", "NORMAL"),
 													 _Tr("Preferences", "SIMPLE")},
@@ -1830,6 +1831,7 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Equip Grenade"), "cg_keyToolGrenade");
 			layouter.AddControl(_Tr("Preferences", "Last Used Tool"), "cg_keyLastTool");
 			layouter.AddPlusMinusField(_Tr("Preferences", "Switch Tools by Wheel"), "cg_switchToolByWheel");
+			layouter.AddControl(_Tr("Preferences", "Pie Menu"), "cg_keyPieMenu");
 
 			layouter.AddHeading(_Tr("Preferences", "Movement"));
 			layouter.AddControl(_Tr("Preferences", "Move Forward"), "cg_keyMoveForward");
@@ -1857,6 +1859,7 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Flashlight"), "cg_keyFlashlight");
 			layouter.AddControl(_Tr("Preferences", "Global Chat"), "cg_keyGlobalChat");
 			layouter.AddControl(_Tr("Preferences", "Team Chat"), "cg_keyTeamChat");
+			layouter.AddControl(_Tr("Preferences", "Chat Log"), "cg_keyChatLog");
 			layouter.AddControl(_Tr("Preferences", "Chat Zoom"), "cg_keyZoomChatLog");
 			layouter.AddControl(_Tr("Preferences", "Limbo Menu"), "cg_keyLimbo");
 			layouter.AddControl(_Tr("Preferences", "Save Map"), "cg_keySaveMap");
@@ -1865,6 +1868,7 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Master Volume Up"), "cg_keyVolumeUp");
 			layouter.AddControl(_Tr("Preferences", "Master Volume Down"), "cg_keyVolumeDown");
 			layouter.AddControl(_Tr("Preferences", "Force Spectator Mode"), "cg_keyStaffSpectating");
+			layouter.AddControl(_Tr("Preferences", "Toggle Demo Recording"), "cg_keyDemoRecord");
 
 			layouter.FinishLayout();
 		}

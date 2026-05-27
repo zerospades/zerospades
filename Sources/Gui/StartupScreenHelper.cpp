@@ -23,6 +23,11 @@
 #include <cctype>
 #include <regex>
 #include <utility>
+#ifdef WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 #include <Imports/OpenGL.h> //for gpu info
 #include <Imports/SDL.h>
@@ -653,6 +658,24 @@ namespace spades {
 				SPLog("Cannot open the user resource directory: g_userResourceDirectory is empty.");
 				return false;
 			}
+
+			return ShowDirectoryInShell(path);
+		}
+
+		bool StartupScreenHelper::BrowseDemosDirectory() {
+			std::string base = g_userResourceDirectory;
+			if (base.empty()) {
+				SPLog("Cannot open the demos directory: g_userResourceDirectory is empty.");
+				return false;
+			}
+
+			// Ensure the Demos directory exists before trying to open it.
+			std::string path = base + "/Demos";
+#ifdef WIN32
+			_mkdir(path.c_str());
+#else
+			mkdir(path.c_str(), 0755);
+#endif
 
 			return ShowDirectoryInShell(path);
 		}

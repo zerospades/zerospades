@@ -68,7 +68,9 @@ namespace spades {
 			}
 			{
 				spades::ui::Button button(Manager);
-				button.Caption = _Tr("Client", "Disconnect");
+				button.Caption = helper.IsDemoMode()
+					? _Tr("Client", "Exit Demo")
+					: _Tr("Client", "Disconnect");
 				button.Bounds = AABB2(winX, winY + 96.0F, winW, 30.0F);
 				@button.Activated = spades::ui::EventHandler(this.OnDisconnect);
 				AddChild(button);

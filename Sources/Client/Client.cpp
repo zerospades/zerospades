@@ -20,8 +20,10 @@
  */
 
 #include <cstdarg>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 
 #include "Client.h"
 #include "Fonts.h"
@@ -41,6 +43,7 @@
 #include "LimboView.h"
 #include "MapView.h"
 #include "PaletteView.h"
+#include "PieMenuView.h"
 #include "ScoreboardView.h"
 #include "TCProgressView.h"
 
@@ -70,8 +73,11 @@ namespace spades {
 	namespace client {
 
 		Client::Client(Handle<IRenderer> r, Handle<IAudioDevice> audioDev,
-					   const ServerAddress& host, Handle<FontManager> fontManager)
-			: playerName(StripNewlines(cg_playerName.operator std::string()).substr(0, 15)),
+					   const ServerAddress& host, Handle<FontManager> fontManager,
+					   const std::string& demoPath)
+			: activeNet(nullptr),
+			  demoFilePath(demoPath),
+			  playerName(StripNewlines(cg_playerName.operator std::string()).substr(0, 15)),
 			  logStream(nullptr),
 			  hostname(host),
 			  renderer(r),
@@ -145,11 +151,11 @@ namespace spades {
 			scoreboard = stmp::make_unique<ScoreboardView>(this);
 			limbo = stmp::make_unique<LimboView>(this);
 			paletteView = stmp::make_unique<PaletteView>(this);
+			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
+				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
-
-			bloodMarks = stmp::make_unique<BloodMarks>(*this);
 
 			renderer->SetGameMap(nullptr);
 		}
@@ -175,7 +181,10 @@ namespace spades {
 			// reset on new map
 			placedBlocks = 0;
 
-			staffSpectating = false;
+			// In demo replay, every seek calls SetWorld via ResetWorldForReplay;
+			// preserve the staff/ESP toggle across seeks.
+			if (!IsDemoMode())
+				staffSpectating = false;
 			reloadKeyPressed = false;
 			scoreboardVisible = false;
 			flashlightOn = false;
@@ -226,6 +235,43 @@ namespace spades {
 			worldSetTime = time;
 		}
 
+		Client::ViewState Client::SaveViewState() const {
+			ViewState s;
+			s.followEnabled = followCameraState.enabled;
+			s.followFirstPerson = followCameraState.firstPerson;
+			s.followedPlayerId = followedPlayerId;
+			s.freePosition = freeCameraState.position;
+			s.freeVelocity = freeCameraState.velocity;
+			s.yaw = followAndFreeCameraState.yaw;
+			s.pitch = followAndFreeCameraState.pitch;
+			s.worldSetTime = worldSetTime;
+			return s;
+		}
+
+		void Client::RestoreViewState(const ViewState& s) {
+			followCameraState.enabled = s.followEnabled;
+			followCameraState.firstPerson = s.followFirstPerson;
+			followedPlayerId = s.followedPlayerId;
+			freeCameraState.position = s.freePosition;
+			freeCameraState.velocity = s.freeVelocity;
+			followAndFreeCameraState.yaw = s.yaw;
+			followAndFreeCameraState.pitch = s.pitch;
+			worldSetTime = s.worldSetTime;
+		}
+
+		void Client::ReloadDemo() {
+			if (demoNet == nullptr || demoFilePath.empty())
+				return;
+
+			SetWorld(nullptr);
+			demoNet.reset();
+
+			demoNet = stmp::make_unique<DemoNetClient>(this);
+			if (!demoNet->OpenDemo(demoFilePath))
+				SPRaise("Failed to reload demo file: %s", demoFilePath.c_str());
+			activeNet = demoNet.get();
+		}
+
 		Client::~Client() {
 			SPADES_MARK_FUNCTION();
 
@@ -240,6 +286,10 @@ namespace spades {
 				SPLog("Disconnecting");
 				net->Disconnect();
 				net.reset();
+			}
+			if (demoNet) {
+				SPLog("Closing demo playback");
+				demoNet.reset();
 			}
 
 			SPLog("Disconnected");
@@ -268,6 +318,8 @@ namespace spades {
 		/** Initiate an initialization which likely to take some time */
 		void Client::DoInit() {
 			renderer->Init();
+
+			bloodMarks = stmp::make_unique<BloodMarks>(*this);
 
 			// load images
 			SmokeSpriteEntity::Preload(renderer.GetPointerOrNull());
@@ -531,9 +583,27 @@ namespace spades {
 			mumbleLink.SetContext(hostname.ToString(false));
 			mumbleLink.SetIdentity(playerName);
 
-			SPLog("Started connecting to '%s'", hostname.ToString().c_str());
-			net = stmp::make_unique<NetClient>(this);
-			net->Connect(hostname);
+			if (!demoFilePath.empty()) {
+				SPLog("Starting demo playback: '%s'", demoFilePath.c_str());
+
+				// Check if file exists
+				std::ifstream testFile(demoFilePath);
+				if (!testFile.good()) {
+					SPRaise("Demo file not found: %s", demoFilePath.c_str());
+				}
+				testFile.close();
+
+				demoNet = stmp::make_unique<DemoNetClient>(this);
+				if (!demoNet->OpenDemo(demoFilePath)) {
+					SPRaise("Failed to open demo file (invalid format?): %s", demoFilePath.c_str());
+				}
+				activeNet = demoNet.get();
+			} else {
+				SPLog("Started connecting to '%s'", hostname.ToString().c_str());
+				net = stmp::make_unique<NetClient>(this);
+				net->Connect(hostname);
+				activeNet = net.get();
+			}
 
 			// get host/time string
 			std::string fn = hostname.ToString(false);
@@ -584,19 +654,37 @@ namespace spades {
 
 			timeSinceInit += std::min(dt, 0.03F);
 
-			// update network
+			// update network or demo playback
 			try {
-				if (net->GetStatus() == NetClientStatusConnected)
-					net->DoEvents(0);
-				else
-					net->DoEvents(10);
+				activeNet->DoEvents(dt);
 			} catch (const std::exception& ex) {
-				if (net->GetStatus() == NetClientStatusNotConnected) {
+				NetClientStatus status = activeNet->GetStatus();
+				if (status == NetClientStatusNotConnected) {
 					SPLog("Disconnected because of error:\n%s", ex.what());
 					NetLog("Disconnected because of error:\n%s", ex.what());
 					throw;
 				} else {
 					SPLog("Exception while processing network packets (ignored):\n%s", ex.what());
+				}
+			}
+
+			// Repeated seek preview while a seek key is held.
+			// Each repeat tick advances demoSeekPendingTime and calls SeekPreview() so the
+			// HUD updates smoothly.  The world-replay Seek() is deferred to key release.
+			if (demoNet && (demoSeekForwardHeld || demoSeekBackwardHeld)) {
+				constexpr float kSeekStep = 5.0f;
+				constexpr float kRepeatInterval = 0.35f;
+				demoSeekRepeatTimer += dt;
+				while (demoSeekRepeatTimer >= kRepeatInterval) {
+					demoSeekRepeatTimer -= kRepeatInterval;
+					float prev = demoSeekPendingTime;
+					float duration = demoNet->GetDuration();
+					if (demoSeekForwardHeld)
+						demoSeekPendingTime = std::min(duration, demoSeekPendingTime + kSeekStep);
+					if (demoSeekBackwardHeld)
+						demoSeekPendingTime = std::max(0.0f, demoSeekPendingTime - kSeekStep);
+					if (demoSeekPendingTime != prev)
+						demoNet->SeekPreview(demoSeekPendingTime);
 				}
 			}
 
@@ -606,11 +694,29 @@ namespace spades {
 			largeMapView->Update(dt);
 			paletteView->Update(dt);
 
+			// Close the pie menu if the conditions that let it open no longer hold
+			// (player died, changed team to spectator, entered limbo, opened scripted UI).
+			if (pieMenuView->IsOpen()) {
+				bool shouldClose = true;
+				if (world && !scriptedUI->NeedsInput() && !inGameLimbo && !staffSpectating) {
+					auto maybePlayer = world->GetLocalPlayer();
+					if (maybePlayer) {
+						Player& lp = maybePlayer.value();
+						if (lp.IsAlive() && !lp.IsSpectator())
+							shouldClose = false;
+					}
+				}
+				if (shouldClose)
+					pieMenuView->Close();
+			}
+			pieMenuView->Update(dt);
+
 			UpdateDamageIndicators(dt);
 			UpdateAutoFocus(dt);
 
 			if (world) {
-				UpdateWorld(dt);
+				float gameplayDt = demoNet ? dt * demoNet->GetSpeed() : dt;
+				UpdateWorld(dt, gameplayDt);
 				mumbleLink.Update(world->GetLocalPlayer().get_pointer());
 			} else {
 				renderer->SetFogColor(MakeVector3(0, 0, 0));
@@ -621,9 +727,10 @@ namespace spades {
 			limbo->Update(dt);
 
 			// The loading screen
-			if (net->GetStatus() == NetClientStatusReceivingMap) {
+			NetClientStatus currentStatus = activeNet->GetStatus();
+			if (currentStatus == NetClientStatusReceivingMap) {
 				// Apply temporal smoothing on the progress value
-				float progress = net->GetMapReceivingProgress();
+				float progress = activeNet->GetMapReceivingProgress();
 
 				if (mapReceivingProgressSmoothed > progress)
 					mapReceivingProgressSmoothed = progress;
@@ -674,6 +781,9 @@ namespace spades {
 		}
 
 		bool Client::IsLimboViewActive() {
+			// In demo mode, never show limbo view - user is spectating
+			if (IsDemoMode())
+				return false;
 			return world && (!world->GetLocalPlayer() || inGameLimbo);
 		}
 
@@ -689,6 +799,10 @@ namespace spades {
 			if (team == 2)
 				team = 255;
 
+			// In demo mode, player actions are replayed from the demo file
+			if (IsDemoMode())
+				return;
+
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 			if (!maybePlayer || maybePlayer->IsSpectator()) { // join
 				if (team == 255) {
@@ -696,7 +810,7 @@ namespace spades {
 					// NetClient doesn't like invalid weapon ID
 					weap = WeaponType::RIFLE_WEAPON;
 				}
-				net->SendJoin(team, weap, playerName, lastScore);
+				activeNet->SendJoin(team, weap, playerName, lastScore);
 			} else { // localplayer has joined
 				Player& p = maybePlayer.value();
 
@@ -704,9 +818,9 @@ namespace spades {
 				const auto curWeap = p.GetWeapon().GetWeaponType();
 
 				if (team != curTeam)
-					net->SendTeamChange(team);
+					activeNet->SendTeamChange(team);
 				if (team != 255 && weap != curWeap)
-					net->SendWeaponChange(weap);
+					activeNet->SendWeaponChange(weap);
 			}
 
 			// set loadout
@@ -982,20 +1096,30 @@ namespace spades {
 
 		void Client::FollowNextPlayer(bool reverse) {
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
-			SPAssert(maybePlayer);
 
-			Player& localPlayer = maybePlayer.value();
+			// In demo mode, there's no local player - we're always spectating
+			bool localPlayerIsSpectating = true;
+			bool skipDeadPlayers = false;
+			int localPlayerId = -1;
 
-			bool localPlayerIsSpectador = localPlayer.IsSpectator();
-			bool localPlayerIsSpectating = localPlayerIsSpectador || staffSpectating;
-			bool skipDeadPlayers = !localPlayerIsSpectador && cg_skipDeadPlayersWhenDead;
+			if (maybePlayer) {
+				Player& localPlayer = maybePlayer.value();
+				bool localPlayerIsSpectador = localPlayer.IsSpectator();
+				localPlayerIsSpectating = localPlayerIsSpectador || staffSpectating;
+				skipDeadPlayers = !localPlayerIsSpectador && cg_skipDeadPlayersWhenDead;
+				localPlayerId = localPlayer.GetId();
+			}
 
-			int localPlayerId = localPlayer.GetId();
 			int nextId = FollowsNonLocalPlayer(GetCameraMode())
 				? followedPlayerId : localPlayerId;
 
 			auto slots = world->GetNumPlayerSlots();
 
+			// Ensure nextId is valid
+			if (nextId < 0 || nextId >= static_cast<int>(slots))
+				nextId = 0;
+
+			int startId = nextId;
 			do {
 				reverse ? --nextId : ++nextId;
 
@@ -1007,7 +1131,7 @@ namespace spades {
 				stmp::optional<Player&> p = world->GetPlayer(nextId);
 				if (!p || p->IsSpectator())
 					continue; // Do not follow a non-existent player or spectator
-				if (!localPlayerIsSpectating && !p->IsTeammate(localPlayer))
+				if (!localPlayerIsSpectating && maybePlayer && !p->IsTeammate(maybePlayer.value()))
 					continue; // Skip enemies unless the local player is a spectator
 				if (skipDeadPlayers && !p->IsAlive())
 					continue; // Skip dead players if the local player is not a spectator
@@ -1017,10 +1141,10 @@ namespace spades {
 					continue;
 
 				break;
-			} while (nextId != followedPlayerId);
+			} while (nextId != startId);
 
 			followedPlayerId = nextId;
-			followCameraState.enabled = staffSpectating || (followedPlayerId != localPlayerId);
+			followCameraState.enabled = staffSpectating || IsDemoMode() || (followedPlayerId != localPlayerId);
 		}
 	} // namespace client
 } // namespace spades

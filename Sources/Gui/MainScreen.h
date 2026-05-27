@@ -50,6 +50,7 @@ namespace spades {
 			void RestoreRenderer();
 
 			std::string Connect(const ServerAddress &host);
+		std::string PlayDemo(const std::string &demoPath);
 
 		protected:
 			~MainScreen();

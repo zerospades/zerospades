@@ -18,6 +18,7 @@
  */
 
 #include "Client.h"
+#include "NetClient.h"
 
 #include <Gui/ConsoleCommand.h>
 

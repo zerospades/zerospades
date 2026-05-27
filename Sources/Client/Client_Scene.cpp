@@ -67,13 +67,29 @@ namespace spades {
 			if (!world)
 				return ClientCameraMode::None;
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
-			if (!maybePlayer)
+			if (!maybePlayer) {
+				// No local player - demo mode or not joined
+				if (IsDemoMode()) {
+					// In demo mode, check if we're following a player
+					if (followCameraState.enabled) {
+						auto followedPlayer = world->GetPlayer(followedPlayerId);
+						if (followedPlayer) {
+							bool isAlive = followedPlayer->IsAlive();
+							if (followCameraState.firstPerson && isAlive)
+								return ClientCameraMode::FirstPersonFollow;
+							else
+								return ClientCameraMode::ThirdPersonFollow;
+						}
+					}
+					return ClientCameraMode::Free;
+				}
 				return ClientCameraMode::NotJoined;
+			}
 
 			Player& p = maybePlayer.value();
 
 			bool localPlayerIsSpectating = p.IsSpectator() || staffSpectating;
-			bool isStaff = net ? net->GetGameProperties()->isStaff : false;
+			bool isStaff = activeNet->GetGameProperties()->isStaff;
 
 			if (!localPlayerIsSpectating && p.IsAlive()) {
 				// There exists an alive (non-spectator) local player
@@ -83,7 +99,8 @@ namespace spades {
 			} else {
 				// The local player is dead or a spectator
 				if (followCameraState.enabled) {
-					bool isAlive = world->GetPlayer(followedPlayerId)->IsAlive();
+					auto followedPlayer = world->GetPlayer(followedPlayerId);
+					bool isAlive = followedPlayer && followedPlayer->IsAlive();
 					if (followCameraState.firstPerson && isAlive)
 						return ClientCameraMode::FirstPersonFollow;
 					else
@@ -104,6 +121,16 @@ namespace spades {
 				case ClientCameraMode::None: SPUnreachable();
 				case ClientCameraMode::NotJoined:
 				case ClientCameraMode::Free:
+					SPAssert(world);
+					// In demo mode, there's no local player - use followed player or recorded player
+					if (IsDemoMode()) {
+						if (followedPlayerId >= 0 && world->GetPlayer(followedPlayerId))
+							return followedPlayerId;
+						if (demoNet)
+							return demoNet->GetRecordedLocalPlayerId();
+						return 0;
+					}
+					return world->GetLocalPlayerIndex().value();
 				case ClientCameraMode::FirstPersonLocal:
 				case ClientCameraMode::ThirdPersonLocal:
 					SPAssert(world);
@@ -199,20 +226,25 @@ namespace spades {
 					case ClientCameraMode::None: SPUnreachable();
 					case ClientCameraMode::NotJoined: {
 						// get highest solid block at map's center
-						IntVector3 mapPos;
-						mapPos.x = map->Width() / 2;
-						mapPos.y = map->Height() / 2;
-						mapPos.z = map->GetTop(mapPos.x, mapPos.y) - map->Depth();
+						if (map) {
+							IntVector3 mapPos;
+							mapPos.x = map->Width() / 2;
+							mapPos.y = map->Height() / 2;
+							mapPos.z = map->GetTop(mapPos.x, mapPos.y) - map->Depth();
 
-						def.viewOrigin.x = static_cast<float>(mapPos.x);
-						def.viewOrigin.y = static_cast<float>(mapPos.y);
-						def.viewOrigin.z = static_cast<float>(mapPos.z);
+							def.viewOrigin.x = static_cast<float>(mapPos.x);
+							def.viewOrigin.y = static_cast<float>(mapPos.y);
+							def.viewOrigin.z = static_cast<float>(mapPos.z);
+						} else {
+							// Map not loaded yet, use default position
+							def.viewOrigin = MakeVector3(256.0F, 256.0F, 5.0F);
+						}
 						def.viewAxis[0] = MakeVector3(1, 0, 0);
 						def.viewAxis[1] = MakeVector3(0, -1, 0);
 						def.viewAxis[2] = MakeVector3(0, 0, 1);
 
 						def.zNear = 0.05F;
-						def.skipWorld = false;
+						def.skipWorld = !map;
 						break;
 					}
 					case ClientCameraMode::FirstPersonLocal:

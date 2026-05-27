@@ -42,16 +42,49 @@
 #include "GameMap.h"
 #include "World.h"
 
+#include "DemoRecorder.h"
 #include "NetClient.h"
 
 DEFINE_SPADES_SETTING(cg_corpseClearOnRespawn, "0");
 DEFINE_SPADES_SETTING(cg_centerMessage, "2");
 DEFINE_SPADES_SETTING(cg_autoScreenshot, "0");
+DEFINE_SPADES_SETTING(cg_demoAutoRecord, "0");
+DEFINE_SPADES_SETTING(cg_demoMaxFiles, "10");
+DEFINE_SPADES_SETTING(cg_demoAutoPrune, "1");
 
 namespace spades {
+	extern std::string g_pendingMapName;
+	extern std::string g_pendingServerName;
+
 	namespace client {
 
 #pragma mark - Server Packet Handlers
+
+		std::string Client::BuildDemoContext() {
+			std::string modeName = "game";
+			if (world) {
+				auto gmode = world->GetMode();
+				if (gmode) {
+					switch (gmode->ModeType()) {
+						case IGameMode::m_CTF: modeName = "ctf"; break;
+						case IGameMode::m_TC: modeName = "tc"; break;
+					}
+				}
+			}
+			if (activeNet && activeNet->GetStatus() == NetClientStatusConnected &&
+			    activeNet->GetGameProperties()->isGameModeArena)
+				modeName = "arena";
+
+			// Field order: server-map-gamemode
+			// Each field is sanitized so '-' never appears within a field.
+			std::string ctx;
+			if (!g_pendingServerName.empty())
+				ctx += DemoRecorder::SanitizeComponent(g_pendingServerName) + "-";
+			if (!g_pendingMapName.empty())
+				ctx += DemoRecorder::SanitizeComponent(g_pendingMapName) + "-";
+			ctx += modeName;
+			return ctx;
+		}
 
 		void Client::LocalPlayerCreated() {
 			Player& p = world->GetLocalPlayer().value();
@@ -87,20 +120,26 @@ namespace spades {
 			followCameraState.enabled = false;
 
 			// get highest solid block at map's center
-			IntVector3 mapPos;
-			mapPos.x = map->Width() / 2;
-			mapPos.y = map->Height() / 2;
-			mapPos.z = map->GetTop(mapPos.x, mapPos.y) - map->Depth();
+			if (map) {
+				IntVector3 mapPos;
+				mapPos.x = map->Width() / 2;
+				mapPos.y = map->Height() / 2;
+				mapPos.z = map->GetTop(mapPos.x, mapPos.y) - map->Depth();
 
-			freeCameraState.position.x = static_cast<float>(mapPos.x);
-			freeCameraState.position.y = static_cast<float>(mapPos.y);
-			freeCameraState.position.z = static_cast<float>(mapPos.z);
+				freeCameraState.position.x = static_cast<float>(mapPos.x);
+				freeCameraState.position.y = static_cast<float>(mapPos.y);
+				freeCameraState.position.z = static_cast<float>(mapPos.z);
+			} else {
+				// Map not loaded yet, use default position
+				freeCameraState.position = MakeVector3(256.0F, 256.0F, 5.0F);
+			}
 			freeCameraState.velocity = MakeVector3(0, 0, 0);
 			followAndFreeCameraState.yaw = DEG2RAD(90);
 			followAndFreeCameraState.pitch = DEG2RAD(89);
 
-			// welcome players
-			centerMessageView->AddMessage(_Tr("Client", "Welcome to the server, {0}!", playerName));
+			// welcome players (skip during demo playback)
+			if (!IsDemoMode())
+				centerMessageView->AddMessage(_Tr("Client", "Welcome to the server, {0}!", playerName));
 
 			// play intro sound
 			Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Intro.opus");
@@ -112,6 +151,19 @@ namespace spades {
 			std::string archInfo = VersionInfo::GetAppArchitecture();
 			std::string s = _Tr("Client", "You are connected with {0} ({2}) on {1}", verStr, osInfo, archInfo);
 			chatWindow->AddMessage(ChatWindow::ColoredMessage(s, MsgColorSysInfo));
+
+			// start recording if auto-record is enabled
+			if (net && (int)cg_demoAutoRecord != 0) {
+				if (net->StartDemoRecording("", BuildDemoContext())) {
+					SPLog("Started auto-recording demo: %s", net->GetDemoFilename().c_str());
+					ShowAlert(_Tr("Client", "Recording demo"), AlertType::Notice);
+					if ((int)cg_demoAutoPrune != 0) {
+						int maxDemos = (int)cg_demoMaxFiles;
+						if (maxDemos >= 1)
+							DemoRecorder::PruneOldRecordings(static_cast<size_t>(maxDemos));
+					}
+				}
+			}
 		}
 
 		void Client::TeamCapturedTerritory(int teamId, int terId) {
@@ -124,7 +176,7 @@ namespace spades {
 
 			{
 				if (old >= NEUTRAL_TEAM) {
-					msg = _Tr("Client", "{0} captured an Neutral Territory", teamName);
+					msg = _Tr("Client", "{0} captured a Neutral Territory", teamName);
 				} else {
 					msg = _Tr("Client", "{0} captured {1}'s Territory", teamName, oldTeamName);
 				}
@@ -135,7 +187,7 @@ namespace spades {
 			{
 				teamName = chatWindow->TeamColorMessage(teamName, teamId);
 				if (old >= NEUTRAL_TEAM) {
-					msg = _Tr("Client", "{0} captured an neutral territory", teamName);
+					msg = _Tr("Client", "{0} captured a neutral territory", teamName);
 				} else {
 					oldTeamName = chatWindow->TeamColorMessage(oldTeamName, old);
 					msg = _Tr("Client", "{0} captured {1}'s territory", teamName, oldTeamName);
@@ -160,10 +212,13 @@ namespace spades {
 			std::string teamName = world->GetTeamName(otherTeamId);
 
 			{
-				msg = _Tr("Client", "{0} captured {1}'s Intel.", p.GetName(), teamName);
+				msg = _Tr("Client", "{0} captured {1}'s Intel", p.GetName(), teamName);
 				NetLog("%s", msg.c_str());
-				if (cg_centerMessage)
+				if (cg_centerMessage) {
+					if (p.IsLocalPlayer())
+						msg = _Tr("Client", "You captured {0}'s Intel", teamName);
 					centerMessageView->AddMessage(msg);
+				}
 			}
 			{
 				msg = _Tr("Client", "{0} captured {1}'s intel",
@@ -189,10 +244,13 @@ namespace spades {
 			std::string teamName = world->GetTeamName(otherTeamId);
 
 			{
-				msg = _Tr("Client", "{0} picked up {1}'s Intel.", p.GetName(), teamName);
+				msg = _Tr("Client", "{0} picked up {1}'s Intel", p.GetName(), teamName);
 				NetLog("%s", msg.c_str());
-				if (cg_centerMessage)
+				if (cg_centerMessage) {
+					if (p.IsLocalPlayer())
+						msg = _Tr("Client", "You picked up {0}'s Intel", teamName);
 					centerMessageView->AddMessage(msg);
+				}
 			}
 			{
 				msg = _Tr("Client", "{0} picked up {1}'s intel",
@@ -218,8 +276,11 @@ namespace spades {
 			{
 				msg = _Tr("Client", "{0} dropped {1}'s Intel", p.GetName(), teamName);
 				NetLog("%s", msg.c_str());
-				if (cg_centerMessage)
+				if (cg_centerMessage) {
+					if (p.IsLocalPlayer())
+						msg = _Tr("Client", "You dropped {0}'s Intel", teamName);
 					centerMessageView->AddMessage(msg);
+				}
 			}
 			{
 				msg = _Tr("Client", "{0} dropped {1}'s intel",
@@ -339,11 +400,19 @@ namespace spades {
 
 		void Client::PlayerJoinedTeam(Player& p) {
 			std::string msg;
-			std::string teamName = p.IsSpectator()
-				? _Tr("Client", "Spectator") : p.GetTeamName();
+				std::string teamName = p.IsSpectator()
+					? _Tr("Client", "Spectator") : p.GetTeamName();
 
-			{
-				msg = _Tr("Client", "{0} joined {1} team", p.GetName(), teamName);
+				if (p.IsLocalPlayer()) {
+					msg = p.IsSpectator()
+						? _Tr("Client", "You are now a spectator")
+					: _Tr("Client", "You joined {0} team", teamName);
+					centerMessageView->AddMessage(msg);
+					return;
+				}
+
+				{
+					msg = _Tr("Client", "{0} joined {1} team", p.GetName(), teamName);
 				NetLog("%s", msg.c_str());
 				scriptedUI->RecordChatLog(msg, ConvertColorRGBA(p.GetColor()));
 			}
@@ -355,7 +424,9 @@ namespace spades {
 		}
 
 		void Client::PlayerSpawned(Player& p) {
-			if (net->GetGameProperties()->isGameModeArena || cg_corpseClearOnRespawn)
+			bool isArena = activeNet && activeNet->GetStatus() == NetClientStatusConnected &&
+			               activeNet->GetGameProperties()->isGameModeArena;
+			if (isArena || cg_corpseClearOnRespawn)
 				RemoveCorpseForPlayer(p.GetId());
 		}
 

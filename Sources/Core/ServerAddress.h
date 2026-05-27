@@ -42,6 +42,9 @@ namespace spades {
 		ProtocolVersion GetProtocolVersion() const { return mVersion; }
 		std::string ToString(bool includeProtocol = true) const;
 
+		/** Returns the resolved host as a dotted-decimal IPv4 string, e.g. "1.2.3.4". */
+		std::string GetIPString() const;
+
 		static uint32_t ParseIntegerAddress(const std::string& str);
 	};
 } // namespace spades

@@ -65,7 +65,8 @@ namespace spades {
 			 */
 			bool manyPlayers = true;
 
-			int GetMaxNumPlayerSlots() const { return manyPlayers ? 256 : 32; }
+			static constexpr int kMaxPlayerSlots = 256;
+			int GetMaxNumPlayerSlots() const { return manyPlayers ? kMaxPlayerSlots : 32; }
 		};
 	} // namespace client
 } // namespace spades

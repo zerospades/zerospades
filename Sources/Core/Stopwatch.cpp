@@ -45,5 +45,5 @@ static double GetSWTicks() {
 namespace spades {
 	Stopwatch::Stopwatch() { Reset(); }
 	void Stopwatch::Reset() { start = GetSWTicks(); }
-	double Stopwatch::GetTime() { return GetSWTicks() - start; }
+	double Stopwatch::GetTime() const { return GetSWTicks() - start; }
 } // namespace spades

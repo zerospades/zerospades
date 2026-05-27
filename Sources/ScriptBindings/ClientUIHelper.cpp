@@ -66,6 +66,10 @@ namespace spades {
 						  "ClientUIHelper", "void AlertError(const string& in)",
 						  asMETHOD(ClientUIHelper, AlertError), asCALL_THISCALL);
 						manager->CheckError(r);
+						r = eng->RegisterObjectMethod(
+						  "ClientUIHelper", "bool IsDemoMode() const",
+						  asMETHOD(ClientUIHelper, IsDemoMode), asCALL_THISCALL);
+						manager->CheckError(r);
 						break;
 					default: break;
 				}

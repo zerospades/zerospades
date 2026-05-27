@@ -495,11 +495,11 @@ namespace spades {
 			uint8_t playerId;
 			uint8_t hp;
 			uint8_t blocks;
-			uint8_t grenades;
-			uint8_t clip;
-			uint8_t reserve;
-			uint8_t score;
-		};
+				uint8_t grenades;
+				uint8_t clip;
+				uint8_t reserve;
+				uint32_t score;
+			};
 		PlayerPropertiesPacket DecodePlayerProperties(NetPacketReader& r);
 		NetPacketWriter EncodePlayerProperties(const PlayerPropertiesPacket& p);
 

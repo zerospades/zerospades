@@ -107,7 +107,7 @@ msgstr "{0} capturó el territorio {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:91
 msgctxt "Client"
-msgid "{0} captured an neutral territory"
+msgid "{0} captured a neutral territory"
 msgstr "{0} ha capturado un territorio neutral"
 
 #: Sources/Client/Client_NetHandler.cpp:99
@@ -117,7 +117,7 @@ msgstr "{0} capturó el Territorio {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:101
 msgctxt "Client"
-msgid "{0} captured an Neutral Territory"
+msgid "{0} captured a Neutral Territory"
 msgstr "{0} ha capturado un Territorio Neutral"
 
 #: Sources/Client/Client_NetHandler.cpp:127
@@ -127,8 +127,8 @@ msgstr "{0} capturó la intel {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:134
 msgctxt "Client"
-msgid "{0} captured {1}'s Intel."
-msgstr "{0} capturó la Intel {1}."
+msgid "{0} captured {1}'s Intel"
+msgstr "{0} capturó la Intel {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:158
 msgctxt "Client"
@@ -137,8 +137,8 @@ msgstr "{0} tomó la intel {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:165
 msgctxt "Client"
-msgid "{0} picked up {1}'s Intel."
-msgstr "{0} tomó la Intel {1}."
+msgid "{0} picked up {1}'s Intel"
+msgstr "{0} tomó la Intel {1}"
 
 #: Sources/Client/Client_NetHandler.cpp:183
 msgctxt "Client"
@@ -161,6 +161,18 @@ msgstr "El jugador {0} ha salido"
 msgctxt "Client"
 msgid "{0} joined {1} team"
 msgstr "{0} se unio al equipo {1}"
+
+msgctxt "Client"
+msgid "You captured {0}'s Intel"
+msgstr "Has capturado la Intel {0}"
+
+msgctxt "Client"
+msgid "You picked up {0}'s Intel"
+msgstr "Has tomado la Intel {0}"
+
+msgctxt "Client"
+msgid "You dropped {0}'s Intel"
+msgstr "Has soltado la Intel {0}"
 
 #: Sources/Client/Client_NetHandler.cpp:294
 msgctxt "Client"
@@ -987,6 +999,10 @@ msgctxt "Preferences"
 msgid "Team Chat"
 msgstr "Chat de equipo"
 
+msgctxt "Preferences"
+msgid "Chat Log"
+msgstr "Registro del chat"
+
 #: Resources/Scripts/Gui/Preferences.as:714
 msgctxt "Preferences"
 msgid "Limbo Menu"
@@ -1415,6 +1431,10 @@ msgstr ""
 "Modo Rápido:Reduce la resolución de la imagen para hacer un rendimiento mas "
 "rápido.|Apagado|2x|4x"
 
+msgctxt "StartupScreen"
+msgid "Graphics Settings"
+msgstr "Ajustes de gráficos"
+
 #: Resources/Scripts/Gui/StartupScreen.as:1486
 msgctxt "StartupScreen"
 msgid "Audio Settings"
@@ -1630,7 +1650,15 @@ msgstr "[{0}] Seleccionar Equipo/Arma"
 #: Sources/Client/Client_NetHandler.cpp:66
 msgctxt "Client"
 msgid "Welcome to the server, {0}!"
-msgstr "Bienvenido al servidor, {0}!"
+msgstr "¡Bienvenido al servidor, {0}!"
+
+msgctxt "Client"
+msgid "You are now a spectator"
+msgstr "Ahora eres un espectador"
+
+msgctxt "Client"
+msgid "You joined {0} team"
+msgstr "Te has unido al equipo {0}"
 
 #: Sources/Client/Client_Update.cpp:906
 msgctxt "Client"

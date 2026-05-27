@@ -269,7 +269,11 @@ namespace spades {
 			float focusPlayerAngle;
 	
 			if (isFollowing) {
-				Player& player = client->GetCameraTargetPlayer();
+				int targetId = client->GetCameraTargetPlayerId();
+				auto maybeTarget = world->GetPlayer(targetId);
+				if (!maybeTarget)
+					return;
+				Player& player = maybeTarget.value();
 				Vector3 o = player.GetFront2D();
 
 				focusPlayerPos = player.GetPosition();
@@ -278,21 +282,25 @@ namespace spades {
 			} else if (isFreeCamera) {
 				focusPlayerPos = client->freeCameraState.position;
 				focusPlayerAngle = client->followAndFreeCameraState.yaw - M_PI_F * 0.5F;
-				focusPlayerPtr = world->GetLocalPlayer();
+				focusPlayerPtr = world->GetLocalPlayer(); // May be empty in demo mode
 			} else {
 				return;
 			}
 
 			// The local player (this is important for access control)
+			// In demo mode, there's no local player - treat as spectator
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
-			if (!maybePlayer)
+			bool localPlayerIsSpectator = client->IsDemoMode() ||
+				(maybePlayer && maybePlayer->IsSpectator());
+			bool localPlayerIsSpectating = localPlayerIsSpectator || client->staffSpectating;
+
+			// Need either a local player or demo mode to continue
+			if (!maybePlayer && !client->IsDemoMode())
 				return;
 
-			Player& localPlayer = maybePlayer.value();
-			Player& focusPlayer = focusPlayerPtr.value();
-
-			bool localPlayerIsSpectator = localPlayer.IsSpectator();
-			bool localPlayerIsSpectating = localPlayerIsSpectator || client->staffSpectating;
+			// Pointers for safe access (may be null in demo mode)
+			Player* localPlayer = maybePlayer ? &maybePlayer.value() : nullptr;
+			Player* focusPlayer = focusPlayerPtr ? &focusPlayerPtr.value() : nullptr;
 
 			if (largeMap && zoomState < 0.0001F)
 				return;
@@ -520,15 +528,15 @@ namespace spades {
 				Player& p = maybePlayer.value();
 				if (p.IsSpectator() || !p.IsAlive())
 					continue; // don't draw dead players or spectators
-				if (!localPlayerIsSpectating && !localPlayer.IsTeammate(p))
+				if (!localPlayerIsSpectating && localPlayer && !localPlayer->IsTeammate(p))
 					continue; // don't draw enemies when not spectating a player
 
 				// dont draw the focused player icon if we are NOT on staff spectating mode
-				if (&p == &focusPlayer && !client->staffSpectating)
+				if (focusPlayer && &p == focusPlayer && !client->staffSpectating)
 					continue;
 
 				IntVector3 iconColor = world->GetTeamColor(p.GetTeamId());
-				if (&p == &localPlayer) {
+				if (localPlayer && &p == localPlayer) {
 					iconColor = localPlayerColor;
 				} else if (colorMode) {
 					int colorIndex = i % 32;
@@ -557,7 +565,7 @@ namespace spades {
 				DrawIcon(pos, *iconImg, iconColorF, playerAngle);
 
 				// dont draw the focused player name when following non-local players
-				if (&p == &focusPlayer && isFollowingNonLocal)
+				if (focusPlayer && &p == focusPlayer && isFollowingNonLocal)
 					continue;
 
 				// draw player names
@@ -567,13 +575,13 @@ namespace spades {
 			}
 
 			// draw the focused player view
-			if (focusPlayer.IsAlive() || localPlayerIsSpectating) {
-				IntVector3 iconColor = world->GetTeamColor(focusPlayer.GetTeamId());
-				if (focusPlayer.IsLocalPlayer()) {
+			if (focusPlayer && (focusPlayer->IsAlive() || localPlayerIsSpectating)) {
+				IntVector3 iconColor = world->GetTeamColor(focusPlayer->GetTeamId());
+				if (focusPlayer->IsLocalPlayer()) {
 					iconColor = localPlayerIsSpectating
 						? spectatorColor : localPlayerColor;
 				} else if (colorMode) {
-					int colorIndex = focusPlayer.GetId() % 32;
+					int colorIndex = focusPlayer->GetId() % 32;
 					iconColor = MakeIntVector3(
 						palette[colorIndex][0],
 						palette[colorIndex][1],
@@ -584,7 +592,7 @@ namespace spades {
 
 				Handle<IImage> iconImg = playerIcon;
 				if (iconMode && !isFreeCamera) {
-					switch (focusPlayer.GetWeaponType()) {
+					switch (focusPlayer->GetWeaponType()) {
 						case RIFLE_WEAPON: iconImg = playerRifleIcon; break;
 						case SMG_WEAPON: iconImg = playerSMGIcon; break;
 						case SHOTGUN_WEAPON: iconImg = playerShotgunIcon; break;
@@ -597,6 +605,14 @@ namespace spades {
 					? *playerADSViewIcon : *playerViewIcon,
 					iconColorF * 0.9F, focusPlayerAngle);
 				DrawIcon(focusPlayerPos, *iconImg, iconColorF, focusPlayerAngle);
+			} else if (localPlayerIsSpectating && isFreeCamera) {
+				// In demo free camera mode, draw a simple view indicator
+				IntVector3 iconColor = spectatorColor;
+				Vector4 iconColorF = ModifyColor(iconColor) * largeMapAlpha;
+				float zoomState = client->spectatorZoomState;
+				DrawIcon(focusPlayerPos, (zoomState > 0.99F)
+					? *playerADSViewIcon : *playerViewIcon,
+					iconColorF * 0.9F, focusPlayerAngle);
 			}
 
 			// draw map objects
@@ -616,7 +632,7 @@ namespace spades {
 					// draw both flags
 					if (team2.hasIntel) {
 						stmp::optional<Player&> carrier = world->GetPlayer(team2.carrierId);
-						if (carrier && (localPlayerIsSpectating || carrier->IsTeammate(localPlayer))) {
+						if (carrier && (localPlayerIsSpectating || (localPlayer && carrier->IsTeammate(*localPlayer)))) {
 							float pulse = std::max(0.5F, fabsf(sinf(world->GetTime() * 4.0F)));
 							DrawIcon(carrier->GetPosition(), *intelIcon, teamColorF * pulse);
 						}
@@ -651,7 +667,9 @@ namespace spades {
 					pos.y += ((outRect.GetHeight() - size.y) * 0.5F);
 				}
 
-				Vector4 color = ConvertColorRGBA(focusPlayer.GetColor());
+				Vector4 color = focusPlayer
+					? ConvertColorRGBA(focusPlayer->GetColor())
+					: MakeVector4(1, 1, 1, 1);
 				float luminosity = color.x + color.y + color.z;
 				Vector4 shadowColor = (luminosity > 0.9F)
 					? MakeVector4(0, 0, 0, 0.8F)
