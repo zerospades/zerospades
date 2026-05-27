@@ -22,7 +22,7 @@
 
 #include <Core/CpuID.h>
 
-#if defined(__i386__) || defined(_M_IX86) || defined(__x86_64__)
+#if defined(__i386__) || defined(_M_IX86) || defined(__amd64__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64)
 #if defined(_MSC_VER)
 // MSVC 2013 doesn't define __SSE__?
 #define ENABLE_MMX 0
