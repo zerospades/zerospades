@@ -62,6 +62,7 @@
 #include <set>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -109,10 +110,63 @@ namespace {
 		return callbacks;
 	}
 
+	using OrderedCallbacks = std::vector<std::vector<std::tuple<int, int, int>>>;
+
 	// ---------------------------------------------------------------------------
 	// kBlockColor: solid white block color for test placement (health=100, RGB=white).
 	// ---------------------------------------------------------------------------
 	const IntVector3 kBlockColor{255, 255, 255}; // RGB white
+
+	OrderedCallbacks CaptureOrderedCallbacks(
+	  const std::vector<std::vector<IntVector3>>& allBlocksFell) {
+		OrderedCallbacks callbacks;
+		callbacks.reserve(allBlocksFell.size());
+		for (const auto& cluster : allBlocksFell) {
+			std::vector<std::tuple<int, int, int>> cells;
+			cells.reserve(cluster.size());
+			for (const auto& cell : cluster)
+				cells.emplace_back(cell.x, cell.y, cell.z);
+			callbacks.emplace_back(std::move(cells));
+		}
+		return callbacks;
+	}
+
+	OrderedCallbacks FixtureCallbacksToOrdered(const nlohmann::json& fixtureCallbacks) {
+		OrderedCallbacks callbacks;
+		callbacks.reserve(fixtureCallbacks.size());
+		for (const auto& callback : fixtureCallbacks) {
+			std::vector<std::tuple<int, int, int>> cells;
+			const auto& fixtureCells = callback.at("cells");
+			cells.reserve(fixtureCells.size());
+			for (const auto& cell : fixtureCells)
+				cells.emplace_back(cell.at(0).get<int>(), cell.at(1).get<int>(),
+				                   cell.at(2).get<int>());
+			callbacks.emplace_back(std::move(cells));
+		}
+		return callbacks;
+	}
+
+	OrderedCallbacks RunTwoIsolatedPillars(const std::vector<IntVector3>& createOrder,
+	                                      const std::vector<IntVector3>& destroyOrder) {
+		SettingsGuard guard;
+		auto vxl = MakeFlatMapBytes();
+		HeadlessWorld hw(42, vxl);
+		auto& world = hw.GetWorld();
+		auto& map = *world.GetMap();
+
+		for (const auto& pos : createOrder)
+			world.CreateBlock(pos, kBlockColor);
+		hw.Advance(1);
+
+		for (const auto& pos : createOrder)
+			EXPECT_TRUE(map.IsSolid(pos.x, pos.y, pos.z));
+
+		auto cells = destroyOrder;
+		world.DestroyBlock(cells);
+		hw.Advance(1);
+
+		return CaptureOrderedCallbacks(hw.GetListener().allBlocksFell);
+	}
 
 } // namespace
 
@@ -376,6 +430,33 @@ TEST_F(MapTestBase, ClusterFixture_Connected) {
 			    {cell.at(0).get<int>(), cell.at(1).get<int>(), cell.at(2).get<int>()});
 		EXPECT_EQ(actualSet, expectedSet) << "Callback " << i << " cell set mismatch";
 	}
+}
+
+TEST_F(MapTestBase, ClusterFixture_TwoIsolatedInsertionOrderExactOrder) {
+	auto j = LoadFixtureJson("map_value_lookup_018_cluster_two_isolated.json");
+	const auto& val = j.at("expected").at("value");
+
+	int p1x = val.at("p1_x").get<int>();
+	int p1y = val.at("p1_y").get<int>();
+	int p2x = val.at("p2_x").get<int>();
+	int p2y = val.at("p2_y").get<int>();
+	int destroyedZ = val.at("destroyed_z").get<int>();
+	int floatingZ = val.at("floating_z").get<int>();
+
+	const IntVector3 p1Base{p1x, p1y, destroyedZ};
+	const IntVector3 p1Floating{p1x, p1y, floatingZ};
+	const IntVector3 p2Base{p2x, p2y, destroyedZ};
+	const IntVector3 p2Floating{p2x, p2y, floatingZ};
+
+	const auto expected = FixtureCallbacksToOrdered(val.at("callbacks"));
+	ASSERT_EQ(expected.size(), static_cast<size_t>(val.at("callback_count").get<int>()));
+
+	EXPECT_EQ(RunTwoIsolatedPillars({p1Base, p1Floating, p2Base, p2Floating},
+	                                {p1Base, p2Base}),
+	          expected);
+	EXPECT_EQ(RunTwoIsolatedPillars({p2Floating, p1Base, p2Base, p1Floating},
+	                                {p2Base, p1Base}),
+	          expected);
 }
 
 // ClusterFixture_TwoIsolated: replay two isolated pillars scenario.
