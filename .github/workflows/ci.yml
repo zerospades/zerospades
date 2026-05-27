@@ -414,8 +414,10 @@ jobs:
         run: |
           mkdir -p coverage
           gcovr -r . --filter 'Sources/Client/' --filter 'Sources/Core/' \
-            --html-details coverage/index.html --html-title "ZeroSpades coverage" \
-            --cobertura coverage/cobertura.xml
+            --html-details --html-title "ZeroSpades coverage" \
+            --output coverage/index.html
+          gcovr -r . --filter 'Sources/Client/' --filter 'Sources/Core/' \
+            --xml --output coverage/cobertura.xml
 
       - name: Upload coverage (informational, no gate)
         uses: actions/upload-artifact@v7
