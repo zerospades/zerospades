@@ -19,6 +19,7 @@
 
  */
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <deque>
@@ -162,6 +163,9 @@ namespace spades {
 			for (const auto& block : blocks)
 				blockMap[block] = true;
 
+			std::vector<CellPos> orderedBlocks = blocks;
+			std::sort(orderedBlocks.begin(), orderedBlocks.end());
+
 			std::vector<std::vector<CellPos>> ret;
 			std::deque<decltype(blockMap)::iterator> queue;
 
@@ -170,9 +174,11 @@ namespace spades {
 
 			std::size_t addedCount = 0;
 
-			for (auto it = blockMap.begin(); it != blockMap.end(); it++) {
+			for (const auto& root : orderedBlocks) {
 				SPAssert(queue.empty());
 
+				auto it = blockMap.find(root);
+				SPAssert(it != blockMap.end());
 				if (!it->second)
 					continue;
 				queue.emplace_back(it);
@@ -213,12 +219,19 @@ namespace spades {
 				}
 
 				SPAssert(!outBlocks.empty());
+				std::sort(outBlocks.begin(), outBlocks.end());
 				addedCount += outBlocks.size();
 				ret.emplace_back(std::move(outBlocks));
 			}
 
 			SPAssert(addedCount == blocks.size());
 			(void)addedCount; // used only in debug builds
+
+			std::sort(ret.begin(), ret.end(),
+			          [](const std::vector<CellPos>& a, const std::vector<CellPos>& b) {
+				          return std::lexicographical_compare(a.begin(), a.end(), b.begin(),
+				                                              b.end());
+			          });
 
 			return ret;
 		}
