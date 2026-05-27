@@ -459,6 +459,38 @@ TEST_F(MapTestBase, ClusterFixture_TwoIsolatedInsertionOrderExactOrder) {
 	          expected);
 }
 
+TEST_F(MapTestBase, ClusterOrder_MultiCellClusterCellOrderExactOrder) {
+	SettingsGuard guard;
+	auto vxl = MakeFlatMapBytes();
+	HeadlessWorld hw(42, vxl);
+	auto& world = hw.GetWorld();
+	auto& map = *world.GetMap();
+
+	const IntVector3 base{30, 30, 61};
+	const IntVector3 root{30, 30, 60};
+	const IntVector3 yArm{30, 31, 60};
+	const IntVector3 xArm{31, 30, 60};
+
+	world.CreateBlock(xArm, kBlockColor);
+	world.CreateBlock(base, kBlockColor);
+	world.CreateBlock(yArm, kBlockColor);
+	world.CreateBlock(root, kBlockColor);
+	hw.Advance(1);
+
+	ASSERT_TRUE(map.IsSolid(base.x, base.y, base.z));
+	ASSERT_TRUE(map.IsSolid(root.x, root.y, root.z));
+	ASSERT_TRUE(map.IsSolid(yArm.x, yArm.y, yArm.z));
+	ASSERT_TRUE(map.IsSolid(xArm.x, xArm.y, xArm.z));
+
+	std::vector<IntVector3> cells;
+	cells.push_back(base);
+	world.DestroyBlock(cells);
+	hw.Advance(1);
+
+	const OrderedCallbacks expected{{{30, 30, 60}, {30, 31, 60}, {31, 30, 60}}};
+	EXPECT_EQ(CaptureOrderedCallbacks(hw.GetListener().allBlocksFell), expected);
+}
+
 // ClusterFixture_TwoIsolated: replay two isolated pillars scenario.
 // Verify: callback_count == 2; each callback has 1 cell (distinct, not merged).
 // This is the critical Rust parity test — merging into 1 callback would fail here.
