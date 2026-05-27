@@ -68,7 +68,10 @@ target_include_directories(zerospades_testable PUBLIC
 # FP-determinism flags applied ONLY to zerospades_testable, never to the game exe
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 	target_compile_options(zerospades_testable PRIVATE
-		-fno-fast-math -ffp-contract=off -msse2 -mfpmath=sse)
+		-fno-fast-math -ffp-contract=off)
+	if(ZEROSPADES_USE_SSE_FP_FLAGS)
+		target_compile_options(zerospades_testable PRIVATE -msse2 -mfpmath=sse)
+	endif()
 elseif(MSVC)
 	target_compile_options(zerospades_testable PRIVATE /fp:strict)
 endif()

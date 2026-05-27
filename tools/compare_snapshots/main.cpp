@@ -1,7 +1,7 @@
 // compare_snapshots — WorldSnapshot field-level diff CLI (SCHE-06, D-19).
 //
 // Reads two fixture/snapshot JSON files, walks their "expected" objects field
-// by field, applies per-field absolute tolerances from ToleranceMatchers.h
+// by field, applies per-field absolute tolerances from Tolerance.h
 // (the single source of truth shared with the GoogleTest matchers, D-18), and
 // prints a field-level diff. Exit codes:
 //   0  all compared fields match within tolerance ("PASS")
@@ -20,7 +20,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "ToleranceMatchers.h" // resolved via Tests/Helpers include path
+#include "Tolerance.h" // resolved via Tests/Helpers include path
 
 using json = nlohmann::json;
 using namespace spades::tests; // ToleranceForField + tolerance constants

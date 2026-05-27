@@ -25,6 +25,18 @@ else()
 	set(USE_VCPKG OFF)
 endif()
 
+set(ZEROSPADES_USE_SSE_FP_FLAGS OFF)
+if(CMAKE_OSX_ARCHITECTURES)
+	set(ZEROSPADES_USE_SSE_FP_FLAGS ON)
+	foreach(_zs_arch IN LISTS CMAKE_OSX_ARCHITECTURES)
+		if(NOT _zs_arch MATCHES "^(x86_64|i[3-6]86)$")
+			set(ZEROSPADES_USE_SSE_FP_FLAGS OFF)
+		endif()
+	endforeach()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+	set(ZEROSPADES_USE_SSE_FP_FLAGS ON)
+endif()
+
 # Prefer GLVND OpenGL
 if(POLICY CMP0072)
 	cmake_policy(SET CMP0072 NEW)

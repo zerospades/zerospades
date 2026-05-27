@@ -85,7 +85,10 @@ target_compile_definitions(zerospades_tests PRIVATE
 # FP-determinism flags on test binary (same as zerospades_testable)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(zerospades_tests PRIVATE
-        -fno-fast-math -ffp-contract=off -msse2 -mfpmath=sse)
+        -fno-fast-math -ffp-contract=off)
+    if(ZEROSPADES_USE_SSE_FP_FLAGS)
+        target_compile_options(zerospades_tests PRIVATE -msse2 -mfpmath=sse)
+    endif()
 elseif(MSVC)
     target_compile_options(zerospades_tests PRIVATE /fp:strict)
 endif()
