@@ -80,29 +80,104 @@ namespace spades {
 				z = int(k & 0xFFFFF);
 			}
 
-			// Navigation cube faces: axis (0/1/2), sign, label, axis tint.
-			struct NaviFace { int ax, sg; const char* label; };
-			const NaviFace kNaviFaces[6] = {{0, +1, "Right"}, {0, -1, "Left"},
-			                                {1, +1, "Back"},  {1, -1, "Front"},
-			                                {2, +1, "Bottom"}, {2, -1, "Top"}};
 			Vector3 AxisUnit3(int a) {
 				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
 			}
 			Vector4 AxisTint(int a) {
-				if (a == 0) return MakeVector4(0.75F, 0.45F, 0.45F, 1.0F);
-				if (a == 1) return MakeVector4(0.45F, 0.72F, 0.45F, 1.0F);
-				return MakeVector4(0.5F, 0.55F, 0.74F, 1.0F);
+				if (a == 0) return MakeVector4(0.78F, 0.5F, 0.5F, 1.0F);
+				if (a == 1) return MakeVector4(0.5F, 0.74F, 0.5F, 1.0F);
+				return MakeVector4(0.55F, 0.58F, 0.78F, 1.0F);
 			}
-			bool PointInQuad(const Vector2& p, const Vector2 q[4]) {
+			const char* FaceLabel(int ax, int sg) {
+				static const char* names[3][2] = {
+				  {"Left", "Right"}, {"Front", "Back"}, {"Top", "Bottom"}};
+				return names[ax][sg > 0 ? 1 : 0];
+			}
+			// Inside a convex polygon (n verts, ordered): consistent edge-cross signs.
+			bool PointInPoly(const Vector2& p, const Vector2* q, int n) {
 				float sign = 0.0F;
-				for (int i = 0; i < 4; i++) {
+				for (int i = 0; i < n; i++) {
 					const Vector2& a = q[i];
-					const Vector2& b = q[(i + 1) % 4];
+					const Vector2& b = q[(i + 1) % n];
 					float cr = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
 					if (i == 0) sign = cr;
 					else if (cr * sign < 0.0F) return false;
 				}
 				return true;
+			}
+
+			// One facet of the chamfered (beveled) navigation cube.
+			struct NaviFacet {
+				int n;             // 3 (corner bevel) or 4 (face / edge bevel)
+				Vector3 v[4];      // world-space vertices
+				Vector3 dir;       // outward normal = snap view direction
+				int tint;          // axis 0/1/2 for faces, -1 for bevels
+				const char* label; // for the 6 faces, else nullptr
+			};
+
+			Vector3 Comp3(int ax, float on, int u, float uu, int v, float vv) {
+				float c[3];
+				c[ax] = on; c[u] = uu; c[v] = vv;
+				return MakeVector3(c[0], c[1], c[2]);
+			}
+
+			// Build the 6 faces + 12 edge bevels + 8 corner bevels of the cube.
+			void BuildNaviFacets(std::vector<NaviFacet>& out) {
+				const float t = 0.66F; // face half-extent; bevels live in [t, 1]
+				out.clear();
+				// 6 faces (square, shrunk to +/-t).
+				for (int ax = 0; ax < 3; ax++) {
+					int u = (ax + 1) % 3, v = (ax + 2) % 3;
+					for (int s = -1; s <= 1; s += 2) {
+						NaviFacet f;
+						f.n = 4;
+						f.v[0] = Comp3(ax, float(s), u, -t, v, -t);
+						f.v[1] = Comp3(ax, float(s), u, t, v, -t);
+						f.v[2] = Comp3(ax, float(s), u, t, v, t);
+						f.v[3] = Comp3(ax, float(s), u, -t, v, t);
+						f.dir = AxisUnit3(ax) * float(s);
+						f.tint = ax;
+						f.label = FaceLabel(ax, s);
+						out.push_back(f);
+					}
+				}
+				// 12 edge bevels (one per axis-pair and sign pair).
+				const int pairs[3][2] = {{0, 1}, {1, 2}, {2, 0}};
+				for (int pi = 0; pi < 3; pi++) {
+					int a = pairs[pi][0], b = pairs[pi][1], c = 3 - a - b;
+					for (int sa = -1; sa <= 1; sa += 2)
+					for (int sb = -1; sb <= 1; sb += 2) {
+						NaviFacet f;
+						f.n = 4;
+						float c0[3], c1[3], c2[3], c3[3];
+						c0[a] = float(sa); c0[b] = sb * t; c0[c] = -t;
+						c1[a] = float(sa); c1[b] = sb * t; c1[c] = t;
+						c2[a] = sa * t; c2[b] = float(sb); c2[c] = t;
+						c3[a] = sa * t; c3[b] = float(sb); c3[c] = -t;
+						f.v[0] = MakeVector3(c0[0], c0[1], c0[2]);
+						f.v[1] = MakeVector3(c1[0], c1[1], c1[2]);
+						f.v[2] = MakeVector3(c2[0], c2[1], c2[2]);
+						f.v[3] = MakeVector3(c3[0], c3[1], c3[2]);
+						f.dir = (AxisUnit3(a) * float(sa) + AxisUnit3(b) * float(sb)).Normalize();
+						f.tint = -1;
+						f.label = nullptr;
+						out.push_back(f);
+					}
+				}
+				// 8 corner bevels (triangles).
+				for (int sx = -1; sx <= 1; sx += 2)
+				for (int sy = -1; sy <= 1; sy += 2)
+				for (int sz = -1; sz <= 1; sz += 2) {
+					NaviFacet f;
+					f.n = 3;
+					f.v[0] = MakeVector3(sx * 1.0F, sy * t, sz * t);
+					f.v[1] = MakeVector3(sx * t, sy * 1.0F, sz * t);
+					f.v[2] = MakeVector3(sx * t, sy * t, sz * 1.0F);
+					f.dir = MakeVector3(float(sx), float(sy), float(sz)).Normalize();
+					f.tint = -1;
+					f.label = nullptr;
+					out.push_back(f);
+				}
 			}
 		} // namespace
 
@@ -1245,85 +1320,100 @@ namespace spades {
 
 		// --- Navigation cube -------------------------------------------------
 
-		void KV6EditorView::NaviCorners(int face, Vector2 out[4]) {
-			const NaviFace& f = kNaviFaces[face];
-			float s = 0.62F;
-			int u = (f.ax + 1) % 3, v = (f.ax + 2) % 3;
-			Vector3 cen = AxisUnit3(f.ax) * (float(f.sg) * s);
-			Vector3 cu = AxisUnit3(u) * s, cv = AxisUnit3(v) * s;
-			Vector3 c[4] = {cen - cu - cv, cen + cu - cv, cen + cu + cv, cen - cu + cv};
-			for (int i = 0; i < 4; i++)
-				out[i] = MakeVector2(gizCx + Vector3::Dot(c[i], camRight) * gizR,
-				                     gizCy - Vector3::Dot(c[i], camUp) * gizR);
-		}
-
-		int KV6EditorView::NaviCubeFaceAt(const Vector2& p) {
-			for (int i = 0; i < 6; i++) {
-				const NaviFace& f = kNaviFaces[i];
-				if (-Vector3::Dot(AxisUnit3(f.ax) * float(f.sg), camFwd) <= 0.01F)
-					continue; // back-facing
-				Vector2 q[4];
-				NaviCorners(i, q);
-				if (PointInQuad(p, q))
-					return i;
-			}
-			return -1;
-		}
-
-		void KV6EditorView::DrawNaviCube() {
-			client::IFont& font = fontManager->GetGuiFont();
-			int hover = NaviCubeFaceAt(cursor);
-			for (int i = 0; i < 6; i++) {
-				const NaviFace& f = kNaviFaces[i];
-				float facing = -Vector3::Dot(AxisUnit3(f.ax) * float(f.sg), camFwd);
-				if (facing <= 0.01F)
-					continue; // only the faces toward the camera
-				Vector2 q[4];
-				NaviCorners(i, q);
-				float sh = 0.4F + 0.6F * facing;
-				Vector4 base = AxisTint(f.ax);
-				Vector4 col = (i == hover) ? MakeVector4(0.4F, 0.7F, 1.0F, 0.96F)
-				                           : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.96F);
-				ColorNP(col);
-				renderer->DrawImage((client::IImage*)NULL, q[0], q[1], q[3], AABB2(0, 0, 1, 1));
-				Vector4 ec = MakeVector4(0.1F, 0.1F, 0.12F, 0.8F);
-				for (int e = 0; e < 4; e++)
-					DrawLine2D(q[e], q[(e + 1) % 4], 1.0F, ec);
-				// 3x3 grid: the inner lines mark the edge/corner (bevel) click zones.
-				Vector2 e1 = q[1] - q[0], e2 = q[3] - q[0];
-				Vector4 gc = MakeVector4(0.1F, 0.1F, 0.12F, 0.5F);
-				DrawLine2D(q[0] + e1 * 0.34F, q[0] + e1 * 0.34F + e2, 1.0F, gc);
-				DrawLine2D(q[0] + e1 * 0.66F, q[0] + e1 * 0.66F + e2, 1.0F, gc);
-				DrawLine2D(q[0] + e2 * 0.34F, q[0] + e2 * 0.34F + e1, 1.0F, gc);
-				DrawLine2D(q[0] + e2 * 0.66F, q[0] + e2 * 0.66F + e1, 1.0F, gc);
-				Vector2 ctr = (q[0] + q[1] + q[2] + q[3]) * 0.25F;
-				float ls = 0.75F;
-				Vector2 ts = font.Measure(f.label);
-				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
-				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.7F));
+		void KV6EditorView::FillTri(const Vector2& A, const Vector2& B, const Vector2& C,
+		                            const Vector4& col) {
+			Vector2 p[3] = {A, B, C};
+			auto sw = [](Vector2& a, Vector2& b) { Vector2 t = a; a = b; b = t; };
+			if (p[0].y > p[1].y) sw(p[0], p[1]);
+			if (p[1].y > p[2].y) sw(p[1], p[2]);
+			if (p[0].y > p[1].y) sw(p[0], p[1]);
+			float y0 = p[0].y, y2 = p[2].y;
+			if (y2 - y0 < 0.5F)
+				return;
+			auto xAt = [](const Vector2& a, const Vector2& b, float y) {
+				float dy = b.y - a.y;
+				return a.x + (b.x - a.x) * ((std::fabs(dy) < 1.0e-5F) ? 0.0F : (y - a.y) / dy);
+			};
+			ColorNP(col);
+			const int N = 10; // horizontal strips approximate the triangle
+			for (int i = 0; i < N; i++) {
+				float ya = y0 + (y2 - y0) * float(i) / N;
+				float yb = y0 + (y2 - y0) * float(i + 1) / N;
+				float la = xAt(p[0], p[2], ya), lb = xAt(p[0], p[2], yb);
+				float ra = (ya < p[1].y) ? xAt(p[0], p[1], ya) : xAt(p[1], p[2], ya);
+				float rb = (yb < p[1].y) ? xAt(p[0], p[1], yb) : xAt(p[1], p[2], yb);
+				(void)rb;
+				renderer->DrawImage((client::IImage*)NULL, MakeVector2(la, ya), MakeVector2(ra, ya),
+				                    MakeVector2(lb, yb), AABB2(0, 0, 1, 1));
 			}
 		}
 
 		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
-			int f = NaviCubeFaceAt(p);
-			if (f < 0)
-				return false;
-			const NaviFace& face = kNaviFaces[f];
-			Vector2 q[4];
-			NaviCorners(f, q);
-			// Inverse of the affine map p = q0 + uu*(q1-q0) + vv*(q3-q0).
-			Vector2 e1 = q[1] - q[0], e2 = q[3] - q[0], d = p - q[0];
-			float det = e1.x * e2.y - e2.x * e1.y;
-			Vector3 n = AxisUnit3(face.ax) * float(face.sg);
-			if (std::fabs(det) < 1.0e-4F) { dir = n; return true; }
-			float uu = (d.x * e2.y - e2.x * d.y) / det;
-			float vv = (e1.x * d.y - d.x * e1.y) / det;
-			// A 3x3 grid: centre = face, edges = 45deg, corners = isometric.
-			int u = (face.ax + 1) % 3, v = (face.ax + 2) % 3;
-			int su = (uu < 0.34F) ? -1 : (uu > 0.66F) ? 1 : 0;
-			int sv = (vv < 0.34F) ? -1 : (vv > 0.66F) ? 1 : 0;
-			dir = (n + AxisUnit3(u) * float(su) + AxisUnit3(v) * float(sv)).Normalize();
-			return true;
+			std::vector<NaviFacet> facets;
+			BuildNaviFacets(facets);
+			for (const NaviFacet& f : facets) {
+				if (-Vector3::Dot(f.dir, camFwd) <= 0.02F)
+					continue; // back-facing
+				Vector2 q[4];
+				for (int i = 0; i < f.n; i++)
+					q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
+					                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+				if (PointInPoly(p, q, f.n)) { dir = f.dir; return true; }
+			}
+			return false;
+		}
+
+		void KV6EditorView::DrawNaviCube() {
+			client::IFont& font = fontManager->GetGuiFont();
+			std::vector<NaviFacet> facets;
+			BuildNaviFacets(facets);
+			Vector3 hdir;
+			bool hov = NaviCubeDir(cursor, hdir);
+			// Draw bevels behind the faces: corners, then edges, then faces.
+			for (int pass = 0; pass < 3; pass++) {
+				for (const NaviFacet& f : facets) {
+					bool isFace = f.tint >= 0;
+					bool isCorner = (f.n == 3);
+					bool isEdge = !isFace && !isCorner;
+					if ((pass == 0 && !isCorner) || (pass == 1 && !isEdge) || (pass == 2 && !isFace))
+						continue;
+					float facing = -Vector3::Dot(f.dir, camFwd);
+					if (facing <= 0.02F)
+						continue;
+					Vector2 q[4];
+					for (int i = 0; i < f.n; i++)
+						q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
+						                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+					float sh = 0.45F + 0.55F * facing;
+					Vector4 base = isFace ? AxisTint(f.tint) : MakeVector4(0.5F, 0.52F, 0.56F, 1.0F);
+					bool hl = hov && Vector3::Dot(hdir, f.dir) > 0.999F;
+					Vector4 col = hl ? MakeVector4(0.4F, 0.7F, 1.0F, 0.97F)
+					                 : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.97F);
+					if (f.n == 3) {
+						FillTri(q[0], q[1], q[2], col);
+					} else {
+						ColorNP(col);
+						renderer->DrawImage((client::IImage*)NULL, q[0], q[1], q[3], AABB2(0, 0, 1, 1));
+					}
+					Vector4 ec = MakeVector4(0.08F, 0.08F, 0.1F, 0.85F);
+					for (int e = 0; e < f.n; e++)
+						DrawLine2D(q[e], q[(e + 1) % f.n], 1.0F, ec);
+				}
+			}
+			// Face labels last, so they sit on top of the cube.
+			for (const NaviFacet& f : facets) {
+				if (!f.label || -Vector3::Dot(f.dir, camFwd) <= 0.02F)
+					continue;
+				Vector2 ctr = MakeVector2(0.0F, 0.0F);
+				for (int i = 0; i < 4; i++)
+					ctr += MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
+					                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+				ctr = ctr * 0.25F;
+				float ls = 0.85F;
+				Vector2 ts = font.Measure(f.label);
+				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
+				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.8F));
+			}
 		}
 
 		void KV6EditorView::SnapCameraDir(const Vector3& dir) {

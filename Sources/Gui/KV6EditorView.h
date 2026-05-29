@@ -286,10 +286,10 @@ namespace spades {
 			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
 			// rotating cube whose faces are clickable to snap the view.
 			void DrawNaviCube();
-			void NaviCorners(int face, Vector2 out[4]); // projected screen corners
-			int NaviCubeFaceAt(const Vector2& p);        // face under cursor, or -1
-			// View direction for the cursor's spot on the cube (face centre, edge or
-			// corner -> 45deg / isometric). Returns false if not over the cube.
+			// Filled triangle (corner bevels), via horizontal parallelogram strips.
+			void FillTri(const Vector2& a, const Vector2& b, const Vector2& c, const Vector4& col);
+			// View direction for the cursor's spot on the cube (face / bevel edge /
+			// corner -> ortho / 45deg / isometric). Returns false if not over the cube.
 			bool NaviCubeDir(const Vector2& p, Vector3& dir);
 			void SnapCameraDir(const Vector3& dir); // animate to look from `dir`
 			void DrawOverlay(float sw, float sh);
