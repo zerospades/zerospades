@@ -78,7 +78,7 @@ namespace spades {
 			if (!ed.HasPick())
 				return;
 			IntVector3 p = ed.PickPlace(), h = ed.PickSolid();
-			ed.DrawCellOutline(p.x, p.y, p.z, ed.ColorToVec(ed.CurrentColor()));
+			ed.DrawCellOutlineMirrored(p.x, p.y, p.z, ed.ColorToVec(ed.CurrentColor()));
 			ed.DrawCellOutline(h.x, h.y, h.z, kTarget);
 		}
 
@@ -251,7 +251,10 @@ namespace spades {
 			}
 			IntVector3 lo, hi;
 			BBox(q, lo, hi);
-			ed.DrawBoxOutline(lo, hi, kHover);
+			if (useMirror)
+				ed.DrawBoxOutlineMirrored(lo, hi, kHover);
+			else
+				ed.DrawBoxOutline(lo, hi, kHover);
 		}
 
 		// --- MoveSubTool (drag a 3-axis gizmo) -------------------------------

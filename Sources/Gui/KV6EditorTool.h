@@ -48,6 +48,10 @@ namespace spades {
 			// key (so the editor doesn't also open the pause menu).
 			virtual bool OnEscape(KV6EditorView&) { return false; }
 
+			// True if this tool honours the mirror X/Y/Z toggles (shown in the
+			// secondary toolbar next to its sub-tools).
+			virtual bool UsesMirror() const { return false; }
+
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
 			virtual int SubToolCount() const { return 0; }

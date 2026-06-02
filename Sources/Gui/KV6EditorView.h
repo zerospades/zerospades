@@ -111,6 +111,10 @@ namespace spades {
 			void DrawCellOutline(int x, int y, int z, const Vector4& color);
 			// 3D wireframe over the inclusive voxel range [lo, hi].
 			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi, const Vector4& color);
+			// As above, but also drawing the mirror images for the enabled axes.
+			void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color);
+			void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
+			                            const Vector4& color);
 			// Add every solid voxel in [lo, hi] to the selection.
 			void SelectBox(const IntVector3& lo, const IntVector3& hi);
 			// Add the solid voxels among `cells` to the selection.
@@ -191,8 +195,8 @@ namespace spades {
 			float presX, presY, presSwatch;
 
 			// --- Mirror modelling (reflect each edit across the pivot plane) ---
+			// Toggled from the sub-toolbar; honoured by the Draw tool's edits.
 			bool mirrorX = false, mirrorY = false, mirrorZ = false;
-			float mirX0, mirY0, mirBox, mirGap;
 
 			// Orientation gizmo.
 			float gizCx, gizCy, gizR;
@@ -246,6 +250,8 @@ namespace spades {
 
 			// Editing
 			int MirrorIdx(int i, float pivot) const;
+			// Append each cell's mirror images for the enabled axes (Draw edits).
+			void ExpandMirrors(std::vector<IntVector3>& cells) const;
 			void RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz);
 			void TrimVolume();
 
@@ -263,7 +269,6 @@ namespace spades {
 			void UpdateSV(const Vector2& p);
 			void UpdateHue(const Vector2& p);
 			bool PickerMouseDown(const Vector2& p);
-			bool MirrorHitTest(const Vector2& p);
 
 			// Editor overlay lines (cell/box outlines, gizmo) are drawn both as
 			// depth-tested 3D lines (bright where visible) and collected here to be
@@ -282,7 +287,6 @@ namespace spades {
 			void DrawOriginAxes();
 			void DrawMirrorPlanes();
 			void DrawPicker();
-			void DrawMirrorToggles();
 			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
 			// rotating cube whose faces are clickable to snap the view.
 			void DrawNaviCube();
@@ -307,7 +311,8 @@ namespace spades {
 
 			// Secondary toolbar showing the active tool's sub-tools (always shown).
 			float BarsH(); // total height of ribbon + toolbar + sub-toolbar
-			int SubToolbarHitTest(const Vector2& p); // -1 none, else sub-tool index
+			int SubToolbarHitTest(const Vector2& p);       // -1 none, else sub-tool index
+			int SubToolbarMirrorAt(const Vector2& p);      // -1 none, else mirror axis 0/1/2
 			void DrawSubToolbar(float sw);
 
 			// Pause menu / Save As prompt

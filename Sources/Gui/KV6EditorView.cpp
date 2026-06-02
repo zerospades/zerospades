@@ -68,6 +68,7 @@ namespace spades {
 			const float kSubBtn = 88.0F;  // sub-tool button width
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
+			const float kMirW = 24.0F, kMirLabelW = 50.0F; // mirror toggles in sub-bar
 
 			// Pack a (non-negative) voxel coordinate into a selection-set key.
 			int64_t SelKey(int x, int y, int z) {
@@ -475,6 +476,27 @@ namespace spades {
 
 		int KV6EditorView::MirrorIdx(int i, float pivot) const {
 			return int(std::floor(2.0F * pivot + 0.5F)) - i;
+		}
+
+		void KV6EditorView::ExpandMirrors(std::vector<IntVector3>& cells) const {
+			if (!mirrorX && !mirrorY && !mirrorZ)
+				return;
+			Vector3 org = model->GetOrigin();
+			std::vector<IntVector3> out;
+			out.reserve(cells.size() * 8);
+			for (const IntVector3& c : cells) {
+				int xs[2] = {c.x, c.x}, nx = 1;
+				int ys[2] = {c.y, c.y}, ny = 1;
+				int zs[2] = {c.z, c.z}, nz = 1;
+				if (mirrorX) { int m = MirrorIdx(c.x, -org.x); if (m != c.x) { xs[1] = m; nx = 2; } }
+				if (mirrorY) { int m = MirrorIdx(c.y, -org.y); if (m != c.y) { ys[1] = m; ny = 2; } }
+				if (mirrorZ) { int m = MirrorIdx(c.z, -org.z); if (m != c.z) { zs[1] = m; nz = 2; } }
+				for (int a = 0; a < nx; a++)
+				for (int b = 0; b < ny; b++)
+				for (int d = 0; d < nz; d++)
+					out.push_back(MakeIntVector3(xs[a], ys[b], zs[d]));
+			}
+			cells.swap(out);
 		}
 
 		void KV6EditorView::RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz) {
@@ -959,11 +981,6 @@ namespace spades {
 			eyeY = prevY;
 			presX = svX;
 			presY = prevY + prevH + 6.0F;
-
-			mirX0 = 16.0F;
-			mirY0 = 116.0F;
-			mirBox = 22.0F;
-			mirGap = 6.0F;
 		}
 
 		bool KV6EditorView::CursorOverPicker(const Vector2& p) const {
@@ -1004,18 +1021,6 @@ namespace spades {
 			return CursorOverPicker(p);
 		}
 
-		bool KV6EditorView::MirrorHitTest(const Vector2& p) {
-			for (int i = 0; i < 3; i++) {
-				float x = mirX0 + float(i) * (mirBox + mirGap);
-				if (InRect(p, x, mirY0, mirBox, mirBox)) {
-					if (i == 0) mirrorX = !mirrorX;
-					else if (i == 1) mirrorY = !mirrorY;
-					else mirrorZ = !mirrorZ;
-					return true;
-				}
-			}
-			return false;
-		}
 
 		// --- Drawing primitives ----------------------------------------------
 
@@ -1077,6 +1082,31 @@ namespace spades {
 			EmitLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
 		}
 
+		void KV6EditorView::DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) {
+			std::vector<IntVector3> cells;
+			cells.push_back(MakeIntVector3(x, y, z));
+			ExpandMirrors(cells);
+			for (const IntVector3& c : cells)
+				DrawCellOutline(c.x, c.y, c.z, color);
+		}
+
+		void KV6EditorView::DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
+		                                           const Vector4& color) {
+			Vector3 org = model->GetOrigin();
+			for (int mx = 0; mx <= (mirrorX ? 1 : 0); mx++)
+			for (int my = 0; my <= (mirrorY ? 1 : 0); my++)
+			for (int mz = 0; mz <= (mirrorZ ? 1 : 0); mz++) {
+				IntVector3 a = lo, b = hi;
+				if (mx) { int p = MirrorIdx(lo.x, -org.x), q = MirrorIdx(hi.x, -org.x);
+				          a.x = std::min(p, q); b.x = std::max(p, q); }
+				if (my) { int p = MirrorIdx(lo.y, -org.y), q = MirrorIdx(hi.y, -org.y);
+				          a.y = std::min(p, q); b.y = std::max(p, q); }
+				if (mz) { int p = MirrorIdx(lo.z, -org.z), q = MirrorIdx(hi.z, -org.z);
+				          a.z = std::min(p, q); b.z = std::max(p, q); }
+				DrawBoxOutline(a, b, color);
+			}
+		}
+
 		void KV6EditorView::SelectBox(const IntVector3& lo, const IntVector3& hi) {
 			for (int x = lo.x; x <= hi.x; x++)
 			for (int y = lo.y; y <= hi.y; y++)
@@ -1093,7 +1123,9 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::FillCells(const std::vector<IntVector3>& cells, uint32_t color) {
+		void KV6EditorView::FillCells(const std::vector<IntVector3>& cellsIn, uint32_t color) {
+			std::vector<IntVector3> cells = cellsIn;
+			ExpandMirrors(cells); // also fill the mirror images, if enabled
 			if (cells.empty())
 				return;
 			// Grow the volume to contain every cell (plus the current model).
@@ -1128,7 +1160,9 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::EraseCells(const std::vector<IntVector3>& cells) {
+		void KV6EditorView::EraseCells(const std::vector<IntVector3>& cellsIn) {
+			std::vector<IntVector3> cells = cellsIn;
+			ExpandMirrors(cells); // also erase the mirror images, if enabled
 			int count = 0;
 			for (const IntVector3& c : cells) {
 				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z))
@@ -1296,25 +1330,6 @@ namespace spades {
 				float y = presY + float(int(i) / presetCols) * presSwatch;
 				ColorNP(ColorToVec(presets[i]));
 				FillRect(x, y, presSwatch - pad, presSwatch - pad);
-			}
-		}
-
-		void KV6EditorView::DrawMirrorToggles() {
-			client::IFont& font = fontManager->GetGuiFont();
-			font.Draw("Mirror", MakeVector2(mirX0, mirY0 - 15.0F), 0.85F,
-			          MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
-			for (int i = 0; i < 3; i++) {
-				bool on = (i == 0) ? mirrorX : (i == 1 ? mirrorY : mirrorZ);
-				const char* lbl = (i == 0) ? "X" : (i == 1 ? "Y" : "Z");
-				float x = mirX0 + float(i) * (mirBox + mirGap);
-				ColorNP(on ? MakeVector4(0.22F, 0.50F, 0.28F, 1.0F)
-				           : MakeVector4(0.15F, 0.15F, 0.17F, 0.85F));
-				FillRect(x, mirY0, mirBox, mirBox);
-				StrokeRect(x, mirY0, mirBox, mirBox, 1.0F,
-				           on ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
-				              : MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
-				font.Draw(lbl, MakeVector2(x + 7.0F, mirY0 + 4.0F), 0.9F,
-				          MakeVector4(1.0F, 1.0F, 1.0F, 1.0F));
 			}
 		}
 
@@ -1560,6 +1575,45 @@ namespace spades {
 				font.Draw(lbl, MakeVector2(x + (kSubBtn - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
 				          s, MakeVector4(1, 1, 1, 1));
 			}
+
+			if (!t->UsesMirror())
+				return;
+			// Separator, "Mirror" label, then the X/Y/Z toggles.
+			int sc = t->SubToolCount();
+			float gx = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep * 0.5F;
+			ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
+			FillRect(gx, by + 2.0F, 1.0F, kTbH - 4.0F);
+			float baseX = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep + kMirLabelW;
+			font.Draw("Mirror", MakeVector2(baseX - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F),
+			          s, MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
+			const char* ml[3] = {"X", "Y", "Z"};
+			bool mon[3] = {mirrorX, mirrorY, mirrorZ};
+			for (int i = 0; i < 3; i++) {
+				float x = baseX + float(i) * (kMirW + kTbGap);
+				ColorNP(mon[i] ? MakeVector4(0.22F, 0.50F, 0.28F, 1.0F)
+				               : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
+				FillRect(x, by, kMirW, kTbH);
+				StrokeRect(x, by, kMirW, kTbH, 1.0F,
+				           mon[i] ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
+				                  : MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+				Vector2 ts = font.Measure(ml[i]);
+				font.Draw(ml[i], MakeVector2(x + (kMirW - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
+				          s, MakeVector4(1, 1, 1, 1));
+			}
+		}
+
+		int KV6EditorView::SubToolbarMirrorAt(const Vector2& p) {
+			EditorTool* t = ActiveTool();
+			if (!t || !t->UsesMirror())
+				return -1;
+			int sc = t->SubToolCount();
+			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
+			float baseX = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep + kMirLabelW;
+			for (int i = 0; i < 3; i++) {
+				if (InRect(p, baseX + float(i) * (kMirW + kTbGap), by, kMirW, kTbH))
+					return i;
+			}
+			return -1;
 		}
 
 		void KV6EditorView::DrawRibbon(float sw) {
@@ -1768,8 +1822,14 @@ namespace spades {
 					if (EditorTool* t = ActiveTool()) t->SetSubTool(*this, sub);
 					return;
 				}
+				int mir = SubToolbarMirrorAt(cursor);
+				if (mir >= 0) {
+					if (mir == 0) mirrorX = !mirrorX;
+					else if (mir == 1) mirrorY = !mirrorY;
+					else mirrorZ = !mirrorZ;
+					return;
+				}
 				if (PickerMouseDown(cursor)) return;
-				if (MirrorHitTest(cursor)) return;
 				Vector3 navDir;
 				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view
 				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
@@ -1886,7 +1946,6 @@ namespace spades {
 			DrawToolbar(sw, sh);
 			DrawSubToolbar(sw);
 			LayoutPicker();
-			DrawMirrorToggles();
 			DrawNaviCube();
 			DrawPicker();
 			if (tool)

@@ -86,8 +86,9 @@ namespace spades {
 
 			// `apply` runs when the final click is LMB, `applyAlt` when it is RMB
 			// (e.g. fill vs cut, or select vs deselect).
-			RectSubTool(const char* label, ApplyFn apply, ApplyFn applyAlt)
-			    : label(label), apply(std::move(apply)), applyAlt(std::move(applyAlt)) {}
+			RectSubTool(const char* label, ApplyFn apply, ApplyFn applyAlt, bool useMirror = false)
+			    : label(label), apply(std::move(apply)), applyAlt(std::move(applyAlt)),
+			      useMirror(useMirror) {}
 
 			const char* Label() const override { return label; }
 			void OnActivate(KV6EditorView&) override;
@@ -99,6 +100,7 @@ namespace spades {
 			const char* label;
 			ApplyFn apply;
 			ApplyFn applyAlt;
+			bool useMirror;
 
 			int stage = 0;            // 0 none, 1 corner set, 2 rectangle set
 			IntVector3 p1;            // first corner

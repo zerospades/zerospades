@@ -32,7 +32,7 @@ namespace spades {
 				ed.EraseCells(cells);
 			};
 			subs.push_back(std::unique_ptr<SubTool>(new BlockSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill, erase)));
+			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill, erase, true)));
 		}
 	} // namespace gui
 } // namespace spades
