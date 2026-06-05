@@ -30,6 +30,7 @@ namespace spades {
 			DrawTool();
 			const char* Label() const override { return "Draw"; }
 			bool UsesMirror() const override { return true; }
+			bool UsesColor() const override { return true; }
 		};
 	} // namespace gui
 } // namespace spades

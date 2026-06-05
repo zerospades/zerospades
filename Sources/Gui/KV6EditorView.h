@@ -185,6 +185,7 @@ namespace spades {
 			int presetCols = 8;
 			int dragPick = 0; // 0 none, 1 SV square, 2 hue bar
 			bool pickMode = false;
+			bool pickerOpen = false; // the picker is a popup opened from the toolbar
 
 			// Picker panel geometry (recomputed each frame).
 			float pkX, pkY, pkW, pkH;
@@ -193,6 +194,7 @@ namespace spades {
 			float prevX, prevY, prevW, prevH;
 			float eyeX, eyeY, eyeS;
 			float presX, presY, presSwatch;
+			float closeX, closeY, closeS; // picker close button
 
 			// --- Mirror modelling (reflect each edit across the pivot plane) ---
 			// Toggled from the sub-toolbar; honoured by the Draw tool's edits.
@@ -313,6 +315,7 @@ namespace spades {
 			float BarsH(); // total height of ribbon + toolbar + sub-toolbar
 			int SubToolbarHitTest(const Vector2& p);       // -1 none, else sub-tool index
 			int SubToolbarMirrorAt(const Vector2& p);      // -1 none, else mirror axis 0/1/2
+			bool SubToolbarColorAt(const Vector2& p);      // current-colour swatch clicked
 			void DrawSubToolbar(float sw);
 
 			// Pause menu / Save As prompt

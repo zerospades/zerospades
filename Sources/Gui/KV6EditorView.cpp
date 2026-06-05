@@ -69,6 +69,14 @@ namespace spades {
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
 			const float kMirW = 24.0F, kMirLabelW = 50.0F; // mirror toggles in sub-bar
+			const float kColorW = 46.0F;                   // current-colour swatch
+			// X of the colour swatch in the sub-toolbar, after sub-tools (+ mirror).
+			float SubColorX(int subCount, bool mirror) {
+				float x = kTbX0 + float(subCount) * (kSubBtn + kTbGap);
+				if (mirror)
+					x += kTbSep + kMirLabelW + 3.0F * (kMirW + kTbGap);
+				return x + kTbSep;
+			}
 
 			// Pack a (non-negative) voxel coordinate into a selection-set key.
 			int64_t SelKey(int x, int y, int z) {
@@ -965,12 +973,16 @@ namespace spades {
 			presSwatch = (svSize + 6.0F + hueW) / float(presetCols);
 			float contentW = svSize + 6.0F + hueW;
 			prevH = 22.0F;
+			float headerH = 18.0F; // title bar with the close button
 			pkW = 8.0F * 2.0F + contentW;
-			pkH = 8.0F * 2.0F + svSize + 6.0F + prevH + 6.0F + 2.0F * presSwatch;
+			pkH = 8.0F * 2.0F + headerH + svSize + 6.0F + prevH + 6.0F + 2.0F * presSwatch;
 			pkX = sw - 16.0F - pkW;
 			pkY = sh - bottomClear - pkH; // picker now sits at the bottom-right
+			closeS = 13.0F;
+			closeX = pkX + pkW - 8.0F - closeS;
+			closeY = pkY + 5.0F;
 			svX = pkX + 8.0F;
-			svY = pkY + 8.0F;
+			svY = pkY + 8.0F + headerH;
 			hueX = svX + svSize + 6.0F;
 			hueY = svY;
 			prevY = svY + svSize + 6.0F;
@@ -984,7 +996,7 @@ namespace spades {
 		}
 
 		bool KV6EditorView::CursorOverPicker(const Vector2& p) const {
-			return p.x >= pkX && p.x < pkX + pkW && p.y >= pkY && p.y < pkY + pkH;
+			return pickerOpen && p.x >= pkX && p.x < pkX + pkW && p.y >= pkY && p.y < pkY + pkH;
 		}
 
 		bool KV6EditorView::InRect(const Vector2& p, float x, float y, float w, float h) const {
@@ -1002,6 +1014,9 @@ namespace spades {
 		}
 
 		bool KV6EditorView::PickerMouseDown(const Vector2& p) {
+			if (!pickerOpen)
+				return false;
+			if (InRect(p, closeX, closeY, closeS, closeS)) { pickerOpen = false; return true; }
 			if (InRect(p, svX, svY, svSize, svSize)) { dragPick = 1; UpdateSV(p); return true; }
 			if (InRect(p, hueX, hueY, hueW, svSize)) { dragPick = 2; UpdateHue(p); return true; }
 			if (InRect(p, eyeX, eyeY, eyeS, eyeS)) {
@@ -1281,9 +1296,25 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawPicker() {
+			if (!pickerOpen)
+				return;
 			float pad = 2.0F;
 			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.55F));
 			FillRect(pkX, pkY, pkW, pkH);
+
+			// Header: "Colour" + close button.
+			client::IFont& hf = fontManager->GetGuiFont();
+			hf.Draw("Colour", MakeVector2(pkX + 8.0F, pkY + 4.0F), 0.75F,
+			        MakeVector4(0.85F, 0.85F, 0.85F, 1.0F));
+			ColorNP(MakeVector4(0.35F, 0.18F, 0.18F, 1.0F));
+			FillRect(closeX, closeY, closeS, closeS);
+			StrokeRect(closeX, closeY, closeS, closeS, 1.0F, MakeVector4(0.7F, 0.5F, 0.5F, 0.9F));
+			DrawLine2D(MakeVector2(closeX + 3.0F, closeY + 3.0F),
+			           MakeVector2(closeX + closeS - 3.0F, closeY + closeS - 3.0F), 1.5F,
+			           MakeVector4(1, 1, 1, 0.9F));
+			DrawLine2D(MakeVector2(closeX + closeS - 3.0F, closeY + 3.0F),
+			           MakeVector2(closeX + 3.0F, closeY + closeS - 3.0F), 1.5F,
+			           MakeVector4(1, 1, 1, 0.9F));
 
 			int cells = 24;
 			float cw = svSize / float(cells);
@@ -1600,6 +1631,17 @@ namespace spades {
 				font.Draw(ml[i], MakeVector2(x + (kMirW - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
 				          s, MakeVector4(1, 1, 1, 1));
 			}
+
+			if (t->UsesColor()) {
+				float cx = SubColorX(t->SubToolCount(), t->UsesMirror());
+				ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
+				FillRect(cx - kTbSep * 0.5F, by + 2.0F, 1.0F, kTbH - 4.0F); // separator
+				ColorNP(ColorToVec(currentColor));
+				FillRect(cx, by, kColorW, kTbH);
+				StrokeRect(cx, by, kColorW, kTbH, pickerOpen ? 2.0F : 1.0F,
+				           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
+				                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
+			}
 		}
 
 		int KV6EditorView::SubToolbarMirrorAt(const Vector2& p) {
@@ -1614,6 +1656,14 @@ namespace spades {
 					return i;
 			}
 			return -1;
+		}
+
+		bool KV6EditorView::SubToolbarColorAt(const Vector2& p) {
+			EditorTool* t = ActiveTool();
+			if (!t || !t->UsesColor())
+				return false;
+			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
+			return InRect(p, SubColorX(t->SubToolCount(), t->UsesMirror()), by, kColorW, kTbH);
 		}
 
 		void KV6EditorView::DrawRibbon(float sw) {
@@ -1829,6 +1879,7 @@ namespace spades {
 					else mirrorZ = !mirrorZ;
 					return;
 				}
+				if (SubToolbarColorAt(cursor)) { pickerOpen = !pickerOpen; return; }
 				if (PickerMouseDown(cursor)) return;
 				Vector3 navDir;
 				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view

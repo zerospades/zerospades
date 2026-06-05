@@ -51,6 +51,9 @@ namespace spades {
 			// True if this tool honours the mirror X/Y/Z toggles (shown in the
 			// secondary toolbar next to its sub-tools).
 			virtual bool UsesMirror() const { return false; }
+			// True if this tool draws with the current colour (shows the colour
+			// swatch in the secondary toolbar).
+			virtual bool UsesColor() const { return false; }
 
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
