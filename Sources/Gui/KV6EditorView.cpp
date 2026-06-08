@@ -99,7 +99,7 @@ namespace spades {
 			}
 			const char* FaceLabel(int ax, int sg) {
 				static const char* names[3][2] = {
-				  {"Left", "Right"}, {"Front", "Back"}, {"Top", "Bottom"}};
+				  {"Right", "Left"}, {"Back", "Front"}, {"Top", "Bottom"}};
 				return names[ax][sg > 0 ? 1 : 0];
 			}
 			// Inside a convex polygon (n verts, ordered): consistent edge-cross signs.
