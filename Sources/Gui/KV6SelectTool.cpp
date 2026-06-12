@@ -20,6 +20,7 @@
 
 #include "KV6SelectTool.h"
 #include "KV6EditorContext.h"
+#include "KV6SubToolRegistry.h"
 
 namespace spades {
 	namespace gui {
@@ -35,6 +36,10 @@ namespace spades {
 			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", select, deselect)));
 			subs.push_back(std::unique_ptr<EditorTool>(new ByColourSubTool()));
 			subs.push_back(std::unique_ptr<EditorTool>(new MoveSubTool()));
+
+			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
+			// the built-in ones.
+			SubToolRegistry::Instance().BuildFor(SubToolTarget::Select, subs);
 		}
 	} // namespace gui
 } // namespace spades

@@ -20,6 +20,7 @@
 
 #include "KV6DrawTool.h"
 #include "KV6EditorContext.h"
+#include "KV6SubToolRegistry.h"
 
 namespace spades {
 	namespace gui {
@@ -40,6 +41,10 @@ namespace spades {
 			options.AddBool("mirror.y", "Y", "Mirror");
 			options.AddBool("mirror.z", "Z", "Mirror");
 			options.AddColor("color");
+
+			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
+			// the built-in ones.
+			SubToolRegistry::Instance().BuildFor(SubToolTarget::Draw, subs);
 		}
 	} // namespace gui
 } // namespace spades
