@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "KV6ToolEvent.h"
 #include "View.h"
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
@@ -101,7 +102,6 @@ namespace spades {
 			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
 			void SelectLinkedColor(int x, int y, int z);
 
-			bool AltHeld() const { return altHeld; }
 			bool PickModeActive() const { return pickMode; }
 			void ClearPickMode() { pickMode = false; }
 			void PlaceCube();
@@ -223,7 +223,14 @@ namespace spades {
 			bool lookActive = false;
 			bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
 			bool keyUp = false, keyDown = false;
-			bool ctrlHeld = false, altHeld = false;
+			bool ctrlHeld = false, altHeld = false, shiftHeld = false;
+			bool lmbHeld = false, rmbHeld = false; // for move/drag pointer events
+
+			// Build a typed pointer/key event stamped with the current cursor and
+			// modifier state, and route it to the active tool.
+			PointerInput MakePointer(PointerButton b, PointerPhase ph,
+			                         const Vector2& delta = MakeVector2(0, 0)) const;
+			void DispatchPointer(const PointerInput& e);
 
 			// --- Cursor / status ----------------------------------------------
 			Vector2 cursor;

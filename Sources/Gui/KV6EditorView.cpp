@@ -1510,6 +1510,24 @@ namespace spades {
 			return nullptr;
 		}
 
+		PointerInput KV6EditorView::MakePointer(PointerButton b, PointerPhase ph,
+		                                        const Vector2& delta) const {
+			PointerInput e;
+			e.button = b;
+			e.phase = ph;
+			e.pos = cursor;
+			e.delta = delta;
+			e.alt = altHeld;
+			e.ctrl = ctrlHeld;
+			e.shift = shiftHeld;
+			return e;
+		}
+
+		void KV6EditorView::DispatchPointer(const PointerInput& e) {
+			if (EditorTool* t = ActiveTool())
+				t->OnPointer(*this, e);
+		}
+
 		// --- Ribbon (title) + unified toolbar [modes] | [tools] -------------
 		//
 		// Two stacked full-width bars at the very top: a ribbon (title/filename)
@@ -1768,8 +1786,17 @@ namespace spades {
 			}
 			cursor.x = Clampf(cursor.x + dx, 0.0F, renderer->ScreenWidth());
 			cursor.y = Clampf(cursor.y + dy, 0.0F, renderer->ScreenHeight());
-			if (dragPick == 1) UpdateSV(cursor);
-			else if (dragPick == 2) UpdateHue(cursor);
+			if (dragPick == 1) { UpdateSV(cursor); return; }
+			if (dragPick == 2) { UpdateHue(cursor); return; }
+
+			// Forward cursor motion over the viewport to the active tool as a Move
+			// (no button) or Drag (button held) event.
+			if (cursor.y < BarsH())
+				return;
+			PointerButton b = lmbHeld ? PointerButton::Left
+			                          : (rmbHeld ? PointerButton::Right : PointerButton::None);
+			PointerPhase ph = (lmbHeld || rmbHeld) ? PointerPhase::Drag : PointerPhase::Move;
+			DispatchPointer(MakePointer(b, ph, MakeVector2(dx, dy)));
 		}
 
 		void KV6EditorView::WheelEvent(float x, float y) {
@@ -1840,6 +1867,7 @@ namespace spades {
 
 			if (key == "Control") ctrlHeld = down;
 			if (key == "Alt") altHeld = down;
+			if (key == "Shift") shiftHeld = down;
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "s")) { Save(); return; }
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "c")) { CopySelection(); return; }
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "x")) { CutSelection(); return; }
@@ -1850,7 +1878,8 @@ namespace spades {
 			if (key == "LeftMouseButton") {
 				if (!down) {
 					dragPick = 0;
-					if (EditorTool* t = ActiveTool()) t->OnPointerUp(*this, key);
+					lmbHeld = false;
+					DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Up));
 					return;
 				}
 				ToolbarHit hit = ToolbarHitTest(cursor);
@@ -1884,16 +1913,20 @@ namespace spades {
 				Vector3 navDir;
 				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view
 				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
-				if (EditorTool* t = ActiveTool()) t->OnPointerDown(*this, key);
+				lmbHeld = true;
+				DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Down));
 				return;
 			}
 			if (key == "RightMouseButton") {
-				if (down && CursorOverPicker(cursor)) return;
-				if (down && cursor.y < BarsH()) return; // over the bars
-				if (EditorTool* t = ActiveTool()) {
-					if (down) t->OnPointerDown(*this, key);
-					else t->OnPointerUp(*this, key);
+				if (!down) {
+					rmbHeld = false;
+					DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Up));
+					return;
 				}
+				if (CursorOverPicker(cursor)) return;
+				if (cursor.y < BarsH()) return; // over the bars
+				rmbHeld = true;
+				DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Down));
 				return;
 			}
 
@@ -1909,8 +1942,15 @@ namespace spades {
 			if (KV6CheckKey(cr, key)) { keyDown = down; return; }
 
 			// Remaining keys go to the active tool (e.g. Select's [L]).
-			if (EditorTool* t = ActiveTool())
-				t->OnKey(*this, key, down);
+			if (EditorTool* t = ActiveTool()) {
+				KeyInput e;
+				e.key = key;
+				e.phase = down ? KeyPhase::Down : KeyPhase::Up;
+				e.alt = altHeld;
+				e.ctrl = ctrlHeld;
+				e.shift = shiftHeld;
+				t->OnKey(*this, e);
+			}
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {

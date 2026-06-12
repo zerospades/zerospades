@@ -38,17 +38,13 @@ namespace spades {
 			if (SubTool* s = Cur())
 				s->OnActivate(ed);
 		}
-		void MultiSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
+		void MultiSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
 			if (SubTool* s = Cur())
-				s->OnPointerDown(ed, button);
+				s->OnPointer(ed, e);
 		}
-		void MultiSubTool::OnPointerUp(KV6EditorView& ed, const std::string& button) {
+		void MultiSubTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
 			if (SubTool* s = Cur())
-				s->OnPointerUp(ed, button);
-		}
-		void MultiSubTool::OnKey(KV6EditorView& ed, const std::string& key, bool down) {
-			if (SubTool* s = Cur())
-				s->OnKey(ed, key, down);
+				s->OnKey(ed, e);
 		}
 		bool MultiSubTool::OnEscape(KV6EditorView& ed) {
 			SubTool* s = Cur();

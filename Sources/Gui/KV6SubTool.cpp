@@ -61,15 +61,17 @@ namespace spades {
 		void BlockSubTool::OnActivate(KV6EditorView& ed) {
 			ed.SetStatus("Draw: LMB place  -  RMB delete  -  Alt+LMB pick colour");
 		}
-		void BlockSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button == "LeftMouseButton") {
-				if (ed.AltHeld() || ed.PickModeActive()) {
+		void BlockSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			if (e.IsLeft()) {
+				if (e.alt || ed.PickModeActive()) {
 					ed.Eyedropper();
 					ed.ClearPickMode();
 					return;
 				}
 				ed.PlaceCube();
-			} else if (button == "RightMouseButton") {
+			} else if (e.IsRight()) {
 				ed.DeleteCube();
 			}
 		}
@@ -87,8 +89,8 @@ namespace spades {
 		void PointSubTool::OnActivate(KV6EditorView& ed) {
 			ed.SetStatus("Select Point: click to (de)select  -  click empty to clear");
 		}
-		void PointSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button != "LeftMouseButton")
+		void PointSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (!e.IsDown() || !e.IsLeft())
 				return;
 			ed.DoPick();
 			if (ed.HasPick()) {
@@ -111,8 +113,8 @@ namespace spades {
 		void ByColourSubTool::OnActivate(KV6EditorView& ed) {
 			ed.SetStatus("Select By Colour: click a voxel to select its colour region  -  [L]");
 		}
-		void ByColourSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button != "LeftMouseButton")
+		void ByColourSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (!e.IsDown() || !e.IsLeft())
 				return;
 			ed.DoPick();
 			if (ed.HasPick()) {
@@ -122,8 +124,8 @@ namespace spades {
 				ed.ClearSelection();
 			}
 		}
-		void ByColourSubTool::OnKey(KV6EditorView& ed, const std::string& key, bool down) {
-			if (down && EqualsIgnoringCase(key, "L")) {
+		void ByColourSubTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
+			if (e.IsDown() && EqualsIgnoringCase(e.key, "L")) {
 				ed.DoPick();
 				if (ed.HasPick()) {
 					IntVector3 h = ed.PickSolid();
@@ -186,8 +188,10 @@ namespace spades {
 				out.push_back(MakeIntVector3(x, y, z));
 		}
 
-		void RectSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			bool lmb = button == "LeftMouseButton", rmb = button == "RightMouseButton";
+		void RectSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			bool lmb = e.IsLeft(), rmb = e.IsRight();
 			if (!lmb && !rmb)
 				return;
 
@@ -278,38 +282,38 @@ namespace spades {
 			return int(std::lround(Vector2::Dot(m, da) / (dl * dl)));
 		}
 
-		void MoveSubTool::OnPointerDown(KV6EditorView& ed, const std::string& button) {
-			if (button != "LeftMouseButton")
+		void MoveSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (!e.IsLeft())
 				return;
-			Vector3 c;
-			if (!ed.SelectionCentroid(c))
-				return;
-			Vector2 cur = ed.CursorPos();
-			int best = -1;
-			float bestDist = 12.0F; // pixels
-			for (int a = 0; a < 3; a++) {
-				bool ok1, ok2;
-				Vector2 s0 = ed.WorldToScreen(c, ok1);
-				Vector2 sa = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok2);
-				if (!ok1 || !ok2)
-					continue;
-				float d = DistToSeg(cur, s0, sa);
-				if (d < bestDist) { bestDist = d; best = a; }
+			if (e.IsDown()) {
+				Vector3 c;
+				if (!ed.SelectionCentroid(c))
+					return;
+				Vector2 cur = ed.CursorPos();
+				int best = -1;
+				float bestDist = 12.0F; // pixels
+				for (int a = 0; a < 3; a++) {
+					bool ok1, ok2;
+					Vector2 s0 = ed.WorldToScreen(c, ok1);
+					Vector2 sa = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok2);
+					if (!ok1 || !ok2)
+						continue;
+					float d = DistToSeg(cur, s0, sa);
+					if (d < bestDist) { bestDist = d; best = a; }
+				}
+				if (best >= 0) { grabAxis = best; grabCursor = cur; curOffset = 0; }
+			} else if (e.IsUp()) {
+				if (grabAxis < 0)
+					return;
+				Vector3 c;
+				int off = ed.SelectionCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
+				if (off != 0) {
+					int d[3] = {0, 0, 0};
+					d[grabAxis] = off;
+					ed.MoveSelection(d[0], d[1], d[2]);
+				}
+				grabAxis = -1;
 			}
-			if (best >= 0) { grabAxis = best; grabCursor = cur; curOffset = 0; }
-		}
-
-		void MoveSubTool::OnPointerUp(KV6EditorView& ed, const std::string& button) {
-			if (button != "LeftMouseButton" || grabAxis < 0)
-				return;
-			Vector3 c;
-			int off = ed.SelectionCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
-			if (off != 0) {
-				int d[3] = {0, 0, 0};
-				d[grabAxis] = off;
-				ed.MoveSelection(d[0], d[1], d[2]);
-			}
-			grabAxis = -1;
 		}
 
 		bool MoveSubTool::OnEscape(KV6EditorView&) {

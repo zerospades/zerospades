@@ -22,6 +22,8 @@
 
 #include <string>
 
+#include "KV6ToolEvent.h"
+
 namespace spades {
 	namespace gui {
 		class KV6EditorView;
@@ -62,11 +64,10 @@ namespace spades {
 			virtual int ActiveSubTool() const { return 0; }
 			virtual void SetSubTool(KV6EditorView&, int) {}
 
-			// `button` is "LeftMouseButton" / "RightMouseButton".
-			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}
-			virtual void OnPointerUp(KV6EditorView&, const std::string& button) {}
-			virtual void OnPointerDrag(KV6EditorView&) {}
-			virtual void OnKey(KV6EditorView&, const std::string& key, bool down) {}
+			// All pointer activity (press, release, move, drag) arrives here; the
+			// phase and button live on the event.
+			virtual void OnPointer(KV6EditorView&, const PointerInput&) {}
+			virtual void OnKey(KV6EditorView&, const KeyInput&) {}
 
 			// 3D preview, drawn between StartScene and EndScene.
 			virtual void DrawScene(KV6EditorView&) {}

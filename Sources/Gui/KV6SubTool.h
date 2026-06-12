@@ -27,6 +27,8 @@
 
 #include <Core/Math.h>
 
+#include "KV6ToolEvent.h"
+
 namespace spades {
 	namespace gui {
 		class KV6EditorView;
@@ -38,9 +40,8 @@ namespace spades {
 			virtual ~SubTool() {}
 			virtual const char* Label() const = 0;
 			virtual void OnActivate(KV6EditorView&) {}
-			virtual void OnPointerDown(KV6EditorView&, const std::string& button) {}
-			virtual void OnPointerUp(KV6EditorView&, const std::string& button) {}
-			virtual void OnKey(KV6EditorView&, const std::string& key, bool down) {}
+			virtual void OnPointer(KV6EditorView&, const PointerInput&) {}
+			virtual void OnKey(KV6EditorView&, const KeyInput&) {}
 			// Abort an in-progress operation (Esc); return true if consumed.
 			virtual bool OnEscape(KV6EditorView&) { return false; }
 			virtual void DrawScene(KV6EditorView&) {}
@@ -52,7 +53,7 @@ namespace spades {
 		public:
 			const char* Label() const override { return "Block"; }
 			void OnActivate(KV6EditorView&) override;
-			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			void OnPointer(KV6EditorView&, const PointerInput&) override;
 			void DrawScene(KV6EditorView&) override;
 		};
 
@@ -61,7 +62,7 @@ namespace spades {
 		public:
 			const char* Label() const override { return "Point"; }
 			void OnActivate(KV6EditorView&) override;
-			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			void OnPointer(KV6EditorView&, const PointerInput&) override;
 			void DrawScene(KV6EditorView&) override;
 		};
 
@@ -70,8 +71,8 @@ namespace spades {
 		public:
 			const char* Label() const override { return "By Colour"; }
 			void OnActivate(KV6EditorView&) override;
-			void OnPointerDown(KV6EditorView&, const std::string& button) override;
-			void OnKey(KV6EditorView&, const std::string& key, bool down) override;
+			void OnPointer(KV6EditorView&, const PointerInput&) override;
+			void OnKey(KV6EditorView&, const KeyInput&) override;
 			void DrawScene(KV6EditorView&) override;
 		};
 
@@ -92,7 +93,7 @@ namespace spades {
 
 			const char* Label() const override { return label; }
 			void OnActivate(KV6EditorView&) override;
-			void OnPointerDown(KV6EditorView&, const std::string& button) override;
+			void OnPointer(KV6EditorView&, const PointerInput&) override;
 			bool OnEscape(KV6EditorView&) override;
 			void DrawScene(KV6EditorView&) override;
 
@@ -120,8 +121,7 @@ namespace spades {
 		public:
 			const char* Label() const override { return "Move"; }
 			void OnActivate(KV6EditorView&) override;
-			void OnPointerDown(KV6EditorView&, const std::string& button) override;
-			void OnPointerUp(KV6EditorView&, const std::string& button) override;
+			void OnPointer(KV6EditorView&, const PointerInput&) override;
 			bool OnEscape(KV6EditorView&) override;
 			void DrawScene(KV6EditorView&) override;
 
