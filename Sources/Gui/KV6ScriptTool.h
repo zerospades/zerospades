@@ -26,6 +26,7 @@
 #include "KV6EditorTool.h"
 
 class asIScriptObject;
+class asIScriptFunction;
 
 namespace spades {
 	namespace gui {
@@ -50,6 +51,14 @@ namespace spades {
 
 		private:
 			asIScriptObject* obj;
+			// Concrete tool methods, resolved once from the object's type (null if the
+			// tool doesn't provide one).
+			asIScriptFunction* fnActivate = nullptr;
+			asIScriptFunction* fnDeactivate = nullptr;
+			asIScriptFunction* fnPointer = nullptr;
+			asIScriptFunction* fnKey = nullptr;
+			asIScriptFunction* fnEscape = nullptr;
+			asIScriptFunction* fnDraw = nullptr;
 			std::string label;
 		};
 
