@@ -197,8 +197,9 @@ namespace spades {
 			float closeX, closeY, closeS; // picker close button
 
 			// --- Mirror modelling (reflect each edit across the pivot plane) ---
-			// Toggled from the sub-toolbar; honoured by the Draw tool's edits.
-			bool mirrorX = false, mirrorY = false, mirrorZ = false;
+			// The X/Y/Z toggles live in the active tool's options (Draw); the edit
+			// and preview code reads them through MirrorOn().
+			bool MirrorOn(int axis) const; // axis 0/1/2 -> mirror.x/y/z option
 
 			// Orientation gizmo.
 			float gizCx, gizCy, gizR;
@@ -320,9 +321,11 @@ namespace spades {
 
 			// Secondary toolbar showing the active tool's sub-tools (always shown).
 			float BarsH(); // total height of ribbon + toolbar + sub-toolbar
-			int SubToolbarHitTest(const Vector2& p);       // -1 none, else sub-tool index
-			int SubToolbarMirrorAt(const Vector2& p);      // -1 none, else mirror axis 0/1/2
-			bool SubToolbarColorAt(const Vector2& p);      // current-colour swatch clicked
+			int SubToolbarHitTest(const Vector2& p);  // -1 none, else sub-tool index
+			// X / width of the active tool's option `i` in the sub-toolbar (shared by
+			// drawing and hit-testing so they stay in sync).
+			float OptionRect(int i, float& outW);
+			int SubToolbarOptionAt(const Vector2& p); // -1 none, else option index
 			void DrawSubToolbar(float sw);
 
 			// Pause menu / Save As prompt

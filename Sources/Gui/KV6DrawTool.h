@@ -29,8 +29,10 @@ namespace spades {
 		public:
 			DrawTool();
 			const char* Label() const override { return "Draw"; }
-			bool UsesMirror() const override { return true; }
-			bool UsesColor() const override { return true; }
+			ToolOptions* Options() override { return &options; }
+
+		private:
+			ToolOptions options; // mirror X/Y/Z toggles + the colour swatch
 		};
 	} // namespace gui
 } // namespace spades

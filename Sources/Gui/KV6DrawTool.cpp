@@ -33,6 +33,13 @@ namespace spades {
 			};
 			subs.push_back(std::unique_ptr<EditorTool>(new BlockSubTool()));
 			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", fill, erase, true)));
+
+			// Mirror each edit across the pivot plane for the enabled axes, then the
+			// brush colour swatch (opens the picker).
+			options.AddBool("mirror.x", "X", "Mirror");
+			options.AddBool("mirror.y", "Y", "Mirror");
+			options.AddBool("mirror.z", "Z", "Mirror");
+			options.AddColor("color");
 		}
 	} // namespace gui
 } // namespace spades

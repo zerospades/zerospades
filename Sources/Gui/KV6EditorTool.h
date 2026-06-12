@@ -23,6 +23,7 @@
 #include <string>
 
 #include "KV6ToolEvent.h"
+#include "KV6ToolOptions.h"
 
 namespace spades {
 	namespace gui {
@@ -50,12 +51,11 @@ namespace spades {
 			// key (so the editor doesn't also open the pause menu).
 			virtual bool OnEscape(KV6EditorView&) { return false; }
 
-			// True if this tool honours the mirror X/Y/Z toggles (shown in the
-			// secondary toolbar next to its sub-tools).
-			virtual bool UsesMirror() const { return false; }
-			// True if this tool draws with the current colour (shows the colour
-			// swatch in the secondary toolbar).
-			virtual bool UsesColor() const { return false; }
+			// Declarative options shown in the secondary toolbar next to this tool's
+			// sub-tools (e.g. Draw's mirror toggles and colour swatch). Returning
+			// null means the tool has no options. The editor renders and hit-tests
+			// whatever is listed, so tools never touch the toolbar code directly.
+			virtual ToolOptions* Options() { return nullptr; }
 
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).

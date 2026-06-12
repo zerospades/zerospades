@@ -68,15 +68,8 @@ namespace spades {
 			const float kSubBtn = 88.0F;  // sub-tool button width
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
-			const float kMirW = 24.0F, kMirLabelW = 50.0F; // mirror toggles in sub-bar
+			const float kMirW = 24.0F, kMirLabelW = 50.0F; // option toggle / group label
 			const float kColorW = 46.0F;                   // current-colour swatch
-			// X of the colour swatch in the sub-toolbar, after sub-tools (+ mirror).
-			float SubColorX(int subCount, bool mirror) {
-				float x = kTbX0 + float(subCount) * (kSubBtn + kTbGap);
-				if (mirror)
-					x += kTbSep + kMirLabelW + 3.0F * (kMirW + kTbGap);
-				return x + kTbSep;
-			}
 
 			// Pack a (non-negative) voxel coordinate into a selection-set key.
 			int64_t SelKey(int x, int y, int z) {
@@ -487,7 +480,8 @@ namespace spades {
 		}
 
 		void KV6EditorView::ExpandMirrors(std::vector<IntVector3>& cells) const {
-			if (!mirrorX && !mirrorY && !mirrorZ)
+			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
+			if (!mx && !my && !mz)
 				return;
 			Vector3 org = model->GetOrigin();
 			std::vector<IntVector3> out;
@@ -496,9 +490,9 @@ namespace spades {
 				int xs[2] = {c.x, c.x}, nx = 1;
 				int ys[2] = {c.y, c.y}, ny = 1;
 				int zs[2] = {c.z, c.z}, nz = 1;
-				if (mirrorX) { int m = MirrorIdx(c.x, -org.x); if (m != c.x) { xs[1] = m; nx = 2; } }
-				if (mirrorY) { int m = MirrorIdx(c.y, -org.y); if (m != c.y) { ys[1] = m; ny = 2; } }
-				if (mirrorZ) { int m = MirrorIdx(c.z, -org.z); if (m != c.z) { zs[1] = m; nz = 2; } }
+				if (mx) { int m = MirrorIdx(c.x, -org.x); if (m != c.x) { xs[1] = m; nx = 2; } }
+				if (my) { int m = MirrorIdx(c.y, -org.y); if (m != c.y) { ys[1] = m; ny = 2; } }
+				if (mz) { int m = MirrorIdx(c.z, -org.z); if (m != c.z) { zs[1] = m; nz = 2; } }
 				for (int a = 0; a < nx; a++)
 				for (int b = 0; b < ny; b++)
 				for (int d = 0; d < nz; d++)
@@ -553,9 +547,10 @@ namespace spades {
 			// Target plus its mirror images across the pivot plane. The mirror — or
 			// a placement past an edge — may land outside, so grow to fit them all.
 			Vector3 org = model->GetOrigin();
-			int xb = mirrorX ? MirrorIdx(tx, -org.x) : tx; int nx = (mirrorX && xb != tx) ? 2 : 1;
-			int yb = mirrorY ? MirrorIdx(ty, -org.y) : ty; int ny = (mirrorY && yb != ty) ? 2 : 1;
-			int zb = mirrorZ ? MirrorIdx(tz, -org.z) : tz; int nz = (mirrorZ && zb != tz) ? 2 : 1;
+			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
+			int xb = mx ? MirrorIdx(tx, -org.x) : tx; int nx = (mx && xb != tx) ? 2 : 1;
+			int yb = my ? MirrorIdx(ty, -org.y) : ty; int ny = (my && yb != ty) ? 2 : 1;
+			int zb = mz ? MirrorIdx(tz, -org.z) : tz; int nz = (mz && zb != tz) ? 2 : 1;
 
 			int loX = std::min(0, tx); int hiX = std::max(model->GetWidth(), tx + 1);
 			if (nx == 2) { loX = std::min(loX, xb); hiX = std::max(hiX, xb + 1); }
@@ -594,9 +589,10 @@ namespace spades {
 				return;
 			int hx = pickHX, hy = pickHY, hz = pickHZ;
 			Vector3 org = model->GetOrigin();
-			int xb = mirrorX ? MirrorIdx(hx, -org.x) : hx; int nx = (mirrorX && xb != hx) ? 2 : 1;
-			int yb = mirrorY ? MirrorIdx(hy, -org.y) : hy; int ny = (mirrorY && yb != hy) ? 2 : 1;
-			int zb = mirrorZ ? MirrorIdx(hz, -org.z) : hz; int nz = (mirrorZ && zb != hz) ? 2 : 1;
+			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
+			int xb = mx ? MirrorIdx(hx, -org.x) : hx; int nx = (mx && xb != hx) ? 2 : 1;
+			int yb = my ? MirrorIdx(hy, -org.y) : hy; int ny = (my && yb != hy) ? 2 : 1;
+			int zb = mz ? MirrorIdx(hz, -org.z) : hz; int nz = (mz && zb != hz) ? 2 : 1;
 
 			int n = 0;
 			for (int ia = 0; ia < nx; ia++) { int X = (ia == 0) ? hx : xb;
@@ -1108,9 +1104,9 @@ namespace spades {
 		void KV6EditorView::DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 		                                           const Vector4& color) {
 			Vector3 org = model->GetOrigin();
-			for (int mx = 0; mx <= (mirrorX ? 1 : 0); mx++)
-			for (int my = 0; my <= (mirrorY ? 1 : 0); my++)
-			for (int mz = 0; mz <= (mirrorZ ? 1 : 0); mz++) {
+			for (int mx = 0; mx <= (MirrorOn(0) ? 1 : 0); mx++)
+			for (int my = 0; my <= (MirrorOn(1) ? 1 : 0); my++)
+			for (int mz = 0; mz <= (MirrorOn(2) ? 1 : 0); mz++) {
 				IntVector3 a = lo, b = hi;
 				if (mx) { int p = MirrorIdx(lo.x, -org.x), q = MirrorIdx(hi.x, -org.x);
 				          a.x = std::min(p, q); b.x = std::max(p, q); }
@@ -1263,7 +1259,7 @@ namespace spades {
 			float hiY = float(model->GetHeight()) - 0.5F;
 			float hiZ = float(model->GetDepth()) - 0.5F;
 
-			if (mirrorX) {
+			if (MirrorOn(0)) {
 				float px = -org.x;
 				Vector4 col = MakeVector4(1.0F, 0.35F, 0.35F, 0.25F);
 				for (int i = 0; i <= model->GetHeight(); i += 2)
@@ -1273,7 +1269,7 @@ namespace spades {
 					renderer->AddDebugLine(MakeVector3(px, lo, float(i) - 0.5F),
 					                       MakeVector3(px, hiY, float(i) - 0.5F), col);
 			}
-			if (mirrorY) {
+			if (MirrorOn(1)) {
 				float py = -org.y;
 				Vector4 col = MakeVector4(0.4F, 1.0F, 0.4F, 0.25F);
 				for (int i = 0; i <= model->GetWidth(); i += 2)
@@ -1283,7 +1279,7 @@ namespace spades {
 					renderer->AddDebugLine(MakeVector3(lo, py, float(i) - 0.5F),
 					                       MakeVector3(hiX, py, float(i) - 0.5F), col);
 			}
-			if (mirrorZ) {
+			if (MirrorOn(2)) {
 				float pz = -org.z;
 				Vector4 col = MakeVector4(0.45F, 0.6F, 1.0F, 0.25F);
 				for (int i = 0; i <= model->GetWidth(); i += 2)
@@ -1590,6 +1586,19 @@ namespace spades {
 			}
 		}
 
+		bool KV6EditorView::MirrorOn(int axis) const {
+			if (axis < 0 || axis > 2)
+				return false;
+			if (currentMode != EditorMode::Edit || activeTool < 0 ||
+			    activeTool >= int(tools.size()))
+				return false;
+			ToolOptions* o = tools[activeTool]->Options();
+			if (!o)
+				return false;
+			static const char* ids[3] = {"mirror.x", "mirror.y", "mirror.z"};
+			return o->GetBool(ids[axis]);
+		}
+
 		int KV6EditorView::SubToolbarHitTest(const Vector2& p) {
 			EditorTool* t = ActiveTool();
 			if (!t || t->SubToolCount() == 0)
@@ -1600,6 +1609,40 @@ namespace spades {
 					return i;
 			}
 			return -1;
+		}
+
+		// X (and width via outW) of the active tool's option `i`, laid out after the
+		// sub-tool buttons. Options in a new group are preceded by a separator and,
+		// if the group is named, room for its label.
+		float KV6EditorView::OptionRect(int i, float& outW) {
+			outW = 0.0F;
+			EditorTool* t = ActiveTool();
+			ToolOptions* o = t ? t->Options() : nullptr;
+			if (!o)
+				return 0.0F;
+			float x = kTbX0 + float(t->SubToolCount()) * (kSubBtn + kTbGap);
+			std::string prevGroup;
+			bool first = true;
+			for (int k = 0; k < o->Count(); k++) {
+				const ToolOption& op = o->At(k);
+				bool newGroup = first || op.group != prevGroup;
+				if (newGroup) {
+					x += kTbSep; // separator before a new group
+					if (!op.group.empty())
+						x += kMirLabelW; // room for the group label
+				} else {
+					x += kTbGap; // gap between items in the same group
+				}
+				float w = (op.type == ToolOption::Type::Color) ? kColorW : kMirW;
+				if (k == i) {
+					outW = w;
+					return x;
+				}
+				x += w;
+				prevGroup = op.group;
+				first = false;
+			}
+			return x;
 		}
 
 		void KV6EditorView::DrawSubToolbar(float sw) {
@@ -1625,63 +1668,65 @@ namespace spades {
 				          s, MakeVector4(1, 1, 1, 1));
 			}
 
-			if (!t->UsesMirror())
+			// The tool's declarative options (toggles, colour swatch), laid out
+			// generically after the sub-tool buttons.
+			ToolOptions* opts = t->Options();
+			if (!opts)
 				return;
-			// Separator, "Mirror" label, then the X/Y/Z toggles.
-			int sc = t->SubToolCount();
-			float gx = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep * 0.5F;
-			ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-			FillRect(gx, by + 2.0F, 1.0F, kTbH - 4.0F);
-			float baseX = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep + kMirLabelW;
-			font.Draw("Mirror", MakeVector2(baseX - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F),
-			          s, MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
-			const char* ml[3] = {"X", "Y", "Z"};
-			bool mon[3] = {mirrorX, mirrorY, mirrorZ};
-			for (int i = 0; i < 3; i++) {
-				float x = baseX + float(i) * (kMirW + kTbGap);
-				ColorNP(mon[i] ? MakeVector4(0.22F, 0.50F, 0.28F, 1.0F)
-				               : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-				FillRect(x, by, kMirW, kTbH);
-				StrokeRect(x, by, kMirW, kTbH, 1.0F,
-				           mon[i] ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
-				                  : MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
-				Vector2 ts = font.Measure(ml[i]);
-				font.Draw(ml[i], MakeVector2(x + (kMirW - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
-				          s, MakeVector4(1, 1, 1, 1));
-			}
-
-			if (t->UsesColor()) {
-				float cx = SubColorX(t->SubToolCount(), t->UsesMirror());
-				ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-				FillRect(cx - kTbSep * 0.5F, by + 2.0F, 1.0F, kTbH - 4.0F); // separator
-				ColorNP(ColorToVec(currentColor));
-				FillRect(cx, by, kColorW, kTbH);
-				StrokeRect(cx, by, kColorW, kTbH, pickerOpen ? 2.0F : 1.0F,
-				           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
-				                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
+			std::string prevGroup;
+			bool first = true;
+			for (int i = 0; i < opts->Count(); i++) {
+				const ToolOption& op = opts->At(i);
+				float w;
+				float x = OptionRect(i, w);
+				bool newGroup = first || op.group != prevGroup;
+				if (newGroup) {
+					// Separator before the group; named groups also get a label.
+					float labelW = op.group.empty() ? 0.0F : kMirLabelW;
+					ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
+					FillRect(x - labelW - kTbSep * 0.5F, by + 2.0F, 1.0F, kTbH - 4.0F);
+					if (!op.group.empty())
+						font.Draw(op.group,
+						          MakeVector2(x - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F), s,
+						          MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
+				}
+				if (op.type == ToolOption::Type::Color) {
+					ColorNP(ColorToVec(currentColor));
+					FillRect(x, by, w, kTbH);
+					StrokeRect(x, by, w, kTbH, pickerOpen ? 2.0F : 1.0F,
+					           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
+					                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
+				} else { // Bool toggle
+					bool on = op.bvalue;
+					ColorNP(on ? MakeVector4(0.22F, 0.50F, 0.28F, 1.0F)
+					           : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
+					FillRect(x, by, w, kTbH);
+					StrokeRect(x, by, w, kTbH, 1.0F,
+					           on ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
+					              : MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
+					Vector2 ts = font.Measure(op.label);
+					font.Draw(op.label,
+					          MakeVector2(x + (w - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F), s,
+					          MakeVector4(1, 1, 1, 1));
+				}
+				prevGroup = op.group;
+				first = false;
 			}
 		}
 
-		int KV6EditorView::SubToolbarMirrorAt(const Vector2& p) {
+		int KV6EditorView::SubToolbarOptionAt(const Vector2& p) {
 			EditorTool* t = ActiveTool();
-			if (!t || !t->UsesMirror())
+			ToolOptions* o = t ? t->Options() : nullptr;
+			if (!o)
 				return -1;
-			int sc = t->SubToolCount();
 			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
-			float baseX = kTbX0 + float(sc) * (kSubBtn + kTbGap) + kTbSep + kMirLabelW;
-			for (int i = 0; i < 3; i++) {
-				if (InRect(p, baseX + float(i) * (kMirW + kTbGap), by, kMirW, kTbH))
+			for (int i = 0; i < o->Count(); i++) {
+				float w;
+				float x = OptionRect(i, w);
+				if (InRect(p, x, by, w, kTbH))
 					return i;
 			}
 			return -1;
-		}
-
-		bool KV6EditorView::SubToolbarColorAt(const Vector2& p) {
-			EditorTool* t = ActiveTool();
-			if (!t || !t->UsesColor())
-				return false;
-			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
-			return InRect(p, SubColorX(t->SubToolCount(), t->UsesMirror()), by, kColorW, kTbH);
 		}
 
 		void KV6EditorView::DrawRibbon(float sw) {
@@ -1901,14 +1946,18 @@ namespace spades {
 					if (EditorTool* t = ActiveTool()) t->SetSubTool(*this, sub);
 					return;
 				}
-				int mir = SubToolbarMirrorAt(cursor);
-				if (mir >= 0) {
-					if (mir == 0) mirrorX = !mirrorX;
-					else if (mir == 1) mirrorY = !mirrorY;
-					else mirrorZ = !mirrorZ;
+				int opt = SubToolbarOptionAt(cursor);
+				if (opt >= 0) {
+					ToolOptions* o = ActiveTool() ? ActiveTool()->Options() : nullptr;
+					if (o) {
+						ToolOption& op = o->At(opt);
+						if (op.type == ToolOption::Type::Color)
+							pickerOpen = !pickerOpen; // open/close the colour picker
+						else
+							op.bvalue = !op.bvalue; // toggle (e.g. a mirror axis)
+					}
 					return;
 				}
-				if (SubToolbarColorAt(cursor)) { pickerOpen = !pickerOpen; return; }
 				if (PickerMouseDown(cursor)) return;
 				Vector3 navDir;
 				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view
