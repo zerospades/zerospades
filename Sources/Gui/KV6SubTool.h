@@ -27,29 +27,21 @@
 
 #include <Core/Math.h>
 
+#include "KV6EditorTool.h"
 #include "KV6ToolEvent.h"
 
 namespace spades {
 	namespace gui {
 		class KV6EditorView;
 
-		// A sub-tool of a main tool (e.g. Select's Point / Rect). Shown as a button
-		// in the secondary toolbar.
-		class SubTool {
-		public:
-			virtual ~SubTool() {}
-			virtual const char* Label() const = 0;
-			virtual void OnActivate(KV6EditorView&) {}
-			virtual void OnPointer(KV6EditorView&, const PointerInput&) {}
-			virtual void OnKey(KV6EditorView&, const KeyInput&) {}
-			// Abort an in-progress operation (Esc); return true if consumed.
-			virtual bool OnEscape(KV6EditorView&) { return false; }
-			virtual void DrawScene(KV6EditorView&) {}
-		};
+		// Leaf tools shown as buttons in the secondary toolbar (e.g. Select's Point
+		// / Rect). They are ordinary `EditorTool`s with no children of their own; a
+		// `ContainerTool` (Draw, Select) groups them and forwards input to the active
+		// one.
 
 		// Single-voxel placement / deletion (Draw's "Block"): LMB places (or samples
 		// a colour with Alt / pick mode), RMB deletes.
-		class BlockSubTool : public SubTool {
+		class BlockSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Block"; }
 			void OnActivate(KV6EditorView&) override;
@@ -58,7 +50,7 @@ namespace spades {
 		};
 
 		// Single-voxel selection toggle (Select's "Point").
-		class PointSubTool : public SubTool {
+		class PointSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Point"; }
 			void OnActivate(KV6EditorView&) override;
@@ -67,7 +59,7 @@ namespace spades {
 		};
 
 		// Flood-fill selection by colour (Select's "By Colour"); also bound to [L].
-		class ByColourSubTool : public SubTool {
+		class ByColourSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "By Colour"; }
 			void OnActivate(KV6EditorView&) override;
@@ -81,7 +73,7 @@ namespace spades {
 		// can be sized beyond the existing model. The action applied to the cells
 		// (fill voxels, or add to the selection) is injected, so Draw and Select
 		// reuse the same code.
-		class RectSubTool : public SubTool {
+		class RectSubTool : public EditorTool {
 		public:
 			using ApplyFn = std::function<void(KV6EditorView&, const std::vector<IntVector3>&)>;
 
@@ -117,7 +109,7 @@ namespace spades {
 		};
 
 		// Move the current selection by dragging a 3-axis gizmo at its centroid.
-		class MoveSubTool : public SubTool {
+		class MoveSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Move"; }
 			void OnActivate(KV6EditorView&) override;

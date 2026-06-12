@@ -18,41 +18,45 @@
 
  */
 
-#include "KV6MultiSubTool.h"
+#include "KV6ContainerTool.h"
 
 namespace spades {
 	namespace gui {
-		SubTool* MultiSubTool::Cur() {
+		EditorTool* ContainerTool::Cur() {
 			return (active >= 0 && active < int(subs.size())) ? subs[active].get() : nullptr;
 		}
 
-		void MultiSubTool::SetSubTool(KV6EditorView& ed, int i) {
+		void ContainerTool::SetSubTool(KV6EditorView& ed, int i) {
 			if (i == active || i < 0 || i >= int(subs.size()))
 				return;
 			active = i;
-			if (SubTool* s = Cur())
+			if (EditorTool* s = Cur())
 				s->OnActivate(ed);
 		}
 
-		void MultiSubTool::OnActivate(KV6EditorView& ed) {
-			if (SubTool* s = Cur())
+		void ContainerTool::OnActivate(KV6EditorView& ed) {
+			if (EditorTool* s = Cur())
 				s->OnActivate(ed);
 		}
-		void MultiSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
-			if (SubTool* s = Cur())
+		void ContainerTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+			if (EditorTool* s = Cur())
 				s->OnPointer(ed, e);
 		}
-		void MultiSubTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
-			if (SubTool* s = Cur())
+		void ContainerTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
+			if (EditorTool* s = Cur())
 				s->OnKey(ed, e);
 		}
-		bool MultiSubTool::OnEscape(KV6EditorView& ed) {
-			SubTool* s = Cur();
+		bool ContainerTool::OnEscape(KV6EditorView& ed) {
+			EditorTool* s = Cur();
 			return s ? s->OnEscape(ed) : false;
 		}
-		void MultiSubTool::DrawScene(KV6EditorView& ed) {
-			if (SubTool* s = Cur())
+		void ContainerTool::DrawScene(KV6EditorView& ed) {
+			if (EditorTool* s = Cur())
 				s->DrawScene(ed);
+		}
+		void ContainerTool::DrawOverlay(KV6EditorView& ed) {
+			if (EditorTool* s = Cur())
+				s->DrawOverlay(ed);
 		}
 	} // namespace gui
 } // namespace spades

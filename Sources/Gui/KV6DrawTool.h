@@ -20,12 +20,12 @@
 
 #pragma once
 
-#include "KV6MultiSubTool.h"
+#include "KV6ContainerTool.h"
 
 namespace spades {
 	namespace gui {
 		// Draw voxels: Block (single) and Rect (filled box).
-		class DrawTool : public MultiSubTool {
+		class DrawTool : public ContainerTool {
 		public:
 			DrawTool();
 			const char* Label() const override { return "Draw"; }

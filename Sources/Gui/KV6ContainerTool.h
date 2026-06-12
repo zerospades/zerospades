@@ -28,10 +28,10 @@
 
 namespace spades {
 	namespace gui {
-		// A main tool that is just a set of sub-tools (shown in the secondary
-		// toolbar). All input/drawing forwards to the active sub-tool, so concrete
-		// tools (Draw, Select) only have to populate `subs` and provide a Label.
-		class MultiSubTool : public EditorTool {
+		// A tool that is just a set of child tools (shown in the secondary toolbar).
+		// All input/drawing forwards to the active child, so concrete tools (Draw,
+		// Select) only have to populate `subs` and provide a Label.
+		class ContainerTool : public EditorTool {
 		public:
 			int SubToolCount() const override { return int(subs.size()); }
 			const char* SubToolLabel(int i) const override { return subs[i]->Label(); }
@@ -43,11 +43,12 @@ namespace spades {
 			void OnKey(KV6EditorView&, const KeyInput&) override;
 			bool OnEscape(KV6EditorView&) override;
 			void DrawScene(KV6EditorView&) override;
+			void DrawOverlay(KV6EditorView&) override;
 
 		protected:
-			std::vector<std::unique_ptr<SubTool>> subs;
+			std::vector<std::unique_ptr<EditorTool>> subs;
 			int active = 0;
-			SubTool* Cur();
+			EditorTool* Cur();
 		};
 	} // namespace gui
 } // namespace spades

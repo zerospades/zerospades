@@ -31,10 +31,10 @@ namespace spades {
 			auto deselect = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
 				ed.DeselectCells(cells);
 			};
-			subs.push_back(std::unique_ptr<SubTool>(new PointSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", select, deselect)));
-			subs.push_back(std::unique_ptr<SubTool>(new ByColourSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new MoveSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new PointSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", select, deselect)));
+			subs.push_back(std::unique_ptr<EditorTool>(new ByColourSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new MoveSubTool()));
 		}
 	} // namespace gui
 } // namespace spades

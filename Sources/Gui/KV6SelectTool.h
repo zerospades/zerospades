@@ -20,12 +20,12 @@
 
 #pragma once
 
-#include "KV6MultiSubTool.h"
+#include "KV6ContainerTool.h"
 
 namespace spades {
 	namespace gui {
 		// Select voxels: Point (single), Rect (box region), By Colour.
-		class SelectTool : public MultiSubTool {
+		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
 			const char* Label() const override { return "Select"; }

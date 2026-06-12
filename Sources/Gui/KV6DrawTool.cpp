@@ -31,8 +31,8 @@ namespace spades {
 			auto erase = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
 				ed.EraseCells(cells);
 			};
-			subs.push_back(std::unique_ptr<SubTool>(new BlockSubTool()));
-			subs.push_back(std::unique_ptr<SubTool>(new RectSubTool("Rect", fill, erase, true)));
+			subs.push_back(std::unique_ptr<EditorTool>(new BlockSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", fill, erase, true)));
 		}
 	} // namespace gui
 } // namespace spades
