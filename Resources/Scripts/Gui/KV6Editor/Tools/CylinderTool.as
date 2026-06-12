@@ -103,21 +103,13 @@ namespace spades {
 				ctx.DrawCellOutline(p0.x, p0.y, p0.z, hover);
 				return;
 			}
-			// Simple bounding-box preview for now (a proper cylinder rim preview is
-			// left for later).
+			// Preview the disc rim on the centre cap (and the far cap once the depth
+			// is being chosen), so it reads as a cylinder.
 			int na = normalAxis;
-			int u = (na + 1) % 3;
-			int v = (na + 2) % 3;
 			int radSq = (stage == 1) ? RadiusSq(cur) : RadiusSq(p1);
-			int R = 0;
-			while ((R + 1) * (R + 1) <= radSq) R++; // R = floor(radius)
-			int uc = Comp(p0, u);
-			int vc = Comp(p0, v);
-			int nA = Comp(p0, na);
-			int nB = (stage == 1) ? Comp(p0, na) : Comp(cur, na);
-			IntVector3 lo = BuildCell(na, IMin(nA, nB), u, uc - R, v, vc - R);
-			IntVector3 hi = BuildCell(na, IMax(nA, nB), u, uc + R, v, vc + R);
-			ctx.DrawBoxOutlineMirrored(lo, hi, hover);
+			DrawRing(ctx, Comp(p0, na), radSq, hover);
+			if (stage == 2)
+				DrawRing(ctx, Comp(cur, na), radSq, hover);
 		}
 
 		// --- helpers -----------------------------------------------------------
@@ -142,6 +134,34 @@ namespace spades {
 			if (u == 0) xs = uVal; else if (u == 1) ys = uVal; else zs = uVal;
 			if (v == 0) xs = vVal; else if (v == 1) ys = vVal; else zs = vVal;
 			return IntVector3(xs, ys, zs);
+		}
+
+		// Outline the rim cells of the disc (cells inside it with a 4-neighbour
+		// outside) on layer `n`, mirrored to match the eventual fill.
+		private void DrawRing(EditorContext@ ctx, int n, int radSq, Vector4 col) {
+			int na = normalAxis;
+			int u = (na + 1) % 3;
+			int v = (na + 2) % 3;
+			int uc = Comp(p0, u);
+			int vc = Comp(p0, v);
+			int r = 0;
+			while ((r + 1) * (r + 1) <= radSq) r++; // r = floor(radius)
+			for (int du = -r; du <= r; du++) {
+				int du2 = du * du;
+				for (int dv = -r; dv <= r; dv++) {
+					if (du2 + dv * dv > radSq)
+						continue; // outside the disc
+					bool rim =
+						((du + 1) * (du + 1) + dv * dv > radSq) ||
+						((du - 1) * (du - 1) + dv * dv > radSq) ||
+						(du2 + (dv + 1) * (dv + 1) > radSq) ||
+						(du2 + (dv - 1) * (dv - 1) > radSq);
+					if (rim) {
+						IntVector3 cell = BuildCell(na, n, u, uc + du, v, vc + dv);
+						ctx.DrawCellOutlineMirrored(cell.x, cell.y, cell.z, col);
+					}
+				}
+			}
 		}
 
 		// Squared radius from the centre to a rim point, in the face plane.
