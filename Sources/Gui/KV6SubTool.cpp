@@ -44,7 +44,9 @@ namespace spades {
 			const Vector4 kAxisCol[3] = {MakeVector4(1.0F, 0.35F, 0.35F, 1.0F),
 			                             MakeVector4(0.4F, 1.0F, 0.4F, 1.0F),
 			                             MakeVector4(0.45F, 0.6F, 1.0F, 1.0F)};
-			const float kGizLen = 7.0F; // gizmo handle length (voxels)
+			const float kGizLen = 12.0F;   // gizmo handle length (voxels)
+			const float kCube = 0.8F;      // handle cube half-size
+			const float kCubeHi = 1.05F;   // handle cube half-size when active
 
 			// Distance from point p to the segment [a, b] in screen space.
 			float DistToSeg(const Vector2& p, const Vector2& a, const Vector2& b) {
@@ -53,6 +55,17 @@ namespace spades {
 				float t = (l2 < 1.0e-6F) ? 0.0F : Vector2::Dot(p - a, ab) / l2;
 				t = std::max(0.0F, std::min(1.0F, t));
 				return (p - (a + ab * t)).GetLength();
+			}
+
+			// Wireframe cube of half-size h centred at c (the draggable axis handle).
+			void DrawCube(IEditorContext& ed, const Vector3& c, float h, const Vector4& col) {
+				Vector3 p[8];
+				for (int i = 0; i < 8; i++)
+					p[i] = c + MakeVector3((i & 1) ? h : -h, (i & 2) ? h : -h, (i & 4) ? h : -h);
+				static const int e[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7}, {0, 2}, {1, 3},
+				                             {4, 6}, {5, 7}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+				for (int i = 0; i < 12; i++)
+					ed.DrawLine3D(p[e[i][0]], p[e[i][1]], col);
 			}
 		} // namespace
 
@@ -285,6 +298,26 @@ namespace spades {
 			return int(std::lround(Vector2::Dot(m, da) / (dl * dl)));
 		}
 
+		int MoveSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
+			bool ok0;
+			Vector2 s0 = ed.WorldToScreen(c, ok0);
+			if (!ok0)
+				return -1;
+			Vector2 cur = ed.CursorPos();
+			int best = -1;
+			float bestDist = 14.0F; // pixels
+			for (int a = 0; a < 3; a++) {
+				bool ok1;
+				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
+				if (!ok1)
+					continue;
+				// Along the axis line, or near the tip cube (a bigger, easier target).
+				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
+				if (d < bestDist) { bestDist = d; best = a; }
+			}
+			return best;
+		}
+
 		void MoveSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsLeft())
 				return;
@@ -292,19 +325,8 @@ namespace spades {
 				Vector3 c;
 				if (!ed.SelectionCentroid(c))
 					return;
-				Vector2 cur = ed.CursorPos();
-				int best = -1;
-				float bestDist = 12.0F; // pixels
-				for (int a = 0; a < 3; a++) {
-					bool ok1, ok2;
-					Vector2 s0 = ed.WorldToScreen(c, ok1);
-					Vector2 sa = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok2);
-					if (!ok1 || !ok2)
-						continue;
-					float d = DistToSeg(cur, s0, sa);
-					if (d < bestDist) { bestDist = d; best = a; }
-				}
-				if (best >= 0) { grabAxis = best; grabCursor = cur; curOffset = 0; }
+				int best = HitAxis(ed, c);
+				if (best >= 0) { grabAxis = best; grabCursor = ed.CursorPos(); curOffset = 0; }
 			} else if (e.IsUp()) {
 				if (grabAxis < 0)
 					return;
@@ -331,9 +353,13 @@ namespace spades {
 			if (!ed.SelectionCentroid(c))
 				return;
 			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, c, grabAxis) : 0;
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
 			for (int a = 0; a < 3; a++) {
-				Vector4 col = (grabAxis == a) ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				Vector3 tip = c + AxisUnit(a) * kGizLen;
+				ed.DrawLine3D(c, tip, col);
+				DrawCube(ed, tip, active ? kCubeHi : kCube, col); // draggable handle
 			}
 			if (grabAxis >= 0 && curOffset != 0) {
 				int d[3] = {0, 0, 0};

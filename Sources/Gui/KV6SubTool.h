@@ -123,6 +123,8 @@ namespace spades {
 			Vector2 grabCursor;  // cursor at grab start
 			int curOffset = 0;   // current preview offset along grabAxis
 			int OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
+			// Axis whose handle the cursor is over (line or tip cube), else -1.
+			int HitAxis(IEditorContext& ed, const Vector3& c) const;
 		};
 	} // namespace gui
 } // namespace spades
