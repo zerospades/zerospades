@@ -103,13 +103,13 @@ namespace spades {
 				ctx.DrawCellOutline(p0.x, p0.y, p0.z, hover);
 				return;
 			}
-			// Preview the disc rim on the centre cap (and the far cap once the depth
-			// is being chosen), so it reads as a cylinder.
+			// Preview the cylinder as a wireframe: the disc outline on each cap face
+			// plus vertical links between the caps.
 			int na = normalAxis;
 			int radSq = (stage == 1) ? RadiusSq(cur) : RadiusSq(p1);
-			DrawRing(ctx, Comp(p0, na), radSq, hover);
-			if (stage == 2)
-				DrawRing(ctx, Comp(cur, na), radSq, hover);
+			int nA = Comp(p0, na);
+			int nB = (stage == 1) ? Comp(p0, na) : Comp(cur, na);
+			DrawCylinderWire(ctx, radSq, IMin(nA, nB), IMax(nA, nB), hover);
 		}
 
 		// --- helpers -----------------------------------------------------------
@@ -136,14 +136,41 @@ namespace spades {
 			return IntVector3(xs, ys, zs);
 		}
 
-		// Outline the rim cells of the disc (cells inside it with a 4-neighbour
-		// outside) on layer `n`, mirrored to match the eventual fill.
-		private void DrawRing(EditorContext@ ctx, int n, int radSq, Vector4 col) {
+		// World point at (axis n, in-plane u, in-plane v); allows half-integer values
+		// for cell faces/edges (voxel n is centred at world n, spanning n +/- 0.5).
+		private Vector3 WorldPt(int na, float nVal, int u, float uVal, int v, float vVal) {
+			float xs = 0.0f, ys = 0.0f, zs = 0.0f;
+			if (na == 0) xs = nVal; else if (na == 1) ys = nVal; else zs = nVal;
+			if (u == 0) xs = uVal; else if (u == 1) ys = uVal; else zs = uVal;
+			if (v == 0) xs = vVal; else if (v == 1) ys = vVal; else zs = vVal;
+			return Vector3(xs, ys, zs);
+		}
+
+		// One disc boundary edge (A->B in the u/v plane), drawn on the near and far
+		// cap faces with a vertical link at endpoint A.
+		private void CapEdge(EditorContext@ ctx, int na, float nNear, float nFar, int u, int v,
+		                     float uA, float vA, float uB, float vB, Vector4 col) {
+			Vector3 a0 = WorldPt(na, nNear, u, uA, v, vA);
+			Vector3 b0 = WorldPt(na, nNear, u, uB, v, vB);
+			Vector3 a1 = WorldPt(na, nFar, u, uA, v, vA);
+			Vector3 b1 = WorldPt(na, nFar, u, uB, v, vB);
+			ctx.DrawLine3D(a0, b0, col); // near cap edge
+			ctx.DrawLine3D(a1, b1, col); // far cap edge
+			ctx.DrawLine3D(a0, a1, col); // vertical link between the caps
+		}
+
+		// Wireframe of the cylinder: each disc/outside boundary becomes a cap-face
+		// edge on both caps (planes just outside layers nmin / nmax), linked
+		// vertically. Inner faces are skipped, so only the silhouette is drawn.
+		private void DrawCylinderWire(EditorContext@ ctx, int radSq, int nmin, int nmax,
+		                              Vector4 col) {
 			int na = normalAxis;
 			int u = (na + 1) % 3;
 			int v = (na + 2) % 3;
 			int uc = Comp(p0, u);
 			int vc = Comp(p0, v);
+			float nNear = float(nmin) - 0.5f;
+			float nFar = float(nmax) + 0.5f;
 			int r = 0;
 			while ((r + 1) * (r + 1) <= radSq) r++; // r = floor(radius)
 			for (int du = -r; du <= r; du++) {
@@ -151,15 +178,16 @@ namespace spades {
 				for (int dv = -r; dv <= r; dv++) {
 					if (du2 + dv * dv > radSq)
 						continue; // outside the disc
-					bool rim =
-						((du + 1) * (du + 1) + dv * dv > radSq) ||
-						((du - 1) * (du - 1) + dv * dv > radSq) ||
-						(du2 + (dv + 1) * (dv + 1) > radSq) ||
-						(du2 + (dv - 1) * (dv - 1) > radSq);
-					if (rim) {
-						IntVector3 cell = BuildCell(na, n, u, uc + du, v, vc + dv);
-						ctx.DrawCellOutlineMirrored(cell.x, cell.y, cell.z, col);
-					}
+					float fu = float(uc + du);
+					float fv = float(vc + dv);
+					if ((du + 1) * (du + 1) + dv * dv > radSq)
+						CapEdge(ctx, na, nNear, nFar, u, v, fu + 0.5f, fv - 0.5f, fu + 0.5f, fv + 0.5f, col);
+					if ((du - 1) * (du - 1) + dv * dv > radSq)
+						CapEdge(ctx, na, nNear, nFar, u, v, fu - 0.5f, fv - 0.5f, fu - 0.5f, fv + 0.5f, col);
+					if (du2 + (dv + 1) * (dv + 1) > radSq)
+						CapEdge(ctx, na, nNear, nFar, u, v, fu - 0.5f, fv + 0.5f, fu + 0.5f, fv + 0.5f, col);
+					if (du2 + (dv - 1) * (dv - 1) > radSq)
+						CapEdge(ctx, na, nNear, nFar, u, v, fu - 0.5f, fv - 0.5f, fu + 0.5f, fv - 0.5f, col);
 				}
 			}
 		}

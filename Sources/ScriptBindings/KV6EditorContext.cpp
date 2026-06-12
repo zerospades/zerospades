@@ -112,6 +112,11 @@ namespace spades {
 
 					// --- overlay drawing ---
 					r = eng->RegisterObjectMethod(
+					  "EditorContext",
+					  "void DrawLine3D(const Vector3&in, const Vector3&in, const Vector4&in)",
+					  asMETHOD(gui::IEditorContext, DrawLine3D), asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod(
 					  "EditorContext", "void DrawCellOutline(int, int, int, const Vector4&in)",
 					  asMETHOD(gui::IEditorContext, DrawCellOutline), asCALL_THISCALL);
 					manager->CheckError(r);
