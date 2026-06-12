@@ -19,10 +19,9 @@
  */
 
 #include "KV6EditorView.h"
-#include "KV6DrawTool.h"
 #include "KV6EditorTool.h"
 #include "KV6ScreenHelper.h"
-#include "KV6SelectTool.h"
+#include "KV6ToolRegistry.h"
 
 #include <algorithm>
 #include <cmath>
@@ -195,9 +194,8 @@ namespace spades {
 			RGBToHSV(currentColor);
 			LayoutPicker();
 
-			// Register the Edit-mode tools (order = toolbar order).
-			tools.push_back(std::unique_ptr<EditorTool>(new DrawTool()));
-			tools.push_back(std::unique_ptr<EditorTool>(new SelectTool()));
+			// The Edit-mode tools come from the registry (toolbar order = registration).
+			ToolRegistry::Instance().BuildAll(tools);
 			activeTool = 0;
 
 			if (isNew || path.empty())
