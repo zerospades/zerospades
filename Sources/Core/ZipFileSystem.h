@@ -65,6 +65,11 @@ namespace spades {
 
 		std::vector<std::string> EnumFiles(const char*) override;
 
+		// Returns every entry path in the archive (lowercased, forward slashes).
+		// EnumFiles("") returns nothing because its filter wants a directory
+		// prefix; this is the way to iterate all entries for a merge.
+		std::vector<std::string> GetAllFiles();
+
 		std::unique_ptr<IStream> OpenForReading(const char*) override;
 		std::unique_ptr<IStream> OpenForWriting(const char*) override;
 		bool FileExists(const char*) override;

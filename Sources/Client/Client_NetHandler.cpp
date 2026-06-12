@@ -155,8 +155,9 @@ namespace spades {
 			// start recording if auto-record is enabled
 			if (net && (int)cg_demoAutoRecord != 0) {
 				if (net->StartDemoRecording("", BuildDemoContext())) {
-					SPLog("Started auto-recording demo: %s", net->GetDemoFilename().c_str());
-					ShowAlert(_Tr("Client", "Recording demo"), AlertType::Notice);
+					const auto demoPath = net->GetDemoFilename().c_str();
+					SPLog("Started auto-recording demo: %s", demoPath);
+					ShowAlert(_Tr("Client", "Recording demo: {0}", demoPath), AlertType::Notice);
 					if ((int)cg_demoAutoPrune != 0) {
 						int maxDemos = (int)cg_demoMaxFiles;
 						if (maxDemos >= 1)

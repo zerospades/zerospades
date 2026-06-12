@@ -55,6 +55,10 @@ namespace spades {
 					  "ConsoleCommandCandidateIterator@ AutocompleteCommandName(const string& in)",
 					  asMETHOD(gui::ConsoleHelper, AutocompleteCommandName), asCALL_THISCALL);
 					manager->CheckError(r);
+					r = eng->RegisterObjectMethod(
+						"ConsoleHelper", "string GetVersionString()",
+						asMETHOD(gui::ConsoleHelper, GetVersionString), asCALL_THISCALL);
+					manager->CheckError(r);
 					break;
 				default: break;
 			}

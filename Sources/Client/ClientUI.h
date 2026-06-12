@@ -75,7 +75,7 @@ namespace spades {
 			bool WantsClientToBeClosed();
 			bool NeedsInput();
 
-			void RecordChatLog(const std::string&, Vector4 col = {1.0F, 1.0F, 1.0F, 0.8F});
+			void RecordChatLog(const std::string&, Vector4 col = {1, 1, 1, 0.8F});
 
 			void EnterClientMenu();
 			void EnterGlobalChatWindow();

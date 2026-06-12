@@ -16,7 +16,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with ZeroSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -40,6 +40,8 @@
 #include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 #include "IWorldListener.h"
+
+SPADES_SETTING(cg_keyDemoPlayPause);
 
 namespace spades {
 	namespace client {
@@ -70,7 +72,7 @@ namespace spades {
 				void PlayerHitBlockWithSpade(Player&, Vector3, IntVector3, IntVector3) override {}
 				void PlayerKilledPlayer(Player&, Player&, KillType) override {}
 				void BulletHitPlayer(Player&, HitType, Vector3, Player&,
-				                     std::unique_ptr<IBulletHitScanState>&) override {}
+									 std::unique_ptr<IBulletHitScanState>&) override {}
 				void BulletNearPlayer(Player&) override {}
 				void BulletHitBlock(Vector3, IntVector3, IntVector3) override {}
 				void AddBulletTracer(Player&, Vector3, Vector3) override {}
@@ -87,8 +89,8 @@ namespace spades {
 
 
 		DemoNetClient::DemoNetClient(Client* c) : client(c), status(NetClientStatusNotConnected),
-		    expectedMapSize(0), receivedMapBytes(0),
-		    recordedLocalPlayerId(-1), seekingMode(false) {
+			expectedMapSize(0), receivedMapBytes(0),
+			recordedLocalPlayerId(-1), seekingMode(false) {
 			SPADES_MARK_FUNCTION();
 
 			demoPlayer.reset(new DemoPlayer());
@@ -146,7 +148,7 @@ namespace spades {
 			// Check if demo finished - auto-pause when complete
 			if (demoPlayer->IsFinished() && status == NetClientStatusConnected && !demoPlayer->IsPaused()) {
 				SPLog("Demo playback finished");
-				statusString = _Tr("NetClient", "Demo finished - press P to replay");
+				statusString = _Tr("NetClient", "Demo finished - press [{0}] to replay", ToUpperCase(cg_keyDemoPlayPause));
 				demoPlayer->Pause();
 			}
 		}
@@ -209,9 +211,7 @@ namespace spades {
 			}
 		}
 
-		stmp::optional<World&> DemoNetClient::GetWorld() {
-			return client->GetWorld();
-		}
+		stmp::optional<World&> DemoNetClient::GetWorld() { return client->GetWorld(); }
 
 		stmp::optional<Player&> DemoNetClient::GetPlayerOrNull(int pId) {
 			SPADES_MARK_FUNCTION();
@@ -896,7 +896,7 @@ namespace spades {
 
 		float DemoNetClient::GetMapReceivingProgress() {
 			if (status != NetClientStatusReceivingMap || !mapLoader)
-				return 0.0f;
+				return 0.0F;
 			return mapLoader->GetProgress();
 		}
 
@@ -938,21 +938,21 @@ namespace spades {
 
 			try {
 				demoPlayer->ReplayUpTo(targetTime,
-				    [this](const std::vector<char>& data, float dt) {
-					    ProcessPacket(data);
-					    // Age world physics in fixed steps so grenade fuses, falling
-					    // blocks, etc. resolve at their correct demo timestamps under
-					    // the silent listener instead of firing after replay finishes.
-					    if (auto w = GetWorld()) {
-						    const float step = 1.0f / 60.0f;
-						    while (dt >= step) {
-							    w->Advance(step);
-							    dt -= step;
-						    }
-						    if (dt > 0.0f)
-							    w->Advance(dt);
-					    }
-				    });
+					[this](const std::vector<char>& data, float dt) {
+						ProcessPacket(data);
+						// Age world physics in fixed steps so grenade fuses, falling
+						// blocks, etc. resolve at their correct demo timestamps under
+						// the silent listener instead of firing after replay finishes.
+						if (auto w = GetWorld()) {
+							const float step = 1.0F / 60.0F;
+							while (dt >= step) {
+								w->Advance(step);
+								dt -= step;
+							}
+							if (dt > 0.0F)
+								w->Advance(dt);
+						}
+					});
 			} catch (...) {
 				if (GetWorld())
 					GetWorld()->SetListener(savedListener);
@@ -994,14 +994,14 @@ namespace spades {
 		void DemoNetClient::SeekToBeginning() {
 			if (!demoPlayer) return;
 
-			if (initialMap && demoPlayer->GetTime() > 0.0f) {
+			if (initialMap && demoPlayer->GetTime() > 0.0F) {
 				auto view = client->SaveViewState();
 				ResetWorldForReplay();
 				FastReplay(demoPlayer->GetBootstrapEndTime());
 				client->RestoreViewState(view);
 			}
 
-			demoPlayer->Seek(0.0f);
+			demoPlayer->Seek(0.0F);
 			demoPlayer->Resume();
 			statusString = _Tr("NetClient", "Playing demo");
 		}

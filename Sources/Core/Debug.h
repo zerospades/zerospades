@@ -84,6 +84,12 @@ namespace spades {
 	} // namespace reflection
 	void StartLog();
 
+	// Flush and release the log file so its handle is no longer held. Used
+	// before relaunching the process so the new instance can open the log
+	// without colliding with this one on Windows. Later log messages still go
+	// to stdout/console but are no longer written to the file.
+	void StopLog();
+
 	void LogMessage(const char* file, int line, const char* format, ...)
 #ifdef __GNUC__
 	  __attribute__((format(printf, 3, 4)))

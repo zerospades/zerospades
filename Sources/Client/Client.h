@@ -118,8 +118,16 @@ namespace spades {
 			// key release, avoiding one expensive reset/replay per repeat tick.
 			bool demoSeekForwardHeld = false;
 			bool demoSeekBackwardHeld = false;
-			float demoSeekRepeatTimer = 0.0f;   // accumulates dt between preview steps
-			float demoSeekPendingTime = 0.0f;   // target time to commit on key release
+			float demoSeekRepeatTimer = 0.0F;   // accumulates dt between preview steps
+			float demoSeekPendingTime = 0.0F;   // target time to commit on key release
+			bool demoHudVisible = true;
+
+			// Automated one-shot follow for menuless demo replay (--replay-demo):
+			// once the world has loaded the requested player is followed. Unused
+			// unless EnableDemoReplayFollow() has been called.
+			bool demoReplayFollowPending = false;
+			std::string demoReplayFollowSpec; // empty = first player; else id or name
+
 			std::string playerName;
 			std::unique_ptr<IStream> logStream;
 
@@ -375,7 +383,6 @@ namespace spades {
 			void CaptureColor();
 
 			bool inGameLimbo;
-			bool HasLocalPlayer();
 			bool IsLimboViewActive();
 			void CloseLimboView();
 			void SpawnPressed();
@@ -469,6 +476,7 @@ namespace spades {
 
 			bool staffSpectating;
 			bool spectatorPlayerNames;
+
 			Vector4 GetPlayerColor(Player&);
 			void DrawPlayerBox(Player&, const Vector4&);
 			void DrawPlayerName(Player&, const Vector4&);
@@ -502,6 +510,10 @@ namespace spades {
 			std::string ScreenShotPath();
 			void TakeScreenShot(bool sceneOnly, bool scoreboardOnly = false);
 
+			// Demo helpers (see EnableDemoReplayFollow).
+			void UpdateDemoReplayFollow();
+			int ResolveDemoPlayer(const std::string& spec);
+
 			std::string BuildDemoContext();
 
 			std::string MapShotPath();
@@ -517,9 +529,18 @@ namespace spades {
 				const ServerAddress& host, Handle<FontManager>,
 				const std::string& demoPath = "");
 
+			bool HasLocalPlayer();
 			bool IsDemoMode() const { return demoNet != nullptr; }
 			DemoNetClient* GetDemoNetClient() { return demoNet.get(); }
 			void ReloadDemo();
+
+			/**
+			 * Auto-follows a player once the demo world has loaded (empty = first
+			 * player; otherwise a player id or name) and keeps normal playback
+			 * running. Used by menuless demo replay (--replay-demo). Only
+			 * meaningful when the client was created with a demo path.
+			 */
+			void EnableDemoReplayFollow(const std::string& playerSpec);
 
 			void RunFrame(float dt) override;
 			void RunFrameLate(float dt) override;

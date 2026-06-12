@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -40,5 +40,7 @@ namespace spades {
 		std::unique_ptr<IStream> OpenForReading(const char*) override;
 		std::unique_ptr<IStream> OpenForWriting(const char*) override;
 		bool FileExists(const char*) override;
+		bool RemoveFile(const char*) override;
+		bool RenameFile(const char* oldName, const char* newName) override;
 	};
 } // namespace spades

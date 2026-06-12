@@ -57,7 +57,7 @@ namespace spades {
 				@field = ConsoleCommandField(Manager, this.history, helper);
 				field.Bounds = AABB2(10.0F, (height - 30.0F) - 8.0F, sw - 20.0F, 30.0F);
 				field.Placeholder = _Tr("Console", "Command");
-				field.MaxLength = 50;
+				field.MaxLength = 128;
 				@field.Changed = spades::ui::EventHandler(this.OnFieldChanged);
 				AddChild(field);
 			}
@@ -67,6 +67,14 @@ namespace spades {
 				viewer.Bounds = AABB2(10.0F, 5.0F, sw - 20.0F, height - 45.0F);
 				viewer.MaxNumLines = uint(cl_consoleScrollbackLines.IntValue);
 				@this.viewer = viewer;
+			}
+			{
+				spades::ui::Label label(Manager);
+				label.TextColor = Vector4(1.0F, 1.0F, 1.0F, 0.25F);
+				label.Text = helper.GetVersionString();
+				label.Bounds = AABB2(5.0F, (height - 30.0F) - 8.0F, sw - 20.0F, 30.0F);
+				label.Alignment = Vector2(1.0F, 0.5F);
+				AddChild(label);
 			}
 		}
 

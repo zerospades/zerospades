@@ -53,6 +53,8 @@ namespace spades {
 
 			// clientMenu is built lazily in EnterClientMenu() so that helper.IsDemoMode()
 			// reflects the demo flag, which isn't set until after Client::DoInit runs.
+			//@clientMenu = ClientMenu(this);
+			//clientMenu.Bounds = manager.RootElement.Bounds;
 
 			@chatLogWindow = ChatLogWindow(this);
 		}
@@ -96,6 +98,8 @@ namespace spades {
 		}
 		spades::ui::UIElement@ get_ActiveUI() property { return activeUI; }
 
+		bool IsChatEnabled() { return not helper.IsDemoMode() and helper.HasLocalPlayer(); }
+
 		void EnterClientMenu() {
 			if (clientMenu is null) {
 				@clientMenu = ClientMenu(this);
@@ -114,8 +118,9 @@ namespace spades {
 			@manager.ActiveElement = wnd.field;
 		}
 		void EnterChatLogWindow() {
-			@ActiveUI = @chatLogWindow;
+			chatLogWindow.UpdateState(IsChatEnabled());
 			chatLogWindow.ScrollToEnd();
+			@ActiveUI = @chatLogWindow;
 		}
 		void CloseUI() { @ActiveUI = null; }
 		void RecordChatLog(string text, Vector4 color) {

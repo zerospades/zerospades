@@ -15,18 +15,18 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with ZeroSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
 #pragma once
 
 #include <cstdint>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <Core/IStream.h>
 #include <Core/Stopwatch.h>
 
 namespace spades {
@@ -37,12 +37,12 @@ namespace spades {
 		 *
 		 * File format:
 		 * - Header: 2 bytes
-		 *   - Byte 0: File version (1)
-		 *   - Byte 1: Protocol version (3 for 0.75, 4 for 0.76)
+		 *	 - Byte 0: File version (1)
+		 *	 - Byte 1: Protocol version (3 for 0.75, 4 for 0.76)
 		 * - Packets: variable length entries
-		 *   - 4 bytes: timestamp (float, seconds since recording start)
-		 *   - 2 bytes: packet length (uint16)
-		 *   - N bytes: packet data
+		 *	 - 4 bytes: timestamp (float, seconds since recording start)
+		 *	 - 2 bytes: packet length (uint16)
+		 *	 - N bytes: packet data
 		 */
 		class DemoRecorder {
 		public:
@@ -99,10 +99,9 @@ namespace spades {
 			static std::string SanitizeComponent(const std::string& s);
 
 			/**
-			 * Generates a unique filename for a new demo in the Demos/ directory.
-			 * @param context Pre-sanitized context string appended after the timestamp.
-			 *                Individual fields must be joined with '-' by the caller.
-			 *                Format: Demos/YYYY-MM-DD-HH-MM[-context].dem
+			 * Generates a relative filename for a new demo.
+			 * Format: Demos/YYYY-MM-DD-HH-MM[-context].dem
+			 * The Demos/ directory is created if it does not exist.
 			 */
 			static std::string GenerateFilename(const std::string& context = "");
 
@@ -117,21 +116,11 @@ namespace spades {
 			 */
 			static std::vector<std::string> ListRecordings();
 
-			/**
-			 * Sets the base directory under which the Demos/ subfolder is created.
-			 * Must be called before any recording or listing takes place.
-			 * Defaults to the current working directory if never called.
-			 */
-			static void SetBaseDirectory(const std::string& dir);
-
-			/** Returns the absolute path to the Demos directory. */
-			static std::string GetDemosDirectory();
-
 		private:
-			std::ofstream file;
+			std::unique_ptr<IStream> stream;
 			Stopwatch stopwatch;
 			bool recording;
-			std::string filename;
+			std::string filename; // always relative: "Demos/YYYY-MM-DD-HH-MM[-ctx].dem"
 			uint64_t packetCount;
 		};
 

@@ -122,10 +122,14 @@ namespace spades {
 
 		void Close() { @ui.ActiveUI = null; }
 
+		void UpdateState(bool chatEnabled) {
+			sayButton1.Enable = chatEnabled;
+			sayButton2.Enable = chatEnabled;
+		}
+
 		void SayWindowClosed() {
 			@sayWindow = null;
-			sayButton1.Enable = true;
-			sayButton2.Enable = true;
+			UpdateState(ui.IsChatEnabled());
 		}
 
 		private void OnOkPressed(spades::ui::UIElement@ sender) { Close(); }
@@ -156,9 +160,9 @@ namespace spades {
 
 			if (IsEnabled and (EqualsIgnoringCase(key, cg_keyChatLog.StringValue) or key == "Escape"))
 				Close();
-			else if (IsEnabled and EqualsIgnoringCase(key, cg_keyTeamChat.StringValue))
+			else if (IsEnabled and ui.IsChatEnabled() and EqualsIgnoringCase(key, cg_keyTeamChat.StringValue))
 				OnTeamChat(this);
-			else if (IsEnabled and EqualsIgnoringCase(key, cg_keyGlobalChat.StringValue))
+			else if (IsEnabled and ui.IsChatEnabled() and EqualsIgnoringCase(key, cg_keyGlobalChat.StringValue))
 				OnGlobalChat(this);
 			else
 				UIElement::HotKey(key);

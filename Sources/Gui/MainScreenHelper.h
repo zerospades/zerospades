@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -103,7 +103,7 @@ namespace spades {
 
 			bool PollServerListState();
 			void StartQuery();
-			CScriptArray *GetServerList(std::string sortKey, bool descending);
+			CScriptArray* GetServerList(std::string sortKey, bool descending);
 			std::string GetServerListQueryMessage();
 			int GetServerPing(std::string address);
 			std::string ConnectServer(std::string hostname, int protocolVersion, std::string mapName = "");
@@ -111,10 +111,15 @@ namespace spades {
 
 			std::string GetCredits();
 
-		CScriptArray *GetDemoList();
-		std::string PlayDemo(std::string filename);
-		int64_t GetDemoFileSize(std::string filename);
-		bool DeleteDemo(std::string filename);
+			CScriptArray* GetDemoList();
+			std::string PlayDemo(const std::string& filename);
+			int64_t GetDemoFileSize(const std::string& filename);
+			bool DeleteDemo(const std::string& filename);
+			bool RenameDemo(const std::string& oldName, const std::string& newName);
+
+			bool ShouldOpenModsTab();
+			bool IsTryingMod();
+			void RelaunchForMods();
 		};
 	}
 }

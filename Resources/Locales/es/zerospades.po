@@ -256,11 +256,6 @@ msgctxt "Client"
 msgid "Dominating!"
 msgstr "¡Dominando!"
 
-#: Sources/Client/Client_Update.cpp:909
-msgctxt "Client"
-msgid "You were killed by {0}"
-msgstr "Fuiste asesinado por {0}"
-
 #: Sources/Client/Client_Update.cpp:1225
 msgctxt "Client"
 msgid "Insufficient blocks."
@@ -304,7 +299,7 @@ msgstr "Esperando el estado"
 #: Sources/Client/NetClient.cpp:508 Sources/Client/NetClient.cpp:1277
 msgctxt "NetClient"
 msgid "Loading snapshot"
-msgstr "Carga del mapa"
+msgstr "Cargando mapa"
 
 #: Sources/Client/NetClient.cpp:528 Sources/Client/NetClient.cpp:562
 msgctxt "NetClient"
@@ -431,6 +426,310 @@ msgstr "Configurar"
 msgctxt "Client"
 msgid "Disconnect"
 msgstr "Desconectar"
+
+msgctxt "Client"
+msgid "Exit Demo"
+msgstr "Salir de la demo"
+
+msgctxt "StartupScreen"
+msgid "Demo Recording"
+msgstr "Grabador de demos"
+
+msgctxt "StartupScreen"
+msgid "Max stored demos"
+msgstr "Número máximo de demos almacenadas"
+
+msgctxt "StartupScreen"
+msgid "Automatically record every game"
+msgstr "Grabar automáticamente todos los juegos"
+
+msgctxt "StartupScreen"
+msgid "Delete oldest demos when limit is reached"
+msgstr "Eliminar las demos más antiguas cuando se alcance el límite"
+
+msgctxt "StartupScreen"
+msgid "Demos Folder"
+msgstr "Carpeta de demos"
+
+msgctxt "StartupScreen"
+msgid "Open Demos Folder in Explorer"
+msgstr "Abrir la carpeta de demos en el explorador"
+
+msgctxt "StartupScreen"
+msgid "Reveal Demos Folder in Finder"
+msgstr "Mostrar la carpeta de demos en el buscador"
+
+msgctxt "StartupScreen"
+msgid "Browse Demos Folder"
+msgstr "Explorar la carpeta de demos"
+
+msgctxt "MainScreen"
+msgid "Servers"
+msgstr "Servidores"
+
+msgctxt "MainScreen"
+msgid "Demos"
+msgstr "Demos"
+
+msgctxt "MainScreen"
+msgid "Select a demo"
+msgstr "Seleccione una demo"
+
+msgctxt "MainScreen"
+msgid "Delete"
+msgstr "Borrar"
+
+msgctxt "MainScreen"
+msgid "Are you sure you want to delete '{0}'?\nThis action cannot be undone."
+msgstr "¿Está seguro de que desea eliminar '{0}'?\n Esta acción no se puede deshacer."
+
+msgctxt "MainScreen"
+msgid "Rename"
+msgstr "Renombrar"
+
+msgctxt "MainScreen"
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgctxt "MainScreen"
+msgid "Rename Demo"
+msgstr "Renombrar demo"
+
+msgctxt "MainScreen"
+msgid "Failed to rename demo"
+msgstr "No se pudo cambiar el nombre de la demo"
+
+msgctxt "MainScreen"
+msgid "Play"
+msgstr "Reproducir"
+
+msgctxt "MainScreen"
+msgid "Server"
+msgstr "Servidor"
+
+msgctxt "MainScreen"
+msgid "Map"
+msgstr "Mapa"
+
+msgctxt "MainScreen"
+msgid "Game Mode"
+msgstr "Modo de juego"
+
+msgctxt "MainScreen"
+msgid "Timestamp"
+msgstr "Fecha y hora"
+
+msgctxt "MainScreen"
+msgid "Size"
+msgstr "Tamaño"
+
+msgctxt "MainScreen"
+msgid "Mods"
+msgstr "Mods"
+
+msgctxt "MainScreen"
+msgid "Fetching mod list…"
+msgstr "Obteniendo la lista de mods…"
+
+msgctxt "MainScreen"
+msgid "Download the official ZeroSpades mod pack?"
+msgstr "¿Descargar el paquete de mods oficial de ZeroSpades?"
+
+msgctxt "MainScreen"
+msgid "These are mods reviewed and hosted by the ZeroSpades team."
+msgstr "Estos son mods revisados ​​y alojados por el equipo de ZeroSpades."
+
+msgctxt "MainScreen"
+msgid "Source: "
+msgstr "Fuente: "
+
+msgctxt "MainScreen"
+msgid "Files will be saved into your Mods/ folder, overwriting any existing copies."
+msgstr "Los archivos se guardarán en tu carpeta Mods/, sobrescribiendo cualquier copia existente."
+
+msgctxt "MainScreen"
+msgid "Disable all mods? This takes effect after a restart."
+msgstr "¿Desactivar todos los mods? Esto se aplicará después de reiniciar el juego."
+
+msgctxt "MainScreen"
+msgid "Press 'Apply changes' to restart and apply your mods."
+msgstr "Presione 'Aplicar cambios' para reiniciar y aplicar sus mods"
+
+msgctxt "MainScreen"
+msgid "Download official mods…"
+msgstr "Descargar mods oficiales..."
+
+msgctxt "MainScreen"
+msgid "Disable all"
+msgstr "Desactivar todos"
+
+msgctxt "MainScreen"
+msgid "Apply changes"
+msgstr "Aplicar cambios"
+
+msgctxt "MainScreen"
+msgid "Status"
+msgstr "Estado"
+
+msgctxt "MainScreen"
+msgid "Apply Order"
+msgstr "Orden"
+
+msgctxt "MainScreen"
+msgid "Mod"
+msgstr "Mod"
+
+msgctxt "MainScreen"
+msgid "Paks"
+msgstr "Paks"
+
+msgctxt "Preferences"
+msgid "Demo Recording"
+msgstr "Grabador de demos"
+
+msgctxt "Preferences"
+msgid "Start/Stop Recording"
+msgstr "Iniciar/detener grabación"
+
+msgctxt "Preferences"
+msgid "Auto Record"
+msgstr "Grabar automáticamente"
+
+msgctxt "Preferences"
+msgid "Auto Delete Old Demos"
+msgstr "Auto-eliminar demos antiguas"
+
+msgctxt "Preferences"
+msgid "Max Stored Demos"
+msgstr "Límite de demos guardadas"
+
+msgctxt "Preferences"
+msgid "Demo Playback"
+msgstr "Reproductor de demos"
+
+msgctxt "Preferences"
+msgid "Pause/Resume"
+msgstr "Pausar/Reanudar"
+
+msgctxt "Preferences"
+msgid "Speed Up"
+msgstr "Acelerar"
+
+msgctxt "Preferences"
+msgid "Slow Down"
+msgstr "Ralentizar"
+
+msgctxt "Preferences"
+msgid "Seek Forward"
+msgstr "Avanzar"
+
+msgctxt "Preferences"
+msgid "Seek Backward"
+msgstr "Retroceder"
+
+msgctxt "Preferences"
+msgid "Toggle Demo HUD"
+msgstr "Alternar el HUD de la demo"
+
+msgctxt "Client"
+msgid "Recording demo: {0}"
+msgstr "Grabando demo: {0}"
+
+msgctxt "Client"
+msgid "Recording stopped"
+msgstr "La grabación se detuvo"
+
+msgctxt "NetClient"
+msgid "Failed to open demo file"
+msgstr "No se pudo abrir el archivo de la demo"
+
+msgctxt "NetClient"
+msgid "Demo finished - press [{0}] to replay"
+msgstr "Demo finalizada - pulsa [{0}] para volver a reproducir"
+
+msgctxt "NetClient"
+msgid "Loading demo"
+msgstr "Cargando demo"
+
+msgctxt "NetClient"
+msgid "Loading map from demo"
+msgid "Cargando mapa desde la demo"
+
+msgctxt "NetClient"
+msgid "Playing demo"
+msgstr "Reproduciendo demo"
+
+msgctxt "NetClient"
+msgid "Error loading map"
+msgstr "Error al cargar el mapa"
+
+msgctxt "Client"
+msgid "[{0}] Toggle player names"
+msgstr "[{0}] Alternar nombres de jugadores"
+
+msgctxt "Client"
+msgid "[{0}] Toggle ESP"
+msgstr "[{0}] Alternar ESP"
+
+msgctxt "Client"
+msgid "[{0}] Pause"
+msgstr "[{0}] Pausar"
+
+msgctxt "Client"
+msgid "[{0}] Resume"
+msgstr "[{0}] Renaudar"
+
+msgctxt "Client"
+msgid "[{0}/{1}] Seek +/-5s"
+msgstr "[{0}/{1}] Avanzar/Retroceder +/-5s"
+
+msgctxt "Client"
+msgid "[{0}/{1}] Speed: {2}x"
+msgstr "[{0}/{1}] Velocidad: x{2}"
+
+msgctxt "Client"
+msgid "[{0}] Toggle Demo HUD"
+msgstr "[{0}] Alternar interfaz de la demo"
+
+msgctxt "Client"
+msgid "Affirmative"
+msgstr "Afirmativo"
+
+msgctxt "Client"
+msgid "Negative"
+msgstr "Negativo"
+
+msgctxt "Client"
+msgid "Tear It Down!"
+msgstr "¡Derribenlo!"
+
+msgctxt "Client"
+msgid "Help Me Build"
+msgstr "Ayúdame a construir"
+
+msgctxt "Client"
+msgid "Spawnkiller!"
+msgstr "¡Emboscada!"
+
+msgctxt "Client"
+msgid "Behind Us!"
+msgstr "¡Detrás nuestro!"
+
+msgctxt "Client"
+msgid "Thank You"
+msgstr "Gracias"
+
+msgctxt "Client"
+msgid "Cover Me"
+msgstr "Cúbreme"
+
+msgctxt "Client"
+msgid "Behind You"
+msgstr "Detrás de ti"
+
+msgctxt "Client"
+msgid "Help Me"
+msgstr "Ayúdame"
 
 #: Resources/Scripts/Gui/ClientUI.as:484
 msgctxt "Client"
@@ -1028,6 +1327,10 @@ msgctxt "Preferences"
 msgid "Server List URL"
 msgstr "URL de la lista de servidores"
 
+msgctxt "Preferences"
+msgid "Mod List URL"
+msgstr "URL de la lista de mods"
+
 #: Resources/Scripts/Gui/Preferences.as:736
 msgctxt "Preferences"
 msgid "Console Scrollback Lines"
@@ -1515,27 +1818,22 @@ msgstr "Abrir carpeta de configuración en el explorador"
 #: Resources/Scripts/Gui/StartupScreen.as:1649
 msgctxt "StartupScreen"
 msgid "Reveal Config Folder in Finder"
-msgstr "Revelar carpeta de configuraciones en el buscador"
+msgstr "Revelar carpeta de configuración en el buscador"
 
 #: Resources/Scripts/Gui/StartupScreen.as:1651
 msgctxt "StartupScreen"
 msgid "Browse Config Folder"
-msgstr "Examinar carpeta de configuraciones"
+msgstr "Examinar carpeta de configuración"
 
 #: Resources/Scripts/Gui/StartupScreen.as:1668
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening the config directory."
-msgstr ""
-"Un error desconocido ha ocurrido mientras se abria el directorio de "
-"configuraciones."
+msgstr "Un error desconocido ha ocurrido mientras se abria el directorio de configuraciones."
 
 #: Resources/Scripts/Gui/StartupScreen.as:1674
 msgctxt "StartupScreen"
-msgid ""
-"Are you sure to reset all settings? They include (but are not limited to):"
-msgstr ""
-"¿Está seguro de restablecer todos los ajustes? Incluyen (pero no se limitan "
-"a):"
+msgid "Are you sure to reset all settings? They include (but are not limited to):"
+msgstr "¿Está seguro de restablecer todos los ajustes? Incluyen (pero no se limitan a):"
 
 #: Resources/Scripts/Gui/StartupScreen.as:1675
 msgctxt "StartupScreen"
@@ -1660,10 +1958,13 @@ msgctxt "Client"
 msgid "You joined {0} team"
 msgstr "Te has unido al equipo {0}"
 
-#: Sources/Client/Client_Update.cpp:906
 msgctxt "Client"
 msgid "You have killed {0}"
-msgstr "Has matado a {0}"
+msgstr "Has eliminado a {0}"
+
+msgctxt "Client"
+msgid "You were killed by {0}"
+msgstr "Fuiste eliminado por {0}"
 
 #: Resources/Scripts/Gui/Console/ConsoleWindow.as:62
 msgctxt "Console"
@@ -2501,6 +2802,10 @@ msgctxt "Preferences"
 msgid "Scoreboard"
 msgstr "Tabla de puntuaciones"
 
+msgctxt "Preferences"
+msgid "Pie Menu"
+msgstr "Menu circular"
+
 #: Resources/Scripts/Gui/Preferences.as:1439
 msgctxt "Preferences"
 msgid "Chat Zoom"
@@ -2635,11 +2940,6 @@ msgstr "Mods Compatibles"
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening this url."
 msgstr "Se ha producido un error desconocido al abrir esta URL."
-
-#: Sources/Client/Client_Draw.cpp:965
-msgctxt "Client"
-msgid "[{0}] Toggle player names"
-msgstr "[{0}] Alternar nombres de jugadores"
 
 #: Resources/Scripts/Gui/Preferences.as:1211
 msgctxt "Preferences"

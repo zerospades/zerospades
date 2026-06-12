@@ -17,22 +17,35 @@ ZeroSpades is a fork of OpenSpades with extra features and many improvements/fix
 
 Some of the most important changes are:
 
-* In-Game HitTest Debugger (ty BR <3).
-* Extended block color palette (ty Liza&Vier <3).
-* Improved firstperson weapon animations (ty PTrooper <3).
+* Demo recording/playback (credits to Fran6nd).
+* Pie menu (credits to Fran6nd).
+* In-game Hit detection debugger (credits to BR).
+* Improved firstperson weapon animations (credits to PTrooper).
 * More thirdperson animations.
-* Firstperson playermodels (torso&legs).
-* Classic firstperson viewmodel
-* Different playermodels depending on weapon class.
-* Classic randomized dirt color.
-* Dead player corpse & falling blocks physics.
-* Client-side hit analyzer (showing hit player name, distance, and which body part it hit).
+* Weapon charms/keychains support.
+* Configurable left-handed viewmodel.
+* Viewmodel position presets (Default, Balanced, Minimal).
+* Firstperson playermodels (torso & legs).
+* Classic firstperson viewmodel.
+* Dynamic playermodels based on weapon class.
+* Dead player corpse and falling blocks physics.
+* Configurable ragdoll removal.
+* Physically-based lighting for models.
+* Smooth interpolation for player orientations.
+* Killstreak sounds (needs [Killsounds.pak](https://github.com/zerospades/zerospades-paks/raw/refs/heads/main/(SFX)%20Killsounds.pak))
+* Extended block color palette.
+* Configurable alive player counter.
+* HUD hotbar displaying selectable tools.
+* HUD health bar with damage animation.
+* Configurable crosshair and scope.
+* Configurable HUD color and safe zone.
 * Player names while on spectator mode.
-* Teammate names on minimap.
-* Damage dealt to players are now shown as floating text.
-* Player statistics such as kill/death ratio, kill streak, number of melee/grenade kills, and blocks placed.
-* Customizable HUD position and color.
-* Customizable crosshair & scope.
+* Teammate names added to the minimap.
+* Damage dealt to players shown as floating damage numbers.
+* Client-side hit analyzer (showing hit player name, distance, and body part).
+* Player statistics such as: hit accuracy, kill/death ratio, kill streak, number of melee/grenade kills, and blocks placed.
+* Killfeed icons with kill indicators (non-scoped, in-air) and domination tracking.
+* Multiple sensitivity scaling presets (Quake, Source, Valorant, etc.)
 * Same fog tint/color as the classic client (openspades applies a [bluish tint](https://github.com/yvt/openspades/blob/v0.1.3/Resources/Shaders/Fog.vs#L27) to the fog).
 * Demo recording compatible with [aos_replay](https://github.com/BR-/aos_replay) format.
 

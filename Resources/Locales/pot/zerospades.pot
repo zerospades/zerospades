@@ -257,11 +257,6 @@ msgctxt "Client"
 msgid "Weapon Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:909
-msgctxt "Client"
-msgid "You were killed by {0}"
-msgstr ""
-
 #: Sources/Client/Client_Update.cpp:1225
 msgctxt "Client"
 msgid "Insufficient blocks."
@@ -425,6 +420,310 @@ msgstr ""
 #: Resources/Scripts/Gui/ClientUI.as:219
 msgctxt "Client"
 msgid "Disconnect"
+msgstr ""
+
+msgctxt "Client"
+msgid "Exit Demo"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Demo Recording"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Max stored demos"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Automatically record every game"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Delete oldest demos when limit is reached"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Demos Folder"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Open Demos Folder in Explorer"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Reveal Demos Folder in Finder"
+msgstr ""
+
+msgctxt "StartupScreen"
+msgid "Browse Demos Folder"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Servers"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Demos"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Select a demo"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Delete"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Are you sure you want to delete '{0}'?\nThis action cannot be undone."
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Rename"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Cancel"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Rename Demo"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Failed to rename demo"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Play"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Server"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Map"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Game Mode"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Timestamp"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Size"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Mods"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Fetching mod list…"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Download the official ZeroSpades mod pack?"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "These are mods reviewed and hosted by the ZeroSpades team."
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Source: "
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Files will be saved into your Mods/ folder, overwriting any existing copies."
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Disable all mods? This takes effect after a restart."
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Press 'Apply changes' to restart and apply your mods."
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Download official mods…"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Disable All"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Apply Changes"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Status"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Apply Order"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Mod"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Paks"
+msgstr ""
+
+msgctxt "MainScreen"
+msgid "Size"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Demo Recording"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Start/Stop Recording"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Auto Record"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Auto Delete Old Demos"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Max Stored Demos"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Pause/Resume"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Speed Up"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Slow Down"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Seek Forward"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Seek Backward"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Toggle Demo HUD"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Failed to open demo file"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Demo finished - press [{0}] to replay"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Loading demo"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Loading map from demo"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Playing demo"
+msgstr ""
+
+msgctxt "NetClient"
+msgid "Error loading map"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}] Toggle player names"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}] Toggle ESP"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}] Pause"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}] Resume"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}/{1}] Seek +/-5s"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}/{1}] Speed: {2}x"
+msgstr ""
+
+msgctxt "Client"
+msgid "[{0}] Toggle Demo HUD"
+msgstr ""
+
+msgctxt "Client"
+msgid "Recording demo: {0}"
+msgstr ""
+
+msgctxt "Client"
+msgid "Recording stopped"
+msgstr ""
+
+msgctxt "Client"
+msgid "Affirmative"
+msgstr ""
+
+msgctxt "Client"
+msgid "Negative"
+msgstr ""
+
+msgctxt "Client"
+msgid "Tear It Down!"
+msgstr ""
+
+msgctxt "Client"
+msgid "Help Me Build"
+msgstr ""
+
+msgctxt "Client"
+msgid "Spawnkiller!"
+msgstr ""
+
+msgctxt "Client"
+msgid "Behind Us!"
+msgstr ""
+
+msgctxt "Client"
+msgid "Thank You"
+msgstr ""
+
+msgctxt "Client"
+msgid "Cover Me"
+msgstr ""
+
+msgctxt "Client"
+msgid "Behind You"
+msgstr ""
+
+msgctxt "Client"
+msgid "Help Me"
 msgstr ""
 
 #: Resources/Scripts/Gui/ClientUI.as:484
@@ -1008,6 +1307,10 @@ msgstr ""
 #: Resources/Scripts/Gui/Preferences.as:736
 msgctxt "Preferences"
 msgid "Server List URL"
+msgstr ""
+
+msgctxt "Preferences"
+msgid "Mod List URL"
 msgstr ""
 
 #: Resources/Scripts/Gui/Preferences.as:736
@@ -1594,6 +1897,10 @@ msgstr ""
 
 msgctxt "Client"
 msgid "You have killed {0}"
+msgstr ""
+
+msgctxt "Client"
+msgid "You were killed by {0}"
 msgstr ""
 
 #: Resources/Scripts/Gui/Console/ConsoleWindow.as:62
@@ -2411,6 +2718,10 @@ msgctxt "Preferences"
 msgid "Scoreboard"
 msgstr ""
 
+msgctxt "Preferences"
+msgid "Pie Menu"
+msgstr ""
+
 #: Resources/Scripts/Gui/Preferences.as:1439
 msgctxt "Preferences"
 msgid "Chat Zoom"
@@ -2542,11 +2853,6 @@ msgstr ""
 #: Resources/Scripts/Gui/StartupScreen/MainMenu.as:127
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening this url."
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:965
-msgctxt "Client"
-msgid "[{0}] Toggle player names"
 msgstr ""
 
 #: Resources/Scripts/Gui/Preferences.as:1211

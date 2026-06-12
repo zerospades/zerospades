@@ -15,7 +15,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with ZeroSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -23,21 +23,23 @@
 
 #include "DemoPlayer.h"
 #include "ProtocolCodec.h"
+
 #include <Core/Debug.h>
+#include <Core/FileManager.h>
 
 namespace spades {
 	namespace client {
 
 		DemoPlayer::DemoPlayer()
-		    : isOpen(false),
-		      paused(false),
-		      finished(false),
-		      protocolVersion(0),
-		      playbackTime(0.0f),
-		      duration(0.0f),
-		      speed(1.0f),
-		      bootstrapEndTime(0.0f),
-		      currentPacketIndex(0) {}
+			: isOpen(false),
+			  paused(false),
+			  finished(false),
+			  protocolVersion(0),
+			  playbackTime(0.0F),
+			  duration(0.0F),
+			  speed(1.0F),
+			  bootstrapEndTime(0.0F),
+			  currentPacketIndex(0) {}
 
 		DemoPlayer::~DemoPlayer() {
 			Close();
@@ -48,32 +50,33 @@ namespace spades {
 
 			Close();
 
-			file.open(fname, std::ios::binary | std::ios::in);
-			if (!file.is_open()) {
-				SPLog("Failed to open demo file: %s", fname.c_str());
+			try {
+				stream = FileManager::OpenForReading(fname.c_str());
+			} catch (const std::exception& ex) {
+				SPLog("Failed to open demo file: %s (%s)", fname.c_str(), ex.what());
 				return false;
 			}
 
 			filename = fname;
 
 			if (!ReadHeader()) {
-				file.close();
+				stream.reset();
 				return false;
 			}
 
 			if (!PreloadPackets()) {
-				file.close();
+				stream.reset();
 				return false;
 			}
 
 			isOpen = true;
 			paused = false;
 			finished = false;
-			playbackTime = 0.0f;
+			playbackTime = 0.0F;
 			currentPacketIndex = 0;
 
 			SPLog("Opened demo file: %s (protocol %d, %.1f seconds, %zu packets)",
-			      filename.c_str(), protocolVersion, duration, packets.size());
+				  filename.c_str(), protocolVersion, duration, packets.size());
 
 			return true;
 		}
@@ -81,15 +84,14 @@ namespace spades {
 		void DemoPlayer::Close() {
 			SPADES_MARK_FUNCTION();
 
-			if (file.is_open())
-				file.close();
+			stream.reset();
 
 			isOpen = false;
 			paused = false;
 			finished = false;
-			playbackTime = 0.0f;
-			duration = 0.0f;
-			bootstrapEndTime = 0.0f;
+			playbackTime = 0.0F;
+			duration = 0.0F;
+			bootstrapEndTime = 0.0F;
 			currentPacketIndex = 0;
 			packets.clear();
 			filename.clear();
@@ -99,16 +101,13 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			uint8_t header[2];
-			file.read(reinterpret_cast<char*>(header), 2);
-
-			if (!file.good() || file.gcount() != 2) {
+			if (stream->Read(header, 2) != 2) {
 				SPLog("Failed to read demo header");
 				return false;
 			}
 
 			if (header[0] != FILE_VERSION) {
-				SPLog("Unsupported demo file version: %d (expected %d)",
-				      header[0], FILE_VERSION);
+				SPLog("Unsupported demo file version: %d (expected %d)", header[0], FILE_VERSION);
 				return false;
 			}
 
@@ -125,17 +124,15 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			packets.clear();
-			duration = 0.0f;
+			duration = 0.0F;
 
-			while (file.good() && !file.eof()) {
+			while (true) {
 				float timestamp;
-				file.read(reinterpret_cast<char*>(&timestamp), sizeof(float));
-				if (!file.good() || file.gcount() != sizeof(float))
+				if (stream->Read(&timestamp, sizeof(float)) != sizeof(float))
 					break;
 
 				uint16_t length;
-				file.read(reinterpret_cast<char*>(&length), sizeof(uint16_t));
-				if (!file.good() || file.gcount() != sizeof(uint16_t))
+				if (stream->Read(&length, sizeof(uint16_t)) != sizeof(uint16_t))
 					break;
 
 				if (length == 0 || length > 65535) {
@@ -146,9 +143,7 @@ namespace spades {
 				DemoPacket packet;
 				packet.timestamp = timestamp;
 				packet.data.resize(length);
-				file.read(packet.data.data(), length);
-
-				if (!file.good() || file.gcount() != length)
+				if (stream->Read(packet.data.data(), length) != length)
 					break;
 
 				packets.push_back(std::move(packet));
@@ -166,7 +161,7 @@ namespace spades {
 			// start of a demo, each timestamped with the running stopwatch (so
 			// strictly > 0). Without this clamp, Seek(0) would land before the
 			// bootstrap and leave the world in an empty state on rebuild.
-			bootstrapEndTime = 0.0f;
+			bootstrapEndTime = 0.0F;
 			for (const auto& pkt : packets) {
 				if (pkt.data.empty())
 					break;
@@ -174,14 +169,13 @@ namespace spades {
 				if (type != PacketTypeMapStart
 				 && type != PacketTypeMapChunk
 				 && type != PacketTypeStateData
-				 && type != PacketTypeExistingPlayer) {
+				 && type != PacketTypeExistingPlayer)
 					break;
-				}
 				bootstrapEndTime = pkt.timestamp;
 			}
 
 			// All data is preloaded; release the file handle.
-			file.close();
+			stream.reset();
 
 			return true;
 		}
@@ -191,6 +185,8 @@ namespace spades {
 				return 0;
 
 			playbackTime += dt * speed;
+			if (playbackTime >= duration)
+				playbackTime = duration;
 
 			int dispatched = 0;
 			while (currentPacketIndex < packets.size()) {
@@ -218,43 +214,29 @@ namespace spades {
 			// mode, no players), which is never a valid playback state.
 			time = std::max(time, bootstrapEndTime);
 
-			playbackTime = std::max(0.0f, std::min(time, duration));
-			finished = false;
+			playbackTime = std::max(0.0F, std::min(time, duration));
+			finished = (currentPacketIndex >= packets.size());
 
 			// Find the first packet with timestamp > playbackTime (O(log n)).
 			// Update() will start dispatching from this index, so no packet
 			// at or before the seek point gets re-dispatched.
 			auto it = std::upper_bound(packets.begin(), packets.end(), playbackTime,
-			    [](float t, const DemoPacket& p) { return t < p.timestamp; });
+				[](float t, const DemoPacket& p) { return t < p.timestamp; });
 			currentPacketIndex = static_cast<size_t>(std::distance(packets.begin(), it));
 		}
 
-		void DemoPlayer::FastForward(float seconds) {
-			Seek(playbackTime + seconds);
-		}
-
-		void DemoPlayer::Pause() {
-			paused = true;
-		}
-
-		void DemoPlayer::Resume() {
-			paused = false;
-		}
-
-		void DemoPlayer::TogglePause() {
-			paused = !paused;
-		}
-
-		void DemoPlayer::SetSpeed(float s) {
-			speed = std::max(0.1f, std::min(s, 10.0f));
-		}
+		void DemoPlayer::FastForward(float seconds) { Seek(playbackTime + seconds); }
+		void DemoPlayer::Pause() { paused = true; }
+		void DemoPlayer::Resume() { paused = false; }
+		void DemoPlayer::TogglePause() { paused = !paused; }
+		void DemoPlayer::SetSpeed(float s) { speed = std::max(0.1F, std::min(s, 10.0F)); }
 
 		void DemoPlayer::ReplayUpTo(float targetTime, const TimedPacketHandler& handler) const {
 			auto end = std::upper_bound(packets.begin(), packets.end(), targetTime,
-			    [](float t, const DemoPacket& p) { return t < p.timestamp; });
-			float prev = 0.0f;
+				[](float t, const DemoPacket& p) { return t < p.timestamp; });
+			float prev = 0.0F;
 			for (auto it = packets.begin(); it != end; ++it) {
-				float dt = std::max(0.0f, it->timestamp - prev);
+				float dt = std::max(0.0F, it->timestamp - prev);
 				handler(it->data, dt);
 				prev = it->timestamp;
 			}
@@ -263,7 +245,7 @@ namespace spades {
 		void DemoPlayer::Reset() {
 			if (!isOpen)
 				return;
-			playbackTime = 0.0f;
+			playbackTime = 0.0F;
 			currentPacketIndex = 0;
 			finished = false;
 			paused = false;

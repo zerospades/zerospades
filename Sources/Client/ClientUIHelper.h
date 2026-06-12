@@ -38,12 +38,12 @@ namespace spades {
 
 			void SayGlobal(const std::string&);
 			void SayTeam(const std::string&);
-			void EnterChatLogWindow();
 
 			void AlertNotice(const std::string&);
 			void AlertWarning(const std::string&);
 			void AlertError(const std::string&);
 
+			bool HasLocalPlayer() const;
 			bool IsDemoMode() const;
 		};
 	} // namespace client

@@ -122,6 +122,8 @@ jobs:
   build-macos-intel:
     name: Build (macOS Intel)
     runs-on: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -134,8 +136,8 @@ jobs:
           path: |
             vcpkg/installed
             vcpkg/buildtrees
-          key: macos-intel-${{ hashFiles('vcpkg_x86_64-darwin.txt', '.gitmodules') }}
-          restore-keys: macos-intel-
+          key: macos-intel-osx12-${{ hashFiles('vcpkg_x86_64-darwin.txt', '.gitmodules') }}
+          restore-keys: macos-intel-osx12-
 
       - name: Bootstrap vcpkg
         run: vcpkg/bootstrap-vcpkg.sh -disableMetrics
@@ -152,6 +154,7 @@ jobs:
             -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
             -D VCPKG_TARGET_TRIPLET=x64-osx \
             -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application
@@ -188,6 +191,8 @@ jobs:
   build-macos-arm:
     name: Build (macOS Apple Silicon)
     runs-on: macos-14
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -200,8 +205,8 @@ jobs:
           path: |
             vcpkg/installed
             vcpkg/buildtrees
-          key: macos-arm-${{ hashFiles('vcpkg_x86_64-darwin.txt', '.gitmodules') }}
-          restore-keys: macos-arm-
+          key: macos-arm-osx12-${{ hashFiles('vcpkg_x86_64-darwin.txt', '.gitmodules') }}
+          restore-keys: macos-arm-osx12-
 
       - name: Bootstrap vcpkg
         run: vcpkg/bootstrap-vcpkg.sh -disableMetrics
@@ -218,6 +223,7 @@ jobs:
             -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
             -D VCPKG_TARGET_TRIPLET=arm64-osx \
             -D CMAKE_OSX_ARCHITECTURES=arm64 \
+            -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application

@@ -42,6 +42,9 @@ namespace spades {
 			/** Produce a sequence of candidates for command name autocompletion. */
 			ConsoleCommandCandidateIterator *AutocompleteCommandName(const std::string &name);
 
+			/** Returns the application version string. */
+			std::string GetVersionString();
+
 		private:
 			~ConsoleHelper();
 			/** A weak reference to the owning `ConsoleScreen`. */

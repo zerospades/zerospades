@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -40,10 +40,10 @@
 namespace spades {
 
 	DirectoryFileSystem::DirectoryFileSystem(const std::string& r, bool canWrite)
-	    : rootPath(r), canWrite(canWrite) {
+		: rootPath(r), canWrite(canWrite) {
 		SPADES_MARK_FUNCTION();
 		SPLog("Directory File System Initialized: %s (%s)", r.c_str(),
-		      canWrite ? "Read/Write" : "Read-only");
+			  canWrite ? "Read/Write" : "Read-only");
 	}
 
 	DirectoryFileSystem::~DirectoryFileSystem() { SPADES_MARK_FUNCTION(); }
@@ -85,7 +85,7 @@ namespace spades {
 		std::wstring path = Utf8ToWString(PathToPhysical(p).c_str());
 		// open the Win32 find handle.
 		h = FindFirstFileExW((path + L"\\*").c_str(), FindExInfoStandard, &fd,
-		                     FindExSearchNameMatch, NULL, 0);
+							 FindExSearchNameMatch, NULL, 0);
 
 		if (h == INVALID_HANDLE_VALUE)
 			return ret; // couldn't open. return the empty vector.
@@ -197,5 +197,31 @@ namespace spades {
 			return true;
 		}
 		return false;
+	}
+
+	bool DirectoryFileSystem::RemoveFile(const char* fn) {
+		SPADES_MARK_FUNCTION();
+		if (!canWrite)
+			return false;
+		std::string path = PathToPhysical(fn);
+#ifdef WIN32
+		return DeleteFileW(Utf8ToWString(path.c_str()).c_str()) != 0;
+#else
+		return remove(path.c_str()) == 0;
+#endif
+	}
+
+	bool DirectoryFileSystem::RenameFile(const char* oldName, const char* newName) {
+		SPADES_MARK_FUNCTION();
+		if (!canWrite)
+			return false;
+		std::string oldPath = PathToPhysical(oldName);
+		std::string newPath = PathToPhysical(newName);
+#ifdef WIN32
+		return MoveFileW(Utf8ToWString(oldPath.c_str()).c_str(),
+						 Utf8ToWString(newPath.c_str()).c_str()) != 0;
+#else
+		return rename(oldPath.c_str(), newPath.c_str()) == 0;
+#endif
 	}
 } // namespace spades

@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -87,7 +87,7 @@ namespace spades {
 		} // namespace
 
 		MapView::MapView(Client* c, bool largeMap)
-		    : client(c), renderer(c->GetRenderer()), largeMap(largeMap) {
+			: client(c), renderer(c->GetRenderer()), largeMap(largeMap) {
 			actualScale = 1.0F;
 			lastScale = 1.0F;
 			zoomed = false;
@@ -120,8 +120,8 @@ namespace spades {
 			switch (scaleMode) {
 				case 0: scale = 1.0F / 4.0F; break; // 400%
 				case 1: scale = 1.0F / 2.0F; break; // 200%
-				case 2: scale = 1.0F; break;        // 100%
-				case 3: scale = 2.0F; break;        // 50%
+				case 2: scale = 1.0F; break;		// 100%
+				case 3: scale = 2.0F; break;		// 50%
 				default: SPAssert(false);
 			}
 
@@ -156,7 +156,7 @@ namespace spades {
 				pos.y = Clamp(pos.y, inRect.GetMinY(), inRect.GetMaxY());
 			} else {
 				if (pos.x < inRect.GetMinX() || pos.x > inRect.GetMaxX() ||
-				    pos.y < inRect.GetMinY() || pos.y > inRect.GetMaxY())
+					pos.y < inRect.GetMinY() || pos.y > inRect.GetMaxY())
 					return;
 			}
 
@@ -218,18 +218,18 @@ namespace spades {
 
 		// definite a palette of 32 color in RGB code
 		int palette[32][3] = {
-		  {0, 0, 0},       // 0  Black			#000000
-		  {255, 255, 255}, // 1  White			#FFFFFF
-		  {128, 128, 128}, // 2  Dark Grey		#808080
-		  {255, 255, 0},   // 3  Yellow			#FFFF00
-		  {0, 255, 255},   // 4  Cyan			#00FFFF
-		  {255, 0, 255},   // 5  Magenta		#FF00FF
-		  {255, 0, 0},     // 6  Red			#FF0000
-		  {0, 255, 0},     // 7  Bright Green	#00FF00
-		  {0, 0, 255},     // 8  Blue			#0000FF
-		  {128, 0, 0},     // 9  Dark Red		#800000
-		  {0, 128, 0},     // 10 Green			#008000
-		  {0, 0, 128},     // 11 Navy Blue		#000080
+		  {0, 0, 0},	   // 0	 Black			#000000
+		  {255, 255, 255}, // 1	 White			#FFFFFF
+		  {128, 128, 128}, // 2	 Dark Grey		#808080
+		  {255, 255, 0},   // 3	 Yellow			#FFFF00
+		  {0, 255, 255},   // 4	 Cyan			#00FFFF
+		  {255, 0, 255},   // 5	 Magenta		#FF00FF
+		  {255, 0, 0},	   // 6	 Red			#FF0000
+		  {0, 255, 0},	   // 7	 Bright Green	#00FF00
+		  {0, 0, 255},	   // 8	 Blue			#0000FF
+		  {128, 0, 0},	   // 9	 Dark Red		#800000
+		  {0, 128, 0},	   // 10 Green			#008000
+		  {0, 0, 128},	   // 11 Navy Blue		#000080
 		  {128, 128, 0},   // 12 Olive			#808000
 		  {128, 0, 128},   // 13 Purple			#800080
 		  {0, 128, 128},   // 14 Teal			#008080
@@ -246,7 +246,7 @@ namespace spades {
 		  {255, 255, 128}, // 25 Light Yellow	#FFFF80
 		  {255, 128, 255}, // 26 Light Magenta	#FF80FF
 		  {165, 42, 42},   // 27 Maroon			#A52A2A
-		  {255, 69, 0},    // 28 Scarlet		#FF4500
+		  {255, 69, 0},	   // 28 Scarlet		#FF4500
 		  {255, 165, 0},   // 29 Orange			#FFA500
 		  {139, 69, 19},   // 30 Brown			#8B4513
 		  {210, 105, 30},  // 31 Chocolate		#D2691E
@@ -267,12 +267,13 @@ namespace spades {
 			stmp::optional<Player&> focusPlayerPtr;
 			Vector3 focusPlayerPos;
 			float focusPlayerAngle;
-	
+
 			if (isFollowing) {
 				int targetId = client->GetCameraTargetPlayerId();
 				auto maybeTarget = world->GetPlayer(targetId);
 				if (!maybeTarget)
 					return;
+
 				Player& player = maybeTarget.value();
 				Vector3 o = player.GetFront2D();
 
@@ -290,12 +291,15 @@ namespace spades {
 			// The local player (this is important for access control)
 			// In demo mode, there's no local player - treat as spectator
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
-			bool localPlayerIsSpectator = client->IsDemoMode() ||
-				(maybePlayer && maybePlayer->IsSpectator());
-			bool localPlayerIsSpectating = localPlayerIsSpectator || client->staffSpectating;
+
+			bool demoMode = client->IsDemoMode();
+			
+			bool isStaffSpectating = client->staffSpectating;
+			bool localPlayerIsSpectator = demoMode || (maybePlayer && maybePlayer->IsSpectator());
+			bool localPlayerIsSpectating = localPlayerIsSpectator || isStaffSpectating;
 
 			// Need either a local player or demo mode to continue
-			if (!maybePlayer && !client->IsDemoMode())
+			if (!maybePlayer && !demoMode)
 				return;
 
 			// Pointers for safe access (may be null in demo mode)
@@ -354,7 +358,7 @@ namespace spades {
 
 			if (!largeMap) {
 				const int statsMode = cg_stats;
-				if (statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible()))
+				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !demoMode)
 					winY += cg_statsSmallFont ? 10.0F : 20.0F;
 			}
 
@@ -377,7 +381,7 @@ namespace spades {
 			// draw map border
 			renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 1) * alpha);
 			renderer.DrawOutlinedRect(outRect.GetMinX() - 1, outRect.GetMinY() - 1,
-			                          outRect.GetMaxX() + 1, outRect.GetMaxY() + 1);
+									  outRect.GetMaxX() + 1, outRect.GetMaxY() + 1);
 
 			// draw grid lines
 			Vector2 gridSize = mapSize / 8.0F;
@@ -391,7 +395,7 @@ namespace spades {
 				wx = roundf(wx); // rounded for better pixel alignment
 				for (float dx = 0; dx < outRect.GetHeight(); dx += 4) {
 					renderer.DrawImage(nullptr, MakeVector2(wx, outRect.GetMinY() + dx),
-					                   AABB2(0, 0, 1, 2));
+									   AABB2(0, 0, 1, 2));
 				}
 			}
 			for (float y = gridSize.y; y < inRect.GetMaxY() - 1; y += gridSize.y) {
@@ -402,7 +406,7 @@ namespace spades {
 				wy = roundf(wy); // rounded for better pixel alignment
 				for (float dy = 0; dy < outRect.GetWidth(); dy += 4) {
 					renderer.DrawImage(nullptr, MakeVector2(outRect.GetMinX() + dy, wy),
-					                   AABB2(0, 0, 2, 1));
+									   AABB2(0, 0, 2, 1));
 				}
 			}
 
@@ -433,7 +437,7 @@ namespace spades {
 				float fntY = static_cast<float>((i >> 2) * 8);
 
 				renderer.DrawImage(mapFont, MakeVector2(wx - 4, outRect.GetMinY() + 4),
-				                   AABB2(fntX, fntY, 8, 8));
+								   AABB2(fntX, fntY, 8, 8));
 			}
 			for (int i = 0; i < 8; i++) {
 				float startY = (float)i * gridSize.y;
@@ -459,7 +463,7 @@ namespace spades {
 				float fntY = static_cast<float>((i >> 2) * 8 + 16);
 
 				renderer.DrawImage(mapFont, MakeVector2(outRect.GetMinX() + 4, wy - 4),
-				                   AABB2(fntX, fntY, 8, 8));
+								   AABB2(fntX, fntY, 8, 8));
 			}
 
 			// draw bullet tracers
@@ -510,13 +514,18 @@ namespace spades {
 
 			const auto& spectatorColor = MakeIntVector3(200, 200, 200);
 			const auto& localPlayerColor = MakeIntVector3(0, 255, 255);
+			const auto& playerTextColor = MakeVector4(1, 1, 1, 0.75F * largeMapAlpha);
 
+			Handle<IImage> spectatorIcon = renderer.RegisterImage("Gfx/Map/Spectator.png");
 			Handle<IImage> playerIcon = renderer.RegisterImage("Gfx/Map/Player.png");
 			Handle<IImage> playerRifleIcon = renderer.RegisterImage("Gfx/Map/Rifle.png");
 			Handle<IImage> playerSMGIcon = renderer.RegisterImage("Gfx/Map/SMG.png");
 			Handle<IImage> playerShotgunIcon = renderer.RegisterImage("Gfx/Map/Shotgun.png");
 			Handle<IImage> playerViewIcon = renderer.RegisterImage("Gfx/Map/View.png");
 			Handle<IImage> playerADSViewIcon = renderer.RegisterImage("Gfx/Map/ViewADS.png");
+
+			float aimDownState = localPlayerIsSpectating ? client->spectatorZoomState : client->GetAimDownState();
+			Handle<IImage> focusPlayerViewIcon = (aimDownState > 0.99F) ? *playerADSViewIcon : *playerViewIcon;
 
 			IFont& smallFont = client->fontManager->GetSmallFont();
 
@@ -532,7 +541,8 @@ namespace spades {
 					continue; // don't draw enemies when not spectating a player
 
 				// dont draw the focused player icon if we are NOT on staff spectating mode
-				if (focusPlayer && &p == focusPlayer && !client->staffSpectating)
+				bool isFocusedPlayer = focusPlayer && &p == focusPlayer;
+				if (isFocusedPlayer && !isStaffSpectating)
 					continue;
 
 				IntVector3 iconColor = world->GetTeamColor(p.GetTeamId());
@@ -548,7 +558,6 @@ namespace spades {
 				}
 				Vector4 iconColorF = ModifyColor(iconColor) * largeMapAlpha;
 
-
 				Handle<IImage> iconImg = playerIcon;
 				if (iconMode) {
 					switch (p.GetWeaponType()) {
@@ -560,26 +569,29 @@ namespace spades {
 
 				// draw player icons
 				const auto& pos = p.GetPosition();
-				const auto& o = p.GetFront2D();
-				float playerAngle = atan2f(o.y, o.x) + M_PI_F * 0.5F;
+				const auto& ori = p.GetFront2D();
+				float playerAngle = atan2f(ori.y, ori.x) + M_PI_F * 0.5F;
 				DrawIcon(pos, *iconImg, iconColorF, playerAngle);
 
 				// dont draw the focused player name when following non-local players
-				if (focusPlayer && &p == focusPlayer && isFollowingNonLocal)
+				if (isFocusedPlayer && isFollowingNonLocal)
 					continue;
 
 				// draw player names
 				if (namesMode == 1 || (namesMode >= 2 && largeMap))
-					DrawText(smallFont, p.GetName(), pos,
-					         MakeVector4(1, 1, 1, 0.75F * largeMapAlpha));
+					DrawText(smallFont, p.GetName(), pos, playerTextColor);
 			}
 
 			// draw the focused player view
-			if (focusPlayer && (focusPlayer->IsAlive() || localPlayerIsSpectating)) {
+			if (focusPlayer) {
+				bool focusPlayerIsLocal = focusPlayer->IsLocalPlayer();
+				bool focusPlayerIsAlive = focusPlayer->IsAlive();
+
 				IntVector3 iconColor = world->GetTeamColor(focusPlayer->GetTeamId());
-				if (focusPlayer->IsLocalPlayer()) {
-					iconColor = localPlayerIsSpectating
-						? spectatorColor : localPlayerColor;
+				if (!focusPlayerIsAlive) {
+					iconColor = MakeIntVector3(255, 255, 255);
+				} else if (focusPlayerIsLocal) {
+					iconColor = localPlayerIsSpectating ? spectatorColor : localPlayerColor;
 				} else if (colorMode) {
 					int colorIndex = focusPlayer->GetId() % 32;
 					iconColor = MakeIntVector3(
@@ -588,10 +600,14 @@ namespace spades {
 						palette[colorIndex][2]
 					);
 				}
-				Vector4 iconColorF = ModifyColor(iconColor) * largeMapAlpha;
+
+				float iconAlpha = (focusPlayerIsAlive ? 1.0F : 0.5F) * largeMapAlpha;
+				Vector4 iconColorF = ModifyColor(iconColor) * iconAlpha;
 
 				Handle<IImage> iconImg = playerIcon;
-				if (iconMode && !isFreeCamera) {
+				if (localPlayerIsSpectating && isFreeCamera) {
+					iconImg = spectatorIcon;
+				} else if (iconMode) {
 					switch (focusPlayer->GetWeaponType()) {
 						case RIFLE_WEAPON: iconImg = playerRifleIcon; break;
 						case SMG_WEAPON: iconImg = playerSMGIcon; break;
@@ -599,20 +615,14 @@ namespace spades {
 					}
 				}
 
-				float zoomState = localPlayerIsSpectating
-					? client->spectatorZoomState : client->GetAimDownState();
-				DrawIcon(focusPlayerPos, (zoomState > 0.99F)
-					? *playerADSViewIcon : *playerViewIcon,
-					iconColorF * 0.9F, focusPlayerAngle);
+				if (focusPlayerIsAlive || (focusPlayerIsLocal && localPlayerIsSpectating))
+					DrawIcon(focusPlayerPos, *focusPlayerViewIcon, iconColorF * 0.9F, focusPlayerAngle);
 				DrawIcon(focusPlayerPos, *iconImg, iconColorF, focusPlayerAngle);
 			} else if (localPlayerIsSpectating && isFreeCamera) {
 				// In demo free camera mode, draw a simple view indicator
-				IntVector3 iconColor = spectatorColor;
-				Vector4 iconColorF = ModifyColor(iconColor) * largeMapAlpha;
-				float zoomState = client->spectatorZoomState;
-				DrawIcon(focusPlayerPos, (zoomState > 0.99F)
-					? *playerADSViewIcon : *playerViewIcon,
-					iconColorF * 0.9F, focusPlayerAngle);
+				Vector4 iconColorF = ModifyColor(spectatorColor) * largeMapAlpha;
+				DrawIcon(focusPlayerPos, *focusPlayerViewIcon, iconColorF * 0.9F, focusPlayerAngle);
+				DrawIcon(focusPlayerPos, *spectatorIcon, iconColorF, focusPlayerAngle);
 			}
 
 			// draw map objects
@@ -645,8 +655,8 @@ namespace spades {
 				for (int i = 0; i < tc.GetNumTerritories(); i++) {
 					TCGameMode::Territory& t = tc.GetTerritory(i);
 					IntVector3 teamColor = (t.ownerTeamId >= NEUTRAL_TEAM)
-					                         ? MakeIntVector3(128, 128, 128)
-					                         : world->GetTeamColor(t.ownerTeamId);
+											 ? MakeIntVector3(128, 128, 128)
+											 : world->GetTeamColor(t.ownerTeamId);
 
 					Vector4 teamColorF = ModifyColor(teamColor) * largeMapAlpha;
 					DrawIcon(t.pos, *baseIcon, teamColorF);
@@ -683,7 +693,7 @@ namespace spades {
 		}
 
 		MapViewTracer::MapViewTracer(Vector3 p1, Vector3 p2)
-		    : startPos(p1), velocity(300.0F) {
+			: startPos(p1), velocity(300.0F) {
 			// Z coordinate doesn't matter in MapView
 			p1.z = p2.z = 0.0F;
 

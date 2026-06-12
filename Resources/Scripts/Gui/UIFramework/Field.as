@@ -372,6 +372,24 @@ namespace spades {
 				r.DrawImage(null, AABB2(x, y + h, w, 2.0F));
 			}
 
+			private string TruncateToFit(string text) {
+				if (FitsInBox(text))
+					return text;
+
+				string suffix = "..";
+				int charLen = GetCharIndexForString(text, text.length);
+
+				while (charLen > 0) {
+					charLen--;
+					int byteIdx = GetByteIndexForString(text, charLen);
+					string candidate = text.substr(0, byteIdx) + suffix;
+					if (FitsInBox(candidate))
+						return candidate;
+				}
+
+				return suffix;
+			}
+
 			void Render() {
 				Renderer@ r = Manager.Renderer;
 				Vector2 pos = ScreenPosition;
@@ -422,8 +440,9 @@ namespace spades {
 				if (text.length == 0) {
 					if (IsEnabled)
 						font.Draw(Placeholder, textPos, TextScale, PlaceholderColor);
-				} else {
-					font.Draw(text, textPos, TextScale, IsEnabled ? TextColor : DisabledTextColor);
+				} else	{
+					font.Draw(IsFocused ? text : TruncateToFit(text),
+						textPos, TextScale, IsEnabled ? TextColor : DisabledTextColor);
 				}
 
 				UIElement::Render();

@@ -20,12 +20,24 @@
 
 namespace spades {
 
+	// Passed in through PreferenceViewOptions rather than held as a script
+	// global because the script engine disallows them (asEP_DISALLOW_GLOBAL_VARS).
+	class PreferenceViewPersistedState {
+		int SelectedTabIndex = 0;
+		// Stored as decimal strings: AngelScript 2.38 fails to resolve `length`
+		// as a property accessor on array<primitive> in this build.
+		array<string> TabScrollRows;
+	}
+
 	class PreferenceViewOptions {
 		bool GameActive = false;
+		// Null means "don't remember position" — Restore/Save no-op.
+		PreferenceViewPersistedState@ PersistedState;
 	}
 
 	class PreferenceView : spades::ui::UIElement {
 		private spades::ui::UIElement@ owner;
+		private PreferenceViewPersistedState@ persistedState;
 
 		private PreferenceTab @[] tabs;
 
@@ -45,6 +57,7 @@ namespace spades {
 			PreferenceViewOptions@ options, FontManager@ fontManager) {
 			super(owner.Manager);
 			@this.owner = owner;
+			@this.persistedState = options.PersistedState;
 			this.Bounds = owner.Bounds;
 
 			float sw = Manager.ScreenWidth;
@@ -143,7 +156,55 @@ namespace spades {
 				}
 			}
 
+			// Must run after the panel constructors above: each one calls
+			// FinishLayout() which sets the ListView's bounds, so MaxValue
+			// is correct by the time ScrollToRow clamps against it.
+			RestorePersistedState();
 			UpdateTabs();
+		}
+
+		private spades::ui::ListView@ GetTabList(int idx) {
+			if (idx < 0 or idx >= int(tabs.length))
+				return null;
+			spades::ui::UIElement@ view = tabs[idx].View;
+			if (view is null)
+				return null;
+			spades::ui::UIElement @[] @children = view.GetChildren();
+			for (uint i = 0; i < children.length; i++) {
+				spades::ui::ListView@ list = cast<spades::ui::ListView>(children[i]);
+				if (list !is null)
+					return list;
+			}
+			return null;
+		}
+
+		private void RestorePersistedState() {
+			if (persistedState is null)
+				return;
+
+			if (persistedState.SelectedTabIndex >= 0 and persistedState.SelectedTabIndex < int(tabs.length))
+				SelectedTabIndex = persistedState.SelectedTabIndex;
+
+			uint limit = tabs.length;
+			if (persistedState.TabScrollRows.length < limit)
+				limit = persistedState.TabScrollRows.length;
+			for (uint i = 0; i < limit; i++) {
+				spades::ui::ListView@ list = GetTabList(int(i));
+				if (list !is null)
+					list.ScrollToRow(int(parseInt(persistedState.TabScrollRows[i])));
+			}
+		}
+
+		private void SavePersistedState() {
+			if (persistedState is null)
+				return;
+
+			persistedState.SelectedTabIndex = SelectedTabIndex;
+			persistedState.TabScrollRows.resize(tabs.length);
+			for (uint i = 0; i < tabs.length; i++) {
+				spades::ui::ListView@ list = GetTabList(int(i));
+				persistedState.TabScrollRows[i] = "" + ((list !is null) ? list.TopRowIndex : 0);
+			}
 		}
 
 		private void AddTab(spades::ui::UIElement@ view, string caption, HeadingNavIndex@ nav = null) {
@@ -221,6 +282,9 @@ namespace spades {
 		}
 
 		void Close() {
+			// Both Esc and the Back button route through Close(), so this
+			// is the single save point for the persisted position.
+			SavePersistedState();
 			owner.Enable = true;
 			@this.Parent = null;
 			OnClosed();
@@ -1760,9 +1824,6 @@ namespace spades {
 			@layouter.HeadingNav = nav;
 
 			layouter.AddHeading(_Tr("Preferences", "General"));
-			ConfigSlider@ fpsSlider = layouter.AddSliderField(_Tr("Preferences", "FPS Limit"), "cl_fps",
-			0, 300, 1, ConfigFPSFormatter());
-			@fpsSlider.mapper = FPSValueMapper();
 			layouter.AddSliderField(_Tr("Preferences", "Render Scale"), "r_scale",
 			0.2, 1, 0.01, ConfigNumberFormatter(0, "%", "", 100));
 			layouter.AddSliderField(_Tr("Preferences", "Render Scaling Filter"), "r_scaleFilter",
@@ -1831,7 +1892,6 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Equip Grenade"), "cg_keyToolGrenade");
 			layouter.AddControl(_Tr("Preferences", "Last Used Tool"), "cg_keyLastTool");
 			layouter.AddPlusMinusField(_Tr("Preferences", "Switch Tools by Wheel"), "cg_switchToolByWheel");
-			layouter.AddControl(_Tr("Preferences", "Pie Menu"), "cg_keyPieMenu");
 
 			layouter.AddHeading(_Tr("Preferences", "Movement"));
 			layouter.AddControl(_Tr("Preferences", "Move Forward"), "cg_keyMoveForward");
@@ -1861,6 +1921,7 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Team Chat"), "cg_keyTeamChat");
 			layouter.AddControl(_Tr("Preferences", "Chat Log"), "cg_keyChatLog");
 			layouter.AddControl(_Tr("Preferences", "Chat Zoom"), "cg_keyZoomChatLog");
+			layouter.AddControl(_Tr("Preferences", "Pie Menu"), "cg_keyPieMenu");
 			layouter.AddControl(_Tr("Preferences", "Limbo Menu"), "cg_keyLimbo");
 			layouter.AddControl(_Tr("Preferences", "Save Map"), "cg_keySaveMap");
 			layouter.AddControl(_Tr("Preferences", "Save Sceneshot"), "cg_keySceneshot");
@@ -1868,7 +1929,6 @@ namespace spades {
 			layouter.AddControl(_Tr("Preferences", "Master Volume Up"), "cg_keyVolumeUp");
 			layouter.AddControl(_Tr("Preferences", "Master Volume Down"), "cg_keyVolumeDown");
 			layouter.AddControl(_Tr("Preferences", "Force Spectator Mode"), "cg_keyStaffSpectating");
-			layouter.AddControl(_Tr("Preferences", "Toggle Demo Recording"), "cg_keyDemoRecord");
 
 			layouter.FinishLayout();
 		}
@@ -1884,18 +1944,35 @@ namespace spades {
 			@layouter.HeadingNav = nav;
 
 			layouter.AddHeading(_Tr("Preferences", "General"));
-			ConfigField@ urlField = layouter.AddInputField(_Tr("Preferences", "Server List URL"), "cl_serverListUrl", true, true);
-			layouter.AddToggleField(_Tr("Preferences", "Allow Unicode"), "cg_unicode");
+			ConfigSlider@ fpsSlider = layouter.AddSliderField(_Tr("Preferences", "FPS Limit"), "cl_fps",
+			0, 300, 1, ConfigFPSFormatter());
+			@fpsSlider.mapper = FPSValueMapper();
 			layouter.AddSliderField(_Tr("Preferences", "Console Scrollback Lines"), "cl_consoleScrollbackLines",
 			100, 2000, 100, ConfigNumberFormatter(0, ""));
+			ConfigField@ urlField = layouter.AddInputField(_Tr("Preferences", "Server List URL"), "cl_serverListUrl", true, true);
+			ConfigField@ modUrlField = layouter.AddInputField(_Tr("Preferences", "Mod List URL"), "cl_modsIndexUrl", true, true);
+			layouter.AddToggleField(_Tr("Preferences", "Allow Unicode"), "cg_unicode");
 			layouter.AddChoiceStringField(_Tr("Preferences", "Screenshot Format"), "cg_screenshotFormat",
 					 array<string> = { "PNG", "JPEG", "TGA" },
 					 array<string> = { "png", "jpeg", "tga" });
 			layouter.AddSliderField(_Tr("Preferences", "JPEG Quality"), "core_jpegQuality",
 			1, 100, 1, ConfigNumberFormatter(0, "%"));
-
-			layouter.AddHeading(_Tr("Preferences", "Startup"));
 			layouter.AddToggleField(_Tr("Preferences", "Enable Startup Window"), "cl_showStartupWindow");
+
+			layouter.AddHeading(_Tr("Preferences", "Demo Recording"));
+			layouter.AddControl(_Tr("Preferences", "Start/Stop Recording"), "cg_keyDemoRecord");
+			layouter.AddToggleField(_Tr("Preferences", "Auto Record"), "cg_demoAutoRecord");
+			layouter.AddToggleField(_Tr("Preferences", "Auto Delete Old Demos"), "cg_demoAutoPrune");
+			layouter.AddSliderField(_Tr("Preferences", "Max Stored Demos"), "cg_demoMaxFiles",
+				1, 256, 1, ConfigNumberFormatter(0, ""));
+
+			layouter.AddHeading(_Tr("Preferences", "Demo Playback"));
+			layouter.AddControl(_Tr("Preferences", "Pause/Resume"), "cg_keyDemoPlayPause");
+			layouter.AddControl(_Tr("Preferences", "Speed Up"), "cg_keyDemoSpeedUp");
+			layouter.AddControl(_Tr("Preferences", "Slow Down"), "cg_keyDemoSlowDown");
+			layouter.AddControl(_Tr("Preferences", "Seek Forward"), "cg_keyDemoSeekForward");
+			layouter.AddControl(_Tr("Preferences", "Seek Backward"), "cg_keyDemoSeekBackward");
+			layouter.AddControl(_Tr("Preferences", "Toggle Demo HUD"), "cg_keyDemoToggleHud");
 
 			layouter.FinishLayout();
 		}

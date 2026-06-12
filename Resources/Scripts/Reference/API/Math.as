@@ -37,6 +37,45 @@ namespace spades {
     /** Retrieves a random value that lies in [0, 1]. */
     float GetRandom() {}
 
+    /** Retrieves a random integer that lies in [0, maximum). */
+    uint GetRandom(uint maximum) {}
+
+    /** Retrieves a random integer that lies in [minimum, maximum). */
+    uint GetRandom(uint minimum, uint maximum) {}
+
+    /** Retrieves a random integer that lies in [minimum, maximum). */
+    int GetRandom(int minimum, int maximum) {}
+
+    /** Retrieves a random value that lies in [minimum, maximum]. */
+    float GetRandom(float minimum, float maximum) {}
+
+    /** Converts an angle from degrees to radians. */
+    float rad(float degrees) {}
+
+    /** Converts an angle from radians to degrees. */
+    float deg(float radians) {}
+
+    /** Creates a color from hue, saturation, and value, each in [0, 1]. */
+    Vector3 HSV(float h, float s, float v) {}
+
+    /** Converts an 8-bit-per-channel sRGB color to a linear RGB color. */
+    Vector3 ConvertColorRGB(const IntVector3 @color) {}
+
+    /** Converts an 8-bit-per-channel sRGB color to a linear RGBA color. */
+    Vector4 ConvertColorRGBA(const IntVector3 @color) {}
+
+    /** Removes all newline characters from the given string. */
+    string StripNewlines(const string &in text) {}
+
+    /** Removes leading and trailing whitespace from the given string. */
+    string TrimSpaces(const string &in text) {}
+
+    /** Parses the given string as an integer. */
+    int ParseInt(const string &in text) {}
+
+    /** Parses the given string as a double-precision floating-point number. */
+    double ParseDouble(const string &in text) {}
+
     /** Represents a 3-component integral vector. */
     class IntVector3 {
         int x, y, z;

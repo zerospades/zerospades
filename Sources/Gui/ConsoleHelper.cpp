@@ -23,6 +23,8 @@
 #include "ConsoleHelper.h"
 #include "ConsoleScreen.h"
 
+#include <ZeroSpades.h>
+
 namespace spades {
 	namespace gui {
 		ConsoleHelper::ConsoleHelper(ConsoleScreen* scr) {
@@ -68,6 +70,10 @@ namespace spades {
 				return new EmptyIterator<const ConsoleCommandCandidate&>();
 
 			return parent->AutocompleteCommandName(name).Unmanage();
+		}
+		
+		std::string ConsoleHelper::GetVersionString() {
+			return ZEROSPADES_VERSION_FULL "-" GIT_COMMIT_HASH;
 		}
 	} // namespace gui
 } // namespace spades

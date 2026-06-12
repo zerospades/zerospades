@@ -15,19 +15,19 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with ZeroSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
 #pragma once
 
 #include <cstdint>
-#include <fstream>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <Core/IStream.h>
 #include <Core/Stopwatch.h>
 
 namespace spades {
@@ -38,12 +38,12 @@ namespace spades {
 		 *
 		 * File format:
 		 * - Header: 2 bytes
-		 *   - Byte 0: File version (1)
-		 *   - Byte 1: Protocol version (3 for 0.75, 4 for 0.76)
+		 *	 - Byte 0: File version (1)
+		 *	 - Byte 1: Protocol version (3 for 0.75, 4 for 0.76)
 		 * - Packets: variable length entries
-		 *   - 4 bytes: timestamp (float, seconds since recording start)
-		 *   - 2 bytes: packet length (uint16)
-		 *   - N bytes: packet data
+		 *	 - 4 bytes: timestamp (float, seconds since recording start)
+		 *	 - 2 bytes: packet length (uint16)
+		 *	 - N bytes: packet data
 		 */
 		class DemoPlayer {
 		public:
@@ -134,14 +134,27 @@ namespace spades {
 			float GetDuration() const { return duration; }
 
 			/**
-			 * @return Protocol version of the demo (3 for 0.75, 4 for 0.76)
-			 */
-			int GetProtocolVersion() const { return protocolVersion; }
-
-			/**
 			 * @return Current playback speed multiplier
 			 */
 			float GetSpeed() const { return speed; }
+
+			/**
+			 * Timestamp of the last packet that is part of the initial-state stream
+			 * (MapStart / MapChunk / StateData / ExistingPlayer). These packets are
+			 * written by the recorder immediately after the stopwatch starts, so
+			 * they always carry tiny but strictly positive timestamps; seek logic
+			 * uses this value to ensure they are always re-applied when rebuilding
+			 * the world.
+			 *
+			 * @return Bootstrap-end timestamp in seconds, or 0 if there is no
+			 *		   identifiable bootstrap prefix.
+			 */
+			float GetBootstrapEndTime() const { return bootstrapEndTime; }
+
+			/**
+			 * @return Protocol version of the demo (3 for 0.75, 4 for 0.76)
+			 */
+			int GetProtocolVersion() const { return protocolVersion; }
 
 			/**
 			 * @return The filename of the loaded demo
@@ -154,19 +167,6 @@ namespace spades {
 			size_t GetCurrentPacketIndex() const { return currentPacketIndex; }
 
 			/**
-			 * Timestamp of the last packet that is part of the initial-state stream
-			 * (MapStart / MapChunk / StateData / ExistingPlayer). These packets are
-			 * written by the recorder immediately after the stopwatch starts, so
-			 * they always carry tiny but strictly positive timestamps; seek logic
-			 * uses this value to ensure they are always re-applied when rebuilding
-			 * the world.
-			 *
-			 * @return Bootstrap-end timestamp in seconds, or 0 if there is no
-			 *         identifiable bootstrap prefix.
-			 */
-			float GetBootstrapEndTime() const { return bootstrapEndTime; }
-
-			/**
 			 * Calls handler for every packet whose timestamp is <= targetTime, in order.
 			 * The handler also receives the time delta from the previous packet (or 0
 			 * for the first), so callers can age the world in step with playback time
@@ -174,7 +174,7 @@ namespace spades {
 			 * Does NOT modify playbackTime, currentPacketIndex, or paused state; safe to
 			 * call during a backward-seek reset without disrupting normal playback state.
 			 * @param targetTime Upper bound (inclusive) on packet timestamps to replay
-			 * @param handler    Callback invoked for each matching packet, with dt
+			 * @param handler	 Callback invoked for each matching packet, with dt
 			 */
 			void ReplayUpTo(float targetTime, const TimedPacketHandler& handler) const;
 
@@ -189,7 +189,7 @@ namespace spades {
 				std::vector<char> data;
 			};
 
-			std::ifstream file;
+			std::unique_ptr<IStream> stream;
 			std::string filename;
 			bool isOpen;
 			bool paused;

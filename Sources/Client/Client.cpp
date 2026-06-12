@@ -260,7 +260,7 @@ namespace spades {
 		}
 
 		void Client::ReloadDemo() {
-			if (demoNet == nullptr || demoFilePath.empty())
+			if (!IsDemoMode() || demoFilePath.empty())
 				return;
 
 			SetWorld(nullptr);
@@ -287,6 +287,7 @@ namespace spades {
 				net->Disconnect();
 				net.reset();
 			}
+
 			if (demoNet) {
 				SPLog("Closing demo playback");
 				demoNet.reset();
@@ -295,7 +296,8 @@ namespace spades {
 			SPLog("Disconnected");
 
 			RemoveAllLocalEntities();
-
+			bloodMarks.reset();
+			
 			renderer->SetGameMap(nullptr);
 			audioDevice->SetGameMap(nullptr);
 
@@ -327,6 +329,9 @@ namespace spades {
 			renderer->RegisterImage("Gfx/Bullet/7.62mm.png");
 			renderer->RegisterImage("Gfx/Bullet/9mm.png");
 			renderer->RegisterImage("Gfx/Bullet/12gauge.png");
+			renderer->RegisterImage("Gfx/Demo/Pause.png");
+			renderer->RegisterImage("Gfx/Demo/Play.png");
+			renderer->RegisterImage("Gfx/Demo/Recording.png");
 			renderer->RegisterImage("Gfx/Hotbar/Block.png");
 			renderer->RegisterImage("Gfx/Hotbar/Grenade.png");
 			renderer->RegisterImage("Gfx/Hotbar/Spade.png");
@@ -585,18 +590,9 @@ namespace spades {
 
 			if (!demoFilePath.empty()) {
 				SPLog("Starting demo playback: '%s'", demoFilePath.c_str());
-
-				// Check if file exists
-				std::ifstream testFile(demoFilePath);
-				if (!testFile.good()) {
-					SPRaise("Demo file not found: %s", demoFilePath.c_str());
-				}
-				testFile.close();
-
 				demoNet = stmp::make_unique<DemoNetClient>(this);
-				if (!demoNet->OpenDemo(demoFilePath)) {
-					SPRaise("Failed to open demo file (invalid format?): %s", demoFilePath.c_str());
-				}
+				if (!demoNet->OpenDemo(demoFilePath))
+					SPRaise("Failed to open demo file: %s", demoFilePath.c_str());
 				activeNet = demoNet.get();
 			} else {
 				SPLog("Started connecting to '%s'", hostname.ToString().c_str());
@@ -672,17 +668,23 @@ namespace spades {
 			// Each repeat tick advances demoSeekPendingTime and calls SeekPreview() so the
 			// HUD updates smoothly.  The world-replay Seek() is deferred to key release.
 			if (demoNet && (demoSeekForwardHeld || demoSeekBackwardHeld)) {
-				constexpr float kSeekStep = 5.0f;
-				constexpr float kRepeatInterval = 0.35f;
+				constexpr float kSeekStep = 5.0F;
+				constexpr float kRepeatInterval = 0.35F;
 				demoSeekRepeatTimer += dt;
 				while (demoSeekRepeatTimer >= kRepeatInterval) {
 					demoSeekRepeatTimer -= kRepeatInterval;
 					float prev = demoSeekPendingTime;
-					float duration = demoNet->GetDuration();
-					if (demoSeekForwardHeld)
-						demoSeekPendingTime = std::min(duration, demoSeekPendingTime + kSeekStep);
-					if (demoSeekBackwardHeld)
-						demoSeekPendingTime = std::max(0.0f, demoSeekPendingTime - kSeekStep);
+					float minTime = demoNet->GetBootstrapEndTime();
+					float maxTime = demoNet->GetDuration();
+					if (demoSeekForwardHeld) {
+						demoSeekPendingTime = std::min(maxTime, demoSeekPendingTime + kSeekStep);
+						if (demoSeekPendingTime >= maxTime)
+							demoSeekForwardHeld = false;
+					} else if (demoSeekBackwardHeld) {
+						demoSeekPendingTime = std::max(minTime, demoSeekPendingTime - kSeekStep);
+						if (demoSeekPendingTime <= minTime)
+							demoSeekBackwardHeld = false;
+					}
 					if (demoSeekPendingTime != prev)
 						demoNet->SeekPreview(demoSeekPendingTime);
 				}
@@ -721,6 +723,11 @@ namespace spades {
 			} else {
 				renderer->SetFogColor(MakeVector3(0, 0, 0));
 			}
+
+			// Auto-follow a player for menuless demo replay, before the scene is
+			// composed so the follow camera takes effect on the rendered frame.
+			if (demoReplayFollowPending)
+				UpdateDemoReplayFollow();
 
 			chatWindow->Update(dt);
 			killfeedWindow->Update(dt);
@@ -776,6 +783,74 @@ namespace spades {
 			renderer->Flip();
 		}
 
+		void Client::EnableDemoReplayFollow(const std::string& playerSpec) {
+			demoReplayFollowPending = true;
+			demoReplayFollowSpec = playerSpec;
+		}
+
+		int Client::ResolveDemoPlayer(const std::string& spec) {
+			if (!world)
+				return -1;
+
+			size_t slots = world->GetNumPlayerSlots();
+
+			if (!spec.empty()) {
+				// A purely numeric spec is treated as a player id (slot index).
+				bool numeric = true;
+				for (char c : spec) {
+					if (c < '0' || c > '9') {
+						numeric = false;
+						break;
+					}
+				}
+				if (numeric) {
+					int id = std::atoi(spec.c_str());
+					if (id >= 0 && (size_t)id < slots && world->GetPlayer((unsigned int)id))
+						return id;
+					SPLog("Demo: player id %s not present, using first player", spec.c_str());
+				} else {
+					for (size_t i = 0; i < slots; i++) {
+						auto p = world->GetPlayer((unsigned int)i);
+						if (p && p->GetName() == spec)
+							return (int)i;
+					}
+					SPLog("Demo: player named '%s' not found, using first player", spec.c_str());
+				}
+			}
+
+			// Default / fallback: first player that is on a team (not a spectator),
+			// since spectators have no body to watch.
+			for (size_t i = 0; i < slots; i++) {
+				auto p = world->GetPlayer((unsigned int)i);
+				if (p && !p->IsSpectator())
+					return (int)i;
+			}
+
+			// All occupied slots are spectators; fall back to the first one.
+			for (size_t i = 0; i < slots; i++) {
+				if (world->GetPlayer((unsigned int)i))
+					return (int)i;
+			}
+			return -1;
+		}
+
+		void Client::UpdateDemoReplayFollow() {
+			if (!world || !demoNet || activeNet->GetStatus() != NetClientStatusConnected)
+				return;
+
+			// Wait until at least one player exists, then follow it. ResolveDemoPlayer
+			// returns -1 while the world has no players, so this stays pending across
+			// the first frames of playback without ever blocking.
+			int pid = ResolveDemoPlayer(demoReplayFollowSpec);
+			if (pid < 0)
+				return;
+
+			followedPlayerId = pid;
+			followCameraState.enabled = true;
+			followCameraState.firstPerson = true;
+			demoReplayFollowPending = false;
+		}
+
 		bool Client::HasLocalPlayer() {
 			return world && world->GetLocalPlayer();
 		}
@@ -794,14 +869,14 @@ namespace spades {
 		}
 
 		void Client::SpawnPressed() {
+			// In demo mode, player actions are replayed from the demo file
+			if (IsDemoMode())
+				return;
+			
 			WeaponType weap = limbo->GetSelectedWeapon();
 			int team = limbo->GetSelectedTeam();
 			if (team == 2)
 				team = 255;
-
-			// In demo mode, player actions are replayed from the demo file
-			if (IsDemoMode())
-				return;
 
 			stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 			if (!maybePlayer || maybePlayer->IsSpectator()) { // join
@@ -1144,7 +1219,7 @@ namespace spades {
 			} while (nextId != startId);
 
 			followedPlayerId = nextId;
-			followCameraState.enabled = staffSpectating || IsDemoMode() || (followedPlayerId != localPlayerId);
+			followCameraState.enabled = IsDemoMode() || staffSpectating || (followedPlayerId != localPlayerId);
 		}
 	} // namespace client
 } // namespace spades

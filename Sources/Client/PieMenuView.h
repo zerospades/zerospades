@@ -55,6 +55,8 @@ namespace spades {
 
 			std::array<std::string, kSliceCount> worldLabels;
 			std::array<std::string, kSliceCount> playerLabels;
+			std::array<std::string, kSliceCount> worldDisplayLabels;
+			std::array<std::string, kSliceCount> playerDisplayLabels;
 
 			// Precomputed per-slice ray params (sin/cos of θ_c ± α).
 			// Populated once in the constructor; used by scanline fill.

@@ -378,8 +378,8 @@ namespace spades {
 			UIElement::set_Bounds(v);
 			Vector2 size = this.Size;
 			float h = 24.0F;
-			slider.Bounds = AABB2(100.0F, 2.0F, size.x - 100.0F, h - 4.0F);
-			valueLabel.Bounds = AABB2(100.0F, 0.0F, size.x - 100.0F, h);
+			slider.Bounds = AABB2(160.0F, 2.0F, size.x - 160.0F, h - 4.0F);
+			valueLabel.Bounds = AABB2(160.0F, 0.0F, size.x - 160.0F, h);
 		}
 	}
 
@@ -581,7 +581,7 @@ namespace spades {
 			Vector2 size = manager.RootElement.Size;
 			ContentsHeight = size.y - ContentsTop * 2.0F;
 
-			float mainWidth = size.x - 250.0F;
+			float mainWidth = size.x - 220.0F;
 			{
 				spades::ui::TextViewer e(Manager);
 				e.Bounds = AABB2(mainWidth, ContentsTop + 30.0F, size.x - mainWidth - 10.0F, ContentsHeight - 60.0F);

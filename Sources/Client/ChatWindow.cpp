@@ -224,8 +224,9 @@ namespace spades {
 			float y = firstY;
 
 			if (killfeed) {
+				bool demoMode = client->IsDemoMode();
 				const int statsMode = cg_stats;
-				if (statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible()))
+				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !demoMode)
 					winY += cg_statsSmallFont ? 10.0F : 20.0F;
 			}
 

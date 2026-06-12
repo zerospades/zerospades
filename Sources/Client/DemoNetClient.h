@@ -15,7 +15,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with ZeroSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -30,6 +30,7 @@
 #include "GameMap.h"
 #include "INetClient.h"
 #include "Player.h"
+
 #include <Core/Math.h>
 
 namespace spades {
@@ -117,18 +118,19 @@ namespace spades {
 			 */
 			void SeekPreview(float time);
 			void SeekToBeginning();
-			float GetTime() const { return demoPlayer ? demoPlayer->GetTime() : 0.0f; }
-			float GetDuration() const { return demoPlayer ? demoPlayer->GetDuration() : 0.0f; }
+			float GetTime() const { return demoPlayer ? demoPlayer->GetTime() : 0.0F; }
+			float GetDuration() const { return demoPlayer ? demoPlayer->GetDuration() : 0.0F; }
+			float GetSpeed() const { return demoPlayer ? demoPlayer->GetSpeed() : 1.0F; }
+			float GetBootstrapEndTime() const {return demoPlayer ? demoPlayer->GetBootstrapEndTime() : 0.0F; }
 			bool IsFinished() const { return demoPlayer ? demoPlayer->IsFinished() : true; }
 			bool IsPaused() const { return demoPlayer ? demoPlayer->IsPaused() : false; }
-			float GetSpeed() const { return demoPlayer ? demoPlayer->GetSpeed() : 1.0f; }
 			int GetRecordedLocalPlayerId() const { return recordedLocalPlayerId; }
 
 			// Stub network methods (no-ops — demo playback sends nothing to a server)
 			void Disconnect() override { status = NetClientStatusNotConnected; }
 			int GetPing() override { return 0; }
-			float GetPacketLoss() override { return 0.0f; }
-			float GetPacketThrottle() override { return 1.0f; }
+			float GetPacketLoss() override { return 0.0F; }
+			float GetPacketThrottle() override { return 1.0F; }
 			double GetDownlinkBps() override { return 0.0; }
 			double GetUplinkBps() override { return 0.0; }
 

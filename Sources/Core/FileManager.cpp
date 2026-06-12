@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -68,8 +68,7 @@ namespace spades {
 		for (auto* fs : g_fileSystems) {
 			try {
 				return fs->OpenForWriting(fn);
-			} catch (...) {
-			}
+			} catch (...) {}
 		}
 
 		SPRaise("No filesystem is writable");
@@ -94,6 +93,28 @@ namespace spades {
 		return false;
 	}
 
+	bool FileManager::RemoveFile(const char* fn) {
+		SPADES_MARK_FUNCTION();
+		if (!fn)
+			SPInvalidArgument("fn");
+		for (auto* fs : g_fileSystems) {
+			if (fs->FileExists(fn))
+				return fs->RemoveFile(fn);
+		}
+		return false;
+	}
+
+	bool FileManager::RenameFile(const char* oldName, const char* newName) {
+		SPADES_MARK_FUNCTION();
+		if (!oldName || !newName)
+			SPInvalidArgument("oldName/newName");
+		for (auto* fs : g_fileSystems) {
+			if (fs->FileExists(oldName))
+				return fs->RenameFile(oldName, newName);
+		}
+		return false;
+	}
+
 	void FileManager::AddFileSystem(spades::IFileSystem* fs) {
 		SPADES_MARK_FUNCTION();
 		AppendFileSystem(fs);
@@ -103,14 +124,12 @@ namespace spades {
 		SPADES_MARK_FUNCTION();
 		if (!fs)
 			SPInvalidArgument("fs");
-
 		g_fileSystems.push_back(fs);
 	}
 	void FileManager::PrependFileSystem(spades::IFileSystem* fs) {
 		SPADES_MARK_FUNCTION();
 		if (!fs)
 			SPInvalidArgument("fs");
-
 		g_fileSystems.push_front(fs);
 	}
 

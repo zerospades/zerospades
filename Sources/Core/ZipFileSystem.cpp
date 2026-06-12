@@ -409,6 +409,14 @@ namespace spades {
 		return lst;
 	}
 
+	std::vector<std::string> ZipFileSystem::GetAllFiles() {
+		std::vector<std::string> out;
+		out.reserve(files.size());
+		for (const auto& kv : files)
+			out.push_back(kv.first);
+		return out;
+	}
+
 	bool ZipFileSystem::MoveToFile(const char* fn) {
 		SPADES_MARK_FUNCTION();
 

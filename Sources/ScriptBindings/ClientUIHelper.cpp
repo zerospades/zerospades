@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -65,6 +65,10 @@ namespace spades {
 						r = eng->RegisterObjectMethod(
 						  "ClientUIHelper", "void AlertError(const string& in)",
 						  asMETHOD(ClientUIHelper, AlertError), asCALL_THISCALL);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod(
+						  "ClientUIHelper", "bool HasLocalPlayer() const",
+						  asMETHOD(ClientUIHelper, HasLocalPlayer), asCALL_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "ClientUIHelper", "bool IsDemoMode() const",

@@ -25,6 +25,8 @@ namespace spades {
 	class ClientMenu : spades::ui::UIElement {
 		private ClientUI@ ui;
 		private ClientUIHelper@ helper;
+		// Lives for the session so reopening Setup lands on the same tab/row.
+		private PreferenceViewPersistedState@ preferenceState = PreferenceViewPersistedState();
 
 		ClientMenu(ClientUI@ ui) {
 			super(ui.manager);
@@ -44,7 +46,7 @@ namespace spades {
 				label.Bounds = AABB2(winX - 8.0F, winY - 8.0F, winW + 16.0F, winH + 16.0F);
 				AddChild(label);
 			}
-			
+
 			{
 				spades::ui::Button button(Manager);
 				button.Caption = _Tr("Client", "Back to Game");
@@ -81,14 +83,12 @@ namespace spades {
 		private void OnSetup(spades::ui::UIElement@ sender) {
 			PreferenceViewOptions opt;
 			opt.GameActive = true;
+			@opt.PersistedState = preferenceState;
 
 			PreferenceView al(this, opt, ui.fontManager);
 			al.Run();
 		}
-		private void OnChatLog(spades::ui::UIElement@ sender) {
-			@ui.ActiveUI = @ui.chatLogWindow;
-			ui.chatLogWindow.ScrollToEnd();
-		}
+		private void OnChatLog(spades::ui::UIElement@ sender) { ui.EnterChatLogWindow(); }
 		private void OnDisconnect(spades::ui::UIElement@ sender) { ui.shouldExit = true; }
 
 		void HotKey(string key) {

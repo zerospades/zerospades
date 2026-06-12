@@ -175,27 +175,29 @@ namespace spades {
 			// Slice order: top, then clockwise. Affirmative/Negative occupy
 			// the same slots in both variants so the gesture transfers.
 			worldLabels = {
-				_Tr("Client", "Affirmative"),
-				_Tr("Client", "Negative"),
-				_Tr("Client", "Tear It Down!"),
-				_Tr("Client", "Help Me Build"),
-				_Tr("Client", "Spawnkiller!"),
-				_Tr("Client", "Behind Us!"),
+				"Affirmative",
+				"Behind Us!",
+				"Spawnkiller!",
+				"Negative",
+				"Help Me Build",
+				"Tear It Down!",
 			};
 			playerLabels = {
-				_Tr("Client", "Affirmative"),
-				_Tr("Client", "Negative"),
-				_Tr("Client", "Thank You"),
-				_Tr("Client", "Cover Me"),
-				_Tr("Client", "Behind You"),
-				_Tr("Client", "Help Me"),
+				"Affirmative",
+				"Behind You",
+				"Cover Me",
+				"Negative",
+				"Help Me",
+				"Thank You",
 			};
 
 			const float kPI = static_cast<float>(M_PI);
 			const float kSliceSpan = kPI * 2.0F / static_cast<float>(kSliceCount);
-			const float halfSliceRad =
-				kSliceSpan * 0.5F - (kSliceGapDeg * kPI / 180.0F) * 0.5F;
+			const float halfSliceRad = kSliceSpan * 0.5F - (kSliceGapDeg * kPI / 180.0F) * 0.5F;
 			for (int i = 0; i < kSliceCount; i++) {
+				worldDisplayLabels[i] = _Tr("Client", worldLabels[i]);
+				playerDisplayLabels[i] = _Tr("Client", playerLabels[i]);
+				
 				float center =
 					-kPI * 0.5F + kSliceSpan * static_cast<float>(i);
 				sliceCenterAngles[i] = center;
@@ -253,8 +255,8 @@ namespace spades {
 			static const std::string empty;
 			if (selection < 0 || selection >= kSliceCount)
 				return empty;
-			const auto& labels =
-			  (variant == Variant::Player) ? playerLabels : worldLabels;
+			const auto& labels = (variant == Variant::Player) 
+				? playerDisplayLabels : worldDisplayLabels;
 			return labels[static_cast<size_t>(selection)];
 		}
 
@@ -299,8 +301,8 @@ namespace spades {
 			float sh = renderer.ScreenHeight();
 			Vector2 center = {sw * 0.5F, sh * 0.5F};
 
-			const auto& labels =
-			  (variant == Variant::Player) ? playerLabels : worldLabels;
+			const auto& labels = (variant == Variant::Player) 
+				? playerDisplayLabels : worldDisplayLabels;
 
 			// Ease-out open animation: scale from 0.85 → 1.0, alpha from 0 → 1.
 			float eased = 1.0F - (1.0F - openPhase) * (1.0F - openPhase);

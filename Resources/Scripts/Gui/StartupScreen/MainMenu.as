@@ -63,8 +63,8 @@ namespace spades {
 			{
 				spades::ui::SimpleButton button(Manager);
 				button.Caption = _Tr("StartupScreen", "GitHub Repository");
-				Vector2 size = Font.Measure(button.Caption);
-				button.Bounds = AABB2(sw - 170.0F - (size.x + 16.0F) - 10.0F, 20.0F, size.x + 16.0F, size.y);
+				float capSize = Font.Measure(button.Caption).x;
+				button.Bounds = AABB2(sw - 170.0F - (capSize + 16.0F) - 10.0F, 20.0F, capSize + 16.0F, 20.0F);
 				button.TextColor = Vector4(0.1F, 0.7F, 1, 1);
 				@button.Activated = spades::ui::EventHandler(this.OnGithubRepositoryPressed);
 				AddChild(button);
@@ -72,18 +72,17 @@ namespace spades {
 			{
 				spades::ui::SimpleButton button(Manager);
 				button.Caption = _Tr("StartupScreen", "Compatible Mods");
-				Vector2 size = Font.Measure(button.Caption);
-				button.Bounds = AABB2(sw - 170.0F - (size.x + 16.0F) - 10.0F, 44.0F, size.x + 16.0F, size.y);
+				float capSize = Font.Measure(button.Caption).x;
+				button.Bounds = AABB2(sw - 170.0F - (capSize + 16.0F) - 10.0F, 44.0F, capSize + 16.0F, 20.0F);
 				button.TextColor = Vector4(0.1F, 0.7F, 1, 1);
 				@button.Activated = spades::ui::EventHandler(this.OnGithubPaksRepositoryPressed);
 				AddChild(button);
 			}
-			
 			{
 				spades::ui::CheckBox button(Manager);
 				button.Caption = _Tr("StartupScreen", "Skip this screen next time");
-				Vector2 size = Font.Measure(button.Caption);
-				button.Bounds = AABB2(8.0F, 45.0F, size.x + 16.0F, size.y);
+				float capSize = Font.Measure(button.Caption).x;
+				button.Bounds = AABB2(8.0F, 45.0F, capSize + 18.0F, 20.0F);
 				AddChild(button);
 				@bypassStartupWindowCheck = button;
 				@button.Activated = spades::ui::EventHandler(this.OnBypassStartupWindowCheckChanged);

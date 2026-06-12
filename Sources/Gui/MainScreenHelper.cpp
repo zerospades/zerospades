@@ -16,7 +16,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -30,6 +30,7 @@
 #include <curl/curl.h>
 #include <json/json.h>
 
+#include "Main.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/DemoRecorder.h>
@@ -59,8 +60,8 @@ namespace spades {
 		int mPing, mPlayers, mMaxPlayers;
 
 		ServerItem(const std::string &name, const std::string &ip, const std::string &map,
-		           const std::string &gameMode, const std::string &country,
-		           const std::string &version, int ping, int players, int maxPlayers);
+				   const std::string &gameMode, const std::string &country,
+				   const std::string &version, int ping, int players, int maxPlayers);
 
 	public:
 		static ServerItem *Create(Json::Value &val);
@@ -77,17 +78,17 @@ namespace spades {
 	};
 
 	ServerItem::ServerItem(const std::string &name, const std::string &ip, const std::string &map,
-	                       const std::string &gameMode, const std::string &country,
-	                       const std::string &version, int ping, int players, int maxPlayers)
-	    : mName(name),
-	      mIp(ip),
-	      mMap(map),
-	      mGameMode(gameMode),
-	      mCountry(country),
-	      mVersion(version),
-	      mPing(ping),
-	      mPlayers(players),
-	      mMaxPlayers(maxPlayers) {}
+						   const std::string &gameMode, const std::string &country,
+						   const std::string &version, int ping, int players, int maxPlayers)
+		: mName(name),
+		  mIp(ip),
+		  mMap(map),
+		  mGameMode(gameMode),
+		  mCountry(country),
+		  mVersion(version),
+		  mPing(ping),
+		  mPlayers(players),
+		  mMaxPlayers(maxPlayers) {}
 
 	ServerItem *ServerItem::Create(Json::Value &val) {
 		ServerItem *item = NULL;
@@ -135,7 +136,7 @@ namespace spades {
 						if (srv) {
 							resp->list.emplace_back(
 							  new MainScreenServerItem(
-							    srv.get(), owner->favorites.count(srv->GetAddress()) >= 1),
+								srv.get(), owner->favorites.count(srv->GetAddress()) >= 1),
 							  false);
 						}
 					}
@@ -153,7 +154,7 @@ namespace spades {
 					if (cHandle) {
 						size_t (*curlWriteCallback)(void *, size_t, size_t, ServerListQuery *) =
 						  [](void *ptr, size_t size, size_t nmemb,
-						     ServerListQuery *self) -> size_t {
+							 ServerListQuery *self) -> size_t {
 							size_t numBytes = size * nmemb;
 							self->buffer.append(reinterpret_cast<char *>(ptr), numBytes);
 							return numBytes;
@@ -248,9 +249,9 @@ namespace spades {
 
 			if (result && !result->list.empty()) {
 				auto entry = std::find_if(result->list.begin(), result->list.end(),
-				                          [&](const Handle<MainScreenServerItem> &entry) {
-					                          return entry->GetAddress() == ip;
-				                          });
+										  [&](const Handle<MainScreenServerItem> &entry) {
+											  return entry->GetAddress() == ip;
+										  });
 				if (entry != result->list.end()) {
 					(*entry)->SetFavorite(favorite);
 				}
@@ -414,7 +415,7 @@ namespace spades {
 		}
 
 		std::string MainScreenHelper::ConnectServer(std::string hostname, int protocolVersion,
-		                                             std::string mapName) {
+													 std::string mapName) {
 			if (mainScreen == NULL) {
 				return "mainScreen == NULL";
 			}
@@ -451,22 +452,32 @@ namespace spades {
 			return arr;
 		}
 
-		int64_t MainScreenHelper::GetDemoFileSize(std::string filename) {
-			struct stat st;
-			if (stat(filename.c_str(), &st) == 0)
-				return static_cast<int64_t>(st.st_size);
-			return -1;
+		int64_t MainScreenHelper::GetDemoFileSize(const std::string& filename) {
+			try {
+				auto stream = FileManager::OpenForReading(filename.c_str());
+				return static_cast<int64_t>(stream->GetLength());
+			} catch (...) {
+				return -1;
+			}
 		}
 
-		std::string MainScreenHelper::PlayDemo(std::string filename) {
+		std::string MainScreenHelper::PlayDemo(const std::string& filename) {
 			if (mainScreen == NULL)
 				return "mainScreen == NULL";
 			return mainScreen->PlayDemo(filename);
 		}
 
-		bool MainScreenHelper::DeleteDemo(std::string filename) {
-			return std::remove(filename.c_str()) == 0;
+		bool MainScreenHelper::DeleteDemo(const std::string& filename) {
+			return FileManager::RemoveFile(filename.c_str());
 		}
+
+		bool MainScreenHelper::RenameDemo(const std::string& oldName, const std::string& newName) {
+			return FileManager::RenameFile(oldName.c_str(), newName.c_str());
+		}
+
+		bool MainScreenHelper::ShouldOpenModsTab() { return spades::g_openModsTab; }
+		bool MainScreenHelper::IsTryingMod() { return spades::g_tryMod; }
+		void MainScreenHelper::RelaunchForMods() { spades::RelaunchForMods(); }
 
 		std::string MainScreenHelper::GetPendingErrorMessage() {
 			std::string s = errorMessage;

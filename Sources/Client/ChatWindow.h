@@ -14,7 +14,7 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+ along with OpenSpades.	 If not, see <http://www.gnu.org/licenses/>.
 
  */
 
@@ -38,10 +38,10 @@ namespace spades {
 		static const char MsgColorRed = 4;
 		static const char MsgColorGreen = 5;
 		static const char MsgColorRestore = 6;
-		static const char MsgImage = 7;
-		static const char MsgColorGray = 8;
-		static const char MsgColorYellow = 9;
-		static const char MsgColorMax = 12;
+		static const char MsgColorGray = 7;
+		static const char MsgColorYellow = 8;
+		static const char MsgImage = 9;
+		static const char MsgColorMax = MsgImage;
 		static const char MsgColorFriendlyFire = MsgColorRed;
 		static const char MsgColorSysInfo = MsgColorYellow;
 
@@ -58,7 +58,7 @@ namespace spades {
 				float timeFade; // timeout fade opacity
 
 				ChatEntry(const std::string& Msg, float Height, float TimeFade)
-				    : msg(Msg), height(Height), timeFade(TimeFade) {}
+					: msg(Msg), height(Height), timeFade(TimeFade) {}
 			};
 
 			std::list<ChatEntry> entries;

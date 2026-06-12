@@ -39,11 +39,6 @@ namespace spades {
 			ui->SendChat(text, false);
 		}
 
-		void ClientUIHelper::EnterChatLogWindow() {
-			if (!ui) return;
-			ui->EnterChatLogWindow();
-		}
-
 		void ClientUIHelper::AlertNotice(const std::string& text) {
 			if (!ui) return;
 			ui->AlertNotice(text);
@@ -57,6 +52,10 @@ namespace spades {
 		void ClientUIHelper::AlertError(const std::string& text) {
 			if (!ui) return;
 			ui->AlertError(text);
+		}
+
+		bool ClientUIHelper::HasLocalPlayer() const {
+			return ui && ui->client && ui->client->HasLocalPlayer();
 		}
 
 		bool ClientUIHelper::IsDemoMode() const {
