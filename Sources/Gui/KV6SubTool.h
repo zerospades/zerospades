@@ -27,6 +27,7 @@
 
 #include <Core/Math.h>
 
+#include "KV6ClickSequence.h"
 #include "KV6EditorTool.h"
 #include "KV6ToolEvent.h"
 
@@ -70,9 +71,9 @@ namespace spades {
 
 		// A 3-point axis-aligned box: corner, opposite corner (on the clicked face's
 		// plane), then depth. The corner/depth are placed in free space, so the box
-		// can be sized beyond the existing model. The action applied to the cells
-		// (fill voxels, or add to the selection) is injected, so Draw and Select
-		// reuse the same code.
+		// can be sized beyond the existing model. The three clicks are tracked by a
+		// `ClickSequence`; the action applied to the cells (fill voxels, or add to
+		// the selection) is injected, so Draw and Select reuse the same code.
 		class RectSubTool : public EditorTool {
 		public:
 			using ApplyFn = std::function<void(IEditorContext&, const std::vector<IntVector3>&)>;
@@ -95,17 +96,17 @@ namespace spades {
 			ApplyFn applyAlt;
 			bool useMirror;
 
-			int stage = 0;            // 0 none, 1 corner set, 2 rectangle set
-			IntVector3 p1;            // first corner
-			int normalAxis = 2;       // axis of the clicked face's normal
-			IntVector3 rectLo, rectHi; // in-plane rectangle (after the 2nd click)
+			ClickSequence seq;  // the corner / opposite-corner / depth clicks
+			int normalAxis = 2; // axis of the clicked face's normal (set on click 1)
 
-			void Reset() { stage = 0; }
-			// Construction point for the current stage, placed in free space so the
-			// box can be sized beyond existing voxels.
-			bool ShapeCur(IEditorContext& ed, IntVector3& out) const;
-			void BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const;
-			void Cells(const IntVector3& cur, std::vector<IntVector3>& out) const;
+			// Construction point for the current stage (seq.Count() == 1 -> opposite
+			// corner on the face plane; == 2 -> depth along the normal), placed in
+			// free space so the box can be sized beyond existing voxels.
+			bool StagePoint(IEditorContext& ed, IntVector3& out) const;
+			// Inclusive box spanned by the recorded points plus an in-progress one
+			// (`pts` holds 2 or 3 points: corner, opposite corner, [depth]).
+			void BBoxOf(const std::vector<IntVector3>& pts, IntVector3& lo, IntVector3& hi) const;
+			void CellsOf(const std::vector<IntVector3>& pts, std::vector<IntVector3>& out) const;
 		};
 
 		// Move the current selection by dragging a 3-axis gizmo at its centroid.

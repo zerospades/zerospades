@@ -144,43 +144,47 @@ namespace spades {
 		// --- RectSubTool (axis-aligned box) ----------------------------------
 
 		void RectSubTool::OnActivate(IEditorContext& ed) {
-			Reset();
+			seq.Reset();
 			ed.SetStatus("Rect: click a corner on a voxel face");
 		}
 
-		bool RectSubTool::ShapeCur(IEditorContext& ed, IntVector3& out) const {
-			Vector3 pp = VecOf(p1);
+		bool RectSubTool::StagePoint(IEditorContext& ed, IntVector3& out) const {
+			const IntVector3& p0 = seq.Points()[0];
+			Vector3 pp = VecOf(p0);
 			// Opposite corner: free on the face plane. Depth: free along the normal
 			// (use only the normal-axis component of a view-facing plane pick).
-			if (stage == 1)
+			if (seq.Count() == 1)
 				return ed.RayPlaneCell(pp, AxisUnit(normalAxis), out);
 			IntVector3 q;
 			if (!ed.RayPlaneCell(pp, ed.ViewDir(), q))
 				return false;
-			out = p1;
+			out = p0;
 			SetComp(out, normalAxis, Comp(q, normalAxis));
 			return true;
 		}
 
-		void RectSubTool::BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const {
+		void RectSubTool::BBoxOf(const std::vector<IntVector3>& pts, IntVector3& lo,
+		                         IntVector3& hi) const {
 			int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
-			if (stage == 1) {
-				SetComp(lo, na, Comp(p1, na)); SetComp(hi, na, Comp(p1, na));
-				SetComp(lo, u, std::min(Comp(p1, u), Comp(cur, u)));
-				SetComp(hi, u, std::max(Comp(p1, u), Comp(cur, u)));
-				SetComp(lo, v, std::min(Comp(p1, v), Comp(cur, v)));
-				SetComp(hi, v, std::max(Comp(p1, v), Comp(cur, v)));
-			} else {
-				SetComp(lo, u, Comp(rectLo, u)); SetComp(hi, u, Comp(rectHi, u));
-				SetComp(lo, v, Comp(rectLo, v)); SetComp(hi, v, Comp(rectHi, v));
-				SetComp(lo, na, std::min(Comp(p1, na), Comp(cur, na)));
-				SetComp(hi, na, std::max(Comp(p1, na), Comp(cur, na)));
+			const IntVector3& p0 = pts[0];
+			const IntVector3& p1 = pts[1]; // opposite corner -> in-plane extent
+			SetComp(lo, u, std::min(Comp(p0, u), Comp(p1, u)));
+			SetComp(hi, u, std::max(Comp(p0, u), Comp(p1, u)));
+			SetComp(lo, v, std::min(Comp(p0, v), Comp(p1, v)));
+			SetComp(hi, v, std::max(Comp(p0, v), Comp(p1, v)));
+			if (pts.size() >= 3) { // depth point -> extent along the normal
+				SetComp(lo, na, std::min(Comp(p0, na), Comp(pts[2], na)));
+				SetComp(hi, na, std::max(Comp(p0, na), Comp(pts[2], na)));
+			} else { // single layer until the depth is picked
+				SetComp(lo, na, Comp(p0, na));
+				SetComp(hi, na, Comp(p0, na));
 			}
 		}
 
-		void RectSubTool::Cells(const IntVector3& cur, std::vector<IntVector3>& out) const {
+		void RectSubTool::CellsOf(const std::vector<IntVector3>& pts,
+		                          std::vector<IntVector3>& out) const {
 			IntVector3 lo, hi;
-			BBox(cur, lo, hi);
+			BBoxOf(pts, lo, hi);
 			out.clear();
 			for (int x = lo.x; x <= hi.x; x++)
 			for (int y = lo.y; y <= hi.y; y++)
@@ -195,52 +199,48 @@ namespace spades {
 			if (!lmb && !rmb)
 				return;
 
-			if (stage == 0) {
+			// First click: anchor a corner on a solid face and capture the normal.
+			if (seq.Count() == 0) {
 				ed.DoPick();
-				if (!ed.HasPick()) { Reset(); return; }
-				p1 = ed.PickSolid();
-				IntVector3 d = ed.PickPlace() - p1;
+				if (!ed.HasPick())
+					return;
+				IntVector3 p0 = ed.PickSolid();
+				IntVector3 d = ed.PickPlace() - p0;
 				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
-				stage = 1;
+				seq.BeginFixed(3);
+				seq.Add(p0);
 				ed.SetStatus("Rect: pick the opposite corner  (RMB on the last click cuts)");
 				return;
 			}
 
 			IntVector3 q;
-			if (!ShapeCur(ed, q))
+			if (!StagePoint(ed, q))
 				return;
-			if (stage == 1) {
-				int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
-				SetComp(rectLo, na, Comp(p1, na)); SetComp(rectHi, na, Comp(p1, na));
-				SetComp(rectLo, u, std::min(Comp(p1, u), Comp(q, u)));
-				SetComp(rectHi, u, std::max(Comp(p1, u), Comp(q, u)));
-				SetComp(rectLo, v, std::min(Comp(p1, v), Comp(q, v)));
-				SetComp(rectHi, v, std::max(Comp(p1, v), Comp(q, v)));
-				stage = 2;
+			if (!seq.Add(q)) { // still collecting (just set the opposite corner)
 				ed.SetStatus("Rect: pick the depth  (RMB to cut)");
-			} else {
-				// The final click's button decides the action: LMB = apply, RMB = alt.
-				std::vector<IntVector3> cells;
-				Cells(q, cells);
-				if (rmb)
-					applyAlt(ed, cells);
-				else
-					apply(ed, cells);
-				Reset();
-				ed.SetStatus(rmb ? "Rect cut" : "Rect applied");
+				return;
 			}
+			// The final click's button decides the action: LMB = apply, RMB = alt.
+			std::vector<IntVector3> cells;
+			CellsOf(seq.Points(), cells);
+			if (rmb)
+				applyAlt(ed, cells);
+			else
+				apply(ed, cells);
+			seq.Reset();
+			ed.SetStatus(rmb ? "Rect cut" : "Rect applied");
 		}
 
 		bool RectSubTool::OnEscape(IEditorContext& ed) {
-			if (stage == 0)
+			if (!seq.Active())
 				return false;
-			Reset();
+			seq.Reset();
 			ed.SetStatus("Rect cancelled");
 			return true;
 		}
 
 		void RectSubTool::DrawScene(IEditorContext& ed) {
-			if (stage == 0) {
+			if (seq.Count() == 0) {
 				ed.DoPick();
 				if (ed.HasPick()) {
 					IntVector3 h = ed.PickSolid();
@@ -249,12 +249,15 @@ namespace spades {
 				return;
 			}
 			IntVector3 q;
-			if (!ShapeCur(ed, q)) {
-				ed.DrawCellOutline(p1.x, p1.y, p1.z, kHover);
+			if (!StagePoint(ed, q)) {
+				const IntVector3& p0 = seq.Points()[0];
+				ed.DrawCellOutline(p0.x, p0.y, p0.z, kHover);
 				return;
 			}
+			std::vector<IntVector3> pts = seq.Points();
+			pts.push_back(q); // include the in-progress point
 			IntVector3 lo, hi;
-			BBox(q, lo, hi);
+			BBoxOf(pts, lo, hi);
 			if (useMirror)
 				ed.DrawBoxOutlineMirrored(lo, hi, kHover);
 			else
