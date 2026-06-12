@@ -87,6 +87,10 @@ namespace spades {
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
+			// Apply `cells` with the active tool's action: fill (or erase, if
+			// `secondary`) under Draw, select (or deselect) under Select. Lets a
+			// sub-tool act correctly in whichever container hosts it.
+			virtual void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) = 0;
 
 			// --- Overlay drawing (3D wireframe previews) ----------------------
 			virtual void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) = 0;

@@ -1200,6 +1200,18 @@ namespace spades {
 				selection.erase(SelKey(c.x, c.y, c.z));
 		}
 
+		void KV6EditorView::ApplyCells(const std::vector<IntVector3>& cells, bool secondary) {
+			EditorTool* t = ActiveTool();
+			EditorRole role = t ? t->Role() : EditorRole::Edit;
+			if (role == EditorRole::Select) {
+				if (secondary) DeselectCells(cells);
+				else SelectCells(cells);
+			} else {
+				if (secondary) EraseCells(cells);
+				else FillCells(cells, currentColor);
+			}
+		}
+
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {

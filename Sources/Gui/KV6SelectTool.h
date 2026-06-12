@@ -29,6 +29,7 @@ namespace spades {
 		public:
 			SelectTool();
 			const char* Label() const override { return "Select"; }
+			EditorRole Role() const override { return EditorRole::Select; }
 		};
 	} // namespace gui
 } // namespace spades

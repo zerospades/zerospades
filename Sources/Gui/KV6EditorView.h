@@ -128,6 +128,9 @@ namespace spades {
 			void EraseCells(const std::vector<IntVector3>& cells) override;
 			// Remove `cells` from the selection.
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
+			// Fill/erase (Draw) or select/deselect (Select) `cells`, per the active
+			// tool's role.
+			void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) override;
 			Vector4 ColorToVec(uint32_t c) const override;
 
 		protected:

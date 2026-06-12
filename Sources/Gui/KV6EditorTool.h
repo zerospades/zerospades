@@ -29,6 +29,10 @@ namespace spades {
 	namespace gui {
 		class IEditorContext;
 
+		// What a top-level tool does with cells, so sub-tools (incl. scripted ones)
+		// can apply through IEditorContext::ApplyCells without knowing their host.
+		enum class EditorRole { Edit, Select };
+
 		/**
 		 * An editor tool (draw, select, ...).
 		 *
@@ -43,6 +47,10 @@ namespace spades {
 
 			// Short label shown on the toolbar button.
 			virtual const char* Label() const = 0;
+
+			// Whether this (top-level) tool edits voxels or builds a selection.
+			// `ApplyCells` routes by the active tool's role.
+			virtual EditorRole Role() const { return EditorRole::Edit; }
 
 			virtual void OnActivate(IEditorContext&) {}
 			virtual void OnDeactivate(IEditorContext&) {}

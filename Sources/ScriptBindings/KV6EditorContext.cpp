@@ -51,6 +51,9 @@ namespace spades {
 		void Ctx_DeselectCells(gui::IEditorContext* c, CScriptArray* arr) {
 			c->DeselectCells(ToCells(arr));
 		}
+		void Ctx_ApplyCells(gui::IEditorContext* c, CScriptArray* arr, bool secondary) {
+			c->ApplyCells(ToCells(arr), secondary);
+		}
 	} // namespace
 
 	// Exposes the editor's tool seam (`gui::IEditorContext`) to scripts as a
@@ -144,6 +147,10 @@ namespace spades {
 					r = eng->RegisterObjectMethod(
 					  "EditorContext", "void DeselectCells(array<spades::IntVector3>@)",
 					  asFUNCTION(Ctx_DeselectCells), asCALL_CDECL_OBJFIRST);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod(
+					  "EditorContext", "void ApplyCells(array<spades::IntVector3>@, bool)",
+					  asFUNCTION(Ctx_ApplyCells), asCALL_CDECL_OBJFIRST);
 					manager->CheckError(r);
 					break;
 				}
