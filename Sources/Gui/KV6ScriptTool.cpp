@@ -20,8 +20,10 @@
 
 #include "KV6ScriptTool.h"
 #include "KV6EditorContext.h"
+#include "KV6SubToolRegistry.h"
 
-#include <ScriptBindings/ScriptFunction.h>
+#include <string>
+
 #include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
@@ -34,12 +36,30 @@ namespace spades {
 				c->SetObject(obj);
 				return c;
 			}
+
+			// Instantiate a script class via its no-arg factory. Returns an object
+			// owning one reference (caller releases or hands to ScriptEditorTool).
+			asIScriptObject* CreateInstance(asIScriptFunction* factory) {
+				if (factory == nullptr)
+					return nullptr;
+				try {
+					ScriptContextHandle c = ScriptManager::GetInstance()->GetContext();
+					if (c->Prepare(factory) < 0)
+						return nullptr;
+					c.ExecuteChecked();
+					asIScriptObject* o = reinterpret_cast<asIScriptObject*>(c->GetReturnObject());
+					if (o != nullptr)
+						o->AddRef(); // keep it alive past the context's own reference
+					return o;
+				} catch (...) {
+					return nullptr;
+				}
+			}
 		} // namespace
 
 		ScriptEditorTool::ScriptEditorTool(asIScriptObject* o) : obj(o) {
 			if (obj == nullptr)
 				return;
-			obj->AddRef();
 
 			// Resolve the tool's methods on its concrete type. Decls are parsed in the
 			// `spades` namespace so the bound `EditorContext` type resolves.
@@ -133,20 +153,55 @@ namespace spades {
 			c.ExecuteChecked();
 		}
 
-		std::unique_ptr<EditorTool> MakeScriptSubTool(const std::string& factoryDecl, int mode) {
-			try {
-				ScriptFunction f(factoryDecl);
-				ScriptContextHandle c = f.Prepare();
-				c->SetArgDWord(0, static_cast<asDWORD>(mode));
-				c.ExecuteChecked();
-				asIScriptObject* o = reinterpret_cast<asIScriptObject*>(c->GetReturnObject());
-				if (o == nullptr)
-					return nullptr;
-				// The adapter adds its own reference; the context drops its one when it
-				// is recycled, so the tool keeps the object alive.
-				return std::unique_ptr<EditorTool>(new ScriptEditorTool(o));
-			} catch (...) {
-				return nullptr;
+		void RegisterScriptTools(SubToolRegistry& reg) {
+			asIScriptEngine* eng = ScriptManager::GetInstance()->GetEngine();
+			asIScriptModule* mod = eng->GetModule("Client");
+			if (mod == nullptr)
+				return;
+			eng->SetDefaultNamespace("spades");
+			mod->SetDefaultNamespace("spades");
+
+			asITypeInfo* iface = mod->GetTypeInfoByName("EditorTool");
+			if (iface == nullptr)
+				return; // no editor-tool scripts compiled in
+
+			asUINT count = mod->GetObjectTypeCount();
+			for (asUINT i = 0; i < count; i++) {
+				asITypeInfo* ti = mod->GetObjectTypeByIndex(i);
+				if (ti == nullptr || ti == iface || !ti->Implements(iface))
+					continue;
+
+				std::string cn = ti->GetName();
+				asIScriptFunction* factory = ti->GetFactoryByDecl((cn + "@ " + cn + "()").c_str());
+				if (factory == nullptr)
+					continue; // tools need a no-argument constructor
+
+				// Which containers the tool wants (bit 0 = Draw, bit 1 = Select);
+				// default to both if it doesn't say.
+				int targets = 3;
+				if (asIScriptFunction* targetsFn = ti->GetMethodByDecl("int Targets()")) {
+					if (asIScriptObject* probe = CreateInstance(factory)) {
+						try {
+							ScriptContextHandle c = PrepareCall(targetsFn, probe);
+							c.ExecuteChecked();
+							targets = c->GetReturnDWord();
+						} catch (...) {}
+						probe->Release();
+					}
+				}
+
+				if ((targets & 1) != 0)
+					reg.Register(SubToolTarget::Draw, [factory] {
+						asIScriptObject* o = CreateInstance(factory);
+						return o ? std::unique_ptr<EditorTool>(new ScriptEditorTool(o))
+						         : std::unique_ptr<EditorTool>();
+					});
+				if ((targets & 2) != 0)
+					reg.Register(SubToolTarget::Select, [factory] {
+						asIScriptObject* o = CreateInstance(factory);
+						return o ? std::unique_ptr<EditorTool>(new ScriptEditorTool(o))
+						         : std::unique_ptr<EditorTool>();
+					});
 			}
 		}
 	} // namespace gui

@@ -25,26 +25,14 @@
 
 namespace spades {
 	namespace gui {
-		namespace {
-			// Modes understood by the Cylinder script tool: which action it applies.
-			const int kModeFill = 0;   // Draw: fill / erase voxels
-			const int kModeSelect = 1; // Select: add / remove from the selection
-			const char* kCylinderFactory = "EditorTool@ CreateCylinderTool(int)";
-		} // namespace
-
 		SubToolRegistry& SubToolRegistry::Instance() {
 			static SubToolRegistry registry;
 			static bool seeded = false;
 			if (!seeded) {
 				seeded = true;
-				// The Cylinder is authored in AngelScript and shared by both
-				// containers, acting like Rect: it fills under Draw and selects under
-				// Select. If its script is absent the factory yields null and the tool
-				// is simply omitted.
-				registry.Register(SubToolTarget::Draw,
-				                  [] { return MakeScriptSubTool(kCylinderFactory, kModeFill); });
-				registry.Register(SubToolTarget::Select,
-				                  [] { return MakeScriptSubTool(kCylinderFactory, kModeSelect); });
+				// Every script tool implementing the EditorTool interface registers
+				// itself for the targets it declares — no tool is named here.
+				RegisterScriptTools(registry);
 			}
 			return registry;
 		}

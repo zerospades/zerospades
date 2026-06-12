@@ -30,6 +30,7 @@ class asIScriptFunction;
 
 namespace spades {
 	namespace gui {
+		class SubToolRegistry;
 		// Adapts a script object implementing the `EditorTool` script interface to a
 		// C++ `EditorTool`, forwarding each callback into the script. The live
 		// `IEditorContext` is handed to the script as the bound `EditorContext@`, and
@@ -37,7 +38,7 @@ namespace spades {
 		// to cross the boundary.
 		class ScriptEditorTool : public EditorTool {
 		public:
-			// Adopts `obj` (adds a reference; released on destruction).
+			// Adopts `obj` (takes ownership of one reference; released on destruction).
 			explicit ScriptEditorTool(asIScriptObject* obj);
 			~ScriptEditorTool() override;
 
@@ -62,10 +63,10 @@ namespace spades {
 			std::string label;
 		};
 
-		// Build a script-backed tool by calling a global script factory
-		// `EditorTool@ <factory>(int)` with `mode`. Returns null if the script is
-		// unavailable or the call fails, so the editor simply omits the tool rather
-		// than breaking.
-		std::unique_ptr<EditorTool> MakeScriptSubTool(const std::string& factoryDecl, int mode);
+		// Discover every script class implementing the `EditorTool` interface in the
+		// compiled module and register it with `reg` for the targets it declares via
+		// `Targets()`. This is what makes a tool appear by just adding its script —
+		// no C++ change. Safe to call when no scripts are present (registers nothing).
+		void RegisterScriptTools(SubToolRegistry& reg);
 	} // namespace gui
 } // namespace spades

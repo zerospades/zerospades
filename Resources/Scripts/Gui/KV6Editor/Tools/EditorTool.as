@@ -26,6 +26,9 @@ namespace spades {
 	// Pointer phase passed to EditorTool::OnPointer (mirrors C++ PointerPhase).
 	enum EditorPhase { PhaseDown, PhaseUp, PhaseMove, PhaseDrag }
 
+	// Containers a tool wants to appear in, as a bitmask returned by Targets().
+	enum EditorTarget { TargetDraw = 1, TargetSelect = 2 }
+
 	/**
 	 * A scriptable editor tool.
 	 *
@@ -37,6 +40,11 @@ namespace spades {
 	interface EditorTool {
 		// Toolbar label (read once when the tool is created).
 		string Label();
+
+		// Which containers to appear in, as an EditorTarget bitmask (e.g.
+		// EditorTarget::TargetDraw | EditorTarget::TargetSelect). Read once at
+		// discovery; the same class is instantiated separately per container.
+		int Targets();
 
 		void OnActivate(EditorContext@ ctx);
 		void OnDeactivate(EditorContext@ ctx);

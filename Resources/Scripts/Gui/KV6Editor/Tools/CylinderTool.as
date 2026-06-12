@@ -23,19 +23,17 @@ namespace spades {
 	// A 3-click circular cylinder, authored in AngelScript as a demo of editor tool
 	// scripting. Click the centre on a voxel face, click again to set the radius
 	// (the clicked cell lies on the rim), then click the depth along the clicked
-	// face's normal. mode 0 = Draw (fill / erase), mode 1 = Select (select /
-	// deselect). The same class serves both containers.
+	// face's normal. The same class serves both containers: it fills under Draw and
+	// selects under Select, via ctx.ApplyCells (which routes by the active tool).
 	class CylinderTool : EditorTool {
-		private int mode;
 		private int stage = 0; // 0 none, 1 centre set, 2 radius set
 		private int normalAxis = 2;
 		private IntVector3 p0; // centre
 		private IntVector3 p1; // rim point (sets the radius)
 		private IntVector3 cur; // point under the cursor for the current stage
 
-		CylinderTool(int m) { mode = m; }
-
 		string Label() { return "Cylinder"; }
+		int Targets() { return int(EditorTarget::TargetDraw) | int(EditorTarget::TargetSelect); }
 
 		void OnActivate(EditorContext@ ctx) {
 			stage = 0;
@@ -86,7 +84,7 @@ namespace spades {
 
 			// Final click: build the cylinder and apply (button decides fill vs cut).
 			array<IntVector3>@ cells = BuildCylinder(cur);
-			Apply(ctx, cells, rmb);
+			ctx.ApplyCells(cells, rmb); // fill/erase under Draw, select/deselect under Select
 			stage = 0;
 			ctx.SetStatus(rmb ? "Cylinder cut" : "Cylinder applied");
 		}
@@ -201,20 +199,6 @@ namespace spades {
 			return cells;
 		}
 
-		private void Apply(EditorContext@ ctx, array<IntVector3>@ cells, bool alt) {
-			if (mode == 0) { // Draw
-				if (alt) ctx.EraseCells(cells);
-				else ctx.FillCells(cells, ctx.CurrentColor());
-			} else { // Select
-				if (alt) ctx.DeselectCells(cells);
-				else ctx.SelectCells(cells);
-			}
-		}
-	}
-
-	// Factory invoked by the C++ SubToolRegistry (one instance per container).
-	EditorTool@ CreateCylinderTool(int mode) {
-		return CylinderTool(mode);
 	}
 
 }
