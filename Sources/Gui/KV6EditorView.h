@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
 #include "View.h"
 #include <Client/IAudioDevice.h>
@@ -54,7 +55,7 @@ namespace spades {
 		 * motion to drive a spectator-style camera and tracks its own software
 		 * cursor for the 2D UI.
 		 */
-		class KV6EditorView : public View {
+		class KV6EditorView : public View, public IEditorContext {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, const std::string& path, bool isNew);
@@ -72,60 +73,62 @@ namespace spades {
 			void Closing() override {}
 			bool WantsToBeClosed() override { return wantsClose; }
 
-			// --- Tool-facing API (used by EditorTool subclasses) --------------
-			void DoPick();
-			bool HasPick() const { return pickHit; }
-			IntVector3 PickPlace() const { return MakeIntVector3(pickPX, pickPY, pickPZ); }
-			IntVector3 PickSolid() const { return MakeIntVector3(pickHX, pickHY, pickHZ); }
-			Vector3 ViewDir() const { return camFwd; }
-			const Vector2& CursorPos() const { return cursor; }
+			// --- IEditorContext (the seam EditorTool subclasses operate through) ---
+			void DoPick() override;
+			bool HasPick() const override { return pickHit; }
+			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
+			IntVector3 PickSolid() const override { return MakeIntVector3(pickHX, pickHY, pickHZ); }
+			Vector3 ViewDir() const override { return camFwd; }
+			const Vector2& CursorPos() const override { return cursor; }
 			// Voxel whose centre is nearest where the cursor ray meets the plane
 			// (planePoint, normal). Lets tools place points in empty space.
-			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal, IntVector3& out);
+			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
+			                  IntVector3& out) override;
 			// Project a world point to screen pixels. `ok` is false if behind the camera.
-			Vector2 WorldToScreen(const Vector3& w, bool& ok) const;
-			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color);
+			Vector2 WorldToScreen(const Vector3& w, bool& ok) const override;
+			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			// Selection move (used by the move gizmo).
-			bool SelectionCentroid(Vector3& out) const;
-			void MoveSelection(int dx, int dy, int dz);
-			void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color);
-			bool InBounds(int x, int y, int z) const;
-			VoxelModel& Model() { return *model; }
-			uint32_t CurrentColor() const { return currentColor; }
+			bool SelectionCentroid(Vector3& out) const override;
+			void MoveSelection(int dx, int dy, int dz) override;
+			void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) override;
+			bool InBounds(int x, int y, int z) const override;
+			VoxelModel& Model() override { return *model; }
+			uint32_t CurrentColor() const override { return currentColor; }
 
 			// Selection (a set of solid-voxel coords, shared across tools).
-			void ToggleSelect(int x, int y, int z);
-			void AddSelect(int x, int y, int z);
-			bool IsSelected(int x, int y, int z) const;
-			void ClearSelection();
-			int SelectionCount() const { return int(selection.size()); }
+			void ToggleSelect(int x, int y, int z) override;
+			void AddSelect(int x, int y, int z) override;
+			bool IsSelected(int x, int y, int z) const override;
+			void ClearSelection() override;
+			int SelectionCount() const override { return int(selection.size()); }
 			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
-			void SelectLinkedColor(int x, int y, int z);
+			void SelectLinkedColor(int x, int y, int z) override;
 
-			bool PickModeActive() const { return pickMode; }
-			void ClearPickMode() { pickMode = false; }
-			void PlaceCube();
-			void DeleteCube();
-			void Eyedropper();
-			void SetStatus(const std::string&);
-			void DrawCellOutline(int x, int y, int z, const Vector4& color);
+			bool PickModeActive() const override { return pickMode; }
+			void ClearPickMode() override { pickMode = false; }
+			void PlaceCube() override;
+			void DeleteCube() override;
+			void Eyedropper() override;
+			void SetStatus(const std::string&) override;
+			void DrawCellOutline(int x, int y, int z, const Vector4& color) override;
 			// 3D wireframe over the inclusive voxel range [lo, hi].
-			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi, const Vector4& color);
+			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
+			                    const Vector4& color) override;
 			// As above, but also drawing the mirror images for the enabled axes.
-			void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color);
+			void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) override;
 			void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
-			                            const Vector4& color);
+			                            const Vector4& color) override;
 			// Add every solid voxel in [lo, hi] to the selection.
-			void SelectBox(const IntVector3& lo, const IntVector3& hi);
+			void SelectBox(const IntVector3& lo, const IntVector3& hi) override;
 			// Add the solid voxels among `cells` to the selection.
-			void SelectCells(const std::vector<IntVector3>& cells);
+			void SelectCells(const std::vector<IntVector3>& cells) override;
 			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
-			void FillCells(const std::vector<IntVector3>& cells, uint32_t color);
+			void FillCells(const std::vector<IntVector3>& cells, uint32_t color) override;
 			// Remove the solid voxels among `cells` (keeps at least one in the model).
-			void EraseCells(const std::vector<IntVector3>& cells);
+			void EraseCells(const std::vector<IntVector3>& cells) override;
 			// Remove `cells` from the selection.
-			void DeselectCells(const std::vector<IntVector3>& cells);
-			Vector4 ColorToVec(uint32_t c) const;
+			void DeselectCells(const std::vector<IntVector3>& cells) override;
+			Vector4 ColorToVec(uint32_t c) const override;
 
 		protected:
 			~KV6EditorView();

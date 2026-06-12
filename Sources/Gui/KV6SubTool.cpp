@@ -19,7 +19,7 @@
  */
 
 #include "KV6SubTool.h"
-#include "KV6EditorView.h"
+#include "KV6EditorContext.h"
 
 #include <algorithm>
 
@@ -58,10 +58,10 @@ namespace spades {
 
 		// --- BlockSubTool (Draw single) --------------------------------------
 
-		void BlockSubTool::OnActivate(KV6EditorView& ed) {
+		void BlockSubTool::OnActivate(IEditorContext& ed) {
 			ed.SetStatus("Draw: LMB place  -  RMB delete  -  Alt+LMB pick colour");
 		}
-		void BlockSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void BlockSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsDown())
 				return;
 			if (e.IsLeft()) {
@@ -75,7 +75,7 @@ namespace spades {
 				ed.DeleteCube();
 			}
 		}
-		void BlockSubTool::DrawScene(KV6EditorView& ed) {
+		void BlockSubTool::DrawScene(IEditorContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -86,10 +86,10 @@ namespace spades {
 
 		// --- PointSubTool (Select single) ------------------------------------
 
-		void PointSubTool::OnActivate(KV6EditorView& ed) {
+		void PointSubTool::OnActivate(IEditorContext& ed) {
 			ed.SetStatus("Select Point: click to (de)select  -  click empty to clear");
 		}
-		void PointSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void PointSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsDown() || !e.IsLeft())
 				return;
 			ed.DoPick();
@@ -100,7 +100,7 @@ namespace spades {
 				ed.ClearSelection();
 			}
 		}
-		void PointSubTool::DrawScene(KV6EditorView& ed) {
+		void PointSubTool::DrawScene(IEditorContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -110,10 +110,10 @@ namespace spades {
 
 		// --- ByColourSubTool (Select flood-fill) -----------------------------
 
-		void ByColourSubTool::OnActivate(KV6EditorView& ed) {
+		void ByColourSubTool::OnActivate(IEditorContext& ed) {
 			ed.SetStatus("Select By Colour: click a voxel to select its colour region  -  [L]");
 		}
-		void ByColourSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void ByColourSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsDown() || !e.IsLeft())
 				return;
 			ed.DoPick();
@@ -124,7 +124,7 @@ namespace spades {
 				ed.ClearSelection();
 			}
 		}
-		void ByColourSubTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
+		void ByColourSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
 			if (e.IsDown() && EqualsIgnoringCase(e.key, "L")) {
 				ed.DoPick();
 				if (ed.HasPick()) {
@@ -133,7 +133,7 @@ namespace spades {
 				}
 			}
 		}
-		void ByColourSubTool::DrawScene(KV6EditorView& ed) {
+		void ByColourSubTool::DrawScene(IEditorContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -143,12 +143,12 @@ namespace spades {
 
 		// --- RectSubTool (axis-aligned box) ----------------------------------
 
-		void RectSubTool::OnActivate(KV6EditorView& ed) {
+		void RectSubTool::OnActivate(IEditorContext& ed) {
 			Reset();
 			ed.SetStatus("Rect: click a corner on a voxel face");
 		}
 
-		bool RectSubTool::ShapeCur(KV6EditorView& ed, IntVector3& out) const {
+		bool RectSubTool::ShapeCur(IEditorContext& ed, IntVector3& out) const {
 			Vector3 pp = VecOf(p1);
 			// Opposite corner: free on the face plane. Depth: free along the normal
 			// (use only the normal-axis component of a view-facing plane pick).
@@ -188,7 +188,7 @@ namespace spades {
 				out.push_back(MakeIntVector3(x, y, z));
 		}
 
-		void RectSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void RectSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsDown())
 				return;
 			bool lmb = e.IsLeft(), rmb = e.IsRight();
@@ -231,7 +231,7 @@ namespace spades {
 			}
 		}
 
-		bool RectSubTool::OnEscape(KV6EditorView& ed) {
+		bool RectSubTool::OnEscape(IEditorContext& ed) {
 			if (stage == 0)
 				return false;
 			Reset();
@@ -239,7 +239,7 @@ namespace spades {
 			return true;
 		}
 
-		void RectSubTool::DrawScene(KV6EditorView& ed) {
+		void RectSubTool::DrawScene(IEditorContext& ed) {
 			if (stage == 0) {
 				ed.DoPick();
 				if (ed.HasPick()) {
@@ -263,12 +263,12 @@ namespace spades {
 
 		// --- MoveSubTool (drag a 3-axis gizmo) -------------------------------
 
-		void MoveSubTool::OnActivate(KV6EditorView& ed) {
+		void MoveSubTool::OnActivate(IEditorContext& ed) {
 			grabAxis = -1;
 			ed.SetStatus("Move: drag an axis handle to move the selection");
 		}
 
-		int MoveSubTool::OffsetAlong(KV6EditorView& ed, const Vector3& c, int axis) const {
+		int MoveSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const {
 			bool ok1, ok2;
 			Vector2 s0 = ed.WorldToScreen(c, ok1);
 			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
@@ -282,7 +282,7 @@ namespace spades {
 			return int(std::lround(Vector2::Dot(m, da) / (dl * dl)));
 		}
 
-		void MoveSubTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void MoveSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (!e.IsLeft())
 				return;
 			if (e.IsDown()) {
@@ -316,14 +316,14 @@ namespace spades {
 			}
 		}
 
-		bool MoveSubTool::OnEscape(KV6EditorView&) {
+		bool MoveSubTool::OnEscape(IEditorContext&) {
 			if (grabAxis < 0)
 				return false;
 			grabAxis = -1; // cancel the drag (no move committed)
 			return true;
 		}
 
-		void MoveSubTool::DrawScene(KV6EditorView& ed) {
+		void MoveSubTool::DrawScene(IEditorContext& ed) {
 			Vector3 c;
 			if (!ed.SelectionCentroid(c))
 				return;

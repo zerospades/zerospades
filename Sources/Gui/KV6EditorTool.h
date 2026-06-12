@@ -27,15 +27,15 @@
 
 namespace spades {
 	namespace gui {
-		class KV6EditorView;
+		class IEditorContext;
 
 		/**
 		 * An editor tool (draw, select, ...).
 		 *
 		 * Tools receive pointer/key events while active and may draw their own 3D
 		 * preview (between StartScene/EndScene) and 2D overlay. They operate on the
-		 * editor through `KV6EditorView`'s public tool API, so adding a tool is just
-		 * a new subclass registered in `KV6EditorView`'s tool list.
+		 * editor through the `IEditorContext` seam, so adding a tool is just a new
+		 * subclass registered in `KV6EditorView`'s tool list.
 		 */
 		class EditorTool {
 		public:
@@ -44,12 +44,12 @@ namespace spades {
 			// Short label shown on the toolbar button.
 			virtual const char* Label() const = 0;
 
-			virtual void OnActivate(KV6EditorView&) {}
-			virtual void OnDeactivate(KV6EditorView&) {}
+			virtual void OnActivate(IEditorContext&) {}
+			virtual void OnDeactivate(IEditorContext&) {}
 
 			// Abort an in-progress operation (Esc). Returns true if it consumed the
 			// key (so the editor doesn't also open the pause menu).
-			virtual bool OnEscape(KV6EditorView&) { return false; }
+			virtual bool OnEscape(IEditorContext&) { return false; }
 
 			// Declarative options shown in the secondary toolbar next to this tool's
 			// sub-tools (e.g. Draw's mirror toggles and colour swatch). Returning
@@ -62,17 +62,17 @@ namespace spades {
 			virtual int SubToolCount() const { return 0; }
 			virtual const char* SubToolLabel(int) const { return ""; }
 			virtual int ActiveSubTool() const { return 0; }
-			virtual void SetSubTool(KV6EditorView&, int) {}
+			virtual void SetSubTool(IEditorContext&, int) {}
 
 			// All pointer activity (press, release, move, drag) arrives here; the
 			// phase and button live on the event.
-			virtual void OnPointer(KV6EditorView&, const PointerInput&) {}
-			virtual void OnKey(KV6EditorView&, const KeyInput&) {}
+			virtual void OnPointer(IEditorContext&, const PointerInput&) {}
+			virtual void OnKey(IEditorContext&, const KeyInput&) {}
 
 			// 3D preview, drawn between StartScene and EndScene.
-			virtual void DrawScene(KV6EditorView&) {}
+			virtual void DrawScene(IEditorContext&) {}
 			// 2D overlay (tool sub-UI / status), drawn over the scene.
-			virtual void DrawOverlay(KV6EditorView&) {}
+			virtual void DrawOverlay(IEditorContext&) {}
 		};
 	} // namespace gui
 } // namespace spades

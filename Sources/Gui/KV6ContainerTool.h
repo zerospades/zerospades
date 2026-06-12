@@ -36,14 +36,14 @@ namespace spades {
 			int SubToolCount() const override { return int(subs.size()); }
 			const char* SubToolLabel(int i) const override { return subs[i]->Label(); }
 			int ActiveSubTool() const override { return active; }
-			void SetSubTool(KV6EditorView&, int) override;
+			void SetSubTool(IEditorContext&, int) override;
 
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			void OnKey(KV6EditorView&, const KeyInput&) override;
-			bool OnEscape(KV6EditorView&) override;
-			void DrawScene(KV6EditorView&) override;
-			void DrawOverlay(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void OnKey(IEditorContext&, const KeyInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void DrawScene(IEditorContext&) override;
+			void DrawOverlay(IEditorContext&) override;
 
 		protected:
 			std::vector<std::unique_ptr<EditorTool>> subs;

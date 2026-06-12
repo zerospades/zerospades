@@ -26,7 +26,7 @@ namespace spades {
 			return (active >= 0 && active < int(subs.size())) ? subs[active].get() : nullptr;
 		}
 
-		void ContainerTool::SetSubTool(KV6EditorView& ed, int i) {
+		void ContainerTool::SetSubTool(IEditorContext& ed, int i) {
 			if (i == active || i < 0 || i >= int(subs.size()))
 				return;
 			active = i;
@@ -34,27 +34,27 @@ namespace spades {
 				s->OnActivate(ed);
 		}
 
-		void ContainerTool::OnActivate(KV6EditorView& ed) {
+		void ContainerTool::OnActivate(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->OnActivate(ed);
 		}
-		void ContainerTool::OnPointer(KV6EditorView& ed, const PointerInput& e) {
+		void ContainerTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (EditorTool* s = Cur())
 				s->OnPointer(ed, e);
 		}
-		void ContainerTool::OnKey(KV6EditorView& ed, const KeyInput& e) {
+		void ContainerTool::OnKey(IEditorContext& ed, const KeyInput& e) {
 			if (EditorTool* s = Cur())
 				s->OnKey(ed, e);
 		}
-		bool ContainerTool::OnEscape(KV6EditorView& ed) {
+		bool ContainerTool::OnEscape(IEditorContext& ed) {
 			EditorTool* s = Cur();
 			return s ? s->OnEscape(ed) : false;
 		}
-		void ContainerTool::DrawScene(KV6EditorView& ed) {
+		void ContainerTool::DrawScene(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->DrawScene(ed);
 		}
-		void ContainerTool::DrawOverlay(KV6EditorView& ed) {
+		void ContainerTool::DrawOverlay(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->DrawOverlay(ed);
 		}

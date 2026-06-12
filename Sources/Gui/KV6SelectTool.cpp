@@ -19,16 +19,16 @@
  */
 
 #include "KV6SelectTool.h"
-#include "KV6EditorView.h"
+#include "KV6EditorContext.h"
 
 namespace spades {
 	namespace gui {
 		SelectTool::SelectTool() {
 			// Rect adds its solid cells to the selection (LMB) or removes them (RMB).
-			auto select = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+			auto select = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.SelectCells(cells);
 			};
-			auto deselect = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+			auto deselect = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.DeselectCells(cells);
 			};
 			subs.push_back(std::unique_ptr<EditorTool>(new PointSubTool()));

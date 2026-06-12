@@ -32,7 +32,7 @@
 
 namespace spades {
 	namespace gui {
-		class KV6EditorView;
+		class IEditorContext;
 
 		// Leaf tools shown as buttons in the secondary toolbar (e.g. Select's Point
 		// / Rect). They are ordinary `EditorTool`s with no children of their own; a
@@ -44,28 +44,28 @@ namespace spades {
 		class BlockSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Block"; }
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			void DrawScene(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void DrawScene(IEditorContext&) override;
 		};
 
 		// Single-voxel selection toggle (Select's "Point").
 		class PointSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Point"; }
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			void DrawScene(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void DrawScene(IEditorContext&) override;
 		};
 
 		// Flood-fill selection by colour (Select's "By Colour"); also bound to [L].
 		class ByColourSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "By Colour"; }
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			void OnKey(KV6EditorView&, const KeyInput&) override;
-			void DrawScene(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void OnKey(IEditorContext&, const KeyInput&) override;
+			void DrawScene(IEditorContext&) override;
 		};
 
 		// A 3-point axis-aligned box: corner, opposite corner (on the clicked face's
@@ -75,7 +75,7 @@ namespace spades {
 		// reuse the same code.
 		class RectSubTool : public EditorTool {
 		public:
-			using ApplyFn = std::function<void(KV6EditorView&, const std::vector<IntVector3>&)>;
+			using ApplyFn = std::function<void(IEditorContext&, const std::vector<IntVector3>&)>;
 
 			// `apply` runs when the final click is LMB, `applyAlt` when it is RMB
 			// (e.g. fill vs cut, or select vs deselect).
@@ -84,10 +84,10 @@ namespace spades {
 			      useMirror(useMirror) {}
 
 			const char* Label() const override { return label; }
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			bool OnEscape(KV6EditorView&) override;
-			void DrawScene(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void DrawScene(IEditorContext&) override;
 
 		private:
 			const char* label;
@@ -103,7 +103,7 @@ namespace spades {
 			void Reset() { stage = 0; }
 			// Construction point for the current stage, placed in free space so the
 			// box can be sized beyond existing voxels.
-			bool ShapeCur(KV6EditorView& ed, IntVector3& out) const;
+			bool ShapeCur(IEditorContext& ed, IntVector3& out) const;
 			void BBox(const IntVector3& cur, IntVector3& lo, IntVector3& hi) const;
 			void Cells(const IntVector3& cur, std::vector<IntVector3>& out) const;
 		};
@@ -112,16 +112,16 @@ namespace spades {
 		class MoveSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Move"; }
-			void OnActivate(KV6EditorView&) override;
-			void OnPointer(KV6EditorView&, const PointerInput&) override;
-			bool OnEscape(KV6EditorView&) override;
-			void DrawScene(KV6EditorView&) override;
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void DrawScene(IEditorContext&) override;
 
 		private:
 			int grabAxis = -1;   // 0/1/2 while dragging a handle, else -1
 			Vector2 grabCursor;  // cursor at grab start
 			int curOffset = 0;   // current preview offset along grabAxis
-			int OffsetAlong(KV6EditorView& ed, const Vector3& c, int axis) const;
+			int OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
 		};
 	} // namespace gui
 } // namespace spades

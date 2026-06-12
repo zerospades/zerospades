@@ -19,16 +19,16 @@
  */
 
 #include "KV6DrawTool.h"
-#include "KV6EditorView.h"
+#include "KV6EditorContext.h"
 
 namespace spades {
 	namespace gui {
 		DrawTool::DrawTool() {
 			// Rect fills its cells with the current colour (LMB) or erases them (RMB).
-			auto fill = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+			auto fill = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.FillCells(cells, ed.CurrentColor());
 			};
-			auto erase = [](KV6EditorView& ed, const std::vector<IntVector3>& cells) {
+			auto erase = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.EraseCells(cells);
 			};
 			subs.push_back(std::unique_ptr<EditorTool>(new BlockSubTool()));
