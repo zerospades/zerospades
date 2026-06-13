@@ -135,6 +135,10 @@ namespace spades {
 					  "Vector4&in)",
 					  asMETHOD(gui::IEditorContext, DrawBoxOutlineMirrored), asCALL_THISCALL);
 					manager->CheckError(r);
+					r = eng->RegisterObjectMethod(
+					  "EditorContext", "void DrawSolidCube(const Vector3&in, float, const Vector4&in)",
+					  asMETHOD(gui::IEditorContext, DrawSolidCube), asCALL_THISCALL);
+					manager->CheckError(r);
 
 					// --- cell-list edits (array<IntVector3> -> std::vector) ---
 					r = eng->RegisterObjectMethod("EditorContext",

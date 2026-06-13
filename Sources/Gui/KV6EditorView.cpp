@@ -1400,6 +1400,39 @@ namespace spades {
 			}
 		}
 
+		// A solid, shaded cube drawn as a 2D overlay: project the camera-facing faces
+		// and fill them (used for the move gizmo's draggable handles).
+		void KV6EditorView::DrawSolidCube(const Vector3& center, float half,
+		                                  const Vector4& color) {
+			Vector3 corner[8];
+			for (int i = 0; i < 8; i++)
+				corner[i] = center + MakeVector3((i & 1) ? half : -half, (i & 2) ? half : -half,
+				                                 (i & 4) ? half : -half);
+			static const int faceIdx[6][4] = {{0, 2, 6, 4}, {1, 5, 7, 3}, {0, 4, 5, 1},
+			                                  {2, 3, 7, 6}, {0, 1, 3, 2}, {4, 6, 7, 5}};
+			static const float faceN[6][3] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0},
+			                                  {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
+			for (int f = 0; f < 6; f++) {
+				Vector3 n = MakeVector3(faceN[f][0], faceN[f][1], faceN[f][2]);
+				Vector3 toCam = camEye - (center + n * half);
+				float facing = Vector3::Dot(n, toCam);
+				if (facing <= 0.0F)
+					continue; // back-facing
+				Vector2 q[4];
+				bool ok = true, o;
+				for (int i = 0; i < 4; i++) {
+					q[i] = WorldToScreen(corner[faceIdx[f][i]], o);
+					ok = ok && o;
+				}
+				if (!ok)
+					continue;
+				float sh = 0.55F + 0.45F * (facing / std::max(toCam.GetLength(), 1.0e-4F));
+				Vector4 col = MakeVector4(color.x * sh, color.y * sh, color.z * sh, color.w);
+				FillTri(q[0], q[1], q[2], col);
+				FillTri(q[0], q[2], q[3], col);
+			}
+		}
+
 		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
 			std::vector<NaviFacet> facets;
 			BuildNaviFacets(facets);

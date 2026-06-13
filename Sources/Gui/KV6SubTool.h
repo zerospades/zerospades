@@ -117,6 +117,7 @@ namespace spades {
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			bool OnEscape(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
+			void DrawOverlay(IEditorContext&) override;
 
 		private:
 			int grabAxis = -1;   // 0/1/2 while dragging a handle, else -1

@@ -102,6 +102,10 @@ namespace spades {
 			virtual void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                                    const Vector4& color) = 0;
 			virtual void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) = 0;
+			// Opaque, shaded cube of half-size `half` centred at `center` (a solid
+			// gizmo handle). This is a 2D overlay fill, so call it from a tool's
+			// DrawOverlay (not DrawScene).
+			virtual void DrawSolidCube(const Vector3& center, float half, const Vector4& color) = 0;
 
 			// --- Misc editor state / feedback ---------------------------------
 			virtual bool PickModeActive() const = 0;

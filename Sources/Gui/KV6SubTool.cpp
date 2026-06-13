@@ -57,16 +57,6 @@ namespace spades {
 				return (p - (a + ab * t)).GetLength();
 			}
 
-			// Wireframe cube of half-size h centred at c (the draggable axis handle).
-			void DrawCube(IEditorContext& ed, const Vector3& c, float h, const Vector4& col) {
-				Vector3 p[8];
-				for (int i = 0; i < 8; i++)
-					p[i] = c + MakeVector3((i & 1) ? h : -h, (i & 2) ? h : -h, (i & 4) ? h : -h);
-				static const int e[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7}, {0, 2}, {1, 3},
-				                             {4, 6}, {5, 7}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
-				for (int i = 0; i < 12; i++)
-					ed.DrawLine3D(p[e[i][0]], p[e[i][1]], col);
-			}
 		} // namespace
 
 		// --- BlockSubTool (Draw single) --------------------------------------
@@ -357,14 +347,24 @@ namespace spades {
 			for (int a = 0; a < 3; a++) {
 				bool active = (grabAxis == a) || (hover == a);
 				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				Vector3 tip = c + AxisUnit(a) * kGizLen;
-				ed.DrawLine3D(c, tip, col);
-				DrawCube(ed, tip, active ? kCubeHi : kCube, col); // draggable handle
+				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col); // shaft (handle cube in overlay)
 			}
 			if (grabAxis >= 0 && curOffset != 0) {
 				int d[3] = {0, 0, 0};
 				d[grabAxis] = curOffset;
 				ed.DrawSelectionOffset(d[0], d[1], d[2], MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+			}
+		}
+
+		void MoveSubTool::DrawOverlay(IEditorContext& ed) {
+			Vector3 c;
+			if (!ed.SelectionCentroid(c))
+				return;
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
+			for (int a = 0; a < 3; a++) {
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
 			}
 		}
 	} // namespace gui

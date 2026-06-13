@@ -91,6 +91,7 @@ namespace spades {
 			bool SelectionCentroid(Vector3& out) const override;
 			void MoveSelection(int dx, int dy, int dz) override;
 			void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) override;
+			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
 			bool InBounds(int x, int y, int z) const override;
 			VoxelModel& Model() override { return *model; }
 			uint32_t CurrentColor() const override { return currentColor; }
