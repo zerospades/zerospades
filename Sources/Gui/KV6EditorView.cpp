@@ -2101,8 +2101,7 @@ namespace spades {
 			DrawMirrorPlanes();
 			DrawSelection();
 
-			EditorTool* tool = (currentMode == EditorMode::Edit && activeTool < int(tools.size()))
-			                     ? tools[activeTool].get() : nullptr;
+			EditorTool* tool = ActiveTool();
 			if (pasteActive) {
 				DoPick();
 				if (pickHit)
