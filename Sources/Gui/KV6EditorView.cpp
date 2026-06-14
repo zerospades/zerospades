@@ -81,6 +81,24 @@ namespace spades {
 				z = int(k & 0xFFFFF);
 			}
 
+			// The 12 edges of an axis-aligned box spanning corners `a`..`b`, handed
+			// one at a time to `emit(p, q)`. Shared by the cell/box outline overlays
+			// and the viewport bounds, which differ only in how a line is drawn.
+			template <class Emit>
+			void BoxEdges(const Vector3& a, const Vector3& b, Emit emit) {
+				for (int k = 0; k < 2; k++) {
+					float z = (k == 0) ? a.z : b.z;
+					emit(MakeVector3(a.x, a.y, z), MakeVector3(b.x, a.y, z));
+					emit(MakeVector3(b.x, a.y, z), MakeVector3(b.x, b.y, z));
+					emit(MakeVector3(b.x, b.y, z), MakeVector3(a.x, b.y, z));
+					emit(MakeVector3(a.x, b.y, z), MakeVector3(a.x, a.y, z));
+				}
+				emit(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z));
+				emit(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z));
+				emit(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z));
+				emit(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z));
+			}
+
 			Vector3 AxisUnit3(int a) {
 				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
 			}
@@ -1061,34 +1079,14 @@ namespace spades {
 		void KV6EditorView::DrawCellOutline(int x, int y, int z, const Vector4& color) {
 			Vector3 a = MakeVector3(float(x) - 0.5F, float(y) - 0.5F, float(z) - 0.5F);
 			Vector3 b = MakeVector3(float(x) + 0.5F, float(y) + 0.5F, float(z) + 0.5F);
-			for (int k = 0; k < 2; k++) {
-				float zz = (k == 0) ? a.z : b.z;
-				EmitLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
-				EmitLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
-				EmitLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
-				EmitLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
-			}
-			EmitLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
-			EmitLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
-			EmitLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
-			EmitLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
+			BoxEdges(a, b, [&](const Vector3& p, const Vector3& q) { EmitLine(p, q, color); });
 		}
 
 		void KV6EditorView::DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
 		                                   const Vector4& color) {
 			Vector3 a = MakeVector3(float(lo.x) - 0.5F, float(lo.y) - 0.5F, float(lo.z) - 0.5F);
 			Vector3 b = MakeVector3(float(hi.x) + 0.5F, float(hi.y) + 0.5F, float(hi.z) + 0.5F);
-			for (int k = 0; k < 2; k++) {
-				float zz = (k == 0) ? a.z : b.z;
-				EmitLine(MakeVector3(a.x, a.y, zz), MakeVector3(b.x, a.y, zz), color);
-				EmitLine(MakeVector3(b.x, a.y, zz), MakeVector3(b.x, b.y, zz), color);
-				EmitLine(MakeVector3(b.x, b.y, zz), MakeVector3(a.x, b.y, zz), color);
-				EmitLine(MakeVector3(a.x, b.y, zz), MakeVector3(a.x, a.y, zz), color);
-			}
-			EmitLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), color);
-			EmitLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), color);
-			EmitLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), color);
-			EmitLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), color);
+			BoxEdges(a, b, [&](const Vector3& p, const Vector3& q) { EmitLine(p, q, color); });
 		}
 
 		void KV6EditorView::DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) {
@@ -1247,17 +1245,9 @@ namespace spades {
 
 			Vector3 a = MakeVector3(lo, lo, lo);
 			Vector3 b = MakeVector3(hiX, hiY, hiZ);
-			for (int k = 0; k < 2; k++) {
-				float z = (k == 0) ? a.z : b.z;
-				renderer->AddDebugLine(MakeVector3(a.x, a.y, z), MakeVector3(b.x, a.y, z), box);
-				renderer->AddDebugLine(MakeVector3(b.x, a.y, z), MakeVector3(b.x, b.y, z), box);
-				renderer->AddDebugLine(MakeVector3(b.x, b.y, z), MakeVector3(a.x, b.y, z), box);
-				renderer->AddDebugLine(MakeVector3(a.x, b.y, z), MakeVector3(a.x, a.y, z), box);
-			}
-			renderer->AddDebugLine(MakeVector3(a.x, a.y, a.z), MakeVector3(a.x, a.y, b.z), box);
-			renderer->AddDebugLine(MakeVector3(b.x, a.y, a.z), MakeVector3(b.x, a.y, b.z), box);
-			renderer->AddDebugLine(MakeVector3(b.x, b.y, a.z), MakeVector3(b.x, b.y, b.z), box);
-			renderer->AddDebugLine(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z), box);
+			BoxEdges(a, b, [&](const Vector3& p, const Vector3& q) {
+				renderer->AddDebugLine(p, q, box);
+			});
 		}
 
 		// Semi-transparent quad at each enabled mirror plane (drawn as a fan of
