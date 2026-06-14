@@ -24,6 +24,7 @@
 
 #include <string>
 
+#include <Core/Debug.h>
 #include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
@@ -51,7 +52,8 @@ namespace spades {
 					if (o != nullptr)
 						o->AddRef(); // keep it alive past the context's own reference
 					return o;
-				} catch (...) {
+				} catch (const std::exception& ex) {
+					SPLog("Failed to instantiate editor tool script: %s", ex.what());
 					return nullptr;
 				}
 			}
