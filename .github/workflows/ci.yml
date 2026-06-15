@@ -101,6 +101,24 @@ jobs:
             !${{ runner.workspace }}\**\*.pdb
           if-no-files-found: warn
 
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests `
+            -A x64 `
+            -D CMAKE_BUILD_TYPE=Release `
+            -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
+            -D VCPKG_TARGET_TRIPLET=x64-windows-static `
+            -D CMAKE_CXX_STANDARD=17 `
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests --config Release --parallel 8
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests -C Release --output-on-failure --no-tests=error -j $env:NUMBER_OF_PROCESSORS
+
   build-macos-intel:
     name: Build (macOS Intel)
     runs-on: macos-14
@@ -151,6 +169,24 @@ jobs:
           name: zerospades-macos-intel
           path: ${{ runner.workspace }}/zerospades.mk/bin
           if-no-files-found: warn
+
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+            -D VCPKG_TARGET_TRIPLET=x64-osx \
+            -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests -j$(sysctl -n hw.ncpu)
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests --output-on-failure --no-tests=error -j$(sysctl -n hw.ncpu)
 
   build-macos-arm:
     name: Build (macOS Apple Silicon)
@@ -233,6 +269,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: true
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -248,7 +285,14 @@ jobs:
             libogg-dev \
             libopus-dev \
             libopusfile-dev \
-            zlib1g-dev
+            zlib1g-dev \
+            gcovr \
+            python3-pip \
+            python3-jsonschema
+          python3 -m pip install --user 'jsonschema>=4.18,<5'
+          python3 - <<'PY'
+          from jsonschema import Draft202012Validator
+          PY
 
       - name: Build application
         run: |
@@ -264,4 +308,126 @@ jobs:
         with:
           name: zerospades-linux-ubuntu
           path: build/bin/
+          if-no-files-found: warn
+
+      - name: Configure tests
+        run: |
+          cmake -S . -B build-tests \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build-tests -j$(nproc)
+
+      - name: Run tests (shuffled)
+        env:
+          GTEST_SHUFFLE: "1"
+        run: ctest --test-dir build-tests --output-on-failure --no-tests=error -j$(nproc)
+
+      - name: Order-independence proof (3 seeds x 2 layers)
+        run: sh tools/shuffle_check.sh build-tests
+
+      - name: Validate fixture schema + INDEX
+        run: python3 tools/validate_fixtures.py fixtures
+
+      - name: Fixture-immutability guard
+        env:
+          # WR-04: PR title is attacker-controlled. Route it through env: so the
+          # runner sets it as a literal shell variable (never parsed as script).
+          # Never interpolate ${{ github.event.pull_request.title }} into run:.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Resolve the base ref per event type (base_ref/head_ref are PR-only).
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            TITLE="$PR_TITLE"
+          else
+            BASE="${{ github.event.before }}"
+            TITLE="$(git log -1 --pretty=%B)"
+          fi
+
+          # WR-01/WR-03: ensure BASE is a real, reachable commit. The all-zeros
+          # SHA is git's sentinel for "no prior ref" (first push of a new branch,
+          # branch creation, some force-pushes). It is NOT "no changes" — treating
+          # it as such would false-pass an untokened fixture change. So resolve a
+          # reliable base instead: fetch the default branch and use the merge-base.
+          ZERO_SHA="0000000000000000000000000000000000000000"
+          if [ "$BASE" = "$ZERO_SHA" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "Base '$BASE' is the zero-SHA or not present locally; resolving a reliable base." >&2
+            # Best-effort: try to fetch the named base ref directly (covers PR base.sha
+            # not yet in the local object DB, e.g. fork / cross-repo PRs).
+            if [ "$BASE" != "$ZERO_SHA" ]; then
+              git fetch --no-tags --depth=1 origin "$BASE" 2>/dev/null || true
+            fi
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              # Fall back to merge-base with the default branch.
+              if [ -z "${DEFAULT_BRANCH:-}" ]; then
+                echo "ERROR: no default branch available to resolve a fixture-diff base." >&2
+                echo "Refusing to certify fixture immutability without a reliable base (fail closed)." >&2
+                exit 1
+              fi
+              git fetch --no-tags origin "$DEFAULT_BRANCH" 2>/dev/null || true
+              if ! BASE="$(git merge-base HEAD "origin/$DEFAULT_BRANCH" 2>/dev/null)" || [ -z "$BASE" ]; then
+                echo "ERROR: could not resolve a merge-base with origin/$DEFAULT_BRANCH." >&2
+                echo "Refusing to certify fixture immutability without a reliable base (fail closed)." >&2
+                exit 1
+              fi
+              echo "Using merge-base with origin/$DEFAULT_BRANCH as diff base: $BASE" >&2
+            fi
+          fi
+
+          # WR-02: fail closed. Separate "git diff failed" (error) from "no output"
+          # (genuinely no fixture changes). A diff error must NOT become a silent
+          # pass — a guard protecting golden data fails closed, not open.
+          if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- fixtures/); then
+            echo "ERROR: git diff against base '$BASE' failed — refusing to certify fixture immutability." >&2
+            exit 1
+          fi
+          if [ -z "$CHANGED" ]; then
+            echo "No fixture changes — OK."
+            exit 0
+          fi
+          echo "Fixtures changed:"; echo "$CHANGED"
+          # Opt-in token gates deliberate updates (CI-03 / D-09).
+          # IN-01: grep -q no-match (exit 1) is consumed by 'if'; safe under set -e/pipefail.
+          if printf '%s' "$TITLE" | grep -q '\[update-fixtures\]'; then
+            echo "OK: [update-fixtures] token present — deliberate fixture update."
+            exit 0
+          fi
+          echo "ERROR: fixtures/ changed without an [update-fixtures] token." >&2
+          echo "Fixtures are committed golden data (CI-03). To update them deliberately," >&2
+          echo "add [update-fixtures] to the PR title and justify the change in the PR body." >&2
+          exit 1
+
+      - name: Configure coverage build (separate dir, never the gating build)
+        run: |
+          cmake -S . -B build-cov \
+            -D CMAKE_BUILD_TYPE=Debug \
+            -D CMAKE_CXX_STANDARD=17 \
+            -D ZEROSPADES_TESTS=ON \
+            -D CMAKE_CXX_FLAGS="--coverage -O0" \
+            -D CMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build + run for coverage
+        run: |
+          cmake --build build-cov --target zerospades_tests -j$(nproc)
+          ctest --test-dir build-cov --no-tests=error -j$(nproc) || true   # informational: never gates
+
+      - name: gcovr report (HTML + Cobertura)
+        run: |
+          mkdir -p coverage
+          gcovr -r . --filter 'Sources/Client/' --filter 'Sources/Core/' \
+            --html-details --html-title "ZeroSpades coverage" \
+            --output coverage/index.html
+          gcovr -r . --filter 'Sources/Client/' --filter 'Sources/Core/' \
+            --xml --output coverage/cobertura.xml
+
+      - name: Upload coverage (informational, no gate)
+        uses: actions/upload-artifact@v7
+        with:
+          name: zerospades-coverage
+          path: coverage/
           if-no-files-found: warn

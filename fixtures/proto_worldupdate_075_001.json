@@ -1,0 +1,79 @@
+{
+    "version": "1.1.0",
+    "id": "proto_worldupdate_075_001",
+    "subsystem": "proto",
+    "behavior": "protocol_compat",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "comment": "WorldUpdate v0.75 SHORT-branch coverage (PROT-04): CreatePlayer x2 (ids 0,1) -> WorldUpdate v3 (24B/entry, IMPLICIT index = list position). No StateData -> localPlayerIndex stays -1, so BOTH players are repositioned by the WorldUpdate (the WorldUpdate positions override the CreatePlayer pos.z-2.4 spawn positions). Asserts the implicit-index mapping idx=i. Expected generated once from the C++ oracle and frozen.",
+    "inputs": [
+        {
+            "comment": "CreatePlayer id 0, weapon 0 (rifle), team 0, raw wire pos {100,110,40} (fold applies pos.z-2.4 before WorldUpdate overrides).",
+            "bytes_hex": "0c0000000000c8420000dc42000020425030"
+        },
+        {
+            "comment": "CreatePlayer id 1, weapon 1 (smg), team 1, raw wire pos {200,210,40}.",
+            "bytes_hex": "0c0101010000484300005243000020425031"
+        },
+        {
+            "comment": "WorldUpdate v3 (implicit index): idx0 -> p0 {128,64,33}; idx1 -> p1 {256,192,35}.",
+            "bytes_hex": "020000004300008042000004420000803f0000000000000000000080430000404300000c42000000000000803f00000000"
+        }
+    ],
+    "kind": "world_snapshot",
+    "expected": {
+        "players": [
+            {
+                "alive": true,
+                "health": 100,
+                "id": 0,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 128.0,
+                    "y": 64.0,
+                    "z": 33.0
+                },
+                "team_id": 0,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "rifle"
+            },
+            {
+                "alive": true,
+                "health": 100,
+                "id": 1,
+                "orientation": {
+                    "x": 0.0,
+                    "y": 1.0,
+                    "z": 0.0
+                },
+                "position": {
+                    "x": 256.0,
+                    "y": 192.0,
+                    "z": 35.0
+                },
+                "team_id": 1,
+                "tool": "weapon",
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "weapon_type": "smg"
+            }
+        ],
+        "tick": 0
+    }
+}

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(ZeroSpades)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -23,6 +23,18 @@ if(VCPKG_TARGET_TRIPLET)
 	set(USE_VCPKG ON)
 else()
 	set(USE_VCPKG OFF)
+endif()
+
+set(ZEROSPADES_USE_SSE_FP_FLAGS OFF)
+if(CMAKE_OSX_ARCHITECTURES)
+	set(ZEROSPADES_USE_SSE_FP_FLAGS ON)
+	foreach(_zs_arch IN LISTS CMAKE_OSX_ARCHITECTURES)
+		if(NOT _zs_arch MATCHES "^(x86_64|i[3-6]86)$")
+			set(ZEROSPADES_USE_SSE_FP_FLAGS OFF)
+		endif()
+	endforeach()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+	set(ZEROSPADES_USE_SSE_FP_FLAGS ON)
 endif()
 
 # Prefer GLVND OpenGL
@@ -274,6 +286,12 @@ endif()
 
 add_subdirectory(Resources)
 add_subdirectory(Sources)
+
+option(ZEROSPADES_TESTS "Build the ZeroSpades test suite" OFF)
+if(ZEROSPADES_TESTS)
+	enable_testing()
+	add_subdirectory(Tests)
+endif()
 
 if(UNIX AND NOT APPLE)
 	# various texts

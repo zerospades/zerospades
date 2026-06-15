@@ -1,0 +1,24 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "center_x": 150,
+            "center_y": 150,
+            "center_z": 31,
+            "solid_z_after": false,
+            "solid_zm1_after": false,
+            "solid_zp1_after": false
+        }
+    },
+    "id": "map_value_lookup_013_block_action_dig",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.1.0"
+}

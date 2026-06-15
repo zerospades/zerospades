@@ -1,0 +1,23 @@
+{
+    "version": "1.1.0",
+    "id": "proto_mapstart_001",
+    "subsystem": "proto",
+    "behavior": "protocol_compat",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "comment": "MapStart coverage (PROT-04). The MapStart WIRE layout is a single uint32 mapSize and is VERSION-INDEPENDENT (Phase-3 D-13, ProtocolCodec.cpp:419-431) — the codec always ReadInt()s the size regardless of protocol version. The 0.75-vs-0.76 'with/without map-size' distinction (D-05) is a NetClient SEND-side side-effect (if protocolVersion==4 SendMapCached(), NetClient.cpp:947) plus an SPLog of the size, NOT a recv-driven wire difference. The MapStartBothVersions replay test asserts this byte string decodes to the SAME mapSize whether driven with protocolVersion 3 or 4.",
+    "inputs": [],
+    "kind": "packet_roundtrip",
+    "expected": {
+        "bytes_hex": "1200400000",
+        "decoded": {
+            "packet_type": "MapStart",
+            "map_size": 16384,
+            "wire_version_independent": true
+        }
+    }
+}

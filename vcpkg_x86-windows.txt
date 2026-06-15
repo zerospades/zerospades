@@ -7,3 +7,4 @@ libjpeg-turbo:x86-windows-static
 sdl2-image[libjpeg-turbo]:x86-windows-static
 glew:x86-windows-static
 curl:x86-windows-static
+nlohmann-json:x86-windows-static

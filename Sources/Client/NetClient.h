@@ -31,8 +31,8 @@
 #include "DemoRecorder.h"
 #include "GameConstants.h"
 #include "INetClient.h"
-#include "NetProtocol.h"
 #include "Player.h"
+#include "ProtocolCodec.h"
 #include <Core/Debug.h>
 #include <Core/Math.h>
 #include <Core/ServerAddress.h>

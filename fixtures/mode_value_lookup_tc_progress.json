@@ -1,0 +1,32 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "pinned": {
+                "progress": 0.4999998211860657,
+                "progress_base_pos": 0.20000000298023224,
+                "progress_rate": 0.15000000596046448,
+                "progress_start_time": 0.0,
+                "world_time_s": 1.9999988079071045
+            },
+            "reset": {
+                "capturing_team_id": -1,
+                "owner_team_id": 1,
+                "progress_base_pos": 0.0,
+                "progress_rate": 0.0,
+                "progress_start_time": 0.0
+            }
+        }
+    },
+    "id": "mode_value_lookup_tc_progress",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "mode",
+    "version": "1.1.0"
+}

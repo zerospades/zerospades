@@ -1,0 +1,123 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "ticks": [
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.1583251953125,
+                    "y": 256.0,
+                    "z": 59.5
+                },
+                "tick": 0,
+                "velocity": {
+                    "x": 0.1484375,
+                    "y": 0.0,
+                    "z": 0.016393443569540977
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.237060546875,
+                    "y": 256.0,
+                    "z": 59.51734161376953
+                },
+                "tick": 1,
+                "velocity": {
+                    "x": 0.14764344692230225,
+                    "y": 0.0,
+                    "z": 0.032518140971660614
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.3153991699219,
+                    "y": 256.0,
+                    "z": 59.54314422607422
+                },
+                "tick": 2,
+                "velocity": {
+                    "x": 0.14686240255832672,
+                    "y": 0.0,
+                    "z": 0.04837849736213684
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.393310546875,
+                    "y": 256.0,
+                    "z": 59.577266693115234
+                },
+                "tick": 3,
+                "velocity": {
+                    "x": 0.1460941731929779,
+                    "y": 0.0,
+                    "z": 0.06397885084152222
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.4708251953125,
+                    "y": 256.0,
+                    "z": 59.619571685791016
+                },
+                "tick": 4,
+                "velocity": {
+                    "x": 0.1453385353088379,
+                    "y": 0.0,
+                    "z": 0.07932346314191818
+                },
+                "wade": false
+            }
+        ]
+    },
+    "id": "phys_step_climb_001",
+    "inputs": [],
+    "kind": "step_trace",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "phys",
+    "version": "1.1.0"
+}

@@ -53,6 +53,10 @@ namespace spades {
 	/** Generates a random `bool`. This function is thread-safe. */
 	inline bool SampleRandomBool() { return SampleRandom() & 0x1; }
 
+	/** Seeds the calling thread's local xoroshiro128+ RNG to a known state.
+	 *  FOR TEST USE ONLY — production must NOT call this. */
+	void SeedLocalRNG(std::uint64_t s0, std::uint64_t s1);
+
 	/** Get a mutable reference to a random element from a container. */
 	template <class T> inline typename T::reference SampleRandomElement(T& container) {
 		auto begin = std::begin(container);

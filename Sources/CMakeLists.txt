@@ -7,6 +7,118 @@ file(GLOB CLIENT_FILES Client/*.cpp Client/*.h)
 file(GLOB CORE_FILES Core/*.c Core/*.cpp Core/*.h)
 file(GLOB DRAW_GL_FILES Draw/OpenGL/*.cpp Draw/OpenGL/*.h)
 file(GLOB DRAW_SW_FILES Draw/SW/*.cpp Draw/SW/*.h)
+
+# ---------------------------------------------------------------------------
+# zerospades_testable: SDL/GL/ENet/AngelScript-free static lib for headless tests
+# Uses an explicit (non-glob) source list — see CONTEXT.md and RESEARCH.md.
+# HitTestDebugger.cpp is excluded (pulls SWRenderer -> ConcurrentDispatch -> SDL);
+# a stub in Tests/Helpers/HitTestDebuggerStub.cpp satisfies the link when building tests.
+# DirectoryFileSystem.cpp and ConcurrentDispatch.cpp are excluded (direct SDL usage).
+# GameMapLoader.cpp is excluded (Thread.h -> SDL); tests bypass it via GameMap::Load().
+# ---------------------------------------------------------------------------
+add_library(zerospades_testable STATIC
+	# --- Client domain ---
+	Client/World.cpp
+	Client/Player.cpp
+	Client/Weapon.cpp
+	Client/Grenade.cpp
+	Client/GameMap.cpp
+	Client/GameMapWrapper.cpp
+	Client/GameProperties.cpp
+	Client/CTFGameMode.cpp
+	Client/TCGameMode.cpp
+	Client/IGameMode.cpp
+	Client/ProtocolCodec.cpp
+	# HitTestDebugger.cpp excluded: uses SWRenderer -> ConcurrentDispatch -> SDL
+	# GameMapLoader.cpp excluded: Thread.h -> SDL; tests use GameMap::Load() directly
+	# --- Core services (SDL-free subset) ---
+	Core/Math.cpp
+	Core/Debug.cpp
+	Core/Exception.cpp
+	Core/MemoryStream.cpp
+	Core/DynamicMemoryStream.cpp
+	Core/RandomAccessAdaptor.cpp
+	Core/Settings.cpp
+	Core/Strings.cpp
+	Core/Stopwatch.cpp
+	Core/FileManager.cpp
+	# DirectoryFileSystem.cpp excluded: SDL_RWFromFile on all platforms
+	Core/ZipFileSystem.cpp
+	Core/IStream.cpp
+	Core/DeflateStream.cpp
+	Core/ThreadLocalStorage.cpp
+	# ConcurrentDispatch.cpp excluded: SDL_cond/SDL_mutex
+	Core/Bitmap.cpp
+	Core/VoxelModel.cpp
+	Core/IRunnable.cpp
+	Core/PipeStream.cpp
+	Core/RefCountedObject.cpp
+	Core/CP437.cpp # CP437<->UTF-8 framing used by ProtocolCodec EncodeString/DecodeString
+	# --- Audio no-op ---
+	Audio/NullDevice.cpp
+)
+
+target_include_directories(zerospades_testable PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}          # mirrors include_directories(BEFORE ".")
+	${CMAKE_CURRENT_SOURCE_DIR}/json/include
+	${CMAKE_CURRENT_SOURCE_DIR}/ENet/include
+	${CMAKE_SOURCE_DIR}                  # for generated ZeroSpades.h
+)
+
+# FP-determinism flags applied ONLY to zerospades_testable, never to the game exe
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	target_compile_options(zerospades_testable PRIVATE
+		-fno-fast-math -ffp-contract=off)
+	if(ZEROSPADES_USE_SSE_FP_FLAGS)
+		target_compile_options(zerospades_testable PRIVATE -msse2 -mfpmath=sse)
+	endif()
+elseif(MSVC)
+	target_compile_options(zerospades_testable PRIVATE /fp:strict)
+endif()
+
+# Remove testable-lib sources from the game exe's glob lists to avoid duplicate symbols.
+# We list each file that is in zerospades_testable and present in a glob variable.
+set(TESTABLE_CLIENT_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/World.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/Player.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/Weapon.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/Grenade.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/GameMap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/GameMapWrapper.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/GameProperties.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/CTFGameMode.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/TCGameMode.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/IGameMode.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Client/ProtocolCodec.cpp
+)
+set(TESTABLE_CORE_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Math.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Debug.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Exception.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/MemoryStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/DynamicMemoryStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/RandomAccessAdaptor.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Settings.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Strings.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Stopwatch.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/FileManager.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/ZipFileSystem.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/IStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/DeflateStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/ThreadLocalStorage.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/Bitmap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/VoxelModel.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/IRunnable.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/PipeStream.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/RefCountedObject.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Core/CP437.cpp
+)
+set(TESTABLE_AUDIO_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/Audio/NullDevice.cpp
+)
+list(REMOVE_ITEM CLIENT_FILES ${TESTABLE_CLIENT_FILES})
+list(REMOVE_ITEM CORE_FILES ${TESTABLE_CORE_FILES})
+list(REMOVE_ITEM AUDIO_FILES ${TESTABLE_AUDIO_FILES})
 file(GLOB ENET_FILES ENet/*.c ENet/*.h)
 file(GLOB ENET_INCLUDE ENet/include/enet/*.h)
 file(GLOB GUI_FILES Gui/*.cpp Gui/*.h)
@@ -179,6 +291,7 @@ source_group("ScriptBindings" FILES ${SCRIPTBINDING_FILES})
 source_group("libs\\unzip" FILES ${UNZIP_FILES})
 
 target_link_libraries(ZeroSpades
+	zerospades_testable
 	${SDL2_LIBRARY} ${SDL2_IMAGE_LIBRARY} ${OPENGL_LIBRARIES} ${ZLIB_LIBRARIES}
 	${CURL_LIBRARY} ${FREETYPE_LIBRARIES} ${CMAKE_DL_LIBS} ${ANGELSCRIPT_LIBS}
 	${Ogg_LIBRARY} ${OpusFile_LIBRARY})

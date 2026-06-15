@@ -1,0 +1,123 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "ticks": [
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.5,
+                    "y": 256.0,
+                    "z": 32.00874328613281
+                },
+                "tick": 0,
+                "velocity": {
+                    "x": 0.9374999403953552,
+                    "y": 0.0,
+                    "z": 0.016393443569540977
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.9917907714844,
+                    "y": 256.0,
+                    "z": 32.026084899902344
+                },
+                "tick": 1,
+                "velocity": {
+                    "x": 0.9221311211585999,
+                    "y": 0.0,
+                    "z": 0.032518140971660614
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 257.47552490234375,
+                    "y": 256.0,
+                    "z": 32.05188751220703
+                },
+                "tick": 2,
+                "velocity": {
+                    "x": 0.9070142507553101,
+                    "y": 0.0,
+                    "z": 0.04837849736213684
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 257.9513244628906,
+                    "y": 256.0,
+                    "z": 32.08600997924805
+                },
+                "tick": 3,
+                "velocity": {
+                    "x": 0.8921451568603516,
+                    "y": 0.0,
+                    "z": 0.06397885084152222
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 258.4193420410156,
+                    "y": 256.0,
+                    "z": 32.12831497192383
+                },
+                "tick": 4,
+                "velocity": {
+                    "x": 0.8775198459625244,
+                    "y": 0.0,
+                    "z": 0.07932346314191818
+                },
+                "wade": false
+            }
+        ]
+    },
+    "id": "phys_friction_air_001",
+    "inputs": [],
+    "kind": "step_trace",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "phys",
+    "version": "1.1.0"
+}

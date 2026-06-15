@@ -1,0 +1,26 @@
+{
+    "version": "1.1.0",
+    "id": "proto_malformed_001",
+    "subsystem": "proto",
+    "behavior": "implementation_detail",
+    "seed": 42,
+    "protocol_version": "0.75",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "inputs": [
+        {
+            "bytes_hex": "0f05",
+            "comment": "truncated StateData (tag+playerId only) — decode runs off the end at the first fogColor byte"
+        }
+    ],
+    "kind": "packet_roundtrip",
+    "expected": {
+        "bytes_hex": "0f05",
+        "decoded": {
+            "packet_type": "StateData",
+            "note": "expected: SPRaise truncated — rejection asserted by ProtocolMalformedTest, not decoded here"
+        }
+    }
+}

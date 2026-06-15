@@ -18,7 +18,7 @@
 
  */
 
-#include <Imports/SDL.h>
+#include <cstdint>
 
 #include "Debug.h"
 #include "Stopwatch.h"

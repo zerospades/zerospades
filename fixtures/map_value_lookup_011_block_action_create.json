@@ -1,0 +1,26 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "color_after": 1681948926,
+            "rgb_b": 64,
+            "rgb_g": 128,
+            "rgb_r": 255,
+            "solid_after": true,
+            "x": 256,
+            "y": 256,
+            "z": 61
+        }
+    },
+    "id": "map_value_lookup_011_block_action_create",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.1.0"
+}

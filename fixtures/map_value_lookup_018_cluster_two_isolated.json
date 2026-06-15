@@ -1,0 +1,45 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "callback_count": 2,
+            "callbacks": [
+                {
+                    "cells": [
+                        [
+                            10,
+                            10,
+                            60
+                        ]
+                    ]
+                },
+                {
+                    "cells": [
+                        [
+                            50,
+                            50,
+                            60
+                        ]
+                    ]
+                }
+            ],
+            "destroyed_z": 61,
+            "floating_z": 60,
+            "p1_x": 10,
+            "p1_y": 10,
+            "p2_x": 50,
+            "p2_y": 50
+        }
+    },
+    "id": "map_value_lookup_018_cluster_two_isolated",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.1.0"
+}

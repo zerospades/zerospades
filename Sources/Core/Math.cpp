@@ -68,6 +68,11 @@ namespace spades {
 		static constexpr result_type min() { return 0; }
 		static constexpr result_type max() { return std::numeric_limits<result_type>::max(); }
 
+		void Seed(std::uint64_t s0, std::uint64_t s1) noexcept {
+			this->s[0] = (s0 != 0) ? s0 : 1ULL;
+			this->s[1] = (s1 != 0) ? s1 : 1ULL;
+		}
+
 	private:
 		std::uint64_t s[2];
 	};
@@ -104,6 +109,8 @@ namespace spades {
 	template unsigned long SampleRandomInt(unsigned long a, unsigned long b);
 	template long long SampleRandomInt(long long a, long long b);
 	template unsigned long long SampleRandomInt(unsigned long long a, unsigned long long b);
+
+	void SeedLocalRNG(std::uint64_t s0, std::uint64_t s1) { GetThreadLocalRNG().Seed(s0, s1); }
 
 	void Matrix4Multiply(const float a[16], const float b[16], float out[16]) {
 		out[0] = b[0] * a[0] + b[1] * a[4] + b[2] * a[8] + b[3] * a[12];

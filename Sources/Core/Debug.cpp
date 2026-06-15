@@ -30,9 +30,12 @@
 #include "Math.h"
 #include "Strings.h"
 #include <Core/Debug.h>
-#include <Imports/SDL.h>
 
 #define SPADES_USE_TLS 1
+
+#if !SPADES_USE_TLS
+#include <Imports/SDL.h>
+#endif
 
 #if SPADES_USE_TLS
 #include "ThreadLocalStorage.h"

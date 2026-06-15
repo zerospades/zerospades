@@ -25,12 +25,12 @@
 #include "CTFGameMode.h"
 #include "Client.h"
 #include "DemoNetClient.h"
-#include "NetProtocol.h"
 #include "GameMap.h"
 #include "GameMapLoader.h"
 #include "GameProperties.h"
 #include "Grenade.h"
 #include "Player.h"
+#include "ProtocolCodec.h"
 #include "TCGameMode.h"
 #include "Weapon.h"
 #include "World.h"
@@ -46,9 +46,11 @@ SPADES_SETTING(cg_keyDemoPlayPause);
 namespace spades {
 	namespace client {
 
-		namespace {
-			// World listener used during fast replay: forwards only PlayerObjectSet (which
-			// populates clientPlayers) and silently drops all sound/effect callbacks.
+			namespace {
+				enum { BLUE_FLAG = 0, GREEN_FLAG = 1, BLUE_BASE = 2, GREEN_BASE = 3 };
+
+				// World listener used during fast replay: forwards only PlayerObjectSet (which
+				// populates clientPlayers) and silently drops all sound/effect callbacks.
 			class SilentWorldListener : public IWorldListener {
 				Client* client;
 			public:

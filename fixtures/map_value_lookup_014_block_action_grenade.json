@@ -1,0 +1,266 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "value": {
+            "cells": [
+                {
+                    "dx": -1,
+                    "dy": -1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 199,
+                    "z": 29
+                },
+                {
+                    "dx": -1,
+                    "dy": -1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 199,
+                    "z": 30
+                },
+                {
+                    "dx": -1,
+                    "dy": -1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 199,
+                    "z": 31
+                },
+                {
+                    "dx": -1,
+                    "dy": 0,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 200,
+                    "z": 29
+                },
+                {
+                    "dx": -1,
+                    "dy": 0,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 200,
+                    "z": 30
+                },
+                {
+                    "dx": -1,
+                    "dy": 0,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 200,
+                    "z": 31
+                },
+                {
+                    "dx": -1,
+                    "dy": 1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 201,
+                    "z": 29
+                },
+                {
+                    "dx": -1,
+                    "dy": 1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 201,
+                    "z": 30
+                },
+                {
+                    "dx": -1,
+                    "dy": 1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 199,
+                    "y": 201,
+                    "z": 31
+                },
+                {
+                    "dx": 0,
+                    "dy": -1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 199,
+                    "z": 29
+                },
+                {
+                    "dx": 0,
+                    "dy": -1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 199,
+                    "z": 30
+                },
+                {
+                    "dx": 0,
+                    "dy": -1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 199,
+                    "z": 31
+                },
+                {
+                    "dx": 0,
+                    "dy": 0,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 200,
+                    "z": 29
+                },
+                {
+                    "dx": 0,
+                    "dy": 0,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 200,
+                    "z": 30
+                },
+                {
+                    "dx": 0,
+                    "dy": 0,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 200,
+                    "z": 31
+                },
+                {
+                    "dx": 0,
+                    "dy": 1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 201,
+                    "z": 29
+                },
+                {
+                    "dx": 0,
+                    "dy": 1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 201,
+                    "z": 30
+                },
+                {
+                    "dx": 0,
+                    "dy": 1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 200,
+                    "y": 201,
+                    "z": 31
+                },
+                {
+                    "dx": 1,
+                    "dy": -1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 199,
+                    "z": 29
+                },
+                {
+                    "dx": 1,
+                    "dy": -1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 199,
+                    "z": 30
+                },
+                {
+                    "dx": 1,
+                    "dy": -1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 199,
+                    "z": 31
+                },
+                {
+                    "dx": 1,
+                    "dy": 0,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 200,
+                    "z": 29
+                },
+                {
+                    "dx": 1,
+                    "dy": 0,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 200,
+                    "z": 30
+                },
+                {
+                    "dx": 1,
+                    "dy": 0,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 200,
+                    "z": 31
+                },
+                {
+                    "dx": 1,
+                    "dy": 1,
+                    "dz": -1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 201,
+                    "z": 29
+                },
+                {
+                    "dx": 1,
+                    "dy": 1,
+                    "dz": 0,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 201,
+                    "z": 30
+                },
+                {
+                    "dx": 1,
+                    "dy": 1,
+                    "dz": 1,
+                    "solid_after": false,
+                    "x": 201,
+                    "y": 201,
+                    "z": 31
+                }
+            ],
+            "center_x": 200,
+            "center_y": 200,
+            "center_z": 30
+        }
+    },
+    "id": "map_value_lookup_014_block_action_grenade",
+    "inputs": [],
+    "kind": "value_lookup",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "map",
+    "version": "1.1.0"
+}

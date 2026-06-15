@@ -27,7 +27,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "DynamicLibrary.h"
 #include "FileManager.h"
 #include "IStream.h"
 #include "Settings.h"
@@ -37,24 +36,39 @@
 DEFINE_SPADES_SETTING(core_locale, "");
 
 #ifdef WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 // FIMXE: not tested
 static std::string GetUserLocale() {
 	SPADES_MARK_FUNCTION();
-	spades::DynamicLibrary kernel32("kernel32");
-	auto* GetUserDefaultLocaleName = reinterpret_cast<int(__stdcall*)(wchar_t*, int)>(
-	  kernel32.GetSymbolOrNull("GetUserDefaultLocaleName"));
-	if (GetUserDefaultLocaleName) {
-		char buf[256];
-		wchar_t wbuf[256];
-		if (!GetUserDefaultLocaleName(wbuf, 256)) {
-			SPLog("Failed to get the user locale using GetUserDefaultLocaleName.");
-		}
-		std::wcstombs(buf, wbuf, 256);
-		return buf;
-	} else {
+	using GetUserDefaultLocaleNameProc = int(WINAPI*)(LPWSTR, int);
+
+	HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
+	auto* GetUserDefaultLocaleName =
+	  kernel32 != nullptr
+	    ? reinterpret_cast<GetUserDefaultLocaleNameProc>(
+	        GetProcAddress(kernel32, "GetUserDefaultLocaleName"))
+	    : nullptr;
+
+	if (GetUserDefaultLocaleName == nullptr) {
 		SPLog("GetUserDefaultLocaleName not available. Defaults to C locale.");
 		return "C";
 	}
+
+	char buf[256];
+	wchar_t wbuf[256];
+	if (!GetUserDefaultLocaleName(wbuf, 256)) {
+		SPLog("Failed to get the user locale using GetUserDefaultLocaleName.");
+		return "C";
+	}
+	std::wcstombs(buf, wbuf, 256);
+	return buf;
 }
 #else
 #include <clocale>

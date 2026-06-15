@@ -1,0 +1,438 @@
+{
+    "behavior": "implementation_detail",
+    "expected": {
+        "ticks": [
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.7464485168457
+                },
+                "tick": 0,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": -0.4754098355770111
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.505794525146484
+                },
+                "tick": 1,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": -0.4512227773666382
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.505794525146484
+                },
+                "tick": 2,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.5145378112793
+                },
+                "tick": 3,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.016393443569540977
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.53187942504883
+                },
+                "tick": 4,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.032518140971660614
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.557682037353516
+                },
+                "tick": 5,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.04837849736213684
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.59180450439453
+                },
+                "tick": 6,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.06397885084152222
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.63410949707031
+                },
+                "tick": 7,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.07932346314191818
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.68446350097656
+                },
+                "tick": 8,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.09441652148962021
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.74273681640625
+                },
+                "tick": 9,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.10926215350627899
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.808799743652344
+                },
+                "tick": 10,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.12386441230773926
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.88252258300781
+                },
+                "tick": 11,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.13822729885578156
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 54.96377944946289
+                },
+                "tick": 12,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.15235471725463867
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.05244827270508
+                },
+                "tick": 13,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.166250541806221
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.14840316772461
+                },
+                "tick": 14,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.179918572306633
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.251529693603516
+                },
+                "tick": 15,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.1933625340461731
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.36170959472656
+                },
+                "tick": 16,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.2065861076116562
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.478824615478516
+                },
+                "tick": 17,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.2195928990840912
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.60276412963867
+                },
+                "tick": 18,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.23238645493984222
+                },
+                "wade": false
+            },
+            {
+                "airborne": true,
+                "orientation": {
+                    "x": 1.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "player_id": 0,
+                "position": {
+                    "x": 256.0,
+                    "y": 256.0,
+                    "z": 55.73341369628906
+                },
+                "tick": 19,
+                "velocity": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.24497029185295105
+                },
+                "wade": false
+            }
+        ]
+    },
+    "id": "phys_collision_ceiling_001",
+    "inputs": [],
+    "kind": "step_trace",
+    "map": {
+        "generator": "flat",
+        "ground_z": 62
+    },
+    "protocol_version": "0.75",
+    "seed": 42,
+    "subsystem": "phys",
+    "version": "1.1.0"
+}

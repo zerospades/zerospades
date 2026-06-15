@@ -231,6 +231,9 @@ namespace spades {
 			bool IsOnGroundOrWade() {
 				return (velocity.z >= 0.0F && velocity.z < 0.017F) && !airborne;
 			}
+			bool IsAirborne() { return airborne; }
+			/** Raw wade bool set by BoxClipMove (position.z > 61.0F); differs from GetWade() which uses origin offset. */
+			bool IsWading() const { return wade; }
 
 			void UpdateSmooth(float dt);
 			void Update(float dt);

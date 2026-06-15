@@ -22,7 +22,7 @@
 #include <algorithm>
 
 #include "DemoPlayer.h"
-#include "NetProtocol.h"
+#include "ProtocolCodec.h"
 
 #include <Core/Debug.h>
 #include <Core/FileManager.h>
