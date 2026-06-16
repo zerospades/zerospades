@@ -87,6 +87,40 @@ namespace spades {
 			ed.DrawCellOutline(h.x, h.y, h.z, kTarget);
 		}
 
+		// --- PaintBlockSubTool (Paint single) --------------------------------
+
+		void PaintBlockSubTool::OnActivate(IEditorContext& ed) {
+			ed.SetStatus("Paint: LMB drag to recolour  -  RMB / Alt+LMB sample colour");
+		}
+		void PaintBlockSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			// Sample a colour (Alt, pick mode, or RMB), else recolour the hovered
+			// voxel — and keep doing so while the button is dragged.
+			if (e.IsRight() && e.IsDown()) {
+				ed.Eyedropper();
+				return;
+			}
+			if (!e.IsLeft() || !(e.IsDown() || e.IsDrag()))
+				return;
+			if (e.alt || ed.PickModeActive()) {
+				ed.Eyedropper();
+				ed.ClearPickMode();
+				return;
+			}
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			std::vector<IntVector3> cell(1, h);
+			ed.PaintCells(cell, ed.CurrentColor());
+		}
+		void PaintBlockSubTool::DrawScene(IEditorContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			ed.DrawCellOutlineMirrored(h.x, h.y, h.z, ed.ColorToVec(ed.CurrentColor()));
+		}
+
 		// --- PointSubTool (Select single) ------------------------------------
 
 		void PointSubTool::OnActivate(IEditorContext& ed) {
@@ -231,7 +265,7 @@ namespace spades {
 			else
 				apply(ed, cells);
 			seq.Reset();
-			ed.SetStatus(rmb ? "Rect cut" : "Rect applied");
+			ed.SetStatus(rmb ? altMsg : applyMsg);
 		}
 
 		bool RectSubTool::OnEscape(IEditorContext& ed) {

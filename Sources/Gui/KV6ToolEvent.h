@@ -50,6 +50,7 @@ namespace spades {
 
 			bool IsDown() const { return phase == PointerPhase::Down; }
 			bool IsUp() const { return phase == PointerPhase::Up; }
+			bool IsDrag() const { return phase == PointerPhase::Drag; }
 			bool IsLeft() const { return button == PointerButton::Left; }
 			bool IsRight() const { return button == PointerButton::Right; }
 		};

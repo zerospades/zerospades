@@ -50,6 +50,16 @@ namespace spades {
 			void DrawScene(IEditorContext&) override;
 		};
 
+		// Single-voxel recolour (Paint's "Block"): LMB recolours the hovered voxel
+		// and keeps painting while dragged; RMB or Alt+LMB samples a colour.
+		class PaintBlockSubTool : public EditorTool {
+		public:
+			const char* Label() const override { return "Block"; }
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void DrawScene(IEditorContext&) override;
+		};
+
 		// Single-voxel selection toggle (Select's "Point").
 		class PointSubTool : public EditorTool {
 		public:
@@ -80,9 +90,10 @@ namespace spades {
 
 			// `apply` runs when the final click is LMB, `applyAlt` when it is RMB
 			// (e.g. fill vs cut, or select vs deselect).
-			RectSubTool(const char* label, ApplyFn apply, ApplyFn applyAlt, bool useMirror = false)
+			RectSubTool(const char* label, ApplyFn apply, ApplyFn applyAlt, bool useMirror = false,
+			            const char* applyMsg = "Rect applied", const char* altMsg = "Rect cut")
 			    : label(label), apply(std::move(apply)), applyAlt(std::move(applyAlt)),
-			      useMirror(useMirror) {}
+			      useMirror(useMirror), applyMsg(applyMsg), altMsg(altMsg) {}
 
 			const char* Label() const override { return label; }
 			void OnActivate(IEditorContext&) override;
@@ -95,6 +106,8 @@ namespace spades {
 			ApplyFn apply;
 			ApplyFn applyAlt;
 			bool useMirror;
+			const char* applyMsg; // status shown after an LMB apply
+			const char* altMsg;   // status shown after an RMB (alt) apply
 
 			ClickSequence seq;  // the corner / opposite-corner / depth clicks
 			int normalAxis = 2; // axis of the clicked face's normal (set on click 1)
