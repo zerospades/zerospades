@@ -1198,12 +1198,33 @@ namespace spades {
 				selection.erase(SelKey(c.x, c.y, c.z));
 		}
 
+		void KV6EditorView::PaintCells(const std::vector<IntVector3>& cellsIn, uint32_t color) {
+			std::vector<IntVector3> cells = cellsIn;
+			ExpandMirrors(cells); // also recolour the mirror images, if enabled
+			uint32_t rgb = color & 0xFFFFFF;
+			bool any = false;
+			for (const IntVector3& c : cells) {
+				if (!InBounds(c.x, c.y, c.z) || !model->IsSolid(c.x, c.y, c.z))
+					continue; // paint only existing voxels; never grows the volume
+				if ((model->GetColor(c.x, c.y, c.z) & 0xFFFFFF) == rgb)
+					continue; // already this colour
+				model->SetSolid(c.x, c.y, c.z, rgb);
+				any = true;
+			}
+			if (any) {
+				dirty = true;
+				RebuildRenderModel();
+			}
+		}
+
 		void KV6EditorView::ApplyCells(const std::vector<IntVector3>& cells, bool secondary) {
 			EditorTool* t = ActiveTool();
 			EditorRole role = t ? t->Role() : EditorRole::Edit;
 			if (role == EditorRole::Select) {
 				if (secondary) DeselectCells(cells);
 				else SelectCells(cells);
+			} else if (role == EditorRole::Paint) {
+				PaintCells(cells, currentColor); // no inverse: both buttons recolour
 			} else {
 				if (secondary) EraseCells(cells);
 				else FillCells(cells, currentColor);

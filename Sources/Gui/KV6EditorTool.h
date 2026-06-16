@@ -31,7 +31,7 @@ namespace spades {
 
 		// What a top-level tool does with cells, so sub-tools (incl. scripted ones)
 		// can apply through IEditorContext::ApplyCells without knowing their host.
-		enum class EditorRole { Edit, Select };
+		enum class EditorRole { Edit, Select, Paint };
 
 		/**
 		 * An editor tool (draw, select, ...).

@@ -67,6 +67,9 @@ namespace spades {
 			virtual void FillCells(const std::vector<IntVector3>& cells, uint32_t color) = 0;
 			// Remove the solid voxels among `cells` (keeps at least one in the model).
 			virtual void EraseCells(const std::vector<IntVector3>& cells) = 0;
+			// Recolour the solid voxels among `cells` to `color`, without changing the
+			// geometry (skips empty cells; never grows the volume).
+			virtual void PaintCells(const std::vector<IntVector3>& cells, uint32_t color) = 0;
 			// Place / delete / sample at the current pick (Draw's single-voxel ops).
 			virtual void PlaceCube() = 0;
 			virtual void DeleteCube() = 0;

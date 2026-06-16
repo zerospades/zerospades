@@ -127,6 +127,8 @@ namespace spades {
 			void FillCells(const std::vector<IntVector3>& cells, uint32_t color) override;
 			// Remove the solid voxels among `cells` (keeps at least one in the model).
 			void EraseCells(const std::vector<IntVector3>& cells) override;
+			// Recolour the solid voxels among `cells` (no geometry change).
+			void PaintCells(const std::vector<IntVector3>& cells, uint32_t color) override;
 			// Remove `cells` from the selection.
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
 			// Fill/erase (Draw) or select/deselect (Select) `cells`, per the active

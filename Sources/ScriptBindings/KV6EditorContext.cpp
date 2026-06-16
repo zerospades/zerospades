@@ -45,6 +45,9 @@ namespace spades {
 		void Ctx_EraseCells(gui::IEditorContext* c, CScriptArray* arr) {
 			c->EraseCells(ToCells(arr));
 		}
+		void Ctx_PaintCells(gui::IEditorContext* c, CScriptArray* arr, uint32_t color) {
+			c->PaintCells(ToCells(arr), color);
+		}
 		void Ctx_SelectCells(gui::IEditorContext* c, CScriptArray* arr) {
 			c->SelectCells(ToCells(arr));
 		}
@@ -148,6 +151,10 @@ namespace spades {
 					r = eng->RegisterObjectMethod("EditorContext",
 					                              "void EraseCells(array<spades::IntVector3>@)",
 					                              asFUNCTION(Ctx_EraseCells), asCALL_CDECL_OBJFIRST);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext",
+					                              "void PaintCells(array<spades::IntVector3>@, uint)",
+					                              asFUNCTION(Ctx_PaintCells), asCALL_CDECL_OBJFIRST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext",
 					                              "void SelectCells(array<spades::IntVector3>@)",
