@@ -27,7 +27,7 @@ namespace spades {
 	enum EditorPhase { PhaseDown, PhaseUp, PhaseMove, PhaseDrag }
 
 	// Containers a tool wants to appear in, as a bitmask returned by Targets().
-	enum EditorTarget { TargetDraw = 1, TargetSelect = 2 }
+	enum EditorTarget { TargetDraw = 1, TargetSelect = 2, TargetPaint = 4 }
 
 	/**
 	 * A scriptable editor tool.

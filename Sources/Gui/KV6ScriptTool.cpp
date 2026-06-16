@@ -178,9 +178,9 @@ namespace spades {
 				if (factory == nullptr)
 					continue; // tools need a no-argument constructor
 
-				// Which containers the tool wants (bit 0 = Draw, bit 1 = Select);
-				// default to both if it doesn't say.
-				int targets = 3;
+				// Which containers the tool wants (bit 0 = Draw, bit 1 = Select,
+				// bit 2 = Paint); default to all of them if it doesn't say.
+				int targets = 7;
 				if (asIScriptFunction* targetsFn = ti->GetMethodByDecl("int Targets()")) {
 					if (asIScriptObject* probe = CreateInstance(factory)) {
 						try {
@@ -192,18 +192,17 @@ namespace spades {
 					}
 				}
 
-				if ((targets & 1) != 0)
-					reg.Register(SubToolTarget::Draw, [factory] {
+				// Register one fresh-instance factory per container the tool targets.
+				auto registerFor = [&reg, factory](SubToolTarget target) {
+					reg.Register(target, [factory] {
 						asIScriptObject* o = CreateInstance(factory);
 						return o ? std::unique_ptr<EditorTool>(new ScriptEditorTool(o))
 						         : std::unique_ptr<EditorTool>();
 					});
-				if ((targets & 2) != 0)
-					reg.Register(SubToolTarget::Select, [factory] {
-						asIScriptObject* o = CreateInstance(factory);
-						return o ? std::unique_ptr<EditorTool>(new ScriptEditorTool(o))
-						         : std::unique_ptr<EditorTool>();
-					});
+				};
+				if ((targets & 1) != 0) registerFor(SubToolTarget::Draw);
+				if ((targets & 2) != 0) registerFor(SubToolTarget::Select);
+				if ((targets & 4) != 0) registerFor(SubToolTarget::Paint);
 			}
 		}
 	} // namespace gui

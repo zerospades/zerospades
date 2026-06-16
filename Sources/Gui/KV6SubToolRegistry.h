@@ -29,7 +29,7 @@ namespace spades {
 		class EditorTool;
 
 		// Which built-in container a registered sub-tool belongs to.
-		enum class SubToolTarget { Draw, Select };
+		enum class SubToolTarget { Draw, Select, Paint };
 
 		/**
 		 * Sub-tools contributed to the built-in Draw / Select containers, as
