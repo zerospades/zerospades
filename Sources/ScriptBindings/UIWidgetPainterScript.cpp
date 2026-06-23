@@ -34,32 +34,34 @@ namespace spades {
 		void Wrap_PaintButton(client::IRenderer* r, client::IFont* f, const Vector2& pos,
 		                      const Vector2& size, const std::string& caption, const Vector2& align,
 		                      const std::string& hotKey, const Vector2& hotKeyAlign, bool enabled,
-		                      bool hover, bool pressed, bool toggled) {
+		                      bool hover, bool pressed, bool toggled, float textScale) {
 			if (r && f)
 				gui::widgets::PaintButton(*r, *f, pos, size, caption, align, hotKey, hotKeyAlign,
-				                          enabled, hover, pressed, toggled);
+				                          enabled, hover, pressed, toggled, textScale);
 		}
 		void Wrap_PaintSimpleButton(client::IRenderer* r, client::IFont* f, const Vector2& pos,
 		                            const Vector2& size, const std::string& caption,
 		                            const Vector2& align, const Vector4& textColor,
 		                            const Vector4& disabledTextColor, bool enabled, bool hover,
-		                            bool pressed, bool toggled) {
+		                            bool pressed, bool toggled, float textScale) {
 			if (r && f)
 				gui::widgets::PaintSimpleButton(*r, *f, pos, size, caption, align, textColor,
-				                                disabledTextColor, enabled, hover, pressed, toggled);
+				                                disabledTextColor, enabled, hover, pressed, toggled,
+				                                textScale);
 		}
 		void Wrap_PaintCheckBox(client::IRenderer* r, client::IFont* f, const Vector2& pos,
 		                        const Vector2& size, const std::string& caption, bool hover,
-		                        bool pressed, bool toggled) {
+		                        bool pressed, bool toggled, float textScale) {
 			if (r && f)
-				gui::widgets::PaintCheckBox(*r, *f, pos, size, caption, hover, pressed, toggled);
+				gui::widgets::PaintCheckBox(*r, *f, pos, size, caption, hover, pressed, toggled,
+				                            textScale);
 		}
 		void Wrap_PaintRadioButton(client::IRenderer* r, client::IFont* f, const Vector2& pos,
 		                           const Vector2& size, const std::string& caption, bool enabled,
-		                           bool hover, bool pressed, bool toggled) {
+		                           bool hover, bool pressed, bool toggled, float textScale) {
 			if (r && f)
 				gui::widgets::PaintRadioButton(*r, *f, pos, size, caption, enabled, hover, pressed,
-				                               toggled);
+				                               toggled, textScale);
 		}
 	} // namespace
 
@@ -79,23 +81,23 @@ namespace spades {
 					r = eng->RegisterGlobalFunction(
 					  "void PaintButton(Renderer@, Font@, const Vector2&in, const Vector2&in, "
 					  "const string&in, const Vector2&in, const string&in, const Vector2&in, "
-					  "bool, bool, bool, bool)",
+					  "bool, bool, bool, bool, float textScale = 1)",
 					  asFUNCTION(Wrap_PaintButton), asCALL_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "void PaintSimpleButton(Renderer@, Font@, const Vector2&in, const Vector2&in, "
 					  "const string&in, const Vector2&in, const Vector4&in, const Vector4&in, "
-					  "bool, bool, bool, bool)",
+					  "bool, bool, bool, bool, float textScale = 1)",
 					  asFUNCTION(Wrap_PaintSimpleButton), asCALL_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "void PaintCheckBox(Renderer@, Font@, const Vector2&in, const Vector2&in, "
-					  "const string&in, bool, bool, bool)",
+					  "const string&in, bool, bool, bool, float textScale = 1)",
 					  asFUNCTION(Wrap_PaintCheckBox), asCALL_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "void PaintRadioButton(Renderer@, Font@, const Vector2&in, const Vector2&in, "
-					  "const string&in, bool, bool, bool, bool)",
+					  "const string&in, bool, bool, bool, bool, float textScale = 1)",
 					  asFUNCTION(Wrap_PaintRadioButton), asCALL_CDECL);
 					manager->CheckError(r);
 					eng->SetDefaultNamespace("");

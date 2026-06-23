@@ -44,24 +44,26 @@ namespace spades {
 		 * toggled` are its state. Edit the look in one place, here.
 		 */
 		namespace widgets {
+			// `textScale` defaults to 1 (the script widgets' size); the editor passes
+			// smaller values for its compact bars while keeping the same style.
 			void PaintButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                 const Vector2& size, const std::string& caption,
 			                 const Vector2& alignment, const std::string& hotKeyText,
 			                 const Vector2& hotKeyAlignment, bool enabled, bool hover, bool pressed,
-			                 bool toggled);
+			                 bool toggled, float textScale = 1.0F);
 			void PaintSimpleButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                       const Vector2& size, const std::string& caption,
 			                       const Vector2& alignment, const Vector4& textColor,
 			                       const Vector4& disabledTextColor, bool enabled, bool hover,
-			                       bool pressed, bool toggled);
+			                       bool pressed, bool toggled, float textScale = 1.0F);
 			void PaintCheckBox(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                   const Vector2& size, const std::string& caption, bool hover,
-			                   bool pressed, bool toggled);
+			                   bool pressed, bool toggled, float textScale = 1.0F);
 			// `enabled` here is the element's own Enable flag (RadioButton reads
 			// `this.Enable`, not the inherited `IsEnabled`).
 			void PaintRadioButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                      const Vector2& size, const std::string& caption, bool enabled,
-			                      bool hover, bool pressed, bool toggled);
+			                      bool hover, bool pressed, bool toggled, float textScale = 1.0F);
 		} // namespace widgets
 	} // namespace gui
 } // namespace spades
