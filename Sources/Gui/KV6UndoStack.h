@@ -26,6 +26,8 @@
 #include <string>
 #include <vector>
 
+#include <Core/Math.h>
+
 namespace spades {
 	namespace gui {
 		/**
@@ -58,6 +60,9 @@ namespace spades {
 				// Resize/relabel the volume to (w,h,d), shifting existing voxels by
 				// (ox,oy,oz) — the same operation the editor uses to grow / trim.
 				virtual void UndoApplyReframe(int w, int h, int d, int ox, int oy, int oz) = 0;
+				// Set the model's origin (pivot = -origin) and rebuild what depends
+				// on it. Used to replay a pivot change.
+				virtual void UndoApplyOrigin(const Vector3& origin) = 0;
 				// Read / replace the current selection (packed voxel keys).
 				virtual std::set<int64_t> UndoSnapshotSelection() const = 0;
 				virtual void UndoRestoreSelection(const std::set<int64_t>& sel) = 0;
@@ -80,6 +85,8 @@ namespace spades {
 			// Append a volume reframe to the open group.
 			void RecordReframe(int beforeW, int beforeH, int beforeD, int afterW, int afterH,
 			                   int afterD, int ox, int oy, int oz);
+			// Append a pivot (origin) change to the open group.
+			void RecordOrigin(const Vector3& before, const Vector3& after);
 
 			// --- history ------------------------------------------------------
 			bool CanUndo() const { return !undoGroups.empty(); }
@@ -97,7 +104,7 @@ namespace spades {
 
 		private:
 			struct Record {
-				enum class Kind : uint8_t { Voxel, Reframe } kind;
+				enum class Kind : uint8_t { Voxel, Reframe, Origin } kind;
 				union {
 					struct {
 						int x, y, z;
@@ -107,6 +114,9 @@ namespace spades {
 					struct {
 						int bw, bh, bd, aw, ah, ad, ox, oy, oz;
 					} r;
+					struct {
+						float bx, by, bz, ax, ay, az;
+					} o;
 				};
 				static Record MakeVoxel(int x, int y, int z, bool oS, uint32_t oC, bool nS,
 				                        uint32_t nC) {
@@ -120,6 +130,12 @@ namespace spades {
 					Record rec;
 					rec.kind = Kind::Reframe;
 					rec.r = {bw, bh, bd, aw, ah, ad, ox, oy, oz};
+					return rec;
+				}
+				static Record MakeOrigin(const Vector3& b, const Vector3& a) {
+					Record rec;
+					rec.kind = Kind::Origin;
+					rec.o = {b.x, b.y, b.z, a.x, a.y, a.z};
 					return rec;
 				}
 			};

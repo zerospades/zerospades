@@ -67,6 +67,15 @@ namespace spades {
 			pending.hasGeometry = true;
 		}
 
+		void KV6UndoStack::RecordOrigin(const Vector3& before, const Vector3& after) {
+			if (depth == 0)
+				return;
+			if (before.x == after.x && before.y == after.y && before.z == after.z)
+				return; // no-op
+			pending.records.push_back(Record::MakeOrigin(before, after));
+			pending.hasGeometry = true; // the pivot is saved to the file -> dirties it
+		}
+
 		void KV6UndoStack::Commit() {
 			pending.geomBefore = geomId;
 			// Only geometry edits advance the geometry id (drives the dirty flag);
@@ -88,8 +97,10 @@ namespace spades {
 			for (const Record& r : g.records) {
 				if (r.kind == Record::Kind::Voxel)
 					sink.UndoApplyVoxel(r.v.x, r.v.y, r.v.z, r.v.newSolid, r.v.newColor);
-				else
+				else if (r.kind == Record::Kind::Reframe)
 					sink.UndoApplyReframe(r.r.aw, r.r.ah, r.r.ad, r.r.ox, r.r.oy, r.r.oz);
+				else
+					sink.UndoApplyOrigin(MakeVector3(r.o.ax, r.o.ay, r.o.az));
 			}
 			sink.UndoRestoreSelection(g.selAfter);
 			sink.UndoReplayed();
@@ -103,8 +114,10 @@ namespace spades {
 				const Record& r = *it;
 				if (r.kind == Record::Kind::Voxel)
 					sink.UndoApplyVoxel(r.v.x, r.v.y, r.v.z, r.v.oldSolid, r.v.oldColor);
-				else // inverse reframe: back to the before-dims with the negated offset
+				else if (r.kind == Record::Kind::Reframe) // back to before-dims, negated offset
 					sink.UndoApplyReframe(r.r.bw, r.r.bh, r.r.bd, -r.r.ox, -r.r.oy, -r.r.oz);
+				else
+					sink.UndoApplyOrigin(MakeVector3(r.o.bx, r.o.by, r.o.bz));
 			}
 			sink.UndoRestoreSelection(g.selBefore);
 			sink.UndoReplayed();
