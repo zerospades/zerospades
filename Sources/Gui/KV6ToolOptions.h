@@ -33,8 +33,9 @@ namespace spades {
 		struct ToolOption {
 			enum class Type {
 				Bool,  // a toggle button; value lives in `bvalue`
-				Color  // the editor's current-colour swatch; opens the picker on click
+				Color, // the editor's current-colour swatch; opens the picker on click
 				       // (its value is owned by the editor, not stored here)
+				Label  // a read-only text readout; the tool updates `label` each frame
 			};
 
 			std::string id;    // stable key, e.g. "mirror.x"
@@ -63,6 +64,21 @@ namespace spades {
 				o.group = group;
 				o.type = ToolOption::Type::Color;
 				items.push_back(o);
+			}
+			// A read-only readout; the tool refreshes its text via SetLabel each frame.
+			void AddLabel(const std::string& id, const std::string& group = "") {
+				ToolOption o;
+				o.id = id;
+				o.group = group;
+				o.type = ToolOption::Type::Label;
+				items.push_back(o);
+			}
+			void SetLabel(const std::string& id, const std::string& text) {
+				for (ToolOption& o : items)
+					if (o.id == id) {
+						o.label = text;
+						return;
+					}
 			}
 
 			int Count() const { return int(items.size()); }
