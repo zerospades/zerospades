@@ -110,6 +110,15 @@ namespace spades {
 			// DrawOverlay (not DrawScene).
 			virtual void DrawSolidCube(const Vector3& center, float half, const Vector4& color) = 0;
 
+			// --- Pivot --------------------------------------------------------
+			// The model's pivot point (in editor grid coordinates). Moving it keeps
+			// the voxels fixed; the pivot marker / mirror planes follow and it is
+			// written to the file on save. Float-valued.
+			virtual Vector3 GetPivot() const = 0;
+			virtual void SetPivot(const Vector3& pivot) = 0;
+			// Open the modal prompt to type a new pivot (x y z).
+			virtual void BeginPivotEntry() = 0;
+
 			// --- Misc editor state / feedback ---------------------------------
 			virtual bool PickModeActive() const = 0;
 			virtual void ClearPickMode() = 0;

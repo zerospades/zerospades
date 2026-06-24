@@ -109,6 +109,11 @@ namespace spades {
 			bool PickModeActive() const override { return pickMode; }
 			void ClearPickMode() override { pickMode = false; }
 
+			// Pivot (= -origin); moving it keeps the voxels fixed. Undoable.
+			Vector3 GetPivot() const override;
+			void SetPivot(const Vector3& pivot) override;
+			void BeginPivotEntry() override;
+
 			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---
 			// Tools and scripts bracket a multi-step edit so it undoes as one step;
 			// nested brackets coalesce. Edits made between Begin/End (incl. plain
@@ -178,6 +183,7 @@ namespace spades {
 			// KV6UndoStack::Sink — apply primitives the stack replays on undo/redo.
 			void UndoApplyVoxel(int x, int y, int z, bool solid, uint32_t color) override;
 			void UndoApplyReframe(int w, int h, int d, int ox, int oy, int oz) override;
+			void UndoApplyOrigin(const Vector3& origin) override;
 			std::set<int64_t> UndoSnapshotSelection() const override { return selection; }
 			void UndoRestoreSelection(const std::set<int64_t>& sel) override { selection = sel; }
 			void UndoReplayed() override { RebuildRenderModel(); }
@@ -279,10 +285,14 @@ namespace spades {
 			std::string statusMessage;
 			float statusTimer = 0.0F;
 
-			// --- Pause menu (Esc) + Save As prompt ----------------------------
+			// --- Pause menu (Esc) + modal text prompt -------------------------
 			bool menuOpen = false;
 			bool promptOpen = false;
 			std::string promptText;
+			// What an open prompt is collecting (drives its title and what Enter does).
+			enum class PromptKind { SaveAs, Pivot };
+			PromptKind promptKind = PromptKind::SaveAs;
+			void SubmitPrompt(); // act on the prompt text per promptKind
 
 			// Document
 			void NewModel(int n, const std::string& path);
@@ -307,6 +317,8 @@ namespace spades {
 			// also journals it for undo (used by the live mutators).
 			void RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz);
 			void ReframeRaw(int nw, int nh, int nd, int ox, int oy, int oz);
+			// Set the model origin and rebuild the render model (no journaling).
+			void ApplyOriginRaw(const Vector3& origin);
 			void TrimVolume();
 
 			// Colour

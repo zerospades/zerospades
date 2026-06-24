@@ -113,6 +113,16 @@ namespace spades {
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 
+					// --- pivot ---
+					r = eng->RegisterObjectMethod("EditorContext", "Vector3 GetPivot()",
+					                              asMETHOD(gui::IEditorContext, GetPivot),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "void SetPivot(const Vector3&in)",
+					                              asMETHOD(gui::IEditorContext, SetPivot),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+
 					// --- undo / redo ---
 					r = eng->RegisterObjectMethod("EditorContext",
 					                              "void BeginUndoGroup(const string&in)",

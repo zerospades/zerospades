@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include <Client/Fonts.h>
 #include <Client/IFont.h>
@@ -71,6 +72,7 @@ namespace spades {
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
 			const float kMirW = 24.0F, kMirLabelW = 50.0F; // option toggle / group label
 			const float kColorW = 46.0F;                   // current-colour swatch
+			const float kLabelW = 190.0F;                  // read-only readout (e.g. pivot)
 
 			// Pack a (non-negative) voxel coordinate into a selection-set key.
 			int64_t SelKey(int x, int y, int z) {
@@ -215,8 +217,15 @@ namespace spades {
 			LayoutPicker();
 
 			// The Edit-mode tools come from the registry (toolbar order = registration).
+			// Pivot is leftmost, but open on Draw so the user can start modelling.
 			ToolRegistry::Instance().BuildAll(tools);
 			activeTool = 0;
+			for (size_t i = 0; i < tools.size(); i++) {
+				if (std::string(tools[i]->Label()) == "Draw") {
+					activeTool = int(i);
+					break;
+				}
+			}
 
 			if (isNew || path.empty())
 				NewModel(cubeSize, path);
@@ -1293,6 +1302,39 @@ namespace spades {
 				SetStatus("Nothing to redo");
 		}
 
+		// --- Pivot ------------------------------------------------------------
+
+		Vector3 KV6EditorView::GetPivot() const { return model->GetOrigin() * -1.0F; }
+
+		// The renderer bakes `origin` into the render model, so re-bake after changing
+		// it; that keeps the voxels visually fixed while the pivot marker moves.
+		void KV6EditorView::ApplyOriginRaw(const Vector3& origin) {
+			model->SetOrigin(origin);
+			RebuildRenderModel();
+		}
+
+		void KV6EditorView::SetPivot(const Vector3& pivot) {
+			Vector3 before = model->GetOrigin();
+			Vector3 after = pivot * -1.0F;
+			if (after.x == before.x && after.y == before.y && after.z == before.z)
+				return;
+			undo.Begin("Set Pivot");
+			ApplyOriginRaw(after);
+			undo.RecordOrigin(before, after);
+			undo.End();
+		}
+
+		void KV6EditorView::UndoApplyOrigin(const Vector3& origin) { ApplyOriginRaw(origin); }
+
+		void KV6EditorView::BeginPivotEntry() {
+			Vector3 p = GetPivot();
+			char buf[64];
+			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
+			promptText = buf;
+			promptKind = PromptKind::Pivot;
+			promptOpen = true;
+		}
+
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {
@@ -1768,7 +1810,9 @@ namespace spades {
 				} else {
 					x += kTbGap; // gap between items in the same group
 				}
-				float w = (op.type == ToolOption::Type::Color) ? kColorW : kMirW;
+				float w = (op.type == ToolOption::Type::Color)
+				            ? kColorW
+				            : (op.type == ToolOption::Type::Label ? kLabelW : kMirW);
 				if (k == i) {
 					outW = w;
 					return x;
@@ -1821,7 +1865,11 @@ namespace spades {
 						          MakeVector2(x - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F), s,
 						          MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
 				}
-				if (op.type == ToolOption::Type::Color) {
+				if (op.type == ToolOption::Type::Label) {
+					Vector2 ts = font.Measure(op.label);
+					font.Draw(op.label, MakeVector2(x, by + (kTbH - ts.y * s) * 0.5F), s,
+					          MakeVector4(0.85F, 0.85F, 0.9F, 1.0F));
+				} else if (op.type == ToolOption::Type::Color) {
 					ColorNP(ColorToVec(currentColor));
 					FillRect(x, by, w, kTbH);
 					StrokeRect(x, by, w, kTbH, pickerOpen ? 2.0F : 1.0F,
@@ -1930,7 +1978,9 @@ namespace spades {
 			FillRect(x, y, w, h);
 			StrokeRect(x, y, w, h, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
 
-			font.Draw("Save As (full path)", MakeVector2(x + 16.0F, y + 12.0F), 1.0F,
+			const char* title =
+			  (promptKind == PromptKind::Pivot) ? "Set pivot (x y z)" : "Save As (full path)";
+			font.Draw(title, MakeVector2(x + 16.0F, y + 12.0F), 1.0F,
 			          MakeVector4(0.8F, 0.8F, 0.8F, 1.0F));
 
 			float fx = x + 16.0F, fy = y + 44.0F, fw = w - 32.0F, fh = 28.0F;
@@ -1940,8 +1990,36 @@ namespace spades {
 			std::string shown = promptText + "_";
 			font.Draw(shown, MakeVector2(fx + 6.0F, fy + 6.0F), 1.0F, MakeVector4(1, 1, 1, 1));
 
-			font.Draw("[Enter] save    [Esc] cancel", MakeVector2(x + 16.0F, y + h - 24.0F), 0.9F,
+			font.Draw("[Enter] OK    [Esc] cancel", MakeVector2(x + 16.0F, y + h - 24.0F), 0.9F,
 			          MakeVector4(0.7F, 0.7F, 0.7F, 1.0F));
+		}
+
+		void KV6EditorView::SubmitPrompt() {
+			if (promptKind == PromptKind::SaveAs) {
+				std::string p = promptText;
+				if (!p.empty()) {
+					if (p.size() < 4 || !EqualsIgnoringCase(p.substr(p.size() - 4), ".kv6"))
+						p += ".kv6";
+					filePath = p;
+					Save();
+				}
+				promptOpen = false;
+				menuOpen = false;
+				return;
+			}
+			// Pivot: parse three numbers (commas allowed).
+			std::string s = promptText;
+			for (char& c : s)
+				if (c == ',')
+					c = ' ';
+			float x, y, z;
+			if (std::sscanf(s.c_str(), "%f %f %f", &x, &y, &z) == 3) {
+				SetPivot(MakeVector3(x, y, z));
+				SetStatus("Pivot set");
+			} else {
+				SetStatus("Enter three numbers: x y z");
+			}
+			promptOpen = false;
 		}
 
 		// --- View interface ---------------------------------------------------
@@ -1986,18 +2064,8 @@ namespace spades {
 				if (!down)
 					return;
 				if (key == "Escape") { promptOpen = false; }
-				else if (key == "Enter") {
-					std::string p = promptText;
-					if (!p.empty()) {
-						if (p.size() < 4 ||
-						    !EqualsIgnoringCase(p.substr(p.size() - 4), ".kv6"))
-							p += ".kv6";
-						filePath = p;
-						Save();
-					}
-					promptOpen = false;
-					menuOpen = false;
-				} else if (key == "BackSpace") {
+				else if (key == "Enter") { SubmitPrompt(); }
+				else if (key == "BackSpace") {
 					if (!promptText.empty())
 						promptText.pop_back();
 				}
@@ -2012,7 +2080,11 @@ namespace spades {
 					int b = MenuButtonAt(cursor);
 					if (b == 0) menuOpen = false;            // Resume
 					else if (b == 1) { Save(); menuOpen = false; } // Save
-					else if (b == 2) { promptText = filePath; promptOpen = true; } // Save As
+					else if (b == 2) { // Save As
+						promptText = filePath;
+						promptKind = PromptKind::SaveAs;
+						promptOpen = true;
+					}
 					else if (b == 3) wantsClose = true;      // Exit
 				}
 				return;
@@ -2087,8 +2159,9 @@ namespace spades {
 						ToolOption& op = o->At(opt);
 						if (op.type == ToolOption::Type::Color)
 							pickerOpen = !pickerOpen; // open/close the colour picker
-						else
+						else if (op.type == ToolOption::Type::Bool)
 							op.bvalue = !op.bvalue; // toggle (e.g. a mirror axis)
+						// Label: read-only readout, nothing to do
 					}
 					return;
 				}
