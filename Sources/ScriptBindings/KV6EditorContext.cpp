@@ -113,6 +113,33 @@ namespace spades {
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 
+					// --- undo / redo ---
+					r = eng->RegisterObjectMethod("EditorContext",
+					                              "void BeginUndoGroup(const string&in)",
+					                              asMETHOD(gui::IEditorContext, BeginUndoGroup),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "void EndUndoGroup()",
+					                              asMETHOD(gui::IEditorContext, EndUndoGroup),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "void Undo()",
+					                              asMETHOD(gui::IEditorContext, Undo),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "void Redo()",
+					                              asMETHOD(gui::IEditorContext, Redo),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "bool CanUndo()",
+					                              asMETHOD(gui::IEditorContext, CanUndo),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext", "bool CanRedo()",
+					                              asMETHOD(gui::IEditorContext, CanRedo),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
+
 					// --- overlay drawing ---
 					r = eng->RegisterObjectMethod(
 					  "EditorContext",

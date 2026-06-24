@@ -114,6 +114,17 @@ namespace spades {
 			virtual bool PickModeActive() const = 0;
 			virtual void ClearPickMode() = 0;
 			virtual void SetStatus(const std::string&) = 0;
+
+			// --- Undo / redo --------------------------------------------------
+			// Edits made through this context are journaled automatically. Wrap a
+			// multi-step operation in BeginUndoGroup/EndUndoGroup so it undoes as a
+			// single step; nested brackets coalesce.
+			virtual void BeginUndoGroup(const std::string& label) = 0;
+			virtual void EndUndoGroup() = 0;
+			virtual void Undo() = 0;
+			virtual void Redo() = 0;
+			virtual bool CanUndo() const = 0;
+			virtual bool CanRedo() const = 0;
 		};
 	} // namespace gui
 } // namespace spades

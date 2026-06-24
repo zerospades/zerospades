@@ -93,6 +93,12 @@ namespace spades {
 			ed.SetStatus("Paint: LMB drag to recolour  -  RMB / Alt+LMB sample colour");
 		}
 		void PaintBlockSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			// A press/drag/release of LMB is one stroke = one undo step; the inner
+			// PaintCells calls coalesce inside this group.
+			if (e.IsLeft() && e.IsUp()) {
+				ed.EndUndoGroup();
+				return;
+			}
 			// Sample a colour (Alt, pick mode, or RMB), else recolour the hovered
 			// voxel — and keep doing so while the button is dragged.
 			if (e.IsRight() && e.IsDown()) {
@@ -101,6 +107,8 @@ namespace spades {
 			}
 			if (!e.IsLeft() || !(e.IsDown() || e.IsDrag()))
 				return;
+			if (e.IsDown())
+				ed.BeginUndoGroup("Paint");
 			if (e.alt || ed.PickModeActive()) {
 				ed.Eyedropper();
 				ed.ClearPickMode();

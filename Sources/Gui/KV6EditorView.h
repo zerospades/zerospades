@@ -28,6 +28,7 @@
 
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
+#include "KV6UndoStack.h"
 #include "View.h"
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
@@ -55,7 +56,7 @@ namespace spades {
 		 * motion to drive a spectator-style camera and tracks its own software
 		 * cursor for the 2D UI.
 		 */
-		class KV6EditorView : public View, public IEditorContext {
+		class KV6EditorView : public View, public IEditorContext, public KV6UndoStack::Sink {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, const std::string& path, bool isNew);
@@ -107,6 +108,17 @@ namespace spades {
 
 			bool PickModeActive() const override { return pickMode; }
 			void ClearPickMode() override { pickMode = false; }
+
+			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---
+			// Tools and scripts bracket a multi-step edit so it undoes as one step;
+			// nested brackets coalesce. Edits made between Begin/End (incl. plain
+			// FillCells/PaintCells/SelectCells calls) are captured automatically.
+			void BeginUndoGroup(const std::string& label) override { undo.Begin(label); }
+			void EndUndoGroup() override { undo.End(); }
+			void Undo() override;
+			void Redo() override;
+			bool CanUndo() const override { return undo.CanUndo(); }
+			bool CanRedo() const override { return undo.CanRedo(); }
 			void PlaceCube() override;
 			void DeleteCube() override;
 			void Eyedropper() override;
@@ -151,10 +163,30 @@ namespace spades {
 			Handle<client::IModel> renderModel; // rebuilt on edit
 			int cubeSize = 32;
 			std::string filePath;
-			bool dirty = false;
 			int voxelCount = 0;
 			float globalTime = 0.0F;
 			bool wantsClose = false;
+
+			// --- Undo / redo --------------------------------------------------
+			// The stack drives the model back and forth through the Sink interface
+			// below. The document is dirty while its geometry state differs from the
+			// one captured at the last save (-1 = never saved).
+			KV6UndoStack undo{*this};
+			long savedGeomId = -1;
+			bool IsDirty() const { return undo.GeometryStateId() != savedGeomId; }
+
+			// KV6UndoStack::Sink — apply primitives the stack replays on undo/redo.
+			void UndoApplyVoxel(int x, int y, int z, bool solid, uint32_t color) override;
+			void UndoApplyReframe(int w, int h, int d, int ox, int oy, int oz) override;
+			std::set<int64_t> UndoSnapshotSelection() const override { return selection; }
+			void UndoRestoreSelection(const std::set<int64_t>& sel) override { selection = sel; }
+			void UndoReplayed() override { RebuildRenderModel(); }
+
+			// The single voxel-write choke point. `WriteVoxel` journals the change for
+			// undo; `WriteVoxelRaw` only applies it (used by the stack's replay). Both
+			// keep `voxelCount` correct, so no mutator touches it directly.
+			void WriteVoxel(int x, int y, int z, bool solid, uint32_t color);
+			void WriteVoxelRaw(int x, int y, int z, bool solid, uint32_t color);
 
 			// --- Mode (Blender-style) -----------------------------------------
 			// KV6 documents only support Edit mode for now; Object/Animation are
@@ -271,7 +303,10 @@ namespace spades {
 			int MirrorIdx(int i, float pivot) const;
 			// Append each cell's mirror images for the enabled axes (Draw edits).
 			void ExpandMirrors(std::vector<IntVector3>& cells) const;
+			// Resize/relabel the volume. `ReframeRaw` does the work; `RebuildVolume`
+			// also journals it for undo (used by the live mutators).
 			void RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz);
+			void ReframeRaw(int nw, int nh, int nd, int ox, int oy, int oz);
 			void TrimVolume();
 
 			// Colour
@@ -322,11 +357,13 @@ namespace spades {
 			// Unified top toolbar: modes on the left, a separator, then the tools
 			// available in the current mode.
 			struct ToolbarHit {
-				enum Kind { None, Mode, Tool } kind = None;
+				enum Kind { None, Mode, Tool, Undo, Redo } kind = None;
 				int index = -1;
 			};
 			ToolbarHit ToolbarHitTest(const Vector2& p);
 			void DrawToolbar(float sw, float sh);
+			// Left edge of the Undo (redo == false) / Redo button in the toolbar.
+			float UndoButtonX(float sw, bool redo) const;
 
 			// Secondary toolbar showing the active tool's sub-tools (always shown).
 			float BarsH(); // total height of ribbon + toolbar + sub-toolbar

@@ -22,6 +22,7 @@
 #include "KV6EditorTool.h"
 #include "KV6ScreenHelper.h"
 #include "KV6ToolRegistry.h"
+#include "UIWidgetPainter.h"
 
 #include <algorithm>
 #include <cmath>
@@ -65,6 +66,7 @@ namespace spades {
 			const float kBarsH = kRibbonH + kToolbarH + kSubBarH; // always-present bars
 			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
 			const float kSubBtn = 88.0F;  // sub-tool button width
+			const float kUndoBtnW = 50.0F; // Undo / Redo button width (toolbar right edge)
 			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
 			const float kMirW = 24.0F, kMirLabelW = 50.0F; // option toggle / group label
@@ -247,7 +249,8 @@ namespace spades {
 			RebuildRenderModel();
 			filePath = path;
 			FrameCamera();
-			dirty = true;
+			undo.Clear();
+			savedGeomId = -1; // a fresh, never-saved document starts dirty
 		}
 
 		void KV6EditorView::LoadModel(const std::string& path) {
@@ -263,7 +266,8 @@ namespace spades {
 			RebuildRenderModel();
 			filePath = path;
 			FrameCamera();
-			dirty = false;
+			undo.Clear();
+			savedGeomId = undo.GeometryStateId(); // a freshly loaded document is clean
 		}
 
 		int KV6EditorView::CountSolids() {
@@ -295,7 +299,7 @@ namespace spades {
 				return;
 			}
 			if (io->Save(&*model, filePath)) {
-				dirty = false;
+				savedGeomId = undo.GeometryStateId(); // this geometry state is now clean
 				SetStatus("Saved " + filePath);
 			} else {
 				SetStatus("Save failed");
@@ -518,6 +522,12 @@ namespace spades {
 		}
 
 		void KV6EditorView::RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz) {
+			undo.RecordReframe(model->GetWidth(), model->GetHeight(), model->GetDepth(), nw, nh, nd,
+			                   ox, oy, oz);
+			ReframeRaw(nw, nh, nd, ox, oy, oz);
+		}
+
+		void KV6EditorView::ReframeRaw(int nw, int nh, int nd, int ox, int oy, int oz) {
 			Handle<VoxelModel> dst = Handle<VoxelModel>::New(nw, nh, nd);
 			for (int x = 0; x < model->GetWidth(); x++)
 			for (int y = 0; y < model->GetHeight(); y++)
@@ -532,7 +542,6 @@ namespace spades {
 			freePos += shift;
 			cubeSize = std::max(nw, std::max(nh, nd));
 			ShiftSelection(ox, oy, oz); // keep selected voxel coords aligned
-
 		}
 
 		void KV6EditorView::TrimVolume() {
@@ -581,6 +590,7 @@ namespace spades {
 				return;
 			}
 			int ox = -loX, oy = -loY, oz = -loZ;
+			undo.Begin("Place");
 			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
 			    nh != model->GetHeight() || nd != model->GetDepth())
 				RebuildVolume(nw, nh, nd, ox, oy, oz);
@@ -591,12 +601,13 @@ namespace spades {
 			for (int ib = 0; ib < ny; ib++) { int Y = (ib == 0) ? ty : yb;
 			for (int ic = 0; ic < nz; ic++) { int Z = (ic == 0) ? tz : zb;
 				if (!model->IsSolid(X, Y, Z)) {
-					model->SetSolid(X, Y, Z, currentColor);
-					voxelCount++;
+					WriteVoxel(X, Y, Z, true, currentColor);
 					any = true;
 				}
 			}}}
-			if (any) { dirty = true; RebuildRenderModel(); }
+			undo.End();
+			if (any)
+				RebuildRenderModel();
 		}
 
 		void KV6EditorView::DeleteCube() {
@@ -619,17 +630,17 @@ namespace spades {
 			}}}
 			if (n == 0 || voxelCount - n < 1)
 				return;
+			undo.Begin("Delete");
 			for (int ia = 0; ia < nx; ia++) { int X = (ia == 0) ? hx : xb;
 			for (int ib = 0; ib < ny; ib++) { int Y = (ib == 0) ? hy : yb;
 			for (int ic = 0; ic < nz; ic++) { int Z = (ic == 0) ? hz : zb;
 				if (InBounds(X, Y, Z) && model->IsSolid(X, Y, Z)) {
-					model->SetAir(X, Y, Z);
+					WriteVoxel(X, Y, Z, false, 0);
 					selection.erase(SelKey(X, Y, Z)); // drop stale selection entries
-					voxelCount--;
 				}
 			}}}
 			TrimVolume();
-			dirty = true;
+			undo.End();
 			RebuildRenderModel();
 		}
 
@@ -706,22 +717,29 @@ namespace spades {
 		// --- Selection --------------------------------------------------------
 
 		void KV6EditorView::ToggleSelect(int x, int y, int z) {
+			undo.Begin("Select");
 			int64_t k = SelKey(x, y, z);
 			auto it = selection.find(k);
 			if (it == selection.end())
 				selection.insert(k);
 			else
 				selection.erase(it);
+			undo.End();
 		}
 		void KV6EditorView::AddSelect(int x, int y, int z) { selection.insert(SelKey(x, y, z)); }
 		bool KV6EditorView::IsSelected(int x, int y, int z) const {
 			return selection.find(SelKey(x, y, z)) != selection.end();
 		}
-		void KV6EditorView::ClearSelection() { selection.clear(); }
+		void KV6EditorView::ClearSelection() {
+			undo.Begin("Clear Selection");
+			selection.clear();
+			undo.End();
+		}
 
 		void KV6EditorView::SelectLinkedColor(int x, int y, int z) {
 			if (!InBounds(x, y, z) || !model->IsSolid(x, y, z))
 				return;
+			undo.Begin("Select Colour");
 			uint32_t target = model->GetColor(x, y, z) & 0xFFFFFF;
 			std::set<int64_t> visited;
 			std::vector<IntVector3> stack;
@@ -746,6 +764,7 @@ namespace spades {
 				stack.push_back(MakeIntVector3(c.x, c.y, c.z + 1));
 				stack.push_back(MakeIntVector3(c.x, c.y, c.z - 1));
 			}
+			undo.End();
 			SetStatus("Selected " + std::to_string(added) + " linked voxels");
 		}
 
@@ -810,17 +829,16 @@ namespace spades {
 				return false;
 			}
 			CopySelection();
+			undo.Begin("Cut");
 			for (int64_t k : selection) {
 				int x, y, z;
 				SelDecode(k, x, y, z);
-				if (InBounds(x, y, z) && model->IsSolid(x, y, z)) {
-					model->SetAir(x, y, z);
-					voxelCount--;
-				}
+				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
+					WriteVoxel(x, y, z, false, 0);
 			}
 			selection.clear();
 			TrimVolume();
-			dirty = true;
+			undo.End();
 			RebuildRenderModel();
 			SetStatus("Cut " + std::to_string(clipboard.size()) + " voxels");
 			return true;
@@ -854,6 +872,7 @@ namespace spades {
 				return;
 			}
 			int ox = -loX, oy = -loY, oz = -loZ;
+			undo.Begin("Paste");
 			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
 			    nh != model->GetHeight() || nd != model->GetDepth())
 				RebuildVolume(nw, nh, nd, ox, oy, oz);
@@ -863,12 +882,10 @@ namespace spades {
 				    z = anchor.z + v.rel.z + oz;
 				if (!InBounds(x, y, z))
 					continue;
-				if (!model->IsSolid(x, y, z))
-					voxelCount++;
-				model->SetSolid(x, y, z, v.color);
+				WriteVoxel(x, y, z, true, v.color);
 				AddSelect(x, y, z); // select the pasted voxels
 			}
-			dirty = true;
+			undo.End();
 			RebuildRenderModel();
 			SetStatus("Pasted " + std::to_string(clipboard.size()) + " voxels");
 		}
@@ -913,7 +930,7 @@ namespace spades {
 		void KV6EditorView::MoveSelection(int dx, int dy, int dz) {
 			if (selection.empty() || (dx == 0 && dy == 0 && dz == 0))
 				return;
-			// Lift the selected voxels (with their colours) off the model.
+			// Gather the selected voxels (with their colours).
 			std::vector<ClipVoxel> moved;
 			for (int64_t k : selection) {
 				int x, y, z;
@@ -923,12 +940,8 @@ namespace spades {
 			}
 			if (moved.empty())
 				return;
-			for (const ClipVoxel& v : moved) {
-				model->SetAir(v.rel.x, v.rel.y, v.rel.z);
-				voxelCount--;
-			}
-			selection.clear();
-			// Grow to fit the moved voxels at their new positions.
+			// Volume that must hold both the current model and the moved voxels at
+			// their destination — checked up front so we can bail before editing.
 			int loX = 0, loY = 0, loZ = 0;
 			int hiX = model->GetWidth(), hiY = model->GetHeight(), hiZ = model->GetDepth();
 			for (const ClipVoxel& v : moved) {
@@ -940,16 +953,13 @@ namespace spades {
 			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
 			if (nw > 4096 || nh > 4096 || nd > 64) {
 				SetStatus("Reached the maximum model size");
-				// Put them back where they were.
-				for (const ClipVoxel& v : moved) {
-					if (!model->IsSolid(v.rel.x, v.rel.y, v.rel.z))
-						voxelCount++;
-					model->SetSolid(v.rel.x, v.rel.y, v.rel.z, v.color);
-					AddSelect(v.rel.x, v.rel.y, v.rel.z);
-				}
-				RebuildRenderModel();
 				return;
 			}
+			undo.Begin("Move");
+			// Lift the selected voxels off the model, then re-stamp them shifted.
+			for (const ClipVoxel& v : moved)
+				WriteVoxel(v.rel.x, v.rel.y, v.rel.z, false, 0);
+			selection.clear();
 			int ox = -loX, oy = -loY, oz = -loZ;
 			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
 			    nh != model->GetHeight() || nd != model->GetDepth())
@@ -958,13 +968,11 @@ namespace spades {
 				int x = v.rel.x + dx + ox, y = v.rel.y + dy + oy, z = v.rel.z + dz + oz;
 				if (!InBounds(x, y, z))
 					continue;
-				if (!model->IsSolid(x, y, z))
-					voxelCount++;
-				model->SetSolid(x, y, z, v.color);
+				WriteVoxel(x, y, z, true, v.color);
 				AddSelect(x, y, z);
 			}
 			TrimVolume();
-			dirty = true;
+			undo.End();
 			RebuildRenderModel();
 		}
 
@@ -1115,19 +1123,23 @@ namespace spades {
 		}
 
 		void KV6EditorView::SelectBox(const IntVector3& lo, const IntVector3& hi) {
+			undo.Begin("Select");
 			for (int x = lo.x; x <= hi.x; x++)
 			for (int y = lo.y; y <= hi.y; y++)
 			for (int z = lo.z; z <= hi.z; z++) {
 				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
 					AddSelect(x, y, z);
 			}
+			undo.End();
 		}
 
 		void KV6EditorView::SelectCells(const std::vector<IntVector3>& cells) {
+			undo.Begin("Select");
 			for (const IntVector3& c : cells) {
 				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z))
 					AddSelect(c.x, c.y, c.z);
 			}
+			undo.End();
 		}
 
 		void KV6EditorView::FillCells(const std::vector<IntVector3>& cellsIn, uint32_t color) {
@@ -1149,6 +1161,7 @@ namespace spades {
 				return;
 			}
 			int ox = -loX, oy = -loY, oz = -loZ;
+			undo.Begin("Fill");
 			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
 			    nh != model->GetHeight() || nd != model->GetDepth())
 				RebuildVolume(nw, nh, nd, ox, oy, oz);
@@ -1156,15 +1169,13 @@ namespace spades {
 			for (const IntVector3& c : cells) {
 				int X = c.x + ox, Y = c.y + oy, Z = c.z + oz;
 				if (InBounds(X, Y, Z) && !model->IsSolid(X, Y, Z)) {
-					model->SetSolid(X, Y, Z, color);
-					voxelCount++;
+					WriteVoxel(X, Y, Z, true, color);
 					any = true;
 				}
 			}
-			if (any) {
-				dirty = true;
+			undo.End();
+			if (any)
 				RebuildRenderModel();
-			}
 		}
 
 		void KV6EditorView::EraseCells(const std::vector<IntVector3>& cellsIn) {
@@ -1181,40 +1192,42 @@ namespace spades {
 				SetStatus("Cannot remove every voxel");
 				return;
 			}
+			undo.Begin("Erase");
 			for (const IntVector3& c : cells) {
 				if (InBounds(c.x, c.y, c.z) && model->IsSolid(c.x, c.y, c.z)) {
-					model->SetAir(c.x, c.y, c.z);
+					WriteVoxel(c.x, c.y, c.z, false, 0);
 					selection.erase(SelKey(c.x, c.y, c.z));
-					voxelCount--;
 				}
 			}
 			TrimVolume();
-			dirty = true;
+			undo.End();
 			RebuildRenderModel();
 		}
 
 		void KV6EditorView::DeselectCells(const std::vector<IntVector3>& cells) {
+			undo.Begin("Deselect");
 			for (const IntVector3& c : cells)
 				selection.erase(SelKey(c.x, c.y, c.z));
+			undo.End();
 		}
 
 		void KV6EditorView::PaintCells(const std::vector<IntVector3>& cellsIn, uint32_t color) {
 			std::vector<IntVector3> cells = cellsIn;
 			ExpandMirrors(cells); // also recolour the mirror images, if enabled
 			uint32_t rgb = color & 0xFFFFFF;
+			undo.Begin("Paint");
 			bool any = false;
 			for (const IntVector3& c : cells) {
 				if (!InBounds(c.x, c.y, c.z) || !model->IsSolid(c.x, c.y, c.z))
 					continue; // paint only existing voxels; never grows the volume
 				if ((model->GetColor(c.x, c.y, c.z) & 0xFFFFFF) == rgb)
 					continue; // already this colour
-				model->SetSolid(c.x, c.y, c.z, rgb);
+				WriteVoxel(c.x, c.y, c.z, true, rgb);
 				any = true;
 			}
-			if (any) {
-				dirty = true;
+			undo.End();
+			if (any)
 				RebuildRenderModel();
-			}
 		}
 
 		void KV6EditorView::ApplyCells(const std::vector<IntVector3>& cells, bool secondary) {
@@ -1229,6 +1242,55 @@ namespace spades {
 				if (secondary) EraseCells(cells);
 				else FillCells(cells, currentColor);
 			}
+		}
+
+		// --- Undo / redo ------------------------------------------------------
+
+		// The one place voxels are written: keeps `voxelCount` correct and (unlike
+		// WriteVoxelRaw) journals the change so it can be undone.
+		void KV6EditorView::WriteVoxel(int x, int y, int z, bool solid, uint32_t color) {
+			if (!InBounds(x, y, z))
+				return;
+			bool oldSolid = model->IsSolid(x, y, z);
+			uint32_t oldColor = model->GetColor(x, y, z) & 0xFFFFFF;
+			uint32_t newColor = solid ? (color & 0xFFFFFF) : oldColor; // air keeps its colour
+			WriteVoxelRaw(x, y, z, solid, newColor);
+			undo.RecordVoxel(x, y, z, oldSolid, oldColor, solid, newColor);
+		}
+
+		void KV6EditorView::WriteVoxelRaw(int x, int y, int z, bool solid, uint32_t color) {
+			bool was = model->IsSolid(x, y, z);
+			if (solid)
+				model->SetSolid(x, y, z, color);
+			else
+				model->SetAir(x, y, z);
+			if (was && !solid)
+				voxelCount--;
+			else if (!was && solid)
+				voxelCount++;
+		}
+
+		// KV6UndoStack::Sink — the stack replays records through these.
+		void KV6EditorView::UndoApplyVoxel(int x, int y, int z, bool solid, uint32_t color) {
+			WriteVoxelRaw(x, y, z, solid, color);
+		}
+		void KV6EditorView::UndoApplyReframe(int w, int h, int d, int ox, int oy, int oz) {
+			ReframeRaw(w, h, d, ox, oy, oz);
+		}
+
+		void KV6EditorView::Undo() {
+			std::string label = undo.UndoLabel();
+			if (undo.Undo())
+				SetStatus("Undid " + (label.empty() ? std::string("edit") : label));
+			else
+				SetStatus("Nothing to undo");
+		}
+		void KV6EditorView::Redo() {
+			std::string label = undo.RedoLabel();
+			if (undo.Redo())
+				SetStatus("Redid " + (label.empty() ? std::string("edit") : label));
+			else
+				SetStatus("Nothing to redo");
 		}
 
 		// Long world axes through the model's origin (pivot), which renders at
@@ -1543,7 +1605,8 @@ namespace spades {
 				          MakeVector4(0.5F, 1.0F, 0.6F, 1.0F));
 
 			font.Draw("[LMB] use tool  |  [RMB] delete/cancel  |  [MMB] look  |  [WASD/Space/Ctrl] move"
-			          "  |  [Wheel] zoom  |  [Ctrl+C/X/V] copy/cut/paste  |  [Esc] menu",
+			          "  |  [Wheel] zoom  |  [Ctrl+C/X/V] copy/cut/paste  |  [Ctrl+Z/Y] undo/redo"
+			          "  |  [Esc] menu",
 			          MakeVector2(16.0F, sh - 28.0F), 1.0F, grey);
 		}
 
@@ -1593,6 +1656,11 @@ namespace spades {
 			return x;
 		}
 
+		float KV6EditorView::UndoButtonX(float sw, bool redo) const {
+			float undoX = sw - 12.0F - 2.0F * kUndoBtnW - kTbGap;
+			return redo ? undoX + kUndoBtnW + kTbGap : undoX;
+		}
+
 		KV6EditorView::ToolbarHit KV6EditorView::ToolbarHitTest(const Vector2& p) {
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 			for (int i = 0; i < 3; i++) {
@@ -1603,6 +1671,11 @@ namespace spades {
 				if (InRect(p, ToolbarX(3 + i, toolCount), kTbY, kTbBtn, kTbH))
 					return {ToolbarHit::Tool, i};
 			}
+			float sw = renderer->ScreenWidth();
+			if (InRect(p, UndoButtonX(sw, false), kTbY, kUndoBtnW, kTbH))
+				return {ToolbarHit::Undo, 0};
+			if (InRect(p, UndoButtonX(sw, true), kTbY, kUndoBtnW, kTbH))
+				return {ToolbarHit::Redo, 0};
 			return {};
 		}
 
@@ -1616,16 +1689,14 @@ namespace spades {
 			ColorNP(MakeVector4(0.10F, 0.10F, 0.12F, 1.0F));
 			FillRect(0.0F, kRibbonH, sw, kToolbarH);
 
+			// Buttons share the game's look/behaviour via the C++ painter; `active`
+			// maps to the toggled state and the cursor drives hover, so they highlight
+			// exactly like the in-game buttons.
 			auto button = [&](float x, const char* label, bool active, bool enabled) {
-				ColorNP(active ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
-				               : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-				FillRect(x, kTbY, kTbBtn, kTbH);
-				StrokeRect(x, kTbY, kTbBtn, kTbH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
-				Vector4 tc = enabled ? MakeVector4(1, 1, 1, 1) : MakeVector4(0.45F, 0.45F, 0.45F, 1);
-				Vector2 ts = font.Measure(label);
-				font.Draw(label,
-				          MakeVector2(x + (kTbBtn - ts.x * s) * 0.5F, kTbY + (kTbH - ts.y * s) * 0.5F),
-				          s, tc);
+				bool hover = !menuOpen && !promptOpen && InRect(cursor, x, kTbY, kTbBtn, kTbH);
+				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
+				                     MakeVector2(kTbBtn, kTbH), label, MakeVector2(0.5F, 0.5F), "",
+				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, active, s);
 			};
 
 			for (int i = 0; i < 3; i++)
@@ -1638,6 +1709,16 @@ namespace spades {
 				for (int i = 0; i < toolCount; i++)
 					button(ToolbarX(3 + i, toolCount), tools[i]->Label(), activeTool == i, true);
 			}
+
+			// Undo / Redo on the right edge, greyed out when there's nothing to do.
+			auto urButton = [&](float x, const char* label, bool enabled) {
+				bool hover = !menuOpen && !promptOpen && InRect(cursor, x, kTbY, kUndoBtnW, kTbH);
+				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
+				                     MakeVector2(kUndoBtnW, kTbH), label, MakeVector2(0.5F, 0.5F), "",
+				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, false, s);
+			};
+			urButton(UndoButtonX(sw, false), "Undo", undo.CanUndo());
+			urButton(UndoButtonX(sw, true), "Redo", undo.CanRedo());
 		}
 
 		bool KV6EditorView::MirrorOn(int axis) const {
@@ -1712,14 +1793,10 @@ namespace spades {
 			for (int i = 0; i < t->SubToolCount(); i++) {
 				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
 				bool on = t->ActiveSubTool() == i;
-				ColorNP(on ? MakeVector4(0.22F, 0.45F, 0.70F, 1.0F)
-				           : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-				FillRect(x, by, kSubBtn, kTbH);
-				StrokeRect(x, by, kSubBtn, kTbH, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
-				const char* lbl = t->SubToolLabel(i);
-				Vector2 ts = font.Measure(lbl);
-				font.Draw(lbl, MakeVector2(x + (kSubBtn - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F),
-				          s, MakeVector4(1, 1, 1, 1));
+				bool hover = !menuOpen && !promptOpen && InRect(cursor, x, by, kSubBtn, kTbH);
+				widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(kSubBtn, kTbH),
+				                     t->SubToolLabel(i), MakeVector2(0.5F, 0.5F), "",
+				                     MakeVector2(1.0F, 0.5F), true, hover, false, on, s);
 			}
 
 			// The tool's declarative options (toggles, colour swatch), laid out
@@ -1789,7 +1866,7 @@ namespace spades {
 			FillRect(0.0F, 0.0F, sw, kRibbonH);
 
 			std::string name = (!filePath.empty()) ? filePath : "(unsaved model)";
-			if (dirty)
+			if (IsDirty())
 				name += " *";
 			font.Draw("KV6 Editor", MakeVector2(12.0F, 4.0F), 0.95F, MakeVector4(1, 1, 1, 1));
 			font.Draw(name + "   (" + std::to_string(voxelCount) + " voxels)",
@@ -1835,13 +1912,9 @@ namespace spades {
 			y += 44.0F;
 			int hover = MenuButtonAt(cursor);
 			for (int i = 0; i < 4; i++) {
-				ColorNP(hover == i ? MakeVector4(0.30F, 0.30F, 0.34F, 1.0F)
-				                   : MakeVector4(0.18F, 0.18F, 0.20F, 1.0F));
-				FillRect(x, y, w, 36.0F);
-				StrokeRect(x, y, w, 36.0F, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.6F));
-				Vector2 ts = font.Measure(kMenuItems[i]);
-				font.Draw(kMenuItems[i], MakeVector2(x + (w - ts.x) * 0.5F, y + 8.0F), 1.0F,
-				          MakeVector4(1, 1, 1, 1));
+				widgets::PaintButton(*renderer, font, MakeVector2(x, y), MakeVector2(w, 36.0F),
+				                     kMenuItems[i], MakeVector2(0.5F, 0.5F), "",
+				                     MakeVector2(1.0F, 0.5F), true, hover == i, false, false);
 				y += 44.0F;
 			}
 		}
@@ -1971,6 +2044,11 @@ namespace spades {
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "c")) { CopySelection(); return; }
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "x")) { CutSelection(); return; }
 			if (down && ctrlHeld && EqualsIgnoringCase(key, "v")) { StartPaste(); return; }
+			if (down && ctrlHeld && EqualsIgnoringCase(key, "z")) {
+				if (shiftHeld) Redo(); else Undo();
+				return;
+			}
+			if (down && ctrlHeld && EqualsIgnoringCase(key, "y")) { Redo(); return; }
 
 			if (key == "MiddleMouseButton") { lookActive = down; return; }
 
@@ -1995,6 +2073,8 @@ namespace spades {
 					}
 					return;
 				}
+				if (hit.kind == ToolbarHit::Undo) { Undo(); return; }
+				if (hit.kind == ToolbarHit::Redo) { Redo(); return; }
 				int sub = SubToolbarHitTest(cursor);
 				if (sub >= 0) {
 					if (EditorTool* t = ActiveTool()) t->SetSubTool(*this, sub);
