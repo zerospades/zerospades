@@ -140,5 +140,35 @@ namespace spades {
 			// Axis whose handle the cursor is over (line or tip cube), else -1.
 			int HitAxis(IEditorContext& ed, const Vector3& c) const;
 		};
+
+		// Move the model pivot by dragging a 3-axis gizmo, snapped to 0.1 steps.
+		// Voxels stay put; only the pivot/mirror anchor moves. Commits on release.
+		class PivotGizmoSubTool : public EditorTool {
+		public:
+			const char* Label() const override { return "Gizmo"; }
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void DrawScene(IEditorContext&) override;
+			void DrawOverlay(IEditorContext&) override;
+
+		private:
+			int grabAxis = -1;  // 0/1/2 while dragging a handle, else -1
+			Vector2 grabCursor; // cursor at grab start
+			Vector3 grabPivot;  // pivot at grab start (drag is relative to this)
+			float curOffset = 0.0F;
+			int HitAxis(IEditorContext& ed, const Vector3& c) const;
+			// Drag distance along `axis` in voxel units, snapped to 0.1.
+			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
+		};
+
+		// Set the pivot by typing exact values into a prompt.
+		class PivotValuesSubTool : public EditorTool {
+		public:
+			const char* Label() const override { return "Values"; }
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void DrawScene(IEditorContext&) override;
+		};
 	} // namespace gui
 } // namespace spades

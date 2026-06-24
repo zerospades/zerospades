@@ -22,6 +22,7 @@
 #include "KV6EditorContext.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace spades {
 	namespace gui {
@@ -408,6 +409,121 @@ namespace spades {
 				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
 				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
 			}
+		}
+
+		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
+
+		void PivotGizmoSubTool::OnActivate(IEditorContext& ed) {
+			grabAxis = -1;
+			ed.SetStatus("Pivot: drag a handle to move the pivot (0.1 steps)");
+		}
+
+		int PivotGizmoSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
+			bool ok0;
+			Vector2 s0 = ed.WorldToScreen(c, ok0);
+			if (!ok0)
+				return -1;
+			Vector2 cur = ed.CursorPos();
+			int best = -1;
+			float bestDist = 14.0F; // pixels
+			for (int a = 0; a < 3; a++) {
+				bool ok1;
+				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
+				if (!ok1)
+					continue;
+				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
+				if (d < bestDist) { bestDist = d; best = a; }
+			}
+			return best;
+		}
+
+		float PivotGizmoSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const {
+			bool ok1, ok2;
+			Vector2 s0 = ed.WorldToScreen(c, ok1);
+			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
+			if (!ok1 || !ok2)
+				return 0.0F;
+			Vector2 da = sa - s0;
+			float dl = da.GetLength();
+			if (dl < 0.5F)
+				return 0.0F; // axis ~parallel to the view
+			Vector2 m = ed.CursorPos() - grabCursor;
+			float raw = Vector2::Dot(m, da) / (dl * dl);
+			return std::round(raw * 10.0F) / 10.0F; // snap to 0.1
+		}
+
+		void PivotGizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			if (!e.IsLeft())
+				return;
+			if (e.IsDown()) {
+				Vector3 c = ed.GetPivot();
+				int best = HitAxis(ed, c);
+				if (best >= 0) {
+					grabAxis = best;
+					grabCursor = ed.CursorPos();
+					grabPivot = c;
+					curOffset = 0.0F;
+				}
+			} else if (e.IsUp()) {
+				if (grabAxis < 0)
+					return;
+				float off = OffsetAlong(ed, grabPivot, grabAxis);
+				if (off != 0.0F)
+					ed.SetPivot(grabPivot + AxisUnit(grabAxis) * off);
+				grabAxis = -1;
+			}
+		}
+
+		bool PivotGizmoSubTool::OnEscape(IEditorContext&) {
+			if (grabAxis < 0)
+				return false;
+			grabAxis = -1; // cancel the drag (no move committed)
+			return true;
+		}
+
+		void PivotGizmoSubTool::DrawScene(IEditorContext& ed) {
+			Vector3 c = ed.GetPivot();
+			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, grabPivot, grabAxis) : 0.0F;
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
+			for (int a = 0; a < 3; a++) {
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
+			}
+			// Preview the candidate pivot (a small cross) while dragging.
+			if (grabAxis >= 0 && curOffset != 0.0F) {
+				Vector3 cand = grabPivot + AxisUnit(grabAxis) * curOffset;
+				Vector4 pc = MakeVector4(0.4F, 1.0F, 0.5F, 0.9F);
+				ed.DrawLine3D(grabPivot, cand, pc);
+				for (int a = 0; a < 3; a++)
+					ed.DrawLine3D(cand - AxisUnit(a) * 0.6F, cand + AxisUnit(a) * 0.6F, pc);
+			}
+		}
+
+		void PivotGizmoSubTool::DrawOverlay(IEditorContext& ed) {
+			Vector3 c = ed.GetPivot();
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
+			for (int a = 0; a < 3; a++) {
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
+			}
+		}
+
+		// --- PivotValuesSubTool (type the pivot) -----------------------------
+
+		void PivotValuesSubTool::OnActivate(IEditorContext& ed) {
+			ed.SetStatus("Pivot: type x y z, then [Enter]");
+			ed.BeginPivotEntry();
+		}
+		void PivotValuesSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			if (e.IsDown() && e.IsLeft())
+				ed.BeginPivotEntry(); // re-open the prompt
+		}
+		void PivotValuesSubTool::DrawScene(IEditorContext& ed) {
+			Vector3 c = ed.GetPivot(); // mark where the pivot currently is
+			for (int a = 0; a < 3; a++)
+				ed.DrawLine3D(c - AxisUnit(a), c + AxisUnit(a), kAxisCol[a]);
 		}
 	} // namespace gui
 } // namespace spades
