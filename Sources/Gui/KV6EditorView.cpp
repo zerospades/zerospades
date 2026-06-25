@@ -1875,18 +1875,11 @@ namespace spades {
 					StrokeRect(x, by, w, kTbH, pickerOpen ? 2.0F : 1.0F,
 					           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
 					                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
-				} else { // Bool toggle
-					bool on = op.bvalue;
-					ColorNP(on ? MakeVector4(0.22F, 0.50F, 0.28F, 1.0F)
-					           : MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-					FillRect(x, by, w, kTbH);
-					StrokeRect(x, by, w, kTbH, 1.0F,
-					           on ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
-					              : MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
-					Vector2 ts = font.Measure(op.label);
-					font.Draw(op.label,
-					          MakeVector2(x + (w - ts.x * s) * 0.5F, by + (kTbH - ts.y * s) * 0.5F), s,
-					          MakeVector4(1, 1, 1, 1));
+				} else { // Bool toggle -> shared button painter, toggled when on
+					bool hover = !menuOpen && !promptOpen && InRect(cursor, x, by, w, kTbH);
+					widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
+					                     op.label, MakeVector2(0.5F, 0.5F), "",
+					                     MakeVector2(1.0F, 0.5F), true, hover, false, op.bvalue, s);
 				}
 				prevGroup = op.group;
 				first = false;
@@ -1984,9 +1977,7 @@ namespace spades {
 			          MakeVector4(0.8F, 0.8F, 0.8F, 1.0F));
 
 			float fx = x + 16.0F, fy = y + 44.0F, fw = w - 32.0F, fh = 28.0F;
-			ColorNP(MakeVector4(0.05F, 0.05F, 0.06F, 1.0F));
-			FillRect(fx, fy, fw, fh);
-			StrokeRect(fx, fy, fw, fh, 1.0F, MakeVector4(0.5F, 0.6F, 0.9F, 0.9F));
+			widgets::PaintField(*renderer, MakeVector2(fx, fy), MakeVector2(fw, fh), true, false);
 			std::string shown = promptText + "_";
 			font.Draw(shown, MakeVector2(fx + 6.0F, fy + 6.0F), 1.0F, MakeVector4(1, 1, 1, 1));
 
