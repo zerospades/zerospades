@@ -64,6 +64,10 @@ namespace spades {
 			void PaintRadioButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                      const Vector2& size, const std::string& caption, bool enabled,
 			                      bool hover, bool pressed, bool toggled, float textScale = 1.0F);
+			// The text-field box chrome (Field.as). The caret/selection/text are drawn
+			// by the caller (FieldBase in script; its own beam in the editor).
+			void PaintField(client::IRenderer& r, const Vector2& pos, const Vector2& size,
+			                bool focused, bool hover);
 		} // namespace widgets
 	} // namespace gui
 } // namespace spades

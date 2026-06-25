@@ -63,6 +63,11 @@ namespace spades {
 				gui::widgets::PaintRadioButton(*r, *f, pos, size, caption, enabled, hover, pressed,
 				                               toggled, textScale);
 		}
+		void Wrap_PaintField(client::IRenderer* r, const Vector2& pos, const Vector2& size,
+		                     bool focused, bool hover) {
+			if (r)
+				gui::widgets::PaintField(*r, pos, size, focused, hover);
+		}
 	} // namespace
 
 	// Exposes the shared widget painters to AngelScript as `spades::ui` free
@@ -99,6 +104,10 @@ namespace spades {
 					  "void PaintRadioButton(Renderer@, Font@, const Vector2&in, const Vector2&in, "
 					  "const string&in, bool, bool, bool, bool, float textScale = 1)",
 					  asFUNCTION(Wrap_PaintRadioButton), asCALL_CDECL);
+					manager->CheckError(r);
+					r = eng->RegisterGlobalFunction(
+					  "void PaintField(Renderer@, const Vector2&in, const Vector2&in, bool, bool)",
+					  asFUNCTION(Wrap_PaintField), asCALL_CDECL);
 					manager->CheckError(r);
 					eng->SetDefaultNamespace("");
 					break;

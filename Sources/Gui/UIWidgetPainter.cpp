@@ -167,6 +167,20 @@ namespace spades {
 					r.DrawFilledRect(pos.x + 4.0F, dy, pos.x + 4.0F + 8.0F, dy + 8.0F);
 				}
 			}
+
+			void PaintField(client::IRenderer& r, const Vector2& pos, const Vector2& size,
+			                bool focused, bool hover) {
+				ColorNP(r, MakeVector4(0.0F, 0.0F, 0.0F, focused ? 0.3F : 0.1F));
+				r.DrawFilledRect(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
+
+				if (focused)
+					ColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.2F));
+				else if (hover)
+					ColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.1F));
+				else
+					ColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.06F));
+				r.DrawOutlinedRect(pos.x, pos.y, pos.x + size.x, pos.y + size.y);
+			}
 		} // namespace widgets
 	} // namespace gui
 } // namespace spades
