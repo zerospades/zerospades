@@ -462,41 +462,40 @@ namespace spades {
 					grabAxis = best;
 					grabCursor = ed.CursorPos();
 					grabPivot = c;
-					curOffset = 0.0F;
 				}
+			} else if (e.IsDrag()) {
+				if (grabAxis < 0)
+					return;
+				// Move the pivot for real (marker, mirror planes and the toolbar
+				// readout all follow) but without journaling it.
+				float off = OffsetAlong(ed, grabPivot, grabAxis);
+				ed.PreviewPivot(grabPivot + AxisUnit(grabAxis) * off);
 			} else if (e.IsUp()) {
 				if (grabAxis < 0)
 					return;
 				float off = OffsetAlong(ed, grabPivot, grabAxis);
+				ed.PreviewPivot(grabPivot); // rewind the preview...
 				if (off != 0.0F)
-					ed.SetPivot(grabPivot + AxisUnit(grabAxis) * off);
+					ed.SetPivot(grabPivot + AxisUnit(grabAxis) * off); // ...then apply as one step
 				grabAxis = -1;
 			}
 		}
 
-		bool PivotGizmoSubTool::OnEscape(IEditorContext&) {
+		bool PivotGizmoSubTool::OnEscape(IEditorContext& ed) {
 			if (grabAxis < 0)
 				return false;
-			grabAxis = -1; // cancel the drag (no move committed)
+			ed.PreviewPivot(grabPivot); // restore the original pivot, commit nothing
+			grabAxis = -1;
 			return true;
 		}
 
 		void PivotGizmoSubTool::DrawScene(IEditorContext& ed) {
-			Vector3 c = ed.GetPivot();
-			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, grabPivot, grabAxis) : 0.0F;
+			Vector3 c = ed.GetPivot(); // live during a drag (the preview moved the pivot)
 			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
 			for (int a = 0; a < 3; a++) {
 				bool active = (grabAxis == a) || (hover == a);
 				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
 				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
-			}
-			// Preview the candidate pivot (a small cross) while dragging.
-			if (grabAxis >= 0 && curOffset != 0.0F) {
-				Vector3 cand = grabPivot + AxisUnit(grabAxis) * curOffset;
-				Vector4 pc = MakeVector4(0.4F, 1.0F, 0.5F, 0.9F);
-				ed.DrawLine3D(grabPivot, cand, pc);
-				for (int a = 0; a < 3; a++)
-					ed.DrawLine3D(cand - AxisUnit(a) * 0.6F, cand + AxisUnit(a) * 0.6F, pc);
 			}
 		}
 

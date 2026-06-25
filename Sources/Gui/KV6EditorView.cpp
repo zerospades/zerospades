@@ -1326,6 +1326,10 @@ namespace spades {
 
 		void KV6EditorView::UndoApplyOrigin(const Vector3& origin) { ApplyOriginRaw(origin); }
 
+		// Live, non-journaled pivot move for a drag in progress; the tool commits the
+		// net change with one SetPivot on release.
+		void KV6EditorView::PreviewPivot(const Vector3& pivot) { ApplyOriginRaw(pivot * -1.0F); }
+
 		void KV6EditorView::BeginPivotEntry() {
 			Vector3 p = GetPivot();
 			char buf[64];

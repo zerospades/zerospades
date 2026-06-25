@@ -112,6 +112,7 @@ namespace spades {
 			// Pivot (= -origin); moving it keeps the voxels fixed. Undoable.
 			Vector3 GetPivot() const override;
 			void SetPivot(const Vector3& pivot) override;
+			void PreviewPivot(const Vector3& pivot) override;
 			void BeginPivotEntry() override;
 
 			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---

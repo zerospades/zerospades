@@ -156,7 +156,6 @@ namespace spades {
 			int grabAxis = -1;  // 0/1/2 while dragging a handle, else -1
 			Vector2 grabCursor; // cursor at grab start
 			Vector3 grabPivot;  // pivot at grab start (drag is relative to this)
-			float curOffset = 0.0F;
 			int HitAxis(IEditorContext& ed, const Vector3& c) const;
 			// Drag distance along `axis` in voxel units, snapped to 0.1.
 			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;

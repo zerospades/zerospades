@@ -122,6 +122,11 @@ namespace spades {
 					                              asMETHOD(gui::IEditorContext, SetPivot),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("EditorContext",
+					                              "void PreviewPivot(const Vector3&in)",
+					                              asMETHOD(gui::IEditorContext, PreviewPivot),
+					                              asCALL_THISCALL);
+					manager->CheckError(r);
 
 					// --- undo / redo ---
 					r = eng->RegisterObjectMethod("EditorContext",

@@ -116,6 +116,9 @@ namespace spades {
 			// written to the file on save. Float-valued.
 			virtual Vector3 GetPivot() const = 0;
 			virtual void SetPivot(const Vector3& pivot) = 0;
+			// Move the pivot live without recording undo — for a drag in progress.
+			// Commit the result with a single SetPivot on release.
+			virtual void PreviewPivot(const Vector3& pivot) = 0;
 			// Open the modal prompt to type a new pivot (x y z).
 			virtual void BeginPivotEntry() = 0;
 
