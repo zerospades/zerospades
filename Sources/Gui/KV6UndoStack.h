@@ -157,8 +157,13 @@ namespace spades {
 			Group pending;
 			int depth = 0;
 			long geomId = 0, nextGeomId = 0;
+			size_t totalRecords = 0; // deltas held across undo + redo (for the byte cap)
 
 			static const size_t kMaxGroups = 256;
+			// Cap the total deltas too, so one or many big edits can't grow the
+			// history without bound (~240 MB at ~40 bytes/record). The most recent
+			// step is always kept, even if it alone exceeds this.
+			static const size_t kMaxRecords = 6000000;
 		};
 	} // namespace gui
 } // namespace spades

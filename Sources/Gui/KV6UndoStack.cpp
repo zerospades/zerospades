@@ -83,12 +83,20 @@ namespace spades {
 			pending.geomAfter = pending.hasGeometry ? ++nextGeomId : geomId;
 			geomId = pending.geomAfter;
 
+			for (const Group& g : redoGroups)
+				totalRecords -= g.records.size();
 			redoGroups.clear(); // a fresh edit invalidates the redo branch
+
+			totalRecords += pending.records.size();
 			undoGroups.push_back(std::move(pending));
 			pending = Group();
 
-			while (undoGroups.size() > kMaxGroups)
-				undoGroups.pop_front(); // evict the oldest history
+			// Evict the oldest history past either cap, but never the last step.
+			while ((undoGroups.size() > kMaxGroups || totalRecords > kMaxRecords) &&
+			       undoGroups.size() > 1) {
+				totalRecords -= undoGroups.front().records.size();
+				undoGroups.pop_front();
+			}
 		}
 
 		// Replay a group's records forward (redo): frames then their dependent voxels,
@@ -152,6 +160,7 @@ namespace spades {
 			depth = 0;
 			geomId = 0;
 			nextGeomId = 0;
+			totalRecords = 0;
 		}
 
 	} // namespace gui
