@@ -22,6 +22,7 @@
 
 #include "KV6DrawTool.h"
 #include "KV6PaintTool.h"
+#include "KV6PivotTool.h"
 #include "KV6SelectTool.h"
 
 namespace spades {
@@ -33,6 +34,7 @@ namespace spades {
 				seeded = true;
 				// Built-in tools, in toolbar order. Seeding here (rather than via
 				// static initialisers in each tool's TU) keeps the order deterministic.
+				registry.Register([] { return std::unique_ptr<EditorTool>(new PivotTool()); });
 				registry.Register([] { return std::unique_ptr<EditorTool>(new DrawTool()); });
 				registry.Register([] { return std::unique_ptr<EditorTool>(new PaintTool()); });
 				registry.Register([] { return std::unique_ptr<EditorTool>(new SelectTool()); });
