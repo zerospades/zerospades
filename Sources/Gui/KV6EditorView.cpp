@@ -202,6 +202,17 @@ namespace spades {
 					out.push_back(f);
 				}
 			}
+
+			// The navigation cube is fixed geometry, so build the facet set once and
+			// hand back the shared copy (queried every frame for drawing and picking).
+			const std::vector<NaviFacet>& NaviFacets() {
+				static const std::vector<NaviFacet> facets = [] {
+					std::vector<NaviFacet> out;
+					BuildNaviFacets(out);
+					return out;
+				}();
+				return facets;
+			}
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -1554,8 +1565,7 @@ namespace spades {
 		}
 
 		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
-			std::vector<NaviFacet> facets;
-			BuildNaviFacets(facets);
+			const std::vector<NaviFacet>& facets = NaviFacets();
 			for (const NaviFacet& f : facets) {
 				if (-Vector3::Dot(f.dir, camFwd) <= 0.02F)
 					continue; // back-facing
@@ -1570,8 +1580,7 @@ namespace spades {
 
 		void KV6EditorView::DrawNaviCube() {
 			client::IFont& font = fontManager->GetGuiFont();
-			std::vector<NaviFacet> facets;
-			BuildNaviFacets(facets);
+			const std::vector<NaviFacet>& facets = NaviFacets();
 			Vector3 hdir;
 			bool hov = NaviCubeDir(cursor, hdir);
 			// Draw bevels behind the faces: corners, then edges, then faces.
