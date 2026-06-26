@@ -232,16 +232,31 @@ namespace spades {
 		bool KV6ScreenHelper::Save(VoxelModel* model, const std::string& absPath) {
 			if (!model)
 				return false;
-			std::FILE* f = std::fopen(absPath.c_str(), "wb");
+			// Write to a sibling temp file first, then atomically replace the target,
+			// so a failure mid-write can never truncate or corrupt an existing model.
+			std::string tmpPath = absPath + ".savetmp";
+			std::FILE* f = std::fopen(tmpPath.c_str(), "wb");
 			if (!f)
 				return false;
 			try {
-				StdStream stream(f, true);
+				StdStream stream(f, true); // takes ownership; closes/flushes at scope exit
 				model->SaveKV6(stream);
-				return true;
 			} catch (const std::exception&) {
+				std::remove(tmpPath.c_str());
 				return false;
 			}
+			// The StdStream above is destroyed (closing the file) before we replace
+			// the target, so the rename sees a fully written, flushed temp file.
+#ifdef _WIN32
+			if (!MoveFileExA(tmpPath.c_str(), absPath.c_str(),
+			                 MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+#else
+			if (std::rename(tmpPath.c_str(), absPath.c_str()) != 0) {
+#endif
+				std::remove(tmpPath.c_str());
+				return false;
+			}
+			return true;
 		}
 
 	} // namespace gui
