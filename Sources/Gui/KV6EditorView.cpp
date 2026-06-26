@@ -1511,9 +1511,10 @@ namespace spades {
 				float ya = y0 + (y2 - y0) * float(i) / N;
 				float yb = y0 + (y2 - y0) * float(i + 1) / N;
 				float la = xAt(p[0], p[2], ya), lb = xAt(p[0], p[2], yb);
+				// The strip's lower-right corner is implied by DrawImage's affine
+				// parallelogram (top-left, top-right, bottom-left), so only `ra` is
+				// needed here.
 				float ra = (ya < p[1].y) ? xAt(p[0], p[1], ya) : xAt(p[1], p[2], ya);
-				float rb = (yb < p[1].y) ? xAt(p[0], p[1], yb) : xAt(p[1], p[2], yb);
-				(void)rb;
 				renderer->DrawImage((client::IImage*)NULL, MakeVector2(la, ya), MakeVector2(ra, ya),
 				                    MakeVector2(lb, yb), AABB2(0, 0, 1, 1));
 			}
