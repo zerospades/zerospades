@@ -30,7 +30,14 @@
 #include "AutomationOptions.h"
 
 #include <Gui/Utils/Icon.h>
+#ifdef USE_OPENGL
 #include "SDLGLDevice.h"
+#include <Draw/OpenGL/GLRenderer.h>
+#endif
+#ifdef USE_VULKAN
+#include "SDLVulkanDevice.h"
+#include <Draw/Vulkan/VulkanRenderer.h>
+#endif
 #include <Audio/ALDevice.h>
 #include <Audio/NullDevice.h>
 #include <Client/Client.h>
@@ -41,7 +48,6 @@
 #include <Core/IStream.h>
 #include <Core/Math.h>
 #include <Core/Settings.h>
-#include <Draw/OpenGL/GLRenderer.h>
 #include <Draw/SW/SWPort.h>
 #include <Draw/SW/SWRenderer.h>
 #include <ZeroSpades.h>
@@ -52,6 +58,7 @@ DEFINE_SPADES_SETTING(r_fullscreen, "0");
 DEFINE_SPADES_SETTING(r_vsync, "1");
 DEFINE_SPADES_SETTING(r_allowSoftwareRendering, "0");
 DEFINE_SPADES_SETTING(r_renderer, "gl");
+DEFINE_SPADES_SETTING(r_vulkan, "0");
 DEFINE_SPADES_SETTING(s_audioDriver, "openal");
 DEFINE_SPADES_SETTING(cl_fps, "0");
 
@@ -379,12 +386,21 @@ namespace spades {
 		}
 
 		auto SDLRunner::GetRendererType() -> RendererType {
+#ifdef USE_VULKAN
+			if ((bool)r_vulkan)
+				return RendererType::Vulkan;
+#endif
 			if (EqualsIgnoringCase(r_renderer, "gl"))
 				return RendererType::GL;
+			else if (EqualsIgnoringCase(r_renderer, "vulkan"))
+				return RendererType::Vulkan;
 			else if (EqualsIgnoringCase(r_renderer, "sw"))
 				return RendererType::SW;
-			else
-				SPRaise("Unknown renderer name: %s", r_renderer.CString());
+			else {
+				SPLog("Unrecognized renderer '%s', falling back to software renderer.", r_renderer.CString());
+				r_renderer = "sw";
+				return RendererType::SW;
+			}
 		}
 
 		class SDLSWPort : public draw::SWPort, public Disposable {
@@ -475,6 +491,7 @@ namespace spades {
 		std::tuple<Handle<client::IRenderer>, Handle<Disposable>>
 		SDLRunner::CreateRenderer(SDL_Window* wnd, RendererType type) {
 			switch (type) {
+#ifdef USE_OPENGL
 				case RendererType::GL: {
 					auto glDevice = Handle<SDLGLDevice>::New(wnd).Cast<draw::IGLDevice>();
 					auto dummy = Handle<Disposable>::New(); // FIXME
@@ -482,6 +499,16 @@ namespace spades {
 					  Handle<draw::GLRenderer>::New(std::move(glDevice)).Cast<client::IRenderer>(),
 					  std::move(dummy));
 				}
+#endif
+#ifdef USE_VULKAN
+				case RendererType::Vulkan: {
+					auto vulkanDevice = Handle<SDLVulkanDevice>::New(wnd);
+					auto dummy = Handle<Disposable>::New(); // FIXME
+					return std::make_tuple(
+					  Handle<draw::VulkanRenderer>::New(std::move(vulkanDevice)).Cast<client::IRenderer>(),
+					  std::move(dummy));
+				}
+#endif
 				case RendererType::SW: {
 					auto port = Handle<SDLSWPort>::New(wnd).Cast<draw::SWPort>();
 					return std::make_tuple(
@@ -586,6 +613,9 @@ namespace spades {
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 						if (!r_allowSoftwareRendering)
 							SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+						break;
+					case RendererType::Vulkan:
+						sdlFlags = SDL_WINDOW_VULKAN;
 						break;
 					case RendererType::SW: sdlFlags = 0; break;
 				}
