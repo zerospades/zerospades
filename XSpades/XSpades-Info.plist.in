@@ -64,7 +64,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.action-games</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>10.13</string>
+	<string>12.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>

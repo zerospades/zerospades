@@ -1,0 +1,8 @@
+{
+  "name": "molten-vk",
+  "version": "1.4.1",
+  "description": "MoltenVK Vulkan Portability implementation for macOS",
+  "homepage": "https://github.com/KhronosGroup/MoltenVK",
+  "license": "Apache-2.0",
+  "supports": "osx"
+}
