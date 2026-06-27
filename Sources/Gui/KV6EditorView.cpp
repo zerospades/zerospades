@@ -1439,7 +1439,7 @@ namespace spades {
 			FillRect(pkX, pkY, pkW, pkH);
 
 			// Header: "Colour" + close button.
-			client::IFont& hf = fontManager->GetGuiFont();
+			client::IFont& hf = fontManager->GetSmallGuiFont();
 			hf.Draw("Colour", MakeVector2(pkX + 8.0F, pkY + 4.0F), 0.75F,
 			        MakeVector4(0.85F, 0.85F, 0.85F, 1.0F));
 			ColorNP(MakeVector4(0.35F, 0.18F, 0.18F, 1.0F));
@@ -1579,7 +1579,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawNaviCube() {
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			const std::vector<NaviFacet>& facets = NaviFacets();
 			Vector3 hdir;
 			bool hov = NaviCubeDir(cursor, hdir);
@@ -1651,7 +1651,7 @@ namespace spades {
 
 		void KV6EditorView::DrawOverlay(float sw, float sh) {
 			(void)sw;
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			Vector4 grey = MakeVector4(0.75F, 0.75F, 0.75F, 1.0F);
 
 			// Title / filename / camera now live in the ribbon. Here we draw the
@@ -1737,7 +1737,7 @@ namespace spades {
 
 		void KV6EditorView::DrawToolbar(float sw, float sh) {
 			(void)sh;
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			float s = 0.85F;
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 
@@ -1839,7 +1839,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawSubToolbar(float sw) {
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			float s = 0.8F;
 			float bandY = kRibbonH + kToolbarH;
 			float by = bandY + (kSubBarH - kTbH) * 0.5F;
@@ -1916,7 +1916,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawRibbon(float sw) {
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			ColorNP(MakeVector4(0.06F, 0.06F, 0.08F, 1.0F));
 			FillRect(0.0F, 0.0F, sw, kRibbonH);
 
@@ -1953,7 +1953,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawMenu(float sw, float sh) {
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
 			FillRect(0, 0, sw, sh);
 
@@ -1975,7 +1975,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawPrompt(float sw, float sh) {
-			client::IFont& font = fontManager->GetGuiFont();
+			client::IFont& font = fontManager->GetSmallGuiFont();
 			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
 			FillRect(0, 0, sw, sh);
 
