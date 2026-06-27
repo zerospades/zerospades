@@ -376,7 +376,17 @@ namespace spades {
 			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
 
 			Vector3 dir = (at - eye).Normalize();
-			Vector3 side = Vector3::Cross(dir, up).Normalize();
+			// At the navicube Top/Bottom views dir is parallel to the world-up
+			// reference, so Cross(dir, up) collapses to NaN. For every non-vertical
+			// pitch Cross(dir, up).Normalize() equals (-sin(yaw), cos(yaw), 0); use
+			// that heading-derived value at the pole too. It is the continuous limit
+			// of the cross product, so the camera reaches top/bottom smoothly instead
+			// of snapping, and only flips if rotated past the pole.
+			Vector3 side;
+			if (std::fabs(Vector3::Dot(dir, up)) > 0.999F)
+				side = MakeVector3(-sinf(yaw), cosf(yaw), 0.0F);
+			else
+				side = Vector3::Cross(dir, up).Normalize();
 			up = -Vector3::Cross(dir, side);
 
 			sceneDef.viewOrigin = eye;
