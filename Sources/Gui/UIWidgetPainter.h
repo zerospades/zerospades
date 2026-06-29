@@ -31,20 +31,17 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		/**
-		 * The one home of the shared `spades::ui` widget appearance.
+		 * C++ painters for the in-app editor's chrome.
 		 *
-		 * Each function paints a widget exactly as its AngelScript `Render()` used to
-		 * (same primitives, same constants), so both sides stay pixel-identical:
-		 *   - the in-app editor calls these directly (C++-only UI, not moddable);
-		 *   - the script UI forwards to them from `Render()` (see the binding in
-		 *     `ScriptBindings/UIWidgetPainterScript.cpp`), and remains overridable by
-		 *     mods that rewrite the `.as` widget.
+		 * Each function paints a widget to match the AngelScript `spades::ui` look
+		 * (same primitives, same constants), so the editor stays visually consistent
+		 * with the script UI without depending on the script framework.
 		 *
 		 * `pos`/`size` are the widget's screen rectangle; `enabled/hover/pressed/
-		 * toggled` are its state. Edit the look in one place, here.
+		 * toggled` are its state.
 		 */
 		namespace widgets {
-			// `textScale` defaults to 1 (the script widgets' size); the editor passes
+			// `textScale` defaults to 1 (the full widget size); the editor passes
 			// smaller values for its compact bars while keeping the same style.
 			void PaintButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                 const Vector2& size, const std::string& caption,
@@ -64,8 +61,8 @@ namespace spades {
 			void PaintRadioButton(client::IRenderer& r, client::IFont& font, const Vector2& pos,
 			                      const Vector2& size, const std::string& caption, bool enabled,
 			                      bool hover, bool pressed, bool toggled, float textScale = 1.0F);
-			// The text-field box chrome (Field.as). The caret/selection/text are drawn
-			// by the caller (FieldBase in script; its own beam in the editor).
+			// The text-field box chrome. The caret/selection/text are drawn by the
+			// caller (the editor draws its own beam).
 			void PaintField(client::IRenderer& r, const Vector2& pos, const Vector2& size,
 			                bool focused, bool hover);
 		} // namespace widgets
