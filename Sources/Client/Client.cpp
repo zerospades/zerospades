@@ -130,7 +130,6 @@ namespace spades {
 			  fontManager(fontManager),
 			  alertDisappearTime(-10000.0F),
 			  lastLocalCorpse(nullptr),
-			  nextScreenShotIndex(0),
 			  nextMapShotIndex(0),
 			  staffSpectating(false),
 			  spectatorPlayerNames(true) {

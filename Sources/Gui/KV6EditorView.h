@@ -172,6 +172,7 @@ namespace spades {
 			int voxelCount = 0;
 			float globalTime = 0.0F;
 			bool wantsClose = false;
+			bool wantScreenShot = false; // set by the screenshot key, served after FrameDone
 
 			// --- Undo / redo --------------------------------------------------
 			// The stack drives the model back and forth through the Sink interface

@@ -32,6 +32,7 @@
 #include <Client/IFont.h>
 #include <Client/IImage.h>
 #include <Client/IModel.h>
+#include <Client/ScreenShot.h>
 #include <Core/Debug.h>
 #include <Core/Settings.h>
 #include <Core/VoxelModel.h>
@@ -42,6 +43,7 @@ SPADES_SETTING(cg_keyMoveLeft);
 SPADES_SETTING(cg_keyMoveRight);
 SPADES_SETTING(cg_keyJump);
 SPADES_SETTING(cg_keyCrouch);
+SPADES_SETTING(cg_keyScreenshot);
 
 namespace spades {
 	namespace gui {
@@ -2203,6 +2205,8 @@ namespace spades {
 
 			if (down && key == "Tab") { ToggleCameraMode(); return; }
 
+			if (down && KV6CheckKey(cg_keyScreenshot, key)) { wantScreenShot = true; return; }
+
 			std::string fwd = cg_keyMoveForward, bk = cg_keyMoveBackward, lf = cg_keyMoveLeft;
 			std::string rt = cg_keyMoveRight, jp = cg_keyJump, cr = cg_keyCrouch;
 			if (KV6CheckKey(fwd, key)) { keyFwd = down; return; }
@@ -2324,6 +2328,20 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			(void)dt;
 			renderer->FrameDone();
+
+			// Capture the presented frame before Flip, sharing the client's
+			// Screenshots/ numbering and the cg_screenshotFormat setting.
+			if (wantScreenShot) {
+				wantScreenShot = false;
+				try {
+					std::string name = client::SaveScreenShot(*renderer);
+					SetStatus("Screenshot saved: " + name);
+				} catch (const std::exception& ex) {
+					SetStatus("Screenshot failed");
+					SPLog("Editor screenshot failed: %s", ex.what());
+				}
+			}
+
 			renderer->Flip();
 		}
 	} // namespace gui

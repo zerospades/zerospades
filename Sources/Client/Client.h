@@ -468,7 +468,6 @@ namespace spades {
 
 			std::unique_ptr<BloodMarks> bloodMarks;
 
-			int nextScreenShotIndex;
 			int nextMapShotIndex;
 
 			/** Project the specified world-space position to a screen space. */
@@ -555,7 +554,6 @@ namespace spades {
 
 			SceneDefinition CreateSceneDefinition();
 
-			std::string ScreenShotPath();
 			void TakeScreenShot(bool sceneOnly, bool scoreboardOnly = false);
 
 			// Demo helpers (see EnableDemoReplayFollow).
