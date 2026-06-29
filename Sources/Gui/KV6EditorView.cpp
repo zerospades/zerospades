@@ -1406,38 +1406,45 @@ namespace spades {
 		// debug lines, since the editor only has line primitives in 3D).
 		void KV6EditorView::DrawMirrorPlanes() {
 			Vector3 org = model->GetOrigin();
-			float lo = -0.5F;
-			float hiX = float(model->GetWidth()) - 0.5F;
-			float hiY = float(model->GetHeight()) - 0.5F;
-			float hiZ = float(model->GetDepth()) - 0.5F;
+			int w = model->GetWidth(), h = model->GetHeight(), d = model->GetDepth();
+
+			// Grid lines are spaced one tile (2 voxels) apart. Extend one tile past
+			// the model on every side, rounding the far edge up to the tile grid so
+			// the plane is a whole number of tiles and always shows a complete border
+			// (the model spans [-0.5, dim-0.5]; the near edge -2.5 is already aligned).
+			auto stop = [](int n) { return (n % 2 == 0) ? n + 2 : n + 3; };
+			float lo = -2.5F;
+			float hiX = float(stop(w)) - 0.5F;
+			float hiY = float(stop(h)) - 0.5F;
+			float hiZ = float(stop(d)) - 0.5F;
 
 			if (MirrorOn(0)) {
 				float px = -org.x;
 				Vector4 col = MakeVector4(1.0F, 0.35F, 0.35F, 0.25F);
-				for (int i = 0; i <= model->GetHeight(); i += 2)
+				for (int i = -2; i <= stop(h); i += 2)
 					renderer->AddDebugLine(MakeVector3(px, float(i) - 0.5F, lo),
 					                       MakeVector3(px, float(i) - 0.5F, hiZ), col);
-				for (int i = 0; i <= model->GetDepth(); i += 2)
+				for (int i = -2; i <= stop(d); i += 2)
 					renderer->AddDebugLine(MakeVector3(px, lo, float(i) - 0.5F),
 					                       MakeVector3(px, hiY, float(i) - 0.5F), col);
 			}
 			if (MirrorOn(1)) {
 				float py = -org.y;
 				Vector4 col = MakeVector4(0.4F, 1.0F, 0.4F, 0.25F);
-				for (int i = 0; i <= model->GetWidth(); i += 2)
+				for (int i = -2; i <= stop(w); i += 2)
 					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, py, lo),
 					                       MakeVector3(float(i) - 0.5F, py, hiZ), col);
-				for (int i = 0; i <= model->GetDepth(); i += 2)
+				for (int i = -2; i <= stop(d); i += 2)
 					renderer->AddDebugLine(MakeVector3(lo, py, float(i) - 0.5F),
 					                       MakeVector3(hiX, py, float(i) - 0.5F), col);
 			}
 			if (MirrorOn(2)) {
 				float pz = -org.z;
 				Vector4 col = MakeVector4(0.45F, 0.6F, 1.0F, 0.25F);
-				for (int i = 0; i <= model->GetWidth(); i += 2)
+				for (int i = -2; i <= stop(w); i += 2)
 					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, lo, pz),
 					                       MakeVector3(float(i) - 0.5F, hiY, pz), col);
-				for (int i = 0; i <= model->GetHeight(); i += 2)
+				for (int i = -2; i <= stop(h); i += 2)
 					renderer->AddDebugLine(MakeVector3(lo, float(i) - 0.5F, pz),
 					                       MakeVector3(hiX, float(i) - 0.5F, pz), col);
 			}
