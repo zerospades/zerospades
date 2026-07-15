@@ -40,6 +40,12 @@ namespace spades {
 			 * `byteIndex`, starting the scan at byte offset `start`.
 			 */
 			int GetCharIndexForString(const std::string& s, int byteIndex, int start = 0);
+
+			/**
+			 * Length in bytes of the longest common prefix of `a` and `b`, compared
+			 * case-insensitively (ASCII).
+			 */
+			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

@@ -19,20 +19,23 @@
 
  */
 
+#include <algorithm>
+
 #include "ClientUI.h"
 #include "ClientUIHelper.h"
 #include "NetClient.h"
 #include <Client/Client.h>
 #include <Client/Fonts.h>
 #include <Core/Exception.h>
-#include <Core/Settings.h>
-#include <ScriptBindings/Config.h>
-#include <ScriptBindings/ScriptFunction.h>
+#include <Gui/UI/Framework/UIManager.h>
+#include <Gui/UI/InGame/ChatLogWindow.h>
+#include <Gui/UI/InGame/ChatWindow.h>
+#include <Gui/UI/InGame/ClientMenu.h>
 
 namespace spades {
 	namespace client {
 		ClientUI::ClientUI(IRenderer* r, IAudioDevice* a, FontManager* fontManager, Client* client)
-			: renderer(r), audioDevice(a), fontManager(fontManager), client(client) {
+		    : renderer(r), audioDevice(a), fontManager(fontManager), client(client) {
 			SPADES_MARK_FUNCTION();
 			if (!renderer)
 				SPInvalidArgument("renderer");
@@ -41,18 +44,14 @@ namespace spades {
 
 			helper = Handle<ClientUIHelper>::New(this);
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction uiFactory(
-			  "ClientUI@ CreateClientUI(Renderer@, AudioDevice@, FontManager@, ClientUIHelper@)");
-			{
-				ScriptContextHandle ctx = uiFactory.Prepare();
-				ctx->SetArgObject(0, renderer.GetPointerOrNull());
-				ctx->SetArgObject(1, audioDevice.GetPointerOrNull());
-				ctx->SetArgObject(2, fontManager);
-				ctx->SetArgObject(3, &*helper);
-				ctx.ExecuteChecked();
-				ui = reinterpret_cast<asIScriptObject*>(ctx->GetReturnObject());
-			}
+			manager = Handle<gui::ui::UIManager>::New(renderer.GetPointerOrNull(),
+			                                          audioDevice.GetPointerOrNull());
+			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
+
+			// clientMenu is built lazily in EnterClientMenu() so that
+			// helper->IsDemoMode() reflects the demo flag, which isn't set until
+			// after Client::DoInit runs.
+			chatLogWindow = Handle<ChatLogWindow>::New(this);
 		}
 
 		ClientUI::~ClientUI() {
@@ -86,228 +85,80 @@ namespace spades {
 
 		void ClientUI::ClientDestroyed() { client = NULL; }
 
-		void ClientUI::MouseEvent(float x, float y) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void MouseEvent(float, float)");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c->SetArgFloat(0, x);
-			c->SetArgFloat(1, y);
-			c.ExecuteChecked();
+		void ClientUI::SetActiveUI(gui::ui::UIElement* value) {
+			if (activeUI)
+				manager->GetRootElement().RemoveChild(activeUI.GetPointerOrNull());
+			activeUI = value;
+			if (activeUI) {
+				activeUI->SetBounds(manager->GetRootElement().GetBounds());
+				manager->GetRootElement().AddChild(activeUI.GetPointerOrNull());
+			}
+			manager->KeyPanic();
 		}
 
-		void ClientUI::WheelEvent(float x, float y) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void WheelEvent(float, float)");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c->SetArgFloat(0, x);
-			c->SetArgFloat(1, y);
-			c.ExecuteChecked();
-		}
-
-		void ClientUI::KeyEvent(const std::string& key, bool down) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void KeyEvent(string, bool)");
-			ScriptContextHandle c = func.Prepare();
-			std::string k = key;
-			c->SetObject(&*ui);
-			c->SetArgObject(0, reinterpret_cast<void*>(&k));
-			c->SetArgByte(1, down ? 1 : 0);
-			c.ExecuteChecked();
-		}
-
-		void ClientUI::TextInputEvent(const std::string& ch) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void TextInputEvent(string)");
-			ScriptContextHandle c = func.Prepare();
-			std::string k = ch;
-			c->SetObject(&*ui);
-			c->SetArgObject(0, reinterpret_cast<void*>(&k));
-			c.ExecuteChecked();
-		}
-
+		void ClientUI::MouseEvent(float x, float y) { manager->MouseEvent(x, y); }
+		void ClientUI::WheelEvent(float x, float y) { manager->WheelEvent(x, y); }
+		void ClientUI::KeyEvent(const std::string& key, bool down) { manager->KeyEvent(key, down); }
+		void ClientUI::TextInputEvent(const std::string& ch) { manager->TextInputEvent(ch); }
 		void ClientUI::TextEditingEvent(const std::string& ch, int start, int len) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void TextEditingEvent(string,int,int)");
-			ScriptContextHandle c = func.Prepare();
-			std::string k = ch;
-			c->SetObject(&*ui);
-			c->SetArgObject(0, reinterpret_cast<void*>(&k));
-			c->SetArgDWord(1, static_cast<asDWORD>(start));
-			c->SetArgDWord(2, static_cast<asDWORD>(len));
-			c.ExecuteChecked();
+			manager->TextEditingEvent(ch, start, len);
 		}
 
-		bool ClientUI::AcceptsTextInput() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return false;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "bool AcceptsTextInput()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-			return c->GetReturnByte() != 0;
-		}
-
-		AABB2 ClientUI::GetTextInputRect() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return AABB2();
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "AABB2 GetTextInputRect()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-			return *reinterpret_cast<AABB2*>(c->GetReturnObject());
-		}
-
-		bool ClientUI::WantsClientToBeClosed() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return false;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "bool WantsClientToBeClosed()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-			return c->GetReturnByte() != 0;
-		}
-
-		bool ClientUI::NeedsInput() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return false;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "bool NeedsInput()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-			return c->GetReturnByte() != 0;
-		}
+		bool ClientUI::AcceptsTextInput() { return manager->AcceptsTextInput(); }
+		AABB2 ClientUI::GetTextInputRect() { return manager->GetTextInputRect(); }
 
 		void ClientUI::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();
+			if (time < 0.0F)
+				time = 0.0F;
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void RunFrame(float)");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c->SetArgFloat(0, dt);
-			c.ExecuteChecked();
+			manager->RunFrame(dt);
+			if (activeUI)
+				manager->Render();
+
+			time += std::min(dt, 0.05F);
 		}
 
-		void ClientUI::Closing() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
+		void ClientUI::Closing() {}
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void Closing()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-		}
+		bool ClientUI::WantsClientToBeClosed() { return shouldExit; }
+		bool ClientUI::NeedsInput() { return static_cast<bool>(activeUI); }
 
 		void ClientUI::RecordChatLog(const std::string& msg, Vector4 color) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
+			chatLogWindow->Record(msg, color);
+		}
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void RecordChatLog(string, Vector4)");
-			ScriptContextHandle c = func.Prepare();
-			std::string k = msg;
-			c->SetObject(&*ui);
-			c->SetArgObject(0, reinterpret_cast<void*>(&k));
-			c->SetArgObject(1, reinterpret_cast<void*>(&color));
-			c.ExecuteChecked();
+		bool ClientUI::IsChatEnabled() {
+			return !helper->IsDemoMode() && helper->HasLocalPlayer();
 		}
 
 		void ClientUI::EnterClientMenu() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void EnterClientMenu()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-		}
-
-		void ClientUI::EnterGlobalChatWindow() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void EnterGlobalChatWindow()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
+			if (!clientMenu) {
+				clientMenu = Handle<ClientMenu>::New(this);
+				clientMenu->SetBounds(manager->GetRootElement().GetBounds());
+			}
+			SetActiveUI(clientMenu.GetPointerOrNull());
 		}
 
 		void ClientUI::EnterTeamChatWindow() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
+			Handle<ClientChatWindow> wnd = Handle<ClientChatWindow>::New(this, true);
+			SetActiveUI(wnd.GetPointerOrNull());
+			manager->SetActiveElement(wnd->field);
+		}
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void EnterTeamChatWindow()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
+		void ClientUI::EnterGlobalChatWindow() {
+			Handle<ClientChatWindow> wnd = Handle<ClientChatWindow>::New(this, false);
+			SetActiveUI(wnd.GetPointerOrNull());
+			manager->SetActiveElement(wnd->field);
 		}
 
 		void ClientUI::EnterChatLogWindow() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void EnterChatLogWindow()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
+			chatLogWindow->UpdateState(IsChatEnabled());
+			chatLogWindow->ScrollToEnd();
+			SetActiveUI(chatLogWindow.GetPointerOrNull());
 		}
 
-		void ClientUI::CloseUI() {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ClientUI", "void CloseUI()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-		}
+		void ClientUI::CloseUI() { SetActiveUI(nullptr); }
 
 		bool ClientUI::IsIgnored(const std::string& key) {
 			return !ignoreInput.empty() && EqualsIgnoringCase(ignoreInput, key);

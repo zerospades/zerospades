@@ -18,29 +18,17 @@
 
  */
 
-#include <algorithm>
-#include <cctype>
-
 #include "ConsoleCommandField.h"
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Gui/ConsoleHelper.h>
+#include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/DrawUtils.h>
 
 namespace spades {
 	namespace gui {
-		namespace {
-			size_t StringCommonPrefixLength(const std::string& a, const std::string& b) {
-				size_t ln = std::min(a.size(), b.size());
-				for (size_t i = 0; i < ln; i++) {
-					if (std::tolower(static_cast<unsigned char>(a[i])) !=
-					    std::tolower(static_cast<unsigned char>(b[i])))
-						return i;
-				}
-				return ln;
-			}
-		} // namespace
+		using ui::StringCommonPrefixLength;
 
 		// -- ConsoleCommandFieldCandidateView --
 

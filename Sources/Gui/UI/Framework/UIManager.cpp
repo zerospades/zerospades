@@ -167,6 +167,10 @@ namespace spades {
 				if (mb != MouseButton::None) {
 					UIElement* e = GetMouseActiveElement();
 					if (e) {
+						// keep the target alive across dispatch: an activation handler
+						// may detach and release this element mid-call (e.g. a drop-down
+						// list closes itself), which the AngelScript GC used to tolerate
+						Handle<UIElement> keep(e);
 						if (down) {
 							mouseCapturedElement = e;
 							if (e->acceptsFocus)
