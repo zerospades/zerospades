@@ -320,15 +320,16 @@ namespace spades {
 			return html;
 		}
 
-		CScriptArray *MainScreenHelper::GetServerList(std::string sortKey, bool descending) {
+		std::vector<Handle<MainScreenServerItem>>
+		MainScreenHelper::GetServerList(const std::string& sortKey, bool descending) {
 			if (result == NULL) {
-				return NULL;
+				return {};
 			}
 
 			using Item = const Handle<MainScreenServerItem> &;
 			std::vector<Handle<MainScreenServerItem>> &lst = result->list;
 			if (lst.empty())
-				return NULL;
+				return {};
 
 			auto compareFavorite = [&](Item x, Item y) -> stmp::optional<bool> {
 				if (x->IsFavorite() && !y->IsFavorite()) {
@@ -413,14 +414,7 @@ namespace spades {
 				}
 			}
 
-			asIScriptEngine *eng = ScriptManager::GetInstance()->GetEngine();
-			asITypeInfo *t = eng->GetTypeInfoByDecl("array<spades::MainScreenServerItem@>");
-			SPAssert(t != NULL);
-			CScriptArray *arr = CScriptArray::Create(t, static_cast<asUINT>(lst.size()));
-			for (size_t i = 0; i < lst.size(); i++) {
-				arr->SetValue((asUINT)i, &(lst[i]));
-			}
-			return arr;
+			return lst;
 		}
 
 		int MainScreenHelper::GetServerPing(std::string address) {
@@ -461,15 +455,8 @@ namespace spades {
 			return result->message;
 		}
 
-		CScriptArray *MainScreenHelper::GetDemoList() {
-			auto recordings = client::DemoRecorder::ListRecordings();
-			asIScriptEngine *eng = ScriptManager::GetInstance()->GetEngine();
-			asITypeInfo *t = eng->GetTypeInfoByDecl("array<string>");
-			SPAssert(t != NULL);
-			CScriptArray *arr = CScriptArray::Create(t, static_cast<asUINT>(recordings.size()));
-			for (size_t i = 0; i < recordings.size(); i++)
-				arr->SetValue((asUINT)i, &recordings[i]);
-			return arr;
+		std::vector<std::string> MainScreenHelper::GetDemoList() {
+			return client::DemoRecorder::ListRecordings();
 		}
 
 		int64_t MainScreenHelper::GetDemoFileSize(const std::string& filename) {

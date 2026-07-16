@@ -1,20 +1,40 @@
-// public domain.
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ OpenSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ OpenSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#include "CountryFlags.h"
+#include <Client/IImage.h>
+#include <Client/IRenderer.h>
 
 namespace spades {
-
-	class FlagIconRenderer {
-		private Image@ atlas;
-		private Renderer@ renderer;
-		FlagIconRenderer(Renderer@ renderer) {
-			@atlas = renderer.RegisterImage("Gfx/UI/Flags.png");
-			@this.renderer = renderer;
+	namespace gui {
+		FlagIconRenderer::FlagIconRenderer(client::IRenderer* renderer) : renderer(renderer) {
+			atlas = renderer->RegisterImage("Gfx/UI/Flags.png");
 		}
 
-		void DrawIcon(string name, Vector2 pos) {
+		FlagIconRenderer::~FlagIconRenderer() {}
+
+		void FlagIconRenderer::DrawIcon(const std::string& name, Vector2 pos) {
 			int x = -1, y = 1;
 			int code = 0;
-			for (uint i = 0; i < name.length; i++)
-				code += int(name[i]) << (i * 8);
+			for (size_t i = 0; i < name.size(); i++)
+				code += static_cast<int>(static_cast<unsigned char>(name[i])) << (i * 8);
 
 			switch (code) {
 				case 0x4441: x = 0; y = 0; break;
@@ -258,12 +278,12 @@ namespace spades {
 				case 0x415A: x = 14; y = 14; break;
 				case 0x4D5A: x = 15; y = 14; break;
 				case 0x575A: x = 0; y = 15; break;
-			default:
-				x = 17; y = 15;
+				default: x = 17; y = 15;
 			}
 
-			renderer.DrawImage(atlas, AABB2(pos.x - 8.0F, pos.y - 8.0F, 16.0F, 16.0F),
-				AABB2(float(x) * 16.0F, float(y) * 16.0F, 16.0F, 16.0F));
+			renderer->DrawImage(atlas, AABB2(pos.x - 8.0F, pos.y - 8.0F, 16.0F, 16.0F),
+			                    AABB2(static_cast<float>(x) * 16.0F, static_cast<float>(y) * 16.0F,
+			                          16.0F, 16.0F));
 		}
-	}
-}
+	} // namespace gui
+} // namespace spades

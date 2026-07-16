@@ -20,6 +20,5 @@
 
 #include "UIFramework/UIFramework.as"
 #include "MessageBox.as"
-#include "MainScreen/MainScreenUI.as"
 #include "StartupScreen/StartupScreenUI.as"
 #include "Preferences.as"

@@ -25,7 +25,6 @@
 #include <Client/IRenderer.h>
 #include <Core/RefCountedObject.h>
 #include <Core/ServerAddress.h>
-#include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace client {
@@ -33,6 +32,7 @@ namespace spades {
 	}
 	namespace gui {
 		class MainScreenHelper;
+		class MainScreenUI;
 		class MainScreen : public View {
 			friend class MainScreenHelper;
 			Handle<client::IRenderer> renderer;
@@ -42,7 +42,7 @@ namespace spades {
 			float timeToStartInitialization;
 
 			Handle<MainScreenHelper> helper;
-			Handle<asIScriptObject> ui;
+			Handle<MainScreenUI> ui;
 
 			void DrawStartupScreen();
 			void DoInit();

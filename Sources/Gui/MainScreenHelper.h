@@ -26,9 +26,6 @@
 
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
-#include <ScriptBindings/ScriptManager.h>
-
-#include <AngelScript/addons/scriptarray.h>
 
 namespace spades {
 	class ServerItem;
@@ -103,7 +100,8 @@ namespace spades {
 
 			bool PollServerListState();
 			void StartQuery();
-			CScriptArray* GetServerList(std::string sortKey, bool descending);
+			std::vector<Handle<MainScreenServerItem>> GetServerList(const std::string& sortKey,
+			                                                        bool descending);
 			std::string GetServerListQueryMessage();
 			int GetServerPing(std::string address);
 			std::string ConnectServer(std::string hostname, int protocolVersion, std::string mapName = "");
@@ -111,7 +109,7 @@ namespace spades {
 
 			std::string GetCredits();
 
-			CScriptArray* GetDemoList();
+			std::vector<std::string> GetDemoList();
 			std::string PlayDemo(const std::string& filename);
 			int64_t GetDemoFileSize(const std::string& filename);
 			bool DeleteDemo(const std::string& filename);

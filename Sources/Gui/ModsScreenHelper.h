@@ -29,9 +29,6 @@
 
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
-#include <ScriptBindings/ScriptManager.h>
-
-#include <AngelScript/addons/scriptarray.h>
 
 namespace spades {
 	namespace gui {
@@ -63,16 +60,16 @@ namespace spades {
 			int GetRefreshDone();
 			std::string GetRefreshCurrentItem();
 
-			CScriptArray* GetModNames();
+			std::vector<std::string> GetModNames();
 			int GetModPakCount(std::string modName);
 			int64_t GetModTotalSize(std::string modName);
-			CScriptArray* GetModContents(std::string modName);
+			std::vector<std::string> GetModContents(std::string modName);
 
 			// The enabled set: ordered mod names, top applied first, bottom wins
 			// conflicts. Toggling persists immediately; the change takes effect
 			// the next time the game starts (mods are mounted as a startup
 			// overlay — see GetEnabledModPakPaths).
-			CScriptArray* GetEnabledMods();
+			std::vector<std::string> GetEnabledMods();
 			void EnableMod(std::string modName);
 			void DisableMod(std::string modName);
 
