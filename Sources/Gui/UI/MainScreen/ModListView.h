@@ -45,7 +45,6 @@ namespace spades {
 			float orderColWidth;
 			float nameColWidth;
 			float countColWidth;
-			float sizeColWidth;
 
 		public:
 			std::string modName;

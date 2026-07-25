@@ -49,8 +49,9 @@ namespace spades {
 		      orderColWidth(orderColWidth),
 		      nameColWidth(nameColWidth),
 		      countColWidth(countColWidth),
-		      sizeColWidth(sizeColWidth),
-		      modName(modName) {}
+		      modName(modName) {
+			(void)sizeColWidth;
+		}
 
 		void ModListItem::Render() {
 			client::IRenderer& r = GetManager().GetRenderer();

@@ -48,6 +48,13 @@ namespace spades {
 				void Render() override;
 			};
 
+			/** A labelled checkbox (a toggle button drawing a check glyph). */
+			class CheckBox : public Button {
+			public:
+				CheckBox(UIManager* manager) : Button(manager) { toggle = true; }
+				void Render() override;
+			};
+
 			/** A toggle button that is mutually exclusive within a named group. */
 			class RadioButton : public Button {
 			public:

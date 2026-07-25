@@ -110,6 +110,35 @@ namespace spades {
 				                 MakeVector4(0.0F, 0.0F, 0.0F, 0.4F * color.w));
 			}
 
+			void CheckBox::Render() {
+				client::IRenderer& r = GetManager().GetRenderer();
+				Vector2 pos = GetScreenPosition();
+				Vector2 sz = size;
+				Handle<client::IImage> img = r.RegisterImage("Gfx/UI/CheckBox.png");
+
+				if (pressed && hover)
+					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.2F));
+				else if (hover)
+					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.12F));
+				else
+					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.0F));
+				r.DrawImage(nullptr, AABB2(pos.x, pos.y, sz.x, sz.y));
+
+				client::IFont* font = GetFont();
+				if (!font)
+					return;
+
+				Vector2 txtSize = font->Measure(caption);
+				font->DrawShadow(caption,
+				                 pos + (sz - txtSize) * MakeVector2(0.0F, 0.5F) +
+				                     MakeVector2(16.0F, 0.0F),
+				                 1.0F, MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.2F));
+
+				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, toggled ? 0.9F : 0.6F));
+				r.DrawImage(img, AABB2(pos.x, pos.y + (sz.y - 16.0F) * 0.5F, 16.0F, 16.0F),
+				            AABB2(toggled ? 16.0F : 0.0F, 0.0F, 16.0F, 16.0F));
+			}
+
 			void RadioButton::Check() {
 				toggled = true;
 
