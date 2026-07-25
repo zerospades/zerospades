@@ -157,7 +157,10 @@ namespace spades {
 			l.headingNav = nav;
 
 			l.AddHeading(_Tr("Preferences", "World Markers"));
-			l.AddToggleField(_Tr("Preferences", "Damage Indicators"), "cg_damageIndicators");
+			l.AddChoiceField(_Tr("Preferences", "Damage Indicators"), "cg_damageIndicators",
+			                 {_Tr("Preferences", "OFF"), _Tr("Preferences", "ON"),
+			                  _Tr("Preferences", "Grenades")},
+			                 {0, 1, 2});
 			l.AddToggleField(_Tr("Preferences", "Show Hover Player Names"), "cg_playerNames");
 			l.AddToggleField(_Tr("Preferences", "Show Dead Player Names"), "cg_playerNamesDead");
 
@@ -210,6 +213,8 @@ namespace spades {
 			                  _Tr("Preferences", "Side")},
 			                 {0, 1, 2});
 			l.AddToggleField(_Tr("Preferences", "Show Player Names"), "cg_minimapPlayerNames");
+			l.AddToggleField(_Tr("Preferences", "Circular Minimap"), "cg_minimapCircular");
+			l.AddToggleField(_Tr("Preferences", "Rotating Minimap"), "cg_minimapRotating");
 
 			l.AddHeading(_Tr("Preferences", "Target"));
 			l.AddTargetPreview();
