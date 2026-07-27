@@ -213,12 +213,20 @@ namespace spades {
 			void UIElement::KeyPress(const std::string&) {}
 
 			void UIElement::HotKey(const std::string& key) {
-				// a handler may mutate the tree, so iterate over a snapshot
+				// A handler may mutate the tree, so iterate over a snapshot. Dispatch
+				// is modal: if the child that handles the key detaches itself from us
+				// (e.g. a dialog closing on Escape, which also re-enables its owner),
+				// propagation stops there so the same key isn't delivered to a sibling
+				// underneath in the same event. This mirrors the pre-C++ live-list
+				// traversal, whose sibling chain broke at the removed node.
 				std::vector<Handle<UIElement>> snapshot(children);
 				for (auto it = snapshot.rbegin(); it != snapshot.rend(); ++it) {
 					UIElement* e = it->GetPointerOrNull();
-					if (e->visible && e->enable)
+					if (e->visible && e->enable) {
 						e->HotKey(key);
+						if (e->GetParent() != this)
+							break;
+					}
 				}
 			}
 
