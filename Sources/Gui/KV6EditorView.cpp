@@ -1757,7 +1757,8 @@ namespace spades {
 		void KV6EditorView::DrawToolbar(float sw, float sh) {
 			(void)sh;
 			client::IFont& font = fontManager->GetSmallGuiFont();
-			float s = 0.85F;
+			// Match the editor's Esc menu: same font (small GUI) at full scale.
+			float s = 1.0F;
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 
 			// Full-width toolbar band.
