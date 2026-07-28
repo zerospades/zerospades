@@ -38,7 +38,6 @@
 #include "Main.h"
 #include <Core/StdStream.h>
 #include <Core/VoxelModel.h>
-#include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace gui {
@@ -121,15 +120,6 @@ namespace spades {
 #endif
 				return out;
 			}
-
-			CScriptArray* MakeStringArray(const std::vector<std::string>& items) {
-				asIScriptEngine* eng = ScriptManager::GetInstance()->GetEngine();
-				asITypeInfo* t = eng->GetTypeInfoByDecl("array<string>");
-				CScriptArray* arr = CScriptArray::Create(t, static_cast<asUINT>(items.size()));
-				for (size_t i = 0; i < items.size(); i++)
-					arr->SetValue(static_cast<asUINT>(i), const_cast<std::string*>(&items[i]));
-				return arr;
-			}
 		} // namespace
 
 		KV6ScreenHelper::KV6ScreenHelper() {
@@ -140,7 +130,7 @@ namespace spades {
 
 		KV6ScreenHelper::~KV6ScreenHelper() {}
 
-		CScriptArray* KV6ScreenHelper::GetFolders(const std::string& absDir) {
+		std::vector<std::string> KV6ScreenHelper::GetFolders(const std::string& absDir) {
 			std::vector<std::string> out;
 			for (const std::string& name : ListDir(absDir)) {
 				if (IsDirAbs(Join(absDir, name)))
@@ -149,10 +139,10 @@ namespace spades {
 			std::sort(out.begin(), out.end(), [](const std::string& a, const std::string& b) {
 				return ToLower(a) < ToLower(b);
 			});
-			return MakeStringArray(out);
+			return out;
 		}
 
-		CScriptArray* KV6ScreenHelper::GetFiles(const std::string& absDir) {
+		std::vector<std::string> KV6ScreenHelper::GetFiles(const std::string& absDir) {
 			std::vector<std::string> out;
 			for (const std::string& name : ListDir(absDir)) {
 				if (IsModelFile(name) && !IsDirAbs(Join(absDir, name)))
@@ -161,7 +151,7 @@ namespace spades {
 			std::sort(out.begin(), out.end(), [](const std::string& a, const std::string& b) {
 				return ToLower(a) < ToLower(b);
 			});
-			return MakeStringArray(out);
+			return out;
 		}
 
 		bool KV6ScreenHelper::Exists(const std::string& absPath) { return ExistsAbs(absPath); }

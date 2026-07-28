@@ -22,11 +22,9 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <Core/RefCountedObject.h>
-#include <ScriptBindings/ScriptManager.h>
-
-#include <AngelScript/addons/scriptarray.h>
 
 namespace spades {
 	class VoxelModel;
@@ -44,9 +42,9 @@ namespace spades {
 			KV6ScreenHelper();
 
 			// Subfolder names directly under `absDir` (sorted, case-insensitive).
-			CScriptArray* GetFolders(const std::string& absDir);
+			std::vector<std::string> GetFolders(const std::string& absDir);
 			// Model file names (.kv6/.2kv6/.vxl) under `absDir` (sorted).
-			CScriptArray* GetFiles(const std::string& absDir);
+			std::vector<std::string> GetFiles(const std::string& absDir);
 
 			bool Exists(const std::string& absPath);
 			bool IsFolder(const std::string& absPath);
