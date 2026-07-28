@@ -1860,7 +1860,8 @@ namespace spades {
 
 		void KV6EditorView::DrawSubToolbar(float sw) {
 			client::IFont& font = fontManager->GetSmallGuiFont();
-			float s = 0.8F;
+			// Match the editor's Esc menu / main toolbar: small GUI font at full scale.
+			float s = 1.0F;
 			float bandY = kRibbonH + kToolbarH;
 			float by = bandY + (kSubBarH - kTbH) * 0.5F;
 			ColorNP(MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
