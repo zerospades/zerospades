@@ -60,6 +60,10 @@ namespace spades {
 				// recapturing it from the (already-navigated-to) current text.
 				bool historySearchActive = false;
 				std::string historySearchPrefix;
+				// True when the cursor was at the end of the line as the search began.
+				// In that case, if nothing matches the prefix, Up falls back to plain
+				// linear "previous command" browsing instead of doing nothing.
+				bool historySearchFromEnd = false;
 				// Guards `OnChanged` while history navigation itself is updating the
 				// text, so that update isn't mistaken for the user typing (which
 				// would otherwise cancel the in-progress prefix search).

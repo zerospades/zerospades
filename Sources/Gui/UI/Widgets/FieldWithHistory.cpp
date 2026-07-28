@@ -95,6 +95,8 @@ namespace spades {
 					// before the cursor. An empty prefix means "no filter", which
 					// falls back to plain bash-style linear cycling below.
 					historySearchPrefix = GetText().substr(0, GetSelectionStart());
+					historySearchFromEnd = GetSelectionStart() == GetSelectionEnd() &&
+					                       GetSelectionEnd() == static_cast<int>(GetText().size());
 					historySearchActive = true;
 				}
 
@@ -123,7 +125,18 @@ namespace spades {
 							return;
 						}
 					}
-					// No older match: stay put (mirrors zsh's history-search-backward).
+					// No older match. If the search began at the end of the line, drop
+					// the prefix filter and browse to the previous command linearly
+					// (and keep browsing linearly on further Up/Down); otherwise stay
+					// put, mirroring zsh's history-search-backward.
+					if (historySearchFromEnd) {
+						historySearchPrefix.clear();
+						if (currentHistoryIndex > 0) {
+							OverwriteItem();
+							currentHistoryIndex--;
+							LoadHistoryEntry();
+						}
+					}
 				} else {
 					for (size_t i = currentHistoryIndex + 1; i < cmdhistory->size(); i++) {
 						if (MatchesHistorySearch((*cmdhistory)[i].text)) {
