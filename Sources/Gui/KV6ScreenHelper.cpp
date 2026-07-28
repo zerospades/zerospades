@@ -123,9 +123,13 @@ namespace spades {
 		} // namespace
 
 		KV6ScreenHelper::KV6ScreenHelper() {
-			// Home is the user data folder (next to Mods/); the explorer can browse
-			// freely up to the filesystem root from there.
-			defaultDirAbs = std::string(spades::g_userResourceDirectory);
+			// Home is a dedicated `kv6/` folder inside the app-data dir (alongside
+			// Mods/, Demos/, ...), created on demand. The parent already exists (the
+			// game creates it at startup), so a single mkdir is enough. The explorer
+			// can still browse freely up to the filesystem root from there.
+			defaultDirAbs = Join(std::string(spades::g_userResourceDirectory), "kv6");
+			if (!IsDirAbs(defaultDirAbs))
+				MakeDir(defaultDirAbs);
 		}
 
 		KV6ScreenHelper::~KV6ScreenHelper() {}
@@ -192,7 +196,14 @@ namespace spades {
 			return std::rename(absOld.c_str(), absNew.c_str()) == 0;
 		}
 
-		std::string KV6ScreenHelper::DefaultDir() { return defaultDirAbs; }
+		std::string KV6ScreenHelper::DefaultDir() {
+			// Fall back to the app-data root if the kv6/ folder couldn't be created
+			// (e.g. permissions, or the name is taken by a file), so the explorer
+			// always opens somewhere valid.
+			if (IsDirAbs(defaultDirAbs))
+				return defaultDirAbs;
+			return std::string(spades::g_userResourceDirectory);
+		}
 
 		std::string KV6ScreenHelper::ParentDir(const std::string& absPath) {
 			std::string p = absPath;
