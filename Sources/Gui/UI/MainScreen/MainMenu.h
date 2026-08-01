@@ -130,8 +130,9 @@ namespace spades {
 			bool modsDirty = false; // enabled set changed this session; restart to apply
 			float modsCheckColWidth;
 			float modsOrderColWidth;
+			float modsTagColWidth;
 			float modsNameColWidth;
-			float modsCountColWidth;
+			float modsAuthorColWidth;
 			float modsSizeColWidth;
 
 			void OnTabChanged(ui::UIElement& sender);

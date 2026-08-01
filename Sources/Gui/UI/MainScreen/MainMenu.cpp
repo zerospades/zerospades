@@ -39,7 +39,6 @@
 DEFINE_SPADES_SETTING(cg_protocolVersion, "3");
 DEFINE_SPADES_SETTING(cg_lastQuickConnectHost, "127.0.0.1");
 DEFINE_SPADES_SETTING(cg_serverlistSort, "16385");
-SPADES_SETTING(cl_modsIndexUrl);
 
 namespace spades {
 	namespace gui {
@@ -179,8 +178,9 @@ namespace spades {
 
 			modsCheckColWidth = 60.0F;
 			modsOrderColWidth = 90.0F;
-			modsNameColWidth = 320.0F;
-			modsCountColWidth = 80.0F;
+			modsTagColWidth = 56.0F;
+			modsNameColWidth = 200.0F;
+			modsAuthorColWidth = 150.0F;
 			modsSizeColWidth = 100.0F;
 			modsHelper = Handle<ModsScreenHelper>::New();
 
@@ -556,6 +556,13 @@ namespace spades {
 					}
 					{
 						Handle<ModListHeader> header = Handle<ModListHeader>::New(manager);
+						header->SetBounds(AABB2(x, headerPos, modsTagColWidth, headerHeight));
+						header->text = _Tr("MainScreen", "Type");
+						modsPanel->AddChild(header.GetPointerOrNull());
+						x += modsTagColWidth;
+					}
+					{
+						Handle<ModListHeader> header = Handle<ModListHeader>::New(manager);
 						header->SetBounds(AABB2(x, headerPos, modsNameColWidth, headerHeight));
 						header->text = _Tr("MainScreen", "Mod");
 						modsPanel->AddChild(header.GetPointerOrNull());
@@ -563,10 +570,10 @@ namespace spades {
 					}
 					{
 						Handle<ModListHeader> header = Handle<ModListHeader>::New(manager);
-						header->SetBounds(AABB2(x, headerPos, modsCountColWidth, headerHeight));
-						header->text = _Tr("MainScreen", "Paks");
+						header->SetBounds(AABB2(x, headerPos, modsAuthorColWidth, headerHeight));
+						header->text = _Tr("MainScreen", "Author");
 						modsPanel->AddChild(header.GetPointerOrNull());
-						x += modsCountColWidth;
+						x += modsAuthorColWidth;
 					}
 					{
 						Handle<ModListHeader> header = Handle<ModListHeader>::New(manager);
@@ -713,8 +720,8 @@ namespace spades {
 
 			Handle<ModListModel> model = Handle<ModListModel>::New(
 			    &GetManager(), modsHelper.GetPointerOrNull(), std::move(list), std::move(orders),
-			    std::move(exists), modsCheckColWidth, modsOrderColWidth, modsNameColWidth,
-			    modsCountColWidth, modsSizeColWidth);
+			    std::move(exists), modsCheckColWidth, modsOrderColWidth, modsTagColWidth,
+			    modsNameColWidth, modsAuthorColWidth, modsSizeColWidth);
 			modsList->SetModel(model.GetPointerOrNull());
 			model->itemActivated = [this](const std::string& name) { OnModToggle(name); };
 			UpdateModsStatus();
@@ -775,8 +782,7 @@ namespace spades {
 			body +=
 			    _Tr("MainScreen", "These are mods reviewed and hosted by the ZeroSpades team.") +
 			    "\n\n";
-			body += _Tr("MainScreen", "Source: ") +
-			        static_cast<std::string>(cl_modsIndexUrl) + "\n";
+			body += _Tr("MainScreen", "Source: ") + modsHelper->GetIndexUrl() + "\n";
 			body += _Tr("MainScreen", "Files will be saved into your Mods/ folder, overwriting "
 			                          "any existing copies.");
 			Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(
@@ -841,6 +847,15 @@ namespace spades {
 			if (modsHelper->PollRefreshState()) {
 				modsDownloading = false;
 				LoadModList();
+				// A non-empty refresh message means the download failed. The
+				// status label keeps it (sticky), but also raise a loud alert so
+				// a failure can never be mistaken for "nothing happened".
+				std::string err = modsHelper->GetRefreshMessage();
+				if (!err.empty()) {
+					Handle<AlertScreen> al = Handle<AlertScreen>::New(
+					    this, _Tr("MainScreen", "Mod download failed:") + "\n\n" + err);
+					al->Run();
+				}
 				return;
 			}
 			UpdateModsStatus();

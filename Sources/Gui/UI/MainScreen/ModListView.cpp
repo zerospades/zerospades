@@ -20,6 +20,7 @@
 
 #include "ModListView.h"
 #include <Client/IFont.h>
+#include <Client/IImage.h>
 #include <Client/IRenderer.h>
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/UI/Framework/TextUtils.h>
@@ -33,24 +34,73 @@ namespace spades {
 		using ui::UIElement;
 		using ui::UIManager;
 
+		namespace {
+			// Maps an official CATEGORY tag to a weapon icon in the game
+			// resources. Returns "" for categories with no weapon icon (FONT,
+			// SFX, VFX, ...), which are shown as a text pill instead. Matching is
+			// against the uppercase tags used by the official repo.
+			std::string ModCategoryIcon(const std::string& category) {
+				if (category == "SEMI")
+					return "Gfx/Hotbar/Rifle.png";
+				if (category == "SMG")
+					return "Gfx/Hotbar/SMG.png";
+				if (category == "SHOTGUN")
+					return "Gfx/Hotbar/Shotgun.png";
+				if (category == "SPADE")
+					return "Gfx/Hotbar/Spade.png";
+				if (category == "GRENADE")
+					return "Gfx/Hotbar/Grenade.png";
+				return std::string{};
+			}
+		} // namespace
+
 		// -- ModListItem --
 
-		ModListItem::ModListItem(UIManager* manager, const std::string& modName, int pakCount,
-		                         std::int64_t totalSize, bool enabled, bool exists, int orderNum,
-		                         float checkColWidth, float orderColWidth, float nameColWidth,
-		                         float countColWidth, float sizeColWidth)
+		ModListItem::ModListItem(UIManager* manager, const std::string& modName,
+		                         const std::string& category, const std::string& displayName,
+		                         const std::string& author, std::int64_t totalSize, bool enabled,
+		                         bool exists, int orderNum, float checkColWidth, float orderColWidth,
+		                         float tagColWidth, float nameColWidth, float authorColWidth,
+		                         float sizeColWidth)
 		    : ui::ButtonBase(manager),
-		      pakCount(pakCount),
+		      category(category),
+		      displayName(displayName),
+		      author(author),
 		      totalSize(totalSize),
 		      enabled(enabled),
 		      exists(exists),
 		      orderNum(orderNum),
 		      checkColWidth(checkColWidth),
 		      orderColWidth(orderColWidth),
+		      tagColWidth(tagColWidth),
 		      nameColWidth(nameColWidth),
-		      countColWidth(countColWidth),
+		      authorColWidth(authorColWidth),
 		      modName(modName) {
 			(void)sizeColWidth;
+		}
+
+		void ModListItem::RenderTag(client::IRenderer& r, client::IFont* font, float cellX,
+		                            float cellY, float cellH, const Vector4& fgcolor) {
+			if (category.empty())
+				return;
+			std::string iconPath = ModCategoryIcon(category);
+			if (!iconPath.empty()) {
+				Handle<client::IImage> icon = r.RegisterImage(iconPath.c_str());
+				// Fit within the cell height, preserving aspect ratio.
+				float h = cellH - 8.0F;
+				float w = h * (icon->GetWidth() / icon->GetHeight());
+				if (w > tagColWidth - 6.0F) {
+					w = tagColWidth - 6.0F;
+					h = w * (icon->GetHeight() / icon->GetWidth());
+				}
+				float ix = cellX + (tagColWidth - w) * 0.5F;
+				float iy = cellY + (cellH - h) * 0.5F;
+				SetColorNP(r, fgcolor);
+				r.DrawImage(icon, AABB2(ix, iy, w, h));
+			} else if (font) {
+				// Non-weapon category: draw the tag text.
+				font->Draw(category, MakeVector2(cellX + 2.0F, cellY + 2.0F), 1.0F, fgcolor);
+			}
 		}
 
 		void ModListItem::Render() {
@@ -96,12 +146,22 @@ namespace spades {
 				font->Draw(std::to_string(orderNum), MakeVector2(x + 2.0F, pos.y + 2.0F), 1.0F,
 				           fgcolor);
 
-			x = pos.x + checkColWidth + orderColWidth + 2.0F;
-			font->Draw(modName, MakeVector2(x, pos.y + 2.0F), 1.0F, fgcolor);
-			x = pos.x + checkColWidth + orderColWidth + nameColWidth + 2.0F;
-			font->Draw(exists ? std::to_string(pakCount) : "-", MakeVector2(x, pos.y + 2.0F), 1.0F,
-			           fgcolor);
-			x += countColWidth;
+			// Tag column (weapon icon or category pill).
+			x = pos.x + checkColWidth + orderColWidth;
+			RenderTag(r, font, x, pos.y, sz.y, fgcolor);
+
+			// Mod name. For an unstructured name this holds the full filename and
+			// runs into the author column, matching the previous behaviour.
+			x = pos.x + checkColWidth + orderColWidth + tagColWidth + 2.0F;
+			font->Draw(displayName, MakeVector2(x, pos.y + 2.0F), 1.0F, fgcolor);
+
+			// Author.
+			x += nameColWidth;
+			if (!author.empty())
+				font->Draw(author, MakeVector2(x, pos.y + 2.0F), 1.0F, fgcolor);
+
+			// Size.
+			x += authorColWidth;
 			font->Draw(exists ? FormatFileSize(totalSize) : "-", MakeVector2(x, pos.y + 2.0F), 1.0F,
 			           fgcolor);
 		}
@@ -111,8 +171,8 @@ namespace spades {
 		ModListModel::ModListModel(UIManager* manager, ModsScreenHelper* helper,
 		                           std::vector<std::string> list, std::vector<int> orders,
 		                           std::vector<bool> exists, float checkColWidth,
-		                           float orderColWidth, float nameColWidth, float countColWidth,
-		                           float sizeColWidth)
+		                           float orderColWidth, float tagColWidth, float nameColWidth,
+		                           float authorColWidth, float sizeColWidth)
 		    : manager(manager),
 		      helper(helper),
 		      list(std::move(list)),
@@ -120,8 +180,9 @@ namespace spades {
 		      exists(std::move(exists)),
 		      checkColWidth(checkColWidth),
 		      orderColWidth(orderColWidth),
+		      tagColWidth(tagColWidth),
 		      nameColWidth(nameColWidth),
-		      countColWidth(countColWidth),
+		      authorColWidth(authorColWidth),
 		      sizeColWidth(sizeColWidth) {
 			itemElements.resize(this->list.size());
 		}
@@ -136,11 +197,14 @@ namespace spades {
 			if (!itemElements[row]) {
 				const std::string& name = list[row];
 				bool ex = exists[row];
-				int count = ex ? helper->GetModPakCount(name) : 0;
 				std::int64_t size = ex ? helper->GetModTotalSize(name) : 0;
+				std::string category = helper->GetModCategory(name);
+				std::string displayName = helper->GetModDisplayName(name);
+				std::string author = helper->GetModAuthor(name);
 				Handle<ModListItem> item = Handle<ModListItem>::New(
-				    manager, name, count, size, orders[row] > 0, ex, orders[row], checkColWidth,
-				    orderColWidth, nameColWidth, countColWidth, sizeColWidth);
+				    manager, name, category, displayName, author, size, orders[row] > 0, ex,
+				    orders[row], checkColWidth, orderColWidth, tagColWidth, nameColWidth,
+				    authorColWidth, sizeColWidth);
 				item->activated = [this](UIElement& s) { OnItemClicked(s); };
 				itemElements[row] = item;
 			}
