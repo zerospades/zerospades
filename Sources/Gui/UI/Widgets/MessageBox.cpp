@@ -92,6 +92,12 @@ namespace spades {
 		}
 
 		void MessageBoxScreen::Close() {
+			// RemoveChild drops the parent's strong reference — which is the only
+			// one left once Run()'s caller-side handle is gone — so hold the
+			// dialog alive across OnClosed(); otherwise the `closed` callback runs
+			// on a freed object and is silently lost (e.g. the mod download never
+			// starts after pressing OK).
+			Handle<MessageBoxScreen> keepAlive(this);
 			owner->enable = true;
 			GetParent()->RemoveChild(this);
 			OnClosed();
