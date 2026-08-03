@@ -98,8 +98,10 @@ namespace spades {
 				SetColorNP(r, fgcolor);
 				r.DrawImage(icon, AABB2(ix, iy, w, h));
 			} else if (font) {
-				// Non-weapon category: draw the tag text.
-				font->Draw(category, MakeVector2(cellX + 2.0F, cellY + 2.0F), 1.0F, fgcolor);
+				// Non-weapon category: draw the tag text, centered in the cell.
+				float textW = font->Measure(category).x;
+				float tx = cellX + (tagColWidth - textW) * 0.5F;
+				font->Draw(category, MakeVector2(tx, cellY + 2.0F), 1.0F, fgcolor);
 			}
 		}
 
