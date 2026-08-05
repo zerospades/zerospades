@@ -174,6 +174,7 @@ namespace spades {
 			                 [this](UIElement& s) { OnEditHUDClicked(s); }, options.gameActive);
 			l.AddChoiceField(_Tr("Preferences", "HUD Ammo Style"), "cg_hudAmmoStyle",
 			                 {_Tr("Preferences", "NORMAL"), _Tr("Preferences", "SIMPLE")}, {0, 1});
+			l.AddToggleField(_Tr("Preferences", "Show Tool Hotbar"), "cg_hudHotbar");
 			l.AddChoiceField(_Tr("Preferences", "Show Alive Player Count"), "cg_hudPlayerCount",
 			                 {_Tr("Preferences", "OFF"), _Tr("Preferences", "Top"),
 			                  _Tr("Preferences", "Bottom")},
