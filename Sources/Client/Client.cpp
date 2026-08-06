@@ -794,10 +794,7 @@ namespace spades {
 
 		void Client::RunFrameLate(float dt) {
 			SPADES_MARK_FUNCTION();
-
-			// Well done!
-			renderer->FrameDone();
-			renderer->Flip();
+			(void)dt;
 		}
 
 		void Client::EnableDemoReplayFollow(const std::string& playerSpec) {

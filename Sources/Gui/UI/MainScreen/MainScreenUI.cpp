@@ -174,11 +174,7 @@ namespace spades {
 			time += std::min(dt, 0.05F);
 		}
 
-		void MainScreenUI::RunFrameLate(float dt) {
-			(void)dt;
-			renderer->FrameDone();
-			renderer->Flip();
-		}
+		void MainScreenUI::RunFrameLate(float dt) { (void)dt; }
 
 		void MainScreenUI::Closing() { shouldExit = true; }
 

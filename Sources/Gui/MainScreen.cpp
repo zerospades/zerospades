@@ -180,9 +180,6 @@ namespace spades {
 			pos = MakeVector2(sw - 16.0F, sh - 16.0F);
 			pos -= size;
 			font.DrawShadow(str, pos, 1.0F, MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.5));
-
-			renderer->FrameDone();
-			renderer->Flip();
 		}
 
 		void MainScreen::RunFrame(float dt) {
