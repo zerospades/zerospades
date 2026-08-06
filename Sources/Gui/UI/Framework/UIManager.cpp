@@ -282,16 +282,6 @@ namespace spades {
 					activeElement = nullptr;
 				}
 
-				if (clipboardEventHandler && SDL_HasClipboardText()) {
-					char* txt = SDL_GetClipboardText();
-					std::string data = txt ? txt : "";
-					if (txt)
-						SDL_free(txt);
-					PasteClipboardEventHandler handler = std::move(clipboardEventHandler);
-					clipboardEventHandler = nullptr;
-					handler(data);
-				}
-
 				// a timer may add or remove timers while ticking, so iterate a snapshot
 				std::vector<Handle<Timer>> snapshot(timers);
 				for (auto it = snapshot.rbegin(); it != snapshot.rend(); ++it)
@@ -313,8 +303,13 @@ namespace spades {
 
 			void UIManager::Copy(const std::string& text) { SDL_SetClipboardText(text.c_str()); }
 
-			void UIManager::Paste(PasteClipboardEventHandler handler) {
-				clipboardEventHandler = std::move(handler);
+			std::string UIManager::Paste() {
+				char* txt = SDL_GetClipboardText();
+				if (!txt)
+					return std::string();
+				std::string data = txt;
+				SDL_free(txt);
+				return data;
 			}
 		} // namespace ui
 	} // namespace gui

@@ -57,8 +57,6 @@ namespace spades {
 				KeyRepeatManager keyRepeater;
 				KeyRepeatManager charRepeater;
 
-				PasteClipboardEventHandler clipboardEventHandler;
-
 				MouseButton TranslateMouseButton(const std::string& key);
 				UIElement* GetMouseActiveElement();
 				Cursor* GetCurrentCursor();
@@ -121,7 +119,8 @@ namespace spades {
 				void Render();
 
 				void Copy(const std::string& text);
-				void Paste(PasteClipboardEventHandler handler);
+				/** Returns the clipboard's text, or an empty string if it holds none. */
+				std::string Paste();
 			};
 		} // namespace ui
 	} // namespace gui

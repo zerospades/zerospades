@@ -41,9 +41,6 @@ namespace spades {
 			/** Handler invoked for an event raised by a UI element. */
 			using EventHandler = std::function<void(UIElement&)>;
 
-			/** Handler invoked with pasted clipboard text. */
-			using PasteClipboardEventHandler = std::function<void(const std::string&)>;
-
 			/** Handler invoked when a repeated key/character fires. */
 			using KeyRepeatEventHandler = std::function<void(const std::string&)>;
 
