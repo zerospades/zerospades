@@ -215,6 +215,12 @@ namespace spades {
 
 			helper->Update();
 
+			// `DoInit` either sets `ui` or throws, so this should not fire. Guard it
+			// anyway, mirroring `RunFrameLate`, so that an init path which ever leaves
+			// `ui` unset stops here instead of dereferencing null.
+			if (!ui)
+				return;
+
 			ui->RunFrame(dt);
 		}
 
@@ -247,12 +253,21 @@ namespace spades {
 
 		void MainScreen::DoInit() {
 			SPADES_MARK_FUNCTION();
-			renderer->Init();
+			try {
+				renderer->Init();
 
-			ui = Handle<MainScreenUI>::New(renderer.GetPointerOrNull(),
-			                               audioDevice.GetPointerOrNull(),
-			                               fontManager.GetPointerOrNull(),
-			                               helper.GetPointerOrNull());
+				ui = Handle<MainScreenUI>::New(renderer.GetPointerOrNull(),
+				                               audioDevice.GetPointerOrNull(),
+				                               fontManager.GetPointerOrNull(),
+				                               helper.GetPointerOrNull());
+			} catch (const std::exception& ex) {
+				// Let the failure reach the top-level handler, but name the phase in
+				// SystemMessages.log first: a failure here leaves the startup screen as
+				// the last presented frame, which is otherwise hard to tell apart from
+				// a hang.
+				SPLog("[!] Failed to initialize the main screen UI: %s", ex.what());
+				throw;
+			}
 		}
 
 		void MainScreen::Closing() {
