@@ -221,13 +221,15 @@ namespace spades {
 					ot += dt;
 					if ((int32_t)dt > 0) {
 						view->RunFrame((float)dt / 1000.0F);
-						view->RunFrameLate((float)dt / 1000.0F);
 
-						// Views draw; the runner is the only thing that presents. A view
-						// that draws nothing therefore produces an empty frame instead of
-						// leaving the previously presented one on screen.
+						// Views draw; the runner is the only thing that presents. Present
+						// before `RunFrameLate`, which is where post-frame work happens
+						// (closing a subview, restoring renderer state) — that work must
+						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
 						renderer->Flip();
+
+						view->RunFrameLate((float)dt / 1000.0F);
 					}
 
 					if (view->WantsToBeClosed()) {
