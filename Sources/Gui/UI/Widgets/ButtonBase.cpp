@@ -33,6 +33,15 @@ namespace spades {
 				};
 			}
 
+			ButtonBase::~ButtonBase() {
+				// `UIManager` holds a strong reference to a running timer, and the tick
+				// above captures `this`. Without this stop, a button destroyed while
+				// repeating (mouse-up lost to an alt-tab, or the screen torn down) keeps
+				// ticking into freed memory.
+				if (repeatTimer)
+					repeatTimer->Stop();
+			}
+
 			void ButtonBase::PlayMouseEnterSound() {
 				GetManager().PlaySound("Sounds/Feedback/Limbo/Hover.opus");
 			}

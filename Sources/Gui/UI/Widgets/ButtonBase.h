@@ -40,6 +40,9 @@ namespace spades {
 				float lastActivate = -1.0F;
 				Vector2 lastActivatePosition;
 
+			protected:
+				~ButtonBase();
+
 			public:
 				bool pressed = false;
 				bool hover = false;
