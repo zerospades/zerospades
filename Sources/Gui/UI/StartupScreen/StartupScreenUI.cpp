@@ -103,8 +103,6 @@ namespace spades {
 			manager->Render();
 		}
 
-		void StartupScreenUI::RunFrameLate(float dt) { (void)dt; }
-
 		void StartupScreenUI::Closing() { shouldExit = true; }
 		bool StartupScreenUI::WantsToBeClosed() { return shouldExit; }
 	} // namespace gui

@@ -591,7 +591,6 @@ namespace spades {
 			void EnableDemoReplayFollow(const std::string& playerSpec);
 
 			void RunFrame(float dt) override;
-			void RunFrameLate(float dt) override;
 
 			void Closing() override;
 			void MouseEvent(float x, float y) override;

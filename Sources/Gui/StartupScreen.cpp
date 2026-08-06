@@ -133,13 +133,6 @@ namespace spades {
 			ui->RunFrame(dt);
 		}
 
-		void StartupScreen::RunFrameLate(float dt) {
-			SPADES_MARK_FUNCTION();
-			if (!ui)
-				return;
-			ui->RunFrameLate(dt);
-		}
-
 		void StartupScreen::DoInit() {
 			SPADES_MARK_FUNCTION();
 			renderer->Init();

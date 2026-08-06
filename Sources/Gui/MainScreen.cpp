@@ -213,39 +213,36 @@ namespace spades {
 			helper->Update();
 
 			// `DoInit` either sets `ui` or throws, so this should not fire. Guard it
-			// anyway, mirroring `RunFrameLate`, so that an init path which ever leaves
-			// `ui` unset stops here instead of dereferencing null.
+			// anyway, so that an init path which ever leaves `ui` unset stops here
+			// instead of dereferencing null.
 			if (!ui)
 				return;
 
 			ui->RunFrame(dt);
 		}
 
+		// Runs after the runner has presented the frame: this is where the game client
+		// is torn down, so the renderer state it leaves behind is never swapped in.
 		void MainScreen::RunFrameLate(float dt) {
 			SPADES_MARK_FUNCTION();
-			if (subview) {
-				try {
-					subview->RunFrameLate(dt);
-					if (subview->WantsToBeClosed()) {
-						subview->Closing();
-						subview = NULL;
-						RestoreRenderer();
-					} else {
-						return;
-					}
-				} catch (const std::exception& ex) {
-					SPLog("[!] Error while running a game client: %s", ex.what());
-					subview->Closing();
-					subview = NULL;
-					RestoreRenderer();
-					helper->errorMessage = ex.what();
-				}
-			}
-
-			if (!ui)
+			if (!subview)
 				return;
 
-			ui->RunFrameLate(dt);
+			try {
+				subview->RunFrameLate(dt);
+				if (!subview->WantsToBeClosed())
+					return;
+
+				subview->Closing();
+				subview = NULL;
+				RestoreRenderer();
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error while running a game client: %s", ex.what());
+				subview->Closing();
+				subview = NULL;
+				RestoreRenderer();
+				helper->errorMessage = ex.what();
+			}
 		}
 
 		void MainScreen::DoInit() {

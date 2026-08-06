@@ -77,7 +77,6 @@ namespace spades {
 			AABB2 GetTextInputRect();
 
 			void RunFrame(float dt);
-			void RunFrameLate(float dt);
 
 			void Closing();
 			bool WantsToBeClosed();
