@@ -76,6 +76,15 @@ namespace spades {
 			void HotKey(const std::string& key) override;
 		};
 
+		/**
+		 * The part of the main menu that survives a rebuild. Everything else either
+		 * lives in config (the quick-connect address, the protocol choice) or in the
+		 * helper (the server list), and comes back on its own.
+		 */
+		struct MainScreenMainMenuState {
+			int activeTabIndex = 0;
+		};
+
 		/** The main menu: server browser, demo browser, mod manager, footer. */
 		class MainScreenMainMenu : public ui::UIElement {
 			MainScreenUI* ui;         // weak
@@ -99,6 +108,8 @@ namespace spades {
 			Handle<ServerListModel> currentServerListModel;
 			int serverListUpdateTimer = 5;
 			std::string selectedMapName;
+
+			TabPanel* serverPanel;
 
 			// Demo tab state
 			TabPanel* demoPanel;
@@ -177,6 +188,9 @@ namespace spades {
 			void LoadServerList();
 			void LoadDemoList();
 			void LoadModList();
+
+			MainScreenMainMenuState GetState();
+			void SetState(const MainScreenMainMenuState& state);
 
 			void HotKey(const std::string& key) override;
 			void Render() override;

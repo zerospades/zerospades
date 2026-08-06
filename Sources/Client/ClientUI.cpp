@@ -48,6 +48,10 @@ namespace spades {
 			                                          audioDevice.GetPointerOrNull());
 			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
 
+			// These screens bake the screen extent into their layout, so a resize has
+			// to rebuild them rather than just resize the root.
+			manager->screenSizeChanged = [this] { ReloadScreens(); };
+
 			// clientMenu is built lazily in EnterClientMenu() so that
 			// helper->IsDemoMode() reflects the demo flag, which isn't set until
 			// after Client::DoInit runs.
@@ -125,7 +129,24 @@ namespace spades {
 		bool ClientUI::NeedsInput() { return static_cast<bool>(activeUI); }
 
 		void ClientUI::RecordChatLog(const std::string& msg, Vector4 color) {
+			chatLogRecords.emplace_back(msg, color);
 			chatLogWindow->Record(msg, color);
+		}
+
+		void ClientUI::ReloadScreens() {
+			// A chat composer is open only while the player is typing; closing it is
+			// better than leaving a misplaced one, and the partial message is not worth
+			// carrying across a resize.
+			CloseUI();
+
+			// Rebuild through the constructors so the new layout is exactly what
+			// entering the game at this extent would have produced. The menu is pure
+			// chrome and comes back on next open; the log has to be replayed, since it
+			// lives nowhere but in the window we just dropped.
+			clientMenu = nullptr;
+			chatLogWindow = Handle<ChatLogWindow>::New(this);
+			for (const auto& record : chatLogRecords)
+				chatLogWindow->Record(record.first, record.second);
 		}
 
 		bool ClientUI::IsChatEnabled() {

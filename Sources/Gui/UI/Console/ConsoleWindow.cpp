@@ -33,7 +33,8 @@ DEFINE_SPADES_SETTING(cl_consoleScrollbackLines, "1000");
 
 namespace spades {
 	namespace gui {
-		ConsoleWindow::ConsoleWindow(ConsoleHelper* helper, ui::UIManager* manager)
+		ConsoleWindow::ConsoleWindow(ConsoleHelper* helper, ui::UIManager* manager,
+		                             std::vector<ui::CommandHistoryItem>* history)
 		    : ui::UIElement(manager), helper(helper) {
 			float sw = GetManager().screenWidth;
 			float sh = GetManager().screenHeight;
@@ -56,7 +57,7 @@ namespace spades {
 
 			{
 				Handle<ConsoleCommandField> f =
-				    Handle<ConsoleCommandField>::New(manager, &history, helper);
+				    Handle<ConsoleCommandField>::New(manager, history, helper);
 				field = f.GetPointerOrNull();
 				field->SetBounds(AABB2(10.0F, (height - 30.0F) - 8.0F, sw - 20.0F, 30.0F));
 				field->placeholder = _Tr("Console", "Command");

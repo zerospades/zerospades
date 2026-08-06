@@ -211,7 +211,7 @@ namespace spades {
 			// --- Tab strip (always visible) ---
 			{
 				Handle<TabPanel> serverPanelH = Handle<TabPanel>::New(manager);
-				TabPanel* serverPanel = serverPanelH.GetPointerOrNull();
+				serverPanel = serverPanelH.GetPointerOrNull();
 				serverPanel->SetBounds(AABB2(0.0F, 0.0F, sw, sh));
 
 				Handle<TabPanel> demoPanelH = Handle<TabPanel>::New(manager);
@@ -682,6 +682,25 @@ namespace spades {
 				LoadDemoList();
 			if (modsPanel->visible)
 				LoadModList();
+		}
+
+		MainScreenMainMenuState MainScreenMainMenu::GetState() {
+			MainScreenMainMenuState state;
+			if (demoPanel->visible)
+				state.activeTabIndex = 1;
+			else if (modsPanel->visible)
+				state.activeTabIndex = 2;
+			return state;
+		}
+
+		void MainScreenMainMenu::SetState(const MainScreenMainMenuState& state) {
+			serverPanel->visible = state.activeTabIndex == 0;
+			demoPanel->visible = state.activeTabIndex == 1;
+			modsPanel->visible = state.activeTabIndex == 2;
+
+			// A restored tab is populated by the same path a clicked one is: the
+			// constructor only fills the server list.
+			OnTabChanged(*this);
 		}
 
 		void MainScreenMainMenu::LoadModList() {

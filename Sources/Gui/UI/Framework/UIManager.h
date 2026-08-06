@@ -83,6 +83,18 @@ namespace spades {
 				float screenWidth = 0.0F;
 				float screenHeight = 0.0F;
 
+				/**
+				 * Raised from `RunFrame` when the renderer's screen extent changed.
+				 *
+				 * Screens read `screenWidth`/`screenHeight` while they are being built
+				 * and bake the result into absolute child bounds, so a changed extent
+				 * cannot be honoured by resizing the root alone — the owning UI has to
+				 * rebuild the affected screens, or re-run their layout. Nothing else in
+				 * the frame runs before this handler, so it is safe for it to detach and
+				 * replace elements.
+				 */
+				ScreenSizeChangedEventHandler screenSizeChanged;
+
 				UIManager(client::IRenderer* renderer, client::IAudioDevice* audioDevice);
 
 				client::IRenderer& GetRenderer() const { return *renderer; }

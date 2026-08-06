@@ -46,6 +46,9 @@ namespace spades {
 
 			/** Handler invoked when a timer ticks. */
 			using TimerTickEventHandler = std::function<void(Timer&)>;
+
+			/** Handler invoked when the screen extent the UI was laid out for changed. */
+			using ScreenSizeChangedEventHandler = std::function<void()>;
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

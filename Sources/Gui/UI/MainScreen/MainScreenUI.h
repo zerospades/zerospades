@@ -56,6 +56,11 @@ namespace spades {
 			client::SceneDefinition SetupCamera(client::SceneDefinition sceneDef, Vector3 eye,
 			                                    Vector3 at, Vector3 up, float fov, float ratio);
 
+			void Init();
+
+			/** Rebuilds the menu while preserving state (e.g. a screen resize). */
+			void Reload();
+
 		protected:
 			~MainScreenUI();
 

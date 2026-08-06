@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <utility>
 #include <vector>
 
 #include <Client/IAudioDevice.h>
@@ -54,6 +55,10 @@ namespace spades {
 			Handle<ChatLogWindow> chatLogWindow;
 			Handle<ClientMenu> clientMenu;
 
+			// The chat log only exists inside `chatLogWindow`, which a screen resize
+			// has to rebuild. Kept here so the rebuilt window can be replayed into.
+			std::vector<std::pair<std::string, Vector4>> chatLogRecords;
+
 			std::vector<gui::ui::CommandHistoryItem> chatHistory;
 
 			bool shouldExit = false;
@@ -64,6 +69,9 @@ namespace spades {
 			std::string ignoreInput;
 
 			void SendChat(const std::string&, bool isGlobal);
+
+			/** Rebuilds the in-game screens after the screen extent changed. */
+			void ReloadScreens();
 
 			void AlertNotice(const std::string&);
 			void AlertWarning(const std::string&);

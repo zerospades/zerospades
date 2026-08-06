@@ -36,15 +36,17 @@ namespace spades {
 
 		/** The system console window: a scrollback view plus a command field. */
 		class ConsoleWindow : public ui::UIElement {
-			ConsoleHelper* helper; // weak
-			// Owned here; shared with the command field, which keeps a weak pointer.
-			// Declared before `field` so it outlives it.
-			std::vector<ui::CommandHistoryItem> history;
+			ConsoleHelper* helper;      // weak
 			ConsoleCommandField* field; // weak; owned as a child
 			ui::TextViewer* viewer;     // weak; owned as a child
 
 		public:
-			ConsoleWindow(ConsoleHelper* helper, ui::UIManager* manager);
+			/**
+			 * `history` is owned by `ConsoleUI` rather than by this window, so that it
+			 * survives the rebuild a screen resize forces. It must outlive the window.
+			 */
+			ConsoleWindow(ConsoleHelper* helper, ui::UIManager* manager,
+			              std::vector<ui::CommandHistoryItem>* history);
 
 			void FocusField();
 			void AddLine(const std::string& line);

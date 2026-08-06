@@ -53,9 +53,11 @@ namespace spades {
 			manager = Handle<ui::UIManager>::New(renderer, audioDevice);
 			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
 
-			mainMenu = Handle<MainScreenMainMenu>::New(this);
-			mainMenu->SetBounds(manager->GetRootElement().GetBounds());
-			manager->GetRootElement().AddChild(mainMenu.GetPointerOrNull());
+			// The menu bakes the screen extent into its layout, so a resize has to
+			// rebuild it rather than just resize the root.
+			manager->screenSizeChanged = [this] { Reload(); };
+
+			Init();
 
 			// Let the new player choose their IGN
 			std::string nameStr = cg_playerName;
@@ -74,6 +76,29 @@ namespace spades {
 		}
 
 		MainScreenUI::~MainScreenUI() {}
+
+		void MainScreenUI::Init() {
+			mainMenu = Handle<MainScreenMainMenu>::New(this);
+			mainMenu->SetBounds(manager->GetRootElement().GetBounds());
+			manager->GetRootElement().AddChild(mainMenu.GetPointerOrNull());
+		}
+
+		void MainScreenUI::Reload() {
+			// Detach every top-level element, not just the menu: modals attach
+			// themselves next to their owner (`owner->GetParent()->AddChild`), so a
+			// message box, the settings view or the profile prompt is a sibling of the
+			// menu. Leaving one behind would orphan it over a menu it can no longer
+			// re-enable. A dialog open across a resize is dismissed instead.
+			ui::UIElement& root = manager->GetRootElement();
+			while (!root.GetChildren().empty())
+				root.RemoveChild(root.GetChildren()[0].GetPointerOrNull());
+
+			// Rebuild through the constructor so the new layout is exactly what a fresh
+			// launch at this extent would have produced, then restore what survives.
+			MainScreenMainMenuState state = mainMenu->GetState();
+			Init();
+			mainMenu->SetState(state);
+		}
 
 		void MainScreenUI::SetupRenderer() {
 			// load map

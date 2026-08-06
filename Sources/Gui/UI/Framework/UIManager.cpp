@@ -284,11 +284,10 @@ namespace spades {
 			}
 
 			void UIManager::RunFrame(float dt) {
-				// The window can be resized after this manager was built (fullscreen and
-				// DPI transitions do not all complete synchronously), so track the
-				// renderer rather than trusting the extent captured at construction.
-				// Screens that computed absolute positions when they were built keep
-				// them, but hit testing and cursor clamping stay correct.
+				// The window can be resized after this manager was built (alt+enter
+				// toggles fullscreen, and DPI transitions do not all complete
+				// synchronously), so track the renderer rather than trusting the extent
+				// captured at construction.
 				float sw = renderer->ScreenWidth();
 				float sh = renderer->ScreenHeight();
 				if (sw != screenWidth || sh != screenHeight) {
@@ -297,6 +296,16 @@ namespace spades {
 					screenWidth = sw;
 					screenHeight = sh;
 					rootElement->size = MakeVector2(screenWidth, screenHeight);
+
+					// The cursor was clamped to the old extent, so a shrink leaves it
+					// parked outside the new one until the next mouse event.
+					mouseCursorPosition.x = Clamp(mouseCursorPosition.x, 0.0F, screenWidth);
+					mouseCursorPosition.y = Clamp(mouseCursorPosition.y, 0.0F, screenHeight);
+
+					// Raised before anything else in the frame touches the tree, because
+					// the handler typically detaches and rebuilds the screens.
+					if (screenSizeChanged)
+						screenSizeChanged();
 				}
 
 				if (activeElement &&

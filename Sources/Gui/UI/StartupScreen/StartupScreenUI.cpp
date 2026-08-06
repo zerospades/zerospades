@@ -42,6 +42,11 @@ namespace spades {
 
 			manager = Handle<ui::UIManager>::New(renderer, audioDevice);
 			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
+
+			// The menu bakes the screen extent into its layout, so a resize needs the
+			// same rebuild a language change does.
+			manager->screenSizeChanged = [this] { Reload(); };
+
 			Init();
 		}
 
@@ -54,9 +59,12 @@ namespace spades {
 		}
 
 		void StartupScreenUI::Reload() {
-			// Delete StartupScreenMainMenu
+			// Detach every top-level element, not just the menu: modals attach
+			// themselves next to their owner (`owner->GetParent()->AddChild`), so a
+			// message box is a sibling of the menu rather than a child. Leaving one
+			// behind would orphan it over a menu it can no longer re-enable.
 			ui::UIElement& root = manager->GetRootElement();
-			if (!root.GetChildren().empty())
+			while (!root.GetChildren().empty())
 				root.RemoveChild(root.GetChildren()[0].GetPointerOrNull());
 
 			// Reload entire the startup screen while
