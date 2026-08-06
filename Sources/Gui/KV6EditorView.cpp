@@ -2331,17 +2331,14 @@ namespace spades {
 				DrawPrompt(sw, sh);
 
 			DrawCursor();
-		}
 
-		void KV6EditorView::RunFrameLate(float dt) {
-			SPADES_MARK_FUNCTION();
-			(void)dt;
-			renderer->FrameDone();
-
-			// Capture the presented frame before Flip, sharing the client's
-			// Screenshots/ numbering and the cg_screenshotFormat setting.
+			// The runner is the only thing that presents, so the capture happens here
+			// rather than after the frame: `FrameDone` flushes everything drawn above so
+			// the read-back is a complete image. Same shape as `Client::TakeScreenShot`.
+			// Shares the client's Screenshots/ numbering and cg_screenshotFormat.
 			if (wantScreenShot) {
 				wantScreenShot = false;
+				renderer->FrameDone();
 				try {
 					std::string name = client::SaveScreenShot(*renderer);
 					SetStatus("Screenshot saved: " + name);
@@ -2350,8 +2347,6 @@ namespace spades {
 					SPLog("Editor screenshot failed: %s", ex.what());
 				}
 			}
-
-			renderer->Flip();
 		}
 	} // namespace gui
 } // namespace spades

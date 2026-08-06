@@ -70,7 +70,6 @@ namespace spades {
 			bool NeedsAbsoluteMouseCoordinate() override { return false; }
 
 			void RunFrame(float dt) override;
-			void RunFrameLate(float dt) override;
 			void Closing() override {}
 			bool WantsToBeClosed() override { return wantsClose; }
 
@@ -172,7 +171,7 @@ namespace spades {
 			int voxelCount = 0;
 			float globalTime = 0.0F;
 			bool wantsClose = false;
-			bool wantScreenShot = false; // set by the screenshot key, served after FrameDone
+			bool wantScreenShot = false; // set by the screenshot key, served at end of frame
 
 			// --- Undo / redo --------------------------------------------------
 			// The stack drives the model back and forth through the Sink interface
