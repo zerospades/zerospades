@@ -54,9 +54,18 @@ namespace spades {
 			}
 
 			void Timer::RunFrame(float dt) {
+				// `UIManager` ticks a snapshot of its timer list, so this can be reached
+				// after another timer's handler stopped us — including by destroying the
+				// object whose `this` our `tick` captured. Never fire once stopped.
+				if (!running)
+					return;
+
 				nextDelay -= dt;
 				if (nextDelay < 0.0F) {
 					OnTick();
+					if (!running) // the handler stopped us
+						return;
+
 					if (autoReset)
 						nextDelay = std::max(nextDelay + interval, 0.0F);
 					else
@@ -66,10 +75,20 @@ namespace spades {
 
 			void Timer::Start() {
 				nextDelay = interval;
+				if (running)
+					return; // already registered; the countdown above is the restart
+
+				running = true;
 				manager->AddTimer(this);
 			}
 
-			void Timer::Stop() { manager->RemoveTimer(this); }
+			void Timer::Stop() {
+				if (!running)
+					return;
+
+				running = false;
+				manager->RemoveTimer(this);
+			}
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

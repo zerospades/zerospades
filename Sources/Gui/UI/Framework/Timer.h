@@ -49,6 +49,7 @@ namespace spades {
 			class Timer : public RefCountedObject {
 				UIManager* manager; // weak; the manager outlives its timers
 				float nextDelay = 0.0F;
+				bool running = false;
 
 			protected:
 				~Timer();
@@ -64,12 +65,17 @@ namespace spades {
 
 				UIManager& GetManager() const { return *manager; }
 
+				bool IsRunning() const { return running; }
+
 				void OnTick();
 
 				/** Called by `UIManager`. */
 				void RunFrame(float dt);
 
+				/** Registers with the manager and restarts the countdown. */
 				void Start();
+
+				/** Unregisters from the manager. Safe to call from a tick handler. */
 				void Stop();
 			};
 		} // namespace ui
