@@ -34,10 +34,10 @@ namespace spades {
 			}
 
 			ButtonBase::~ButtonBase() {
-				// `UIManager` holds a strong reference to a running timer, and the tick
-				// above captures `this`. Without this stop, a button destroyed while
-				// repeating (mouse-up lost to an alt-tab, or the screen torn down) keeps
-				// ticking into freed memory.
+				// `UIManager` keeps a running timer registered, and the tick above
+				// captures `this`. A button torn down mid-repeat — by its own activation
+				// handler closing the screen, say — has to unregister first, or the
+				// manager keeps ticking into freed memory.
 				if (repeatTimer)
 					repeatTimer->Stop();
 			}
@@ -127,7 +127,10 @@ namespace spades {
 						lastActivatePosition = clientPosition;
 					}
 
-					if (repeat && hover)
+					// Unconditional: `hover` is cleared by paths that do not stop the
+					// timer (`MouseLeave`), so gating on it can leave a button repeating
+					// after the press ended.
+					if (repeat)
 						repeatTimer->Stop();
 				}
 			}
