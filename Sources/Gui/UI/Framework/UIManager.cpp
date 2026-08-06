@@ -28,6 +28,7 @@
 #include <Client/IAudioDevice.h>
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
+#include <Core/Debug.h>
 #include <Imports/SDL.h>
 
 namespace spades {
@@ -37,6 +38,12 @@ namespace spades {
 			    : renderer(renderer), audioDevice(audioDevice) {
 				screenWidth = this->renderer->ScreenWidth();
 				screenHeight = this->renderer->ScreenHeight();
+
+				// Screens lay themselves out from this extent, so a bad one produces a UI
+				// that is built but invisible. Say so rather than failing silently.
+				if (screenWidth <= 0.0F || screenHeight <= 0.0F)
+					SPLog("[!] UI created with an unusable screen extent (%gx%g)",
+					      screenWidth, screenHeight);
 
 				rootElement = Handle<UIElement>::New(this);
 				rootElement->size = MakeVector2(screenWidth, screenHeight);
@@ -277,6 +284,21 @@ namespace spades {
 			}
 
 			void UIManager::RunFrame(float dt) {
+				// The window can be resized after this manager was built (fullscreen and
+				// DPI transitions do not all complete synchronously), so track the
+				// renderer rather than trusting the extent captured at construction.
+				// Screens that computed absolute positions when they were built keep
+				// them, but hit testing and cursor clamping stay correct.
+				float sw = renderer->ScreenWidth();
+				float sh = renderer->ScreenHeight();
+				if (sw != screenWidth || sh != screenHeight) {
+					SPLog("UI screen extent changed from %gx%g to %gx%g", screenWidth,
+					      screenHeight, sw, sh);
+					screenWidth = sw;
+					screenHeight = sh;
+					rootElement->size = MakeVector2(screenWidth, screenHeight);
+				}
+
 				if (activeElement &&
 				    !(activeElement->IsVisible() && activeElement->IsEnabled())) {
 					activeElement = nullptr;
