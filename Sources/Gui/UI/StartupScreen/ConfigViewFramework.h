@@ -113,7 +113,6 @@ namespace spades {
 		/** A single check box bound to an on/off config value. */
 		class StartupScreenConfigCheckItemEditor : public ui::UIElement,
 		                                           public StartupScreenConfigItemEditor {
-			StartupScreenUI* ui; // weak
 			std::string desc;
 			std::string valueOff;
 			std::string valueOn;
@@ -141,7 +140,6 @@ namespace spades {
 		/** A labelled slider bound to a numeric config value. */
 		class StartupScreenConfigSliderItemEditor : public ui::UIElement,
 		                                            public StartupScreenConfigItemEditor {
-			StartupScreenUI* ui; // weak
 			std::string desc;
 			double stepSize;
 			Handle<StartupScreenGenericConfig> config;
@@ -171,7 +169,6 @@ namespace spades {
 		/** A labelled free-form text field bound to a config value. */
 		class StartupScreenConfigFieldItemEditor : public ui::UIElement,
 		                                           public StartupScreenConfigItemEditor {
-			StartupScreenUI* ui; // weak
 			std::string desc;
 			Handle<StartupScreenGenericConfig> config;
 			ui::Field* field; // weak; owned as a child

@@ -44,7 +44,6 @@ namespace spades {
 
 		StartupScreenGraphicsTab::StartupScreenGraphicsTab(StartupScreenUI* ui, Vector2 size)
 		    : UIElement(&ui->GetUIManager()),
-		      ui(ui),
 		      helper(&ui->GetHelper()),
 		      r_renderer("r_renderer", nullptr),
 		      r_fullscreen("r_fullscreen", nullptr) {
@@ -586,7 +585,6 @@ namespace spades {
 
 		StartupScreenAudioTab::StartupScreenAudioTab(StartupScreenUI* ui, Vector2 size)
 		    : UIElement(&ui->GetUIManager()),
-		      ui(ui),
 		      helper(&ui->GetHelper()),
 		      s_audioDriver("s_audioDriver", nullptr),
 		      s_openalDevice("s_openalDevice", nullptr) {
@@ -1016,7 +1014,7 @@ namespace spades {
 		// -- StartupScreenSystemInfoTab --
 
 		StartupScreenSystemInfoTab::StartupScreenSystemInfoTab(StartupScreenUI* ui, Vector2 size)
-		    : UIElement(&ui->GetUIManager()), ui(ui), helper(&ui->GetHelper()) {
+		    : UIElement(&ui->GetUIManager()), helper(&ui->GetHelper()) {
 			UIManager* manager = &GetManager();
 			{
 				Handle<TextViewer> e = Handle<TextViewer>::New(manager);
@@ -1047,7 +1045,7 @@ namespace spades {
 		// -- StartupScreenAdvancedTab --
 
 		StartupScreenAdvancedTab::StartupScreenAdvancedTab(StartupScreenUI* ui, Vector2 size)
-		    : UIElement(&ui->GetUIManager()), ui(ui), helper(&ui->GetHelper()) {
+		    : UIElement(&ui->GetUIManager()), helper(&ui->GetHelper()) {
 			UIManager* manager = &GetManager();
 			float mainWidth = size.x - 220.0F;
 

@@ -125,8 +125,8 @@ namespace spades {
 
 			// -- ScrollBarFill --
 
-			ScrollBarFill::ScrollBarFill(ScrollBarBase* scrollBar, bool up)
-			    : ButtonBase(&scrollBar->GetManager()), scrollBar(scrollBar), up(up) {
+			ScrollBarFill::ScrollBarFill(ScrollBarBase* scrollBar)
+			    : ButtonBase(&scrollBar->GetManager()) {
 				isMouseInteractive = true;
 				repeat = true;
 			}
@@ -185,11 +185,11 @@ namespace spades {
 				trackBar = tb.GetPointerOrNull();
 				AddChild(trackBar);
 
-				Handle<ScrollBarFill> f1 = Handle<ScrollBarFill>::New(this, false);
+				Handle<ScrollBarFill> f1 = Handle<ScrollBarFill>::New(this);
 				fill1 = f1.GetPointerOrNull();
 				fill1->activated = [this](UIElement&) { ScrollBy(-largeChange); };
 				AddChild(fill1);
-				Handle<ScrollBarFill> f2 = Handle<ScrollBarFill>::New(this, true);
+				Handle<ScrollBarFill> f2 = Handle<ScrollBarFill>::New(this);
 				fill2 = f2.GetPointerOrNull();
 				fill2->activated = [this](UIElement&) { ScrollBy(largeChange); };
 				AddChild(fill2);

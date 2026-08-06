@@ -34,7 +34,6 @@ namespace spades {
 
 		/** The Graphics tab: renderer/resolution selection + renderer settings. */
 		class StartupScreenGraphicsTab : public ui::UIElement {
-			StartupScreenUI* ui;         // weak
 			StartupScreenHelper* helper; // weak
 
 			StartupScreenGraphicsDisplayResolutionEditor* resEdit;
@@ -103,7 +102,6 @@ namespace spades {
 
 		/** The Audio tab: backend selection + OpenAL settings. */
 		class StartupScreenAudioTab : public ui::UIElement {
-			StartupScreenUI* ui;         // weak
 			StartupScreenHelper* helper; // weak
 
 			ui::RadioButton* driverOpenAL;
@@ -198,7 +196,6 @@ namespace spades {
 
 		/** The System Info tab: the diagnostics report + copy button. */
 		class StartupScreenSystemInfoTab : public ui::UIElement {
-			StartupScreenUI* ui;         // weak
 			StartupScreenHelper* helper; // weak
 			ui::TextViewer* helpView;
 
@@ -210,7 +207,6 @@ namespace spades {
 
 		/** The Advanced tab: a filterable editor for every config variable. */
 		class StartupScreenAdvancedTab : public ui::UIElement {
-			StartupScreenUI* ui;         // weak
 			StartupScreenHelper* helper; // weak
 
 			ui::Field* filter;

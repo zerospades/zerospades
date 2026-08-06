@@ -171,7 +171,6 @@ namespace spades {
 		    const std::string& valueOff, const std::string& valueOn, const std::string& label,
 		    const std::string& desc)
 		    : UIElement(&ui->GetUIManager()),
-		      ui(ui),
 		      desc(desc),
 		      valueOff(valueOff),
 		      valueOn(valueOn),
@@ -214,7 +213,6 @@ namespace spades {
 		    double maxValue, double stepSize, const std::string& label, const std::string& desc,
 		    Formatter formatter)
 		    : UIElement(&ui->GetUIManager()),
-		      ui(ui),
 		      desc(desc),
 		      stepSize(stepSize),
 		      config(std::move(cfg)),
@@ -291,7 +289,6 @@ namespace spades {
 		    StartupScreenUI* ui, Handle<StartupScreenGenericConfig> cfg, const std::string& label,
 		    const std::string& desc)
 		    : UIElement(&ui->GetUIManager()),
-		      ui(ui),
 		      desc(desc),
 		      config(std::move(cfg)),
 		      label(label) {

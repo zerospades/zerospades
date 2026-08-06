@@ -75,13 +75,14 @@ namespace spades {
 				void Render() override;
 			};
 
-			/** Invisible repeat-button covering the track above/below the thumb. */
+			/**
+			 * Invisible repeat-button covering the track above/below the thumb. Which
+			 * way it scrolls is decided by the `activated` handler the owning scroll bar
+			 * installs, so the fill itself carries no direction.
+			 */
 			class ScrollBarFill : public ButtonBase {
-				ScrollBarBase* scrollBar; // weak
-				bool up;
-
 			public:
-				ScrollBarFill(ScrollBarBase* scrollBar, bool up);
+				ScrollBarFill(ScrollBarBase* scrollBar);
 
 				void PlayMouseEnterSound() override {} // suppress
 				void PlayActivateSound() override {}   // suppress
