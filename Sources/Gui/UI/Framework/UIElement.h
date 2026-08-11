@@ -74,8 +74,14 @@ namespace spades {
 				 */
 				bool clipMouse = true;
 
-				Vector2 position;
-				Vector2 size;
+				// `Vector2`'s default constructor is trivial, so these are indeterminate
+				// unless initialized here. An element whose position is never assigned
+				// (the manager's root sets only `size`) would otherwise inherit whatever
+				// was in the freed memory it was allocated from, and every descendant
+				// adds that garbage into its screen position — a tree that ticks and
+				// renders, entirely off screen.
+				Vector2 position{0.0F, 0.0F};
+				Vector2 size{0.0F, 0.0F};
 
 				UIElement(UIManager* manager);
 
