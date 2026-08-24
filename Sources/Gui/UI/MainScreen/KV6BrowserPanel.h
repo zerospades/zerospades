@@ -32,6 +32,26 @@ namespace spades {
 	namespace gui {
 		class MainScreenHelper;
 
+		/** A modal dialog to select model type: KV6 (enabled) or Map VXL (disabled). */
+		class KV6ModelTypePrompt : public ui::UIElement {
+			ui::UIElement* owner;   // weak
+			ui::Button* vxlButton;  // weak; owned as a child
+
+			void OnKV6(ui::UIElement& sender);
+			void OnVXL(ui::UIElement& sender);
+			void OnCancel(ui::UIElement& sender);
+
+		public:
+			ui::EventHandler closed;
+			int result = -1; // -1: cancelled, 0: KV6, 1: VXL
+
+			KV6ModelTypePrompt(ui::UIElement* owner);
+
+			void Close();
+			void Run();
+			void HotKey(const std::string& key) override;
+		};
+
 		/** A modal text prompt (title, editable field, OK/Cancel) used for names. */
 		class KV6NamePrompt : public ui::UIElement {
 			ui::UIElement* owner;   // weak
@@ -85,7 +105,8 @@ namespace spades {
 			void OnNewFolder(ui::UIElement& sender);
 			void OnNewFolderClosed(ui::UIElement& sender);
 			void OnNewModel(ui::UIElement& sender);
-			void OnNewModelClosed(ui::UIElement& sender);
+			void OnNewModelTypeClosed(ui::UIElement& sender);
+			void OnNewModelNameClosed(ui::UIElement& sender);
 			void OnDelete(ui::UIElement& sender);
 			void OnDeleteClosed(ui::UIElement& sender);
 

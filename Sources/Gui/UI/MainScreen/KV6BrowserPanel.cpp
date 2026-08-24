@@ -26,6 +26,8 @@
 #include <Core/Strings.h>
 #include <Gui/MainScreenHelper.h>
 #include <Gui/UI/Framework/UIManager.h>
+#include <Gui/UI/Widgets/Button.h>
+#include <Gui/UI/Widgets/Label.h>
 #include <Gui/UI/Widgets/MessageBox.h>
 
 DEFINE_SPADES_SETTING(cl_kv6EditorFolder, ""); // remembered folder (absolute)
@@ -38,6 +40,88 @@ namespace spades {
 		using ui::ListView;
 		using ui::UIElement;
 		using ui::UIManager;
+
+		// -- KV6ModelTypePrompt --
+
+		KV6ModelTypePrompt::KV6ModelTypePrompt(UIElement* owner)
+		    : UIElement(&owner->GetManager()), owner(owner) {
+			SetFont(GetManager().GetRootElement().GetFont());
+			SetBounds(owner->GetBounds());
+
+			UIManager* manager = &GetManager();
+			float sw = manager->screenWidth;
+			float sh = manager->screenHeight;
+			float w = std::min(sw - 16.0F, 500.0F);
+			float h = 160.0F;
+			float x = (sw - w) * 0.5F;
+			float y = (sh - h) * 0.5F;
+
+			{
+				Handle<Label> bg = Handle<Label>::New(manager);
+				bg->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.9F);
+				bg->SetBounds(AABB2(0.0F, y - 13.0F, size.x, h + 27.0F));
+				AddChild(bg.GetPointerOrNull());
+			}
+			{
+				Handle<Label> label = Handle<Label>::New(manager);
+				label->text = _Tr("MainScreen", "Which resource to create?");
+				label->SetBounds(AABB2(x, y + 20.0F, w, 30.0F));
+				label->alignment = MakeVector2(0.5F, 0.5F);
+				AddChild(label.GetPointerOrNull());
+			}
+			{
+				Handle<Button> btn = Handle<Button>::New(manager);
+				btn->caption = _Tr("MainScreen", "KV6");
+				btn->SetBounds(AABB2(x + (w - 150.0F) * 0.5F, y + 70.0F, 150.0F, 30.0F));
+				btn->activated = [this](UIElement& s) { OnKV6(s); };
+				AddChild(btn.GetPointerOrNull());
+			}
+			{
+				Handle<Button> btn = Handle<Button>::New(manager);
+				btn->caption = _Tr("MainScreen", "Map VXL");
+				vxlButton = btn.GetPointerOrNull();
+				btn->SetBounds(AABB2(x + (w - 150.0F) * 0.5F, y + 110.0F, 150.0F, 30.0F));
+				btn->activated = [this](UIElement& s) { OnVXL(s); };
+				btn->enable = false; // Disabled until supported
+				AddChild(btn.GetPointerOrNull());
+			}
+		}
+
+		void KV6ModelTypePrompt::OnKV6(UIElement&) {
+			result = 0;
+			Close();
+		}
+
+		void KV6ModelTypePrompt::OnVXL(UIElement&) {
+			result = 1;
+			Close();
+		}
+
+		void KV6ModelTypePrompt::OnCancel(UIElement&) {
+			result = -1;
+			Close();
+		}
+
+		void KV6ModelTypePrompt::Close() {
+			Handle<KV6ModelTypePrompt> keepAlive(this);
+			owner->enable = true;
+			GetParent()->RemoveChild(this);
+			if (closed)
+				closed(*this);
+		}
+
+		void KV6ModelTypePrompt::Run() {
+			owner->enable = false;
+			owner->GetParent()->AddChild(this);
+		}
+
+		void KV6ModelTypePrompt::HotKey(const std::string& key) {
+			if (IsEnabled() && key == "Escape") {
+				OnCancel(*this);
+			} else {
+				UIElement::HotKey(key);
+			}
+		}
 
 		// -- KV6NamePrompt --
 
@@ -178,7 +262,7 @@ namespace spades {
 			}
 			{
 				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "New Model");
+				button->caption = _Tr("MainScreen", "New");
 				button->SetBounds(
 				    AABB2(contentsLeft + contentsWidth - 245.0F, 200.0F, 105.0F, 30.0F));
 				button->activated = [this](UIElement& s) { OnNewModel(s); };
@@ -327,13 +411,32 @@ namespace spades {
 		}
 
 		void KV6BrowserPanel::OnNewModel(UIElement&) {
-			Handle<KV6NamePrompt> prompt = Handle<KV6NamePrompt>::New(
-			    modalOwner, _Tr("MainScreen", "New Model"), "untitled");
-			prompt->closed = [this](UIElement& s) { OnNewModelClosed(s); };
+			Handle<KV6ModelTypePrompt> prompt = Handle<KV6ModelTypePrompt>::New(modalOwner);
+			prompt->closed = [this](UIElement& s) { OnNewModelTypeClosed(s); };
 			prompt->Run();
 		}
 
-		void KV6BrowserPanel::OnNewModelClosed(UIElement& sender) {
+		void KV6BrowserPanel::OnNewModelTypeClosed(UIElement& sender) {
+			KV6ModelTypePrompt* p = dynamic_cast<KV6ModelTypePrompt*>(&sender);
+			if (!p)
+				return;
+
+			if (p->result == 0) { // KV6 selected
+				Handle<KV6NamePrompt> namePrompt = Handle<KV6NamePrompt>::New(
+				    modalOwner, _Tr("MainScreen", "New KV6 Model"), "untitled");
+				namePrompt->closed = [this](UIElement& s) { OnNewModelNameClosed(s); };
+				namePrompt->Run();
+			} else if (p->result == 1) { // VXL selected
+				Handle<AlertScreen> al = Handle<AlertScreen>::New(
+				    modalOwner,
+				    _Tr("MainScreen",
+				        "Map VXL support is not yet implemented. Please use KV6 models."),
+				    120.0F);
+				al->Run();
+			}
+		}
+
+		void KV6BrowserPanel::OnNewModelNameClosed(UIElement& sender) {
 			KV6NamePrompt* p = dynamic_cast<KV6NamePrompt*>(&sender);
 			if (!p || !p->result || p->text.empty())
 				return;
