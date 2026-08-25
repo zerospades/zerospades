@@ -40,6 +40,11 @@ namespace spades {
 			 * `byteIndex`, starting the scan at byte offset `start`.
 			 */
 			int GetCharIndexForString(const std::string& s, int byteIndex, int start = 0);
+
+			/**
+			 * Returns the length of the common prefix between two strings (case-insensitive).
+			 */
+			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades
