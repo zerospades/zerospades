@@ -77,9 +77,6 @@ namespace spades {
 
 			/** Invisible repeat-button covering the track above/below the thumb. */
 			class ScrollBarFill : public ButtonBase {
-				ScrollBarBase* scrollBar; // weak
-				bool up;
-
 			public:
 				ScrollBarFill(ScrollBarBase* scrollBar, bool up);
 

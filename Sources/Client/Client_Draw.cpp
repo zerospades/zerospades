@@ -1723,7 +1723,6 @@ namespace spades {
 			const Vector4 color = GetHUDColor(p);
 			float luminosity = color.x + color.y + color.z;
 
-			const Vector4 white = MakeVector4(1, 1, 1, 1);
 			const Vector4 shadow = MakeVector4(0, 0, 0, 0.65F);
 			const Vector4 gray = MakeVector4(0.4F, 0.4F, 0.4F, 1);
 			const Vector4 bgColor = (luminosity > 0.9F) ? color * gray : gray;
