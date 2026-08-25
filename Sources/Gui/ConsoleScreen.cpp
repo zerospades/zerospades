@@ -31,6 +31,10 @@
 
 namespace spades {
 	namespace gui {
+		namespace {
+			bool s_consoleOpen = false;
+		}
+
 		ConsoleScreen::ConsoleScreen(Handle<client::IRenderer> renderer,
 									 Handle<client::IAudioDevice> audioDevice,
 									 Handle<client::FontManager> fontManager, Handle<View> subview)
@@ -47,6 +51,7 @@ namespace spades {
 		ConsoleScreen::~ConsoleScreen() {
 			SPADES_MARK_FUNCTION();
 
+			s_consoleOpen = false;
 			helper->ConsoleScreenDestroyed();
 		}
 
@@ -221,8 +226,11 @@ namespace spades {
 
 		bool ConsoleScreen::ShouldInterceptInput() {
 			SPADES_MARK_FUNCTION();
-			return ui->ShouldInterceptInput();
+			s_consoleOpen = ui->ShouldInterceptInput();
+			return s_consoleOpen;
 		}
+
+		bool ConsoleScreen::IsConsoleOpen() { return s_consoleOpen; }
 
 		void ConsoleScreen::ToggleConsole() {
 			SPADES_MARK_FUNCTION();
