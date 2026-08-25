@@ -277,7 +277,7 @@ namespace spades {
 						SelectAll();
 						return;
 					} else if (key == "V") {
-						manager.Paste([this](const std::string& s) { Insert(s); });
+						Insert(manager.Paste());
 						OnChanged();
 					} else if (key == "C") {
 						manager.Copy(GetSelectedText());
