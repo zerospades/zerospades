@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build build --target KV6BrowserPanel_test)"
+    ]
+  }
+}

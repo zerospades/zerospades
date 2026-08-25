@@ -18,52 +18,26 @@
 
  */
 
-#include <algorithm>
-
 #include "ConsoleUI.h"
 #include "ConsoleWindow.h"
 #include <Client/Fonts.h>
-#include <Core/Settings.h>
 #include <Gui/UI/Framework/UIManager.h>
-
-SPADES_SETTING(cl_consoleScrollbackLines); // defined in Gui/UI/Console/ConsoleWindow.cpp
 
 namespace spades {
 	namespace gui {
 		ConsoleUI::ConsoleUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
-		                     client::FontManager* fontManager, ConsoleHelper* helper)
-		    : helper(helper) {
+		                     client::FontManager* fontManager, ConsoleHelper* helper) {
 			manager = Handle<ui::UIManager>::New(renderer, audioDevice);
 			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
-			manager->screenSizeChanged = [this] { ReloadScreen(); };
 
-			Init();
-		}
-
-		ConsoleUI::~ConsoleUI() {}
-
-		void ConsoleUI::Init() {
 			Handle<ConsoleWindow> cw =
-			    Handle<ConsoleWindow>::New(helper, manager.GetPointerOrNull(), &commandHistory);
+			    Handle<ConsoleWindow>::New(helper, manager.GetPointerOrNull());
 			console = cw.GetPointerOrNull();
 			console->SetBounds(manager->GetRootElement().GetBounds());
 			manager->GetRootElement().AddChild(console);
 		}
 
-		void ConsoleUI::ReloadScreen() {
-			ui::UIElement& root = manager->GetRootElement();
-			root.RemoveChild(console);
-
-			// Rebuild through the constructor so the new layout is exactly what a
-			// console opened at this extent would have looked like, then replay the
-			// scrollback — it lives nowhere but in the window we just dropped.
-			Init();
-			for (const std::string& line : scrollback)
-				console->AddLine(line);
-
-			if (active)
-				console->FocusField();
-		}
+		ConsoleUI::~ConsoleUI() {}
 
 		void ConsoleUI::MouseEvent(float x, float y) { manager->MouseEvent(x, y); }
 		void ConsoleUI::WheelEvent(float x, float y) { manager->WheelEvent(x, y); }
@@ -100,17 +74,6 @@ namespace spades {
 				console->FocusField();
 		}
 
-		void ConsoleUI::AddLine(const std::string& line) {
-			// Mirrors the viewer's own cap so a rebuild reproduces what was on screen
-			// rather than resurrecting lines it had already dropped.
-			scrollback.push_back(line);
-			size_t maxLines =
-			    static_cast<size_t>(std::max(static_cast<int>(cl_consoleScrollbackLines), 1));
-			if (scrollback.size() > maxLines)
-				scrollback.erase(scrollback.begin(),
-				                 scrollback.begin() + (scrollback.size() - maxLines));
-
-			console->AddLine(line);
-		}
+		void ConsoleUI::AddLine(const std::string& line) { console->AddLine(line); }
 	} // namespace gui
 } // namespace spades

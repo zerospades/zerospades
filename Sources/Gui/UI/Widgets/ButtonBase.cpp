@@ -33,15 +33,6 @@ namespace spades {
 				};
 			}
 
-			ButtonBase::~ButtonBase() {
-				// `UIManager` keeps a running timer registered, and the tick above
-				// captures `this`. A button torn down mid-repeat — by its own activation
-				// handler closing the screen, say — has to unregister first, or the
-				// manager keeps ticking into freed memory.
-				if (repeatTimer)
-					repeatTimer->Stop();
-			}
-
 			void ButtonBase::PlayMouseEnterSound() {
 				GetManager().PlaySound("Sounds/Feedback/Limbo/Hover.opus");
 			}
@@ -127,10 +118,7 @@ namespace spades {
 						lastActivatePosition = clientPosition;
 					}
 
-					// Unconditional: `hover` is cleared by paths that do not stop the
-					// timer (`MouseLeave`), so gating on it can leave a button repeating
-					// after the press ended.
-					if (repeat)
+					if (repeat && hover)
 						repeatTimer->Stop();
 				}
 			}

@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
 
 namespace spades {
@@ -41,15 +40,6 @@ namespace spades {
 			 * `byteIndex`, starting the scan at byte offset `start`.
 			 */
 			int GetCharIndexForString(const std::string& s, int byteIndex, int start = 0);
-
-			/**
-			 * Length in bytes of the longest common prefix of `a` and `b`, compared
-			 * case-insensitively (ASCII).
-			 */
-			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
-
-			/** Human-readable file size ("512 B", "12 KB", "3 MB"); empty for negatives. */
-			std::string FormatFileSize(std::int64_t bytes);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades
