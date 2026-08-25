@@ -23,7 +23,7 @@
 #include <string>
 
 #include <Gui/KV6ScreenHelper.h>
-#include <Gui/UI/MainScreen/KV6ListView.h>
+#include <Gui/UI/MainScreen/EditorListView.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/Field.h>
 #include <Gui/UI/Widgets/Label.h>
@@ -87,7 +87,7 @@ namespace spades {
 
 			ui::Field* pathField; // weak; owned as a child
 			ui::ListView* list;   // weak; owned as a child
-			Handle<KV6ListModel> currentModel;
+			Handle<EditorListModel> currentModel;
 
 			std::string dir;              // current folder (absolute)
 			std::string selected;         // selected entry name within `dir`

@@ -305,14 +305,14 @@ namespace spades {
 
 		void KV6BrowserPanel::Reload() {
 			// Folders first, then files.
-			std::vector<KV6Entry> entries;
+			std::vector<EditorEntry> entries;
 			for (const std::string& name : fs->GetFolders(dir))
-				entries.push_back(KV6Entry{name, true});
+				entries.push_back(EditorEntry{name, true});
 			for (const std::string& name : fs->GetFiles(dir))
-				entries.push_back(KV6Entry{name, false});
+				entries.push_back(EditorEntry{name, false});
 
-			Handle<KV6ListModel> model =
-			    Handle<KV6ListModel>::New(&GetManager(), std::move(entries));
+			Handle<EditorListModel> model =
+			    Handle<EditorListModel>::New(&GetManager(), std::move(entries));
 			model->itemActivated = [this](const std::string& n, bool f) { OnItemActivated(n, f); };
 			model->itemDoubleClicked = [this](const std::string& n, bool f) {
 				OnItemDoubleClicked(n, f);
@@ -354,7 +354,7 @@ namespace spades {
 			if (isFolder) {
 				dir = Child(name);
 				Reload();
-			} else if (!KV6IsEditable(name)) {
+			} else if (!EditorIsEditable(name)) {
 				NotImplemented();
 			} else {
 				OpenModel(Child(name), false);
@@ -375,12 +375,12 @@ namespace spades {
 				return;
 			}
 
-			if (KV6IsModelFile(p) && !KV6IsEditable(p)) {
+			if (EditorIsModelFile(p) && !EditorIsEditable(p)) {
 				NotImplemented();
 				return;
 			}
 			// Treat as a .kv6 file (open existing, or create if it does not exist).
-			if (!KV6IsEditable(p))
+			if (!EditorIsEditable(p))
 				p += ".kv6";
 			OpenModel(p, !fs->Exists(p));
 		}
@@ -441,7 +441,7 @@ namespace spades {
 			if (!p || !p->result || p->text.empty())
 				return;
 			std::string name = p->text;
-			if (!KV6IsEditable(name))
+			if (!EditorIsEditable(name))
 				name += ".kv6";
 			OpenModel(Child(name), true);
 		}
