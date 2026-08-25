@@ -18,30 +18,28 @@
 
  */
 
-#include <algorithm>
+#pragma once
 
-#include "Cursor.h"
-#include "UIManager.h"
-#include <Client/IImage.h>
-#include <Client/IRenderer.h>
+#include <string>
 
 namespace spades {
 	namespace gui {
 		namespace ui {
-			Cursor::Cursor(UIManager* manager, client::IImage* image, Vector2 hotSpot)
-			    : manager(manager), image(image), hotSpot(hotSpot) {}
+			/**
+			 * Converts a UTF-8 code-point count into a byte offset.
+			 *
+			 * Advances `charIndex` code points from byte offset `start` and returns the
+			 * resulting byte offset, clamped to the end of the string.
+			 */
+			int GetByteIndexForString(const std::string& s, int charIndex, int start = 0);
 
-			Cursor::~Cursor() {}
-
-			void Cursor::Render(Vector2 pos) {
-				client::IRenderer& r = manager->GetRenderer();
-
-				// slowly cycling rainbow tint, matching the original UI framework
-				Vector3 rgb = HSV2RGB(std::max(manager->time * 0.1F, 0.0F), 1.0F, 1.0F);
-				r.SetColorAlphaPremultiplied(MakeVector4(rgb.x, rgb.y, rgb.z, 1.0F));
-				r.DrawImage(image.GetPointerOrNull(),
-				            MakeVector2(pos.x - hotSpot.x, pos.y - hotSpot.y));
-			}
+			/**
+			 * Converts a byte offset into a UTF-8 code-point count.
+			 *
+			 * Returns the number of whole code points lying before byte offset
+			 * `byteIndex`, starting the scan at byte offset `start`.
+			 */
+			int GetCharIndexForString(const std::string& s, int byteIndex, int start = 0);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

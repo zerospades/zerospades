@@ -18,15 +18,16 @@
 
  */
 
-#include <ScriptBindings/Config.h>
-#include <ScriptBindings/ScriptFunction.h>
+#include <map>
 
 #include <Client/Fonts.h>
+#include <Core/TMPUtils.h>
 
 #include "ConfigConsoleResponder.h"
 #include "ConsoleCommand.h"
 #include "ConsoleHelper.h"
 #include "ConsoleScreen.h"
+#include <Gui/UI/Console/ConsoleUI.h>
 
 namespace spades {
 	namespace gui {
@@ -40,19 +41,9 @@ namespace spades {
 
 			helper = Handle<ConsoleHelper>::New(this);
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction uiFactory("ConsoleUI@ CreateConsoleUI(Renderer@, "
-											"AudioDevice@, FontManager@, ConsoleHelper@)");
-			{
-				ScriptContextHandle ctx = uiFactory.Prepare();
-				ctx->SetArgObject(0, &*renderer);
-				ctx->SetArgObject(1, &*audioDevice);
-				ctx->SetArgObject(2, &*fontManager);
-				ctx->SetArgObject(3, &*helper);
-
-				ctx.ExecuteChecked();
-				ui = reinterpret_cast<asIScriptObject*>(ctx->GetReturnObject());
-			}
+			ui = std::make_unique<ConsoleUI>(renderer.GetPointerOrNull(),
+											 audioDevice.GetPointerOrNull(),
+											 fontManager.GetPointerOrNull(), helper.GetPointerOrNull());
 		}
 
 		ConsoleScreen::~ConsoleScreen() {
@@ -65,17 +56,10 @@ namespace spades {
 		void ConsoleScreen::MouseEvent(float x, float y) {
 			SPADES_MARK_FUNCTION();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "void MouseEvent(float, float)");
-				ScriptContextHandle c = func.Prepare();
-				c->SetObject(&*ui);
-				c->SetArgFloat(0, x);
-				c->SetArgFloat(1, y);
-				c.ExecuteChecked();
-			} else {
-				return subview->MouseEvent(x, y);
-			}
+			if (ShouldInterceptInput())
+				ui->MouseEvent(x, y);
+			else
+				subview->MouseEvent(x, y);
 		}
 
 		void ConsoleScreen::KeyEvent(const std::string& key, bool down) {
@@ -91,18 +75,10 @@ namespace spades {
 			if (down && !consoleToggleKey.empty())
 				consoleToggleKey.clear();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "void KeyEvent(string, bool)");
-				ScriptContextHandle c = func.Prepare();
-				std::string k = key;
-				c->SetObject(&*ui);
-				c->SetArgObject(0, reinterpret_cast<void*>(&k));
-				c->SetArgByte(1, down ? 1 : 0);
-				c.ExecuteChecked();
-			} else {
-				return subview->KeyEvent(key, down);
-			}
+			if (ShouldInterceptInput())
+				ui->KeyEvent(key, down);
+			else
+				subview->KeyEvent(key, down);
 		}
 
 		void ConsoleScreen::TextInputEvent(const std::string& ch) {
@@ -113,81 +89,46 @@ namespace spades {
 				return;
 			}
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "void TextInputEvent(string)");
-				ScriptContextHandle c = func.Prepare();
-				std::string k = ch;
-				c->SetObject(&*ui);
-				c->SetArgObject(0, reinterpret_cast<void*>(&k));
-				c.ExecuteChecked();
-			} else {
-				return subview->TextInputEvent(ch);
-			}
+			if (ShouldInterceptInput())
+				ui->TextInputEvent(ch);
+			else
+				subview->TextInputEvent(ch);
 		}
 
 		void ConsoleScreen::TextEditingEvent(const std::string& ch, int start, int len) {
 			SPADES_MARK_FUNCTION();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "void TextEditingEvent(string, int, int)");
-				ScriptContextHandle c = func.Prepare();
-				std::string k = ch;
-				c->SetObject(&*ui);
-				c->SetArgObject(0, reinterpret_cast<void*>(&k));
-				c->SetArgDWord(1, static_cast<asDWORD>(start));
-				c->SetArgDWord(2, static_cast<asDWORD>(len));
-				c.ExecuteChecked();
-			} else {
-				return subview->TextEditingEvent(ch, start, len);
-			}
+			if (ShouldInterceptInput())
+				ui->TextEditingEvent(ch, start, len);
+			else
+				subview->TextEditingEvent(ch, start, len);
 		}
 
 		bool ConsoleScreen::AcceptsTextInput() {
 			SPADES_MARK_FUNCTION();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "bool AcceptsTextInput()");
-				ScriptContextHandle c = func.Prepare();
-				c->SetObject(&*ui);
-				c.ExecuteChecked();
-				return c->GetReturnByte() != 0;
-			} else {
+			if (ShouldInterceptInput())
+				return ui->AcceptsTextInput();
+			else
 				return subview->AcceptsTextInput();
-			}
 		}
 
 		AABB2 ConsoleScreen::GetTextInputRect() {
 			SPADES_MARK_FUNCTION();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "AABB2 GetTextInputRect()");
-				ScriptContextHandle c = func.Prepare();
-				c->SetObject(&*ui);
-				c.ExecuteChecked();
-				return *reinterpret_cast<AABB2*>(c->GetReturnObject());
-			} else {
+			if (ShouldInterceptInput())
+				return ui->GetTextInputRect();
+			else
 				return subview->GetTextInputRect();
-			}
 		}
 
 		void ConsoleScreen::WheelEvent(float x, float y) {
 			SPADES_MARK_FUNCTION();
 
-			if (ShouldInterceptInput()) {
-				ScopedPrivilegeEscalation privilege;
-				static ScriptFunction func("ConsoleUI", "void WheelEvent(float, float)");
-				ScriptContextHandle c = func.Prepare();
-				c->SetObject(&*ui);
-				c->SetArgFloat(0, x);
-				c->SetArgFloat(1, y);
-				c.ExecuteChecked();
-			} else {
-				return subview->WheelEvent(x, y);
-			}
+			if (ShouldInterceptInput())
+				ui->WheelEvent(x, y);
+			else
+				subview->WheelEvent(x, y);
 		}
 
 		bool ConsoleScreen::NeedsAbsoluteMouseCoordinate() {
@@ -207,12 +148,7 @@ namespace spades {
 
 			subview->RunFrame(dt);
 
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ConsoleUI", "void RunFrame(float)");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c->SetArgFloat(0, dt);
-			c.ExecuteChecked();
+			ui->RunFrame(dt);
 		}
 
 		void ConsoleScreen::RunFrameLate(float dt) {
@@ -288,13 +224,7 @@ namespace spades {
 
 		bool ConsoleScreen::ShouldInterceptInput() {
 			SPADES_MARK_FUNCTION();
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ConsoleUI", "bool ShouldInterceptInput()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
-			s_consoleOpen = c->GetReturnByte() != 0;
+			s_consoleOpen = ui->ShouldInterceptInput();
 			return s_consoleOpen;
 		}
 
@@ -302,24 +232,12 @@ namespace spades {
 
 		void ConsoleScreen::ToggleConsole() {
 			SPADES_MARK_FUNCTION();
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ConsoleUI", "void ToggleConsole()");
-			ScriptContextHandle c = func.Prepare();
-			c->SetObject(&*ui);
-			c.ExecuteChecked();
+			ui->ToggleConsole();
 		}
 
 		void ConsoleScreen::AddLine(const std::string& line) {
 			SPADES_MARK_FUNCTION();
-
-			ScopedPrivilegeEscalation privilege;
-			static ScriptFunction func("ConsoleUI", "void AddLine(string)");
-			ScriptContextHandle c = func.Prepare();
-			std::string k = line;
-			c->SetObject(&*ui);
-			c->SetArgObject(0, reinterpret_cast<void*>(&k));
-			c.ExecuteChecked();
+			ui->AddLine(line);
 		}
 	} // namespace gui
 } // namespace spades

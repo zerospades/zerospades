@@ -43,6 +43,14 @@ namespace spades {
 		return s;
 	}
 
+	uint StringCommonPrefixLength(string a, string b) {
+		for (uint i = 0, ln = Min(a.length, b.length); i < ln; i++) {
+			if (ToLower(a[i]) != ToLower(b[i]))
+				return i;
+		}
+		return Min(a.length, b.length);
+	}
+
 	string FormatFileSize(int64 bytes) {
 		if (bytes < 0)
 			return "";

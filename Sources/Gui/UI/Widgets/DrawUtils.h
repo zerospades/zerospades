@@ -18,29 +18,23 @@
 
  */
 
-#include <algorithm>
+#pragma once
 
-#include "Cursor.h"
-#include "UIManager.h"
-#include <Client/IImage.h>
 #include <Client/IRenderer.h>
+#include <Core/Math.h>
 
 namespace spades {
 	namespace gui {
 		namespace ui {
-			Cursor::Cursor(UIManager* manager, client::IImage* image, Vector2 hotSpot)
-			    : manager(manager), image(image), hotSpot(hotSpot) {}
-
-			Cursor::~Cursor() {}
-
-			void Cursor::Render(Vector2 pos) {
-				client::IRenderer& r = manager->GetRenderer();
-
-				// slowly cycling rainbow tint, matching the original UI framework
-				Vector3 rgb = HSV2RGB(std::max(manager->time * 0.1F, 0.0F), 1.0F, 1.0F);
-				r.SetColorAlphaPremultiplied(MakeVector4(rgb.x, rgb.y, rgb.z, 1.0F));
-				r.DrawImage(image.GetPointerOrNull(),
-				            MakeVector2(pos.x - hotSpot.x, pos.y - hotSpot.y));
+			/**
+			 * Sets the renderer draw color from a non-premultiplied-alpha value.
+			 *
+			 * The AngelScript UI set colors through the renderer's `ColorNP` property,
+			 * which premultiplied the color before drawing. `IRenderer` only exposes the
+			 * premultiplied setter, so we premultiply here to match the original look.
+			 */
+			inline void SetColorNP(client::IRenderer& r, const Vector4& c) {
+				r.SetColorAlphaPremultiplied(MakeVector4(c.x * c.w, c.y * c.w, c.z * c.w, c.w));
 			}
 		} // namespace ui
 	} // namespace gui

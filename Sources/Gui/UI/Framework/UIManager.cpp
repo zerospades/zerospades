@@ -1,7 +1,7 @@
 /*
  Copyright (c) 2026 Fran6nd, ZeroSpades developers.
 
- This file is part of OpenSpades.
+ This file is part of ZeroSpades, a fork of OpenSpades.
 
  OpenSpades is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <algorithm>
 
 #include "Cursor.h"
+#include "TextUtils.h"
 #include "UIElement.h"
 #include "UIManager.h"
 #include <Client/IAudioChunk.h>
@@ -32,34 +33,6 @@
 namespace spades {
 	namespace gui {
 		namespace ui {
-			namespace {
-				/**
-				 * Converts a UTF-8 code-point index into a byte index, starting the scan
-				 * at byte offset `start`. Mirrors the helper the AngelScript UI relied on
-				 * for translating IME editing ranges.
-				 */
-				int GetByteIndexForString(const std::string& s, int charIndex, int start = 0) {
-					int len = static_cast<int>(s.size());
-					while (start < len && charIndex > 0) {
-						unsigned char c = static_cast<unsigned char>(s[start]);
-						if ((c & 0x80) == 0)
-							start += 1;
-						else if ((c & 0xE0) == 0xC0)
-							start += 2;
-						else if ((c & 0xF0) == 0xE0)
-							start += 3;
-						else if ((c & 0xF8) == 0xF0)
-							start += 4;
-						else if ((c & 0xFC) == 0xF8)
-							start += 5;
-						else
-							start += 1;
-						charIndex--;
-					}
-					return start;
-				}
-			} // namespace
-
 			UIManager::UIManager(client::IRenderer* renderer, client::IAudioDevice* audioDevice)
 			    : renderer(renderer), audioDevice(audioDevice) {
 				screenWidth = this->renderer->ScreenWidth();

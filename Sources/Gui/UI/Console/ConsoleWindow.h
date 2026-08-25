@@ -20,35 +20,36 @@
 
 #pragma once
 
-#include <functional>
 #include <string>
+#include <vector>
+
+#include <Gui/UI/Framework/UIElement.h>
+#include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
 	namespace gui {
+		class ConsoleHelper;
+		class ConsoleCommandField;
 		namespace ui {
-			class UIElement;
-			class Timer;
+			class TextViewer;
+		}
 
-			enum class MouseButton {
-				None,
-				Left,
-				Right,
-				Middle,
-				Button4,
-				Button5
-			};
+		/** The system console window: a scrollback view plus a command field. */
+		class ConsoleWindow : public ui::UIElement {
+			ConsoleHelper* helper; // weak
+			// Owned here; shared with the command field, which keeps a weak pointer.
+			// Declared before `field` so it outlives it.
+			std::vector<ui::CommandHistoryItem> history;
+			ConsoleCommandField* field; // weak; owned as a child
+			ui::TextViewer* viewer;     // weak; owned as a child
 
-			/** Handler invoked for an event raised by a UI element. */
-			using EventHandler = std::function<void(UIElement&)>;
+		public:
+			ConsoleWindow(ConsoleHelper* helper, ui::UIManager* manager);
 
-			/** Handler invoked with pasted clipboard text. */
-			using PasteClipboardEventHandler = std::function<void(const std::string&)>;
+			void FocusField();
+			void AddLine(const std::string& line);
 
-			/** Handler invoked when a repeated key/character fires. */
-			using KeyRepeatEventHandler = std::function<void(const std::string&)>;
-
-			/** Handler invoked when a timer ticks. */
-			using TimerTickEventHandler = std::function<void(Timer&)>;
-		} // namespace ui
+			void HotKey(const std::string& key) override;
+		};
 	} // namespace gui
 } // namespace spades

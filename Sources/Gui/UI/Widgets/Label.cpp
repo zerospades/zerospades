@@ -18,29 +18,33 @@
 
  */
 
-#include <algorithm>
-
-#include "Cursor.h"
-#include "UIManager.h"
-#include <Client/IImage.h>
+#include "DrawUtils.h"
+#include "Label.h"
+#include <Client/IFont.h>
 #include <Client/IRenderer.h>
+#include <Gui/UI/Framework/UIManager.h>
 
 namespace spades {
 	namespace gui {
 		namespace ui {
-			Cursor::Cursor(UIManager* manager, client::IImage* image, Vector2 hotSpot)
-			    : manager(manager), image(image), hotSpot(hotSpot) {}
+			void Label::Render() {
+				client::IRenderer& r = GetManager().GetRenderer();
+				Vector2 pos = GetScreenPosition();
+				Vector2 sz = size;
 
-			Cursor::~Cursor() {}
+				if (backgroundColor.w > 0.0F) {
+					SetColorNP(r, backgroundColor);
+					r.DrawImage(nullptr, AABB2(pos.x, pos.y, sz.x, sz.y));
+				}
 
-			void Cursor::Render(Vector2 pos) {
-				client::IRenderer& r = manager->GetRenderer();
-
-				// slowly cycling rainbow tint, matching the original UI framework
-				Vector3 rgb = HSV2RGB(std::max(manager->time * 0.1F, 0.0F), 1.0F, 1.0F);
-				r.SetColorAlphaPremultiplied(MakeVector4(rgb.x, rgb.y, rgb.z, 1.0F));
-				r.DrawImage(image.GetPointerOrNull(),
-				            MakeVector2(pos.x - hotSpot.x, pos.y - hotSpot.y));
+				if (!text.empty()) {
+					client::IFont* font = GetFont();
+					if (!font)
+						return;
+					Vector2 textSize = font->Measure(text) * textScale;
+					Vector2 textPos = pos + (sz - textSize) * alignment;
+					font->Draw(text, textPos, textScale, IsEnabled() ? textColor : disabledTextColor);
+				}
 			}
 		} // namespace ui
 	} // namespace gui

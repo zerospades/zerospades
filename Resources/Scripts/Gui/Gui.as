@@ -24,4 +24,3 @@
 #include "StartupScreen/StartupScreenUI.as"
 #include "Preferences.as"
 #include "Client/ClientUI.as"
-#include "Console/ConsoleUI.as"
