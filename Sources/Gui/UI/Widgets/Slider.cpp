@@ -100,11 +100,11 @@ namespace spades {
 				knob = k.GetPointerOrNull();
 				AddChild(knob);
 
-				Handle<ScrollBarFill> f1 = Handle<ScrollBarFill>::New(this);
+				Handle<ScrollBarFill> f1 = Handle<ScrollBarFill>::New(this, false);
 				fill1 = f1.GetPointerOrNull();
 				fill1->activated = [this](UIElement&) { ScrollBy(-largeChange); };
 				AddChild(fill1);
-				Handle<ScrollBarFill> f2 = Handle<ScrollBarFill>::New(this);
+				Handle<ScrollBarFill> f2 = Handle<ScrollBarFill>::New(this, true);
 				fill2 = f2.GetPointerOrNull();
 				fill2->activated = [this](UIElement&) { ScrollBy(largeChange); };
 				AddChild(fill2);
