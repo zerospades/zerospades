@@ -30,6 +30,7 @@
 
 namespace spades {
 	namespace gui {
+		using ui::FormatFileSize;
 		using ui::SetColorNP;
 		using ui::UIElement;
 		using ui::UIManager;
