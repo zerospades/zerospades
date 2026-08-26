@@ -29,6 +29,7 @@
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
 #include "KV6UndoStack.h"
+#include "SoftwareCursor.h"
 #include "View.h"
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
@@ -79,7 +80,7 @@ namespace spades {
 			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
 			IntVector3 PickSolid() const override { return MakeIntVector3(pickHX, pickHY, pickHZ); }
 			Vector3 ViewDir() const override { return camFwd; }
-			const Vector2& CursorPos() const override { return cursor; }
+			const Vector2& CursorPos() const override { return softwareCursor.GetPosition(); }
 			// Voxel whose centre is nearest where the cursor ray meets the plane
 			// (planePoint, normal). Lets tools place points in empty space.
 			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
@@ -161,7 +162,6 @@ namespace spades {
 			Handle<client::IAudioDevice> audioDevice;
 			Handle<client::FontManager> fontManager;
 			Handle<KV6ScreenHelper> io;
-			Handle<client::IImage> cursorImg;
 
 			// --- Document -----------------------------------------------------
 			Handle<VoxelModel> model;
@@ -282,7 +282,7 @@ namespace spades {
 			void DispatchPointer(const PointerInput& e);
 
 			// --- Cursor / status ----------------------------------------------
-			Vector2 cursor;
+			SoftwareCursor softwareCursor;
 			std::string statusMessage;
 			float statusTimer = 0.0F;
 
