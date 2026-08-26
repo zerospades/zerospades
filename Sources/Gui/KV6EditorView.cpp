@@ -219,10 +219,17 @@ namespace spades {
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
-		                             client::FontManager* fm, const std::string& path, bool isNew)
-		    : renderer(r), audioDevice(dev), fontManager(fm), softwareCursor(*renderer),
-		      editorMenu(*this, *renderer, *fontManager, softwareCursor) {
+		                             client::FontManager* fm, SoftwareCursor* c,
+		                             const std::string& path, bool isNew)
+		    : renderer(r), audioDevice(dev), fontManager(fm) {
 			SPADES_MARK_FUNCTION();
+			if (c) {
+				softwareCursor = c;
+			} else {
+				ownedCursor = std::make_unique<SoftwareCursor>(*renderer);
+				softwareCursor = ownedCursor.get();
+			}
+			editorMenu = std::make_unique<EditorMenu>(*this, *renderer, *fontManager, *softwareCursor);
 			io = Handle<KV6ScreenHelper>::New();
 
 			BuildPresets();
@@ -426,7 +433,7 @@ namespace spades {
 		                                 IntVector3& out) {
 			if (camSW <= 0.0F || camSH <= 0.0F)
 				return false;
-			const Vector2& cursorPos = softwareCursor.GetPosition();
+			const Vector2& cursorPos = softwareCursor->GetPosition();
 			float sx = ((cursorPos.x - camVpX) / camSW) * 2.0F - 1.0F;
 			float sy = ((cursorPos.y - camVpY) / camSH) * 2.0F - 1.0F;
 			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
@@ -489,7 +496,7 @@ namespace spades {
 			if (camSW <= 0.0F || camSH <= 0.0F)
 				return;
 
-			const Vector2& cursorPos = softwareCursor.GetPosition();
+			const Vector2& cursorPos = softwareCursor->GetPosition();
 			float sx = ((cursorPos.x - camVpX) / camSW) * 2.0F - 1.0F;
 			float sy = ((cursorPos.y - camVpY) / camSH) * 2.0F - 1.0F;
 			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
@@ -1364,7 +1371,7 @@ namespace spades {
 			Vector3 p = GetPivot();
 			char buf[64];
 			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
-			editorMenu.OpenTextPrompt("Set pivot (x y z)", buf, [this](const std::string& s) {
+			editorMenu->OpenTextPrompt("Set pivot (x y z)", buf, [this](const std::string& s) {
 				std::string str = s;
 				for (char& c : str)
 					if (c == ',')
@@ -1618,7 +1625,7 @@ namespace spades {
 			client::IFont& font = fontManager->GetSmallGuiFont();
 			const std::vector<NaviFacet>& facets = NaviFacets();
 			Vector3 hdir;
-			bool hov = NaviCubeDir(softwareCursor.GetPosition(), hdir);
+			bool hov = NaviCubeDir(softwareCursor->GetPosition(), hdir);
 			// Draw bevels behind the faces: corners, then edges, then faces.
 			for (int pass = 0; pass < 3; pass++) {
 				for (const NaviFacet& f : facets) {
@@ -1713,7 +1720,7 @@ namespace spades {
 			PointerInput e;
 			e.button = b;
 			e.phase = ph;
-			e.pos = softwareCursor.GetPosition();
+			e.pos = softwareCursor->GetPosition();
 			e.delta = delta;
 			e.alt = altHeld;
 			e.ctrl = ctrlHeld;
@@ -1779,7 +1786,7 @@ namespace spades {
 			// maps to the toggled state and the cursor drives hover, so they highlight
 			// exactly like the in-game buttons.
 			auto button = [&](float x, const char* label, bool active, bool enabled) {
-				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, kTbY, kTbBtn, kTbH);
+				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, kTbY, kTbBtn, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
 				                     MakeVector2(kTbBtn, kTbH), label, MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, active, s);
@@ -1798,7 +1805,7 @@ namespace spades {
 
 			// Undo / Redo on the right edge, greyed out when there's nothing to do.
 			auto urButton = [&](float x, const char* label, bool enabled) {
-				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, kTbY, kUndoBtnW, kTbH);
+				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, kTbY, kUndoBtnW, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
 				                     MakeVector2(kUndoBtnW, kTbH), label, MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, false, s);
@@ -1882,7 +1889,7 @@ namespace spades {
 			for (int i = 0; i < t->SubToolCount(); i++) {
 				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
 				bool on = t->ActiveSubTool() == i;
-				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, by, kSubBtn, kTbH);
+				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, by, kSubBtn, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(kSubBtn, kTbH),
 				                     t->SubToolLabel(i), MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), true, hover, false, on, s);
@@ -1921,7 +1928,7 @@ namespace spades {
 					           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
 					                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
 				} else { // Bool toggle -> shared button painter, toggled when on
-					bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, by, w, kTbH);
+					bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, by, w, kTbH);
 					widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
 					                     op.label, MakeVector2(0.5F, 0.5F), "",
 					                     MakeVector2(1.0F, 0.5F), true, hover, false, op.bvalue, s);
@@ -1979,8 +1986,8 @@ namespace spades {
 				pitch = Clampf(pitch, -lim, lim);
 				return;
 			}
-			softwareCursor.Accumulate(dx, dy);
-			const Vector2& cursor = softwareCursor.GetPosition();
+			softwareCursor->Accumulate(dx, dy);
+			const Vector2& cursor = softwareCursor->GetPosition();
 			if (dragPick == 1) { UpdateSV(cursor); return; }
 			if (dragPick == 2) { UpdateHue(cursor); return; }
 
@@ -1995,7 +2002,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::WheelEvent(float x, float y) {
-			if (editorMenu.IsActive())
+			if (editorMenu->IsActive())
 				return;
 			if (orbitMode)
 				orbitDist = Clampf(orbitDist * (1.0F + y * 0.1F), 2.0F, 1000.0F);
@@ -2004,8 +2011,8 @@ namespace spades {
 		}
 
 		void KV6EditorView::KeyEvent(const std::string& key, bool down) {
-			const Vector2& cursor = softwareCursor.GetPosition();
-			if (editorMenu.KeyEvent(key, down))
+			const Vector2& cursor = softwareCursor->GetPosition();
+			if (editorMenu->KeyEvent(key, down))
 				return;
 
 			// While pasting, the mouse positions/places the clipboard; other keys
@@ -2118,9 +2125,9 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::TextInputEvent(const std::string& text) { editorMenu.TextInputEvent(text); }
-		bool KV6EditorView::AcceptsTextInput() { return editorMenu.AcceptsTextInput(); }
-		AABB2 KV6EditorView::GetTextInputRect() { return editorMenu.GetTextInputRect(); }
+		void KV6EditorView::TextInputEvent(const std::string& text) { editorMenu->TextInputEvent(text); }
+		bool KV6EditorView::AcceptsTextInput() { return editorMenu->AcceptsTextInput(); }
+		AABB2 KV6EditorView::GetTextInputRect() { return editorMenu->GetTextInputRect(); }
 
 		void KV6EditorView::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();
@@ -2140,7 +2147,7 @@ namespace spades {
 				}
 			}
 
-			if (!editorMenu.IsActive())
+			if (!editorMenu->IsActive())
 				UpdateMovement(dt);
 			if (statusTimer > 0.0F)
 				statusTimer -= dt;
@@ -2198,8 +2205,8 @@ namespace spades {
 			if (tool)
 				tool->DrawOverlay(*this);
 
-			editorMenu.Draw();
-			softwareCursor.Draw();
+			editorMenu->Draw();
+			softwareCursor->Draw();
 
 			// The runner is the only thing that presents, so the capture happens here
 			// rather than after the frame: `FrameDone` flushes everything drawn above so

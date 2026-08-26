@@ -65,10 +65,11 @@ namespace spades {
 				ui->SetupRenderer();
 		}
 
-		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew) {
+		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew,
+		                                      SoftwareCursor* cursor) {
 			try {
 				subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice, &*fontManager,
-				                                     path, isNew)
+				                                     cursor, path, isNew)
 				            .Cast<View>();
 			} catch (const std::exception& ex) {
 				SPLog("[!] Error while opening the KV6 editor: %s", ex.what());

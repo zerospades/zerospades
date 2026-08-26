@@ -55,13 +55,14 @@ namespace spades {
 		 *
 		 * Hosted by `MainScreen` as a `subview` (like the game `Client`), so the
 		 * Runner forwards input and frame events to it. It consumes relative mouse
-		 * motion to drive a spectator-style camera and tracks its own software
-		 * cursor for the 2D UI.
+		 * motion to drive a spectator-style camera and uses a software cursor for
+		 * the 2D UI (which may be shared across views).
 		 */
 		class KV6EditorView : public View, public IEditorContext, public KV6UndoStack::Sink, public IEditorMenuHost {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
-			              client::FontManager* fontManager, const std::string& path, bool isNew);
+			              client::FontManager* fontManager, SoftwareCursor* cursor,
+			              const std::string& path, bool isNew);
 
 			void MouseEvent(float x, float y) override;
 			void WheelEvent(float x, float y) override;
@@ -81,7 +82,7 @@ namespace spades {
 			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
 			IntVector3 PickSolid() const override { return MakeIntVector3(pickHX, pickHY, pickHZ); }
 			Vector3 ViewDir() const override { return camFwd; }
-			const Vector2& CursorPos() const override { return softwareCursor.GetPosition(); }
+			const Vector2& CursorPos() const override { return softwareCursor->GetPosition(); }
 			// Voxel whose centre is nearest where the cursor ray meets the plane
 			// (planePoint, normal). Lets tools place points in empty space.
 			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
@@ -283,12 +284,13 @@ namespace spades {
 			void DispatchPointer(const PointerInput& e);
 
 			// --- Cursor / status ----------------------------------------------
-			SoftwareCursor softwareCursor;
+			SoftwareCursor* softwareCursor = nullptr;
+			std::unique_ptr<SoftwareCursor> ownedCursor; // if no cursor was provided
 			std::string statusMessage;
 			float statusTimer = 0.0F;
 
 			// --- Menu / prompt -----------------------------------------------
-			EditorMenu editorMenu;
+			std::unique_ptr<EditorMenu> editorMenu;
 
 			// Document
 			void NewModel(int n, const std::string& path);

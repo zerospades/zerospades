@@ -32,8 +32,8 @@ namespace spades {
             position = MakeVector2(renderer->ScreenWidth() * 0.5F, renderer->ScreenHeight() * 0.5F);
         }
         void SoftwareCursor::Accumulate(float dx, float dy) {
-            position.x = Clampf(position.x + dx, 0.0F, renderer->ScreenWidth());
-            position.y = Clampf(position.y + dy, 0.0F, renderer->ScreenHeight());
+            position.x = Clamp(position.x + dx, 0.0F, renderer->ScreenWidth());
+            position.y = Clamp(position.y + dy, 0.0F, renderer->ScreenHeight());
         }
         void SoftwareCursor::SetPosition(const Vector2& p) { position = p; }
         void SoftwareCursor::Draw() const {
