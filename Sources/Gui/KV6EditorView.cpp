@@ -1610,6 +1610,7 @@ namespace spades {
 			// Set up mode buttons
 			std::vector<std::string> modeButtons = {"Object", "Edit", "Animation"};
 			toolbar->SetModeButtons(modeButtons);
+			toolbar->SetActiveModeButton(int(currentMode));
 
 			// Set up tool buttons
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;

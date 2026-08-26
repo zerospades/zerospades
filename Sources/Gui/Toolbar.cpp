@@ -43,6 +43,10 @@ namespace spades {
 			modeButtons = labels;
 		}
 
+		void Toolbar::SetActiveModeButton(int index) {
+			activeModeButton = index;
+		}
+
 		void Toolbar::SetToolButtons(const std::vector<ToolbarButton>& buttons) {
 			toolButtons = buttons;
 		}
@@ -107,8 +111,9 @@ namespace spades {
 
 			// Draw mode buttons
 			for (int i = 0; i < int(modeButtons.size()); i++) {
-				bool active = (i == 0); // Assume mode 0 is active (caller manages state)
-				button(ToolbarX(i), modeButtons[i].c_str(), active, i == 1);
+				bool active = (i == activeModeButton);
+				bool enabled = true; // All modes are available (could be restricted later)
+				button(ToolbarX(i), modeButtons[i].c_str(), active, enabled);
 			}
 
 			// Draw separator and tool buttons

@@ -54,6 +54,7 @@ namespace spades {
 			Toolbar() = default;
 
 			void SetModeButtons(const std::vector<std::string>& labels);
+			void SetActiveModeButton(int index);
 			void SetToolButtons(const std::vector<ToolbarButton>& buttons);
 			void SetUndoButton(bool enabled);
 			void SetRedoButton(bool enabled);
@@ -73,6 +74,7 @@ namespace spades {
 			std::vector<ToolbarButton> toolButtons;
 			bool undoEnabled = false;
 			bool redoEnabled = false;
+			int activeModeButton = 0;
 
 			float ToolbarX(int slot) const;
 			float UndoButtonX(float sw, bool redo) const;
