@@ -56,7 +56,7 @@ function Make-Pak
 Make-Pak -PakName pak002-Base.pak -RelativePaths `
   License/Credits-pak002-Base.md,
   Gfx, Scripts/Main.as,
-  Scripts/Gui, Scripts/Base, Shaders, Sounds/Feedback,
+  Scripts/Base, Shaders, Sounds/Feedback,
   Sounds/Misc, Sounds/Player, Textures
 
 Make-Pak -PakName pak005-Models.pak -RelativePaths `

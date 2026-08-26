@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/francoisnd/Desktop/dev/zerospades branch)",
+      "Bash(clang++ -x c++-header -std=c++17 -I. -IBuilt -I/usr/local/opt/openal-soft/include Sources/Gui/KV6EditorView.h -fsyntax-only)",
+      "Bash(./build/bin/ZeroSpades.app/Contents/MacOS/ZeroSpades --help)",
+      "Bash(awk '/^diff --git.*Client\\\\.cpp/,/^diff --git/ {print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(grep -E \"\\\\.\\(cpp|h|hpp\\)$\")",
+      "Bash(awk '/^diff --git.*ScreenShot\\\\.\\(cpp|h\\)/,/^diff --git/ {print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/^diff --git/ {file=$0; getline; getline} /RunFrameLate/ {print NR\": \"file; print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/^diff --git.*View\\\\.h/,/^diff --git/ {if\\(/RunFrameLate/ || /^diff --git/\\) print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/^diff --git.*Client\\\\.h/,/^diff --git/ {print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/^diff --git.*CMakeLists\\\\.txt/,/^diff --git/ {if\\(/^[+-].*\\\\.cpp|^[+-].*\\\\.h|^@@/\\) print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/class ChatLogSayWindow/,/^[[:space:]]*};/ {print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/namespace client {/,/namespace client/ {if\\(/ChatLogWindow::ChatLogWindow/\\) {p=1} if\\(p\\) print NR\": \"$0; if\\(p && /^[[:space:]]*}[[:space:]]*$/\\) {p=0}}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)",
+      "Bash(awk '/class ClientChatWindow/,/^[[:space:]]*};/ {print NR\": \"$0}' /Users/francoisnd/.claude/projects/-Users-francoisnd-Desktop-dev-zerospades/9c573f9d-9a4f-450f-8949-d6ebb6ac874c/tool-results/bpunaor02.txt)"
+    ]
+  }
+}

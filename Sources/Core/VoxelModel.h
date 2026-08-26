@@ -61,6 +61,16 @@ namespace spades {
 		static Handle<VoxelModel> LoadKV6(IStream&);
 
 		/**
+		 * Write this `VoxelModel` to a stream in the KV6 format.
+		 *
+		 * Only surface voxels (those with at least one air-adjacent face) are
+		 * written; fully enclosed interior voxels are omitted, as they are
+		 * reconstructed by `HollowFill` on load. The KV6 format cannot represent
+		 * material IDs, so they are discarded.
+		 */
+		void SaveKV6(IStream&) const;
+
+		/**
 		 * Replace the material ID with the specified value.
 		 */
 		void ForceMaterial(MaterialType newMaterialId);

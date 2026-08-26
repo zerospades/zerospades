@@ -19,10 +19,11 @@
 
 #pragma once
 
+#include <memory>
+
 #include "View.h"
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
-#include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace client {
@@ -30,6 +31,7 @@ namespace spades {
 	}
 	namespace gui {
 		class ConsoleHelper;
+		class ConsoleUI;
 
 		/**
 		 * This `View` wraps another `View` to provide the system console
@@ -68,9 +70,8 @@ namespace spades {
 			Handle<client::IAudioDevice> audioDevice;
 			Handle<View> subview;
 
-			// Scripting
 			Handle<ConsoleHelper> helper;
-			Handle<asIScriptObject> ui;
+			std::unique_ptr<ConsoleUI> ui;
 			bool ShouldInterceptInput();
 			void ToggleConsole();
 			void AddLine(const std::string&);

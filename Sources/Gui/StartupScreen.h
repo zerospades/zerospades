@@ -24,7 +24,6 @@
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Core/RefCountedObject.h>
-#include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace client {
@@ -32,6 +31,7 @@ namespace spades {
 	}
 	namespace gui {
 		class StartupScreenHelper;
+		class StartupScreenUI;
 		class StartupScreen : public View {
 			friend class StartupScreenHelper;
 			Handle<client::IRenderer> renderer;
@@ -41,7 +41,7 @@ namespace spades {
 			bool startRequested = false;
 
 			Handle<StartupScreenHelper> helper;
-			Handle<asIScriptObject> ui;
+			Handle<StartupScreenUI> ui;
 
 			void DoInit();
 
@@ -69,7 +69,6 @@ namespace spades {
 			bool NeedsAbsoluteMouseCoordinate() override;
 
 			void RunFrame(float dt) override;
-			void RunFrameLate(float dt) override;
 
 			void Closing() override;
 

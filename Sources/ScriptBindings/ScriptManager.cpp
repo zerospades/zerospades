@@ -88,6 +88,39 @@ namespace spades {
 		// Normalize the path (resolve .. and .)
 		includePath = NormalizePath(includePath);
 
+		// Wildcard include ("dir/*.as"): pull in every .as in the directory, so mods
+		// can add scripts (e.g. editor tools) by just dropping in a file. EnumFiles
+		// merges paks and mod folders and returns a sorted, de-duplicated set, so the
+		// result is deterministic and a mod file overrides a base file of the same name.
+		if (includePath.find('*') != std::string::npos) {
+			size_t slash = includePath.find_last_of('/');
+			std::string dir = (slash == std::string::npos) ? "" : includePath.substr(0, slash);
+			std::vector<std::string> names;
+			try {
+				names = FileManager::EnumFiles(("Scripts" + dir).c_str());
+			} catch (const std::exception& ex) {
+				SPLog("Failed to enumerate '%s':%s", dir.c_str(), ex.what());
+				return -1;
+			}
+			for (const std::string& name : names) {
+				if (name.size() < 3 || name.compare(name.size() - 3, 3, ".as") != 0)
+					continue;
+				std::string section = dir + "/" + name;
+				std::string contents;
+				try {
+					contents = FileManager::ReadAllBytes(("Scripts" + section).c_str());
+				} catch (const std::exception& ex) {
+					SPLog("Failed to include '%s':%s", section.c_str(), ex.what());
+					return -1;
+				}
+				SPLog("Loading script '%s'", section.c_str());
+				if (builder->AddSectionFromMemory(section.c_str(), contents.c_str(),
+				                                  (unsigned int)(contents.length()), 0) < 0)
+					return -1;
+			}
+			return 0;
+		}
+
 		// path validation should be done by filesystem...
 		std::string data;
 		try {

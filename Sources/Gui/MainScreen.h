@@ -25,7 +25,6 @@
 #include <Client/IRenderer.h>
 #include <Core/RefCountedObject.h>
 #include <Core/ServerAddress.h>
-#include <ScriptBindings/ScriptManager.h>
 
 namespace spades {
 	namespace client {
@@ -33,6 +32,8 @@ namespace spades {
 	}
 	namespace gui {
 		class MainScreenHelper;
+		class MainScreenUI;
+		class SoftwareCursor;
 		class MainScreen : public View {
 			friend class MainScreenHelper;
 			Handle<client::IRenderer> renderer;
@@ -42,7 +43,7 @@ namespace spades {
 			float timeToStartInitialization;
 
 			Handle<MainScreenHelper> helper;
-			Handle<asIScriptObject> ui;
+			Handle<MainScreenUI> ui;
 
 			void DrawStartupScreen();
 			void DoInit();
@@ -51,6 +52,7 @@ namespace spades {
 
 			std::string Connect(const ServerAddress &host);
 		std::string PlayDemo(const std::string &demoPath);
+			std::string OpenKV6Editor(const std::string &path, bool isNew, SoftwareCursor* cursor = nullptr);
 
 		protected:
 			~MainScreen();

@@ -57,8 +57,6 @@ namespace spades {
 
 			std::vector<MenuItem> items;
 
-			Vector2 cursorPos;
-
 			int selectedTeam;
 			WeaponType selectedWeapon;
 

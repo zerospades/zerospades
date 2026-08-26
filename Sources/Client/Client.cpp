@@ -48,6 +48,7 @@
 #include "TCProgressView.h"
 
 #include "BloodMarks.h"
+#include <Gui/SoftwareCursor.h>
 #include "Corpse.h"
 #include "SmokeSpriteEntity.h"
 
@@ -132,7 +133,6 @@ namespace spades {
 			  fontManager(fontManager),
 			  alertDisappearTime(-10000.0F),
 			  lastLocalCorpse(nullptr),
-			  nextScreenShotIndex(0),
 			  nextMapShotIndex(0),
 			  staffSpectating(false),
 			  spectatorPlayerNames(true) {
@@ -158,6 +158,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
+			cursor = stmp::make_unique<gui::SoftwareCursor>(*renderer);
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
@@ -794,14 +795,6 @@ namespace spades {
 				readyToClose = true;
 
 			time += dt;
-		}
-
-		void Client::RunFrameLate(float dt) {
-			SPADES_MARK_FUNCTION();
-
-			// Well done!
-			renderer->FrameDone();
-			renderer->Flip();
 		}
 
 		void Client::EnableDemoReplayFollow(const std::string& playerSpec) {

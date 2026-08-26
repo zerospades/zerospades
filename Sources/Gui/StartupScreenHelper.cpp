@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
+#include <set>
 #include <utility>
 #ifdef WIN32
 #include <direct.h>

@@ -21,25 +21,48 @@
 
 #pragma once
 
+#include <utility>
+#include <vector>
+
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Core/RefCountedObject.h>
-#include <Gui/View.h>
-#include <ScriptBindings/ScriptManager.h>
+#include <Gui/UI/Framework/UIManager.h>
+#include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
 	namespace client {
 		class FontManager;
 		class Client;
 		class ClientUIHelper;
+		class ClientMenu;
+		class ChatLogWindow;
+
 		class ClientUI : public RefCountedObject {
 			friend class ClientUIHelper;
+			friend class ClientMenu;
+			friend class ChatLogWindow;
+			friend class ClientChatWindow;
+
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audioDevice;
 			Handle<FontManager> fontManager;
-
 			Handle<ClientUIHelper> helper;
-			Handle<asIScriptObject> ui;
+
+			Handle<gui::ui::UIManager> manager;
+			Handle<gui::ui::UIElement> activeUI;
+
+			Handle<ChatLogWindow> chatLogWindow;
+			Handle<ClientMenu> clientMenu;
+
+			// The chat log only exists inside `chatLogWindow`, which a screen resize
+			// has to rebuild. Kept here so the rebuilt window can be replayed into.
+			std::vector<std::pair<std::string, Vector4>> chatLogRecords;
+
+			std::vector<gui::ui::CommandHistoryItem> chatHistory;
+
+			bool shouldExit = false;
+			float time = -1.0F;
 
 			// weak reference
 			Client* client;
@@ -47,9 +70,14 @@ namespace spades {
 
 			void SendChat(const std::string&, bool isGlobal);
 
+			/** Rebuilds the in-game screens after the screen extent changed. */
+			void ReloadScreens();
+
 			void AlertNotice(const std::string&);
 			void AlertWarning(const std::string&);
 			void AlertError(const std::string&);
+
+			void SetActiveUI(gui::ui::UIElement* value);
 
 		protected:
 			~ClientUI();
@@ -60,6 +88,10 @@ namespace spades {
 
 			client::IRenderer* GetRenderer() { return &*renderer; }
 			client::IAudioDevice* GetAudioDevice() { return &*audioDevice; }
+			FontManager& GetFontManager() { return *fontManager; }
+			ClientUIHelper& GetHelper() { return *helper; }
+			gui::ui::UIManager& GetUIManager() { return *manager; }
+			std::vector<gui::ui::CommandHistoryItem>& GetChatHistory() { return chatHistory; }
 
 			void MouseEvent(float x, float y);
 			void WheelEvent(float x, float y);
@@ -77,6 +109,8 @@ namespace spades {
 
 			void RecordChatLog(const std::string&, Vector4 col = {1, 1, 1, 0.8F});
 
+			bool IsChatEnabled();
+
 			void EnterClientMenu();
 			void EnterGlobalChatWindow();
 			void EnterTeamChatWindow();
@@ -87,6 +121,5 @@ namespace spades {
 			bool IsIgnored(const std::string& key);
 			void SetIgnored(const std::string& key);
 		};
-		;
 	} // namespace client
 } // namespace spades
