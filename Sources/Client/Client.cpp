@@ -48,6 +48,7 @@
 #include "TCProgressView.h"
 
 #include "BloodMarks.h"
+#include <Gui/SoftwareCursor.h>
 #include "Corpse.h"
 #include "SmokeSpriteEntity.h"
 
@@ -155,6 +156,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
+			cursor = stmp::make_unique<gui::SoftwareCursor>(*renderer);
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 

@@ -43,6 +43,7 @@
 #include <Core/Stopwatch.h>
 #include <Core/VersionInfo.h>
 #include <Gui/View.h>
+#include <Gui/SoftwareCursor.h>
 
 #include "SoundIndicatorEntity.h"
 
@@ -172,6 +173,9 @@ namespace spades {
 
 			// pie menu
 			std::unique_ptr<PieMenuView> pieMenuView;
+
+			// unified cursor used by all UI overlays
+			std::unique_ptr<gui::SoftwareCursor> cursor;
 
 			// player state
 			PlayerInput playerInput;
@@ -628,6 +632,7 @@ namespace spades {
 			IRenderer& GetRenderer() { return *renderer; }
 			SceneDefinition GetLastSceneDef() { return lastSceneDef; }
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
+			gui::SoftwareCursor* GetCursor() { return cursor.get(); }
 
 			float GetTime() { return time; }
 			const std::vector<SoundFeedbackIndicator>& GetSoundFeedbackIndicators() { return soundFeedbackIndicators; }
