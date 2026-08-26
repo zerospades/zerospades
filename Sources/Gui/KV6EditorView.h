@@ -285,6 +285,7 @@ namespace spades {
 			std::unique_ptr<Toolbar> toolbar;
 			std::unique_ptr<OptionBar> optionBar;
 			std::unique_ptr<ColorPicker> colorPicker;
+			float screenWidth = 1024.0F; // cache for toolbar hit detection
 
 			// Document
 			void NewModel(int n, const std::string& path);

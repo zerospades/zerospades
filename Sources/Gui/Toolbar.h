@@ -58,7 +58,7 @@ namespace spades {
 			void SetUndoButton(bool enabled);
 			void SetRedoButton(bool enabled);
 
-			ClickResult HitTest(const Vector2& p);
+			ClickResult HitTest(const Vector2& p, float screenWidth);
 			void Draw(client::IRenderer& renderer, client::FontManager& fontManager,
 			         const Vector2& cursorPos, bool menuActive, float screenWidth);
 

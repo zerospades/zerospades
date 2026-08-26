@@ -1582,6 +1582,7 @@ namespace spades {
 		// Two stacked full-width bars at the very top: a ribbon (title/filename)
 		// above a left-aligned toolbar. The 3D viewport is drawn below them.
 		void KV6EditorView::DrawToolbar(float sw, float sh) {
+			screenWidth = sw; // cache for hit detection in MouseEvent
 			(void)sh;
 			if (!toolbar) return;
 
@@ -1772,6 +1773,21 @@ namespace spades {
 
 				// Check if cursor is over the bars
 				if (cursor.y < BarsH()) {
+					// Check toolbar hits
+					if (toolbar) {
+						auto hit = toolbar->HitTest(cursor, screenWidth);
+						if (hit.type != Toolbar::ClickType::None) {
+							if (hit.type == Toolbar::ClickType::Mode && toolbar->OnModeClicked)
+								toolbar->OnModeClicked(hit.index);
+							else if (hit.type == Toolbar::ClickType::Tool && toolbar->OnToolClicked)
+								toolbar->OnToolClicked(hit.index);
+							else if (hit.type == Toolbar::ClickType::Undo && toolbar->OnUndoClicked)
+								toolbar->OnUndoClicked();
+							else if (hit.type == Toolbar::ClickType::Redo && toolbar->OnRedoClicked)
+								toolbar->OnRedoClicked();
+							return;
+						}
+					}
 					// Toolbar and option bar click handling is delegated to their
 					// callbacks which are wired in the constructor
 					return;

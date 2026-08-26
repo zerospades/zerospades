@@ -68,7 +68,7 @@ namespace spades {
 			return OverlayInRect(p, x, y, w, h);
 		}
 
-		Toolbar::ClickResult Toolbar::HitTest(const Vector2& p) {
+		Toolbar::ClickResult Toolbar::HitTest(const Vector2& p, float screenWidth) {
 			for (int i = 0; i < int(modeButtons.size()); i++) {
 				if (InRect(p, ToolbarX(i), kTbY, kTbBtn, kTbH))
 					return {ClickType::Mode, i};
@@ -77,8 +77,13 @@ namespace spades {
 				if (InRect(p, ToolbarX(3 + i), kTbY, kTbBtn, kTbH))
 					return {ClickType::Tool, i};
 			}
-			// Note: screenWidth is needed but not stored, so we need to pass it to HitTest
-			// For now, we'll assume undo/redo are always at fixed positions
+			// Undo / Redo buttons on the right edge
+			float undoX = UndoButtonX(screenWidth, false);
+			float redoX = UndoButtonX(screenWidth, true);
+			if (InRect(p, undoX, kTbY, kUndoBtnW, kTbH))
+				return {ClickType::Undo, -1};
+			if (InRect(p, redoX, kTbY, kUndoBtnW, kTbH))
+				return {ClickType::Redo, -1};
 			return {};
 		}
 
