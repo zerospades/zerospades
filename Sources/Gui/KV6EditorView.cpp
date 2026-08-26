@@ -68,14 +68,6 @@ namespace spades {
 			const float kToolbarH = 32.0F;
 			const float kSubBarH = 28.0F; // secondary toolbar (active tool's sub-tools)
 			const float kBarsH = kRibbonH + kToolbarH + kSubBarH; // always-present bars
-			const float kTbBtn = 84.0F, kTbH = 24.0F, kTbGap = 2.0F, kTbSep = 14.0F;
-			const float kSubBtn = 88.0F;  // sub-tool button width
-			const float kUndoBtnW = 50.0F; // Undo / Redo button width (toolbar right edge)
-			const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
-			const float kTbX0 = 12.0F; // toolbar sticks to the left edge
-			const float kMirW = 24.0F, kMirLabelW = 50.0F; // option toggle / group label
-			const float kColorW = 46.0F;                   // current-colour swatch
-			const float kLabelW = 190.0F;                  // read-only readout (e.g. pivot)
 
 			// Pack a (non-negative) voxel coordinate into a selection-set key.
 			int64_t SelKey(int x, int y, int z) {
@@ -232,9 +224,35 @@ namespace spades {
 			editorMenu = std::make_unique<EditorMenu>(*this, *renderer, *fontManager, *softwareCursor);
 			io = Handle<KV6ScreenHelper>::New();
 
-			BuildPresets();
-			RGBToHSV(currentColor);
-			LayoutPicker();
+			// Initialize the UI components
+			toolbar = std::make_unique<Toolbar>();
+			optionBar = std::make_unique<OptionBar>();
+			colorPicker = std::make_unique<ColorPicker>();
+
+			// Build and set color picker presets (grayscale ramp + 8 hues)
+			std::vector<uint32_t> presets;
+			const int presetCols = 8;
+			for (int c = 0; c < presetCols; c++) {
+				float g = float(c) / float(presetCols - 1);
+				presets.push_back(PackRGB(g, g, g));
+			}
+			for (int c = 0; c < presetCols; c++)
+				presets.push_back(HSV(float(c) / float(presetCols), 1.0F, 1.0F));
+			colorPicker->SetPresets(presets, presetCols);
+			colorPicker->SetColor(currentColor);
+
+			// Wire up toolbar callbacks
+			toolbar->OnModeClicked = [this](int idx) { currentMode = EditorMode(idx); };
+			toolbar->OnToolClicked = [this](int idx) { activeTool = idx; };
+			toolbar->OnUndoClicked = [this]() { Undo(); };
+			toolbar->OnRedoClicked = [this]() { Redo(); };
+
+			// Wire up color picker callbacks
+			colorPicker->OnColorChanged = [this](uint32_t c) { currentColor = c; };
+			colorPicker->OnEyedropperToggled = [this](bool enabled) {
+				pickMode = enabled;
+				SetStatus(enabled ? "Pick mode: click a voxel" : "Pick mode off");
+			};
 
 			// The Edit-mode tools come from the registry (toolbar order = registration).
 			// Pivot is leftmost, but open on Draw so the user can start modelling.
@@ -726,43 +744,13 @@ namespace spades {
 			                   float((c >> 16) & 0xFF) / 255.0F, 1.0F);
 		}
 
-		void KV6EditorView::BuildPresets() {
-			presets.clear();
-			for (int c = 0; c < presetCols; c++) {
-				float g = float(c) / float(presetCols - 1);
-				presets.push_back(PackRGB(g, g, g));
-			}
-			for (int c = 0; c < presetCols; c++)
-				presets.push_back(HSV(float(c) / float(presetCols), 1.0F, 1.0F));
-		}
-
-		void KV6EditorView::RGBToHSV(uint32_t c) {
-			float r = float(c & 0xFF) / 255.0F;
-			float g = float((c >> 8) & 0xFF) / 255.0F;
-			float b = float((c >> 16) & 0xFF) / 255.0F;
-			float mx = std::max(r, std::max(g, b));
-			float mn = std::min(r, std::min(g, b));
-			float d = mx - mn;
-			val = mx;
-			sat = (mx <= 0.0F) ? 0.0F : d / mx;
-			float h = 0.0F;
-			if (d > 0.0F) {
-				if (mx == r) h = (g - b) / d + (g < b ? 6.0F : 0.0F);
-				else if (mx == g) h = (b - r) / d + 2.0F;
-				else h = (r - g) / d + 4.0F;
-				h /= 6.0F;
-			}
-			hue = h;
-		}
-
-		void KV6EditorView::SyncColor() { currentColor = HSV(hue, sat, val); }
-
 		void KV6EditorView::Eyedropper() {
 			DoPick();
 			if (!pickHit)
 				return;
 			currentColor = model->GetColor(pickHX, pickHY, pickHZ) & 0xFFFFFF;
-			RGBToHSV(currentColor);
+			if (colorPicker)
+				colorPicker->SetColor(currentColor);
 			SetStatus("Picked colour");
 		}
 
@@ -1030,84 +1018,9 @@ namespace spades {
 
 		// --- Layout / hit testing --------------------------------------------
 
-		void KV6EditorView::LayoutPicker() {
-			float sw = renderer->ScreenWidth();
-			float sh = renderer->ScreenHeight();
-			float bottomClear = 44.0F;
-
-			// Navigation cube: top-right corner of the viewport, just under the
-			// toolbar/ribbon bars.
-			float gizBox = 174.0F;
-			gizR = gizBox * 0.5F - 14.0F;
-			gizCx = sw - 16.0F - gizBox * 0.5F;
-			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
-
-			presSwatch = (svSize + 6.0F + hueW) / float(presetCols);
-			float contentW = svSize + 6.0F + hueW;
-			prevH = 22.0F;
-			float headerH = 18.0F; // title bar with the close button
-			pkW = 8.0F * 2.0F + contentW;
-			pkH = 8.0F * 2.0F + headerH + svSize + 6.0F + prevH + 6.0F + 2.0F * presSwatch;
-			pkX = sw - 16.0F - pkW;
-			pkY = sh - bottomClear - pkH; // picker now sits at the bottom-right
-			closeS = 13.0F;
-			closeX = pkX + pkW - 8.0F - closeS;
-			closeY = pkY + 5.0F;
-			svX = pkX + 8.0F;
-			svY = pkY + 8.0F + headerH;
-			hueX = svX + svSize + 6.0F;
-			hueY = svY;
-			prevY = svY + svSize + 6.0F;
-			eyeS = prevH;
-			prevX = svX;
-			prevW = contentW - eyeS - 6.0F;
-			eyeX = prevX + prevW + 6.0F;
-			eyeY = prevY;
-			presX = svX;
-			presY = prevY + prevH + 6.0F;
-		}
-
-		bool KV6EditorView::CursorOverPicker(const Vector2& p) const {
-			return pickerOpen && p.x >= pkX && p.x < pkX + pkW && p.y >= pkY && p.y < pkY + pkH;
-		}
-
 		bool KV6EditorView::InRect(const Vector2& p, float x, float y, float w, float h) const {
 			return OverlayInRect(p, x, y, w, h);
 		}
-
-		void KV6EditorView::UpdateSV(const Vector2& p) {
-			sat = Clampf((p.x - svX) / svSize, 0.0F, 1.0F);
-			val = Clampf(1.0F - (p.y - svY) / svSize, 0.0F, 1.0F);
-			SyncColor();
-		}
-		void KV6EditorView::UpdateHue(const Vector2& p) {
-			hue = Clampf((p.y - hueY) / svSize, 0.0F, 1.0F);
-			SyncColor();
-		}
-
-		bool KV6EditorView::PickerMouseDown(const Vector2& p) {
-			if (!pickerOpen)
-				return false;
-			if (InRect(p, closeX, closeY, closeS, closeS)) { pickerOpen = false; return true; }
-			if (InRect(p, svX, svY, svSize, svSize)) { dragPick = 1; UpdateSV(p); return true; }
-			if (InRect(p, hueX, hueY, hueW, svSize)) { dragPick = 2; UpdateHue(p); return true; }
-			if (InRect(p, eyeX, eyeY, eyeS, eyeS)) {
-				pickMode = !pickMode;
-				SetStatus(pickMode ? "Pick mode: click a voxel" : "Pick mode off");
-				return true;
-			}
-			for (size_t i = 0; i < presets.size(); i++) {
-				float x = presX + float(int(i) % presetCols) * presSwatch;
-				float y = presY + float(int(i) / presetCols) * presSwatch;
-				if (InRect(p, x, y, presSwatch, presSwatch)) {
-					currentColor = presets[i];
-					RGBToHSV(currentColor);
-					return true;
-				}
-			}
-			return CursorOverPicker(p);
-		}
-
 
 		// --- Drawing primitives ----------------------------------------------
 
@@ -1474,75 +1387,6 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::DrawPicker() {
-			if (!pickerOpen)
-				return;
-			float pad = 2.0F;
-			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.55F));
-			FillRect(pkX, pkY, pkW, pkH);
-
-			// Header: "Colour" + close button.
-			client::IFont& hf = fontManager->GetSmallGuiFont();
-			hf.Draw("Colour", MakeVector2(pkX + 8.0F, pkY + 4.0F), 0.75F,
-			        MakeVector4(0.85F, 0.85F, 0.85F, 1.0F));
-			ColorNP(MakeVector4(0.35F, 0.18F, 0.18F, 1.0F));
-			FillRect(closeX, closeY, closeS, closeS);
-			StrokeRect(closeX, closeY, closeS, closeS, 1.0F, MakeVector4(0.7F, 0.5F, 0.5F, 0.9F));
-			DrawLine2D(MakeVector2(closeX + 3.0F, closeY + 3.0F),
-			           MakeVector2(closeX + closeS - 3.0F, closeY + closeS - 3.0F), 1.5F,
-			           MakeVector4(1, 1, 1, 0.9F));
-			DrawLine2D(MakeVector2(closeX + closeS - 3.0F, closeY + 3.0F),
-			           MakeVector2(closeX + 3.0F, closeY + closeS - 3.0F), 1.5F,
-			           MakeVector4(1, 1, 1, 0.9F));
-
-			int cells = 24;
-			float cw = svSize / float(cells);
-			for (int yi = 0; yi < cells; yi++)
-			for (int xi = 0; xi < cells; xi++) {
-				float s = (float(xi) + 0.5F) / float(cells);
-				float v = 1.0F - (float(yi) + 0.5F) / float(cells);
-				ColorNP(ColorToVec(HSV(hue, s, v)));
-				FillRect(svX + float(xi) * cw, svY + float(yi) * cw, cw + 0.5F, cw + 0.5F);
-			}
-			float mx = svX + sat * svSize;
-			float my = svY + (1.0F - val) * svSize;
-			ColorNP(MakeVector4(1.0F, 1.0F, 1.0F, 0.9F));
-			FillRect(mx - 4.0F, my - 1.0F, 8.0F, 2.0F);
-			FillRect(mx - 1.0F, my - 4.0F, 2.0F, 8.0F);
-
-			int hcells = 24;
-			float hh = svSize / float(hcells);
-			for (int i = 0; i < hcells; i++) {
-				ColorNP(ColorToVec(HSV((float(i) + 0.5F) / float(hcells), 1.0F, 1.0F)));
-				FillRect(hueX, hueY + float(i) * hh, hueW, hh + 0.5F);
-			}
-			float hy = hueY + hue * svSize;
-			ColorNP(MakeVector4(1.0F, 1.0F, 1.0F, 0.9F));
-			FillRect(hueX - 2.0F, hy - 1.5F, hueW + 4.0F, 3.0F);
-
-			ColorNP(ColorToVec(currentColor));
-			FillRect(prevX, prevY, prevW, prevH);
-
-			ColorNP(pickMode ? MakeVector4(0.18F, 0.45F, 0.24F, 1.0F)
-			                 : MakeVector4(0.18F, 0.18F, 0.20F, 1.0F));
-			FillRect(eyeX, eyeY, eyeS, eyeS);
-			DrawLine2D(MakeVector2(eyeX + 5.0F, eyeY + eyeS - 5.0F),
-			           MakeVector2(eyeX + eyeS - 5.0F, eyeY + 5.0F), 2.5F,
-			           MakeVector4(1.0F, 1.0F, 1.0F, 0.9F));
-			ColorNP(ColorToVec(currentColor));
-			FillRect(eyeX + 4.0F, eyeY + eyeS - 8.0F, 4.0F, 4.0F);
-			StrokeRect(eyeX, eyeY, eyeS, eyeS, pickMode ? 2.0F : 1.0F,
-			           pickMode ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
-			                    : MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
-
-			for (size_t i = 0; i < presets.size(); i++) {
-				float x = presX + float(int(i) % presetCols) * presSwatch;
-				float y = presY + float(int(i) / presetCols) * presSwatch;
-				ColorNP(ColorToVec(presets[i]));
-				FillRect(x, y, presSwatch - pad, presSwatch - pad);
-			}
-		}
-
 		// --- Navigation cube -------------------------------------------------
 
 		void KV6EditorView::FillTri(const Vector2& A, const Vector2& B, const Vector2& C,
@@ -1737,81 +1581,33 @@ namespace spades {
 		//
 		// Two stacked full-width bars at the very top: a ribbon (title/filename)
 		// above a left-aligned toolbar. The 3D viewport is drawn below them.
-
-		static const char* kModeNames[3] = {"Object", "Edit", "Animation"};
-
-		// X of toolbar slot `i` (modes 0..2, then a separator, then tools 3..).
-		static float ToolbarX(int slot, int toolCount) {
-			float x = kTbX0 + float(slot) * (kTbBtn + kTbGap);
-			if (slot >= 3 && toolCount > 0)
-				x += kTbSep;
-			return x;
-		}
-
-		float KV6EditorView::UndoButtonX(float sw, bool redo) const {
-			float undoX = sw - 12.0F - 2.0F * kUndoBtnW - kTbGap;
-			return redo ? undoX + kUndoBtnW + kTbGap : undoX;
-		}
-
-		KV6EditorView::ToolbarHit KV6EditorView::ToolbarHitTest(const Vector2& p) {
-			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
-			for (int i = 0; i < 3; i++) {
-				if (InRect(p, ToolbarX(i, toolCount), kTbY, kTbBtn, kTbH))
-					return {ToolbarHit::Mode, i};
-			}
-			for (int i = 0; i < toolCount; i++) {
-				if (InRect(p, ToolbarX(3 + i, toolCount), kTbY, kTbBtn, kTbH))
-					return {ToolbarHit::Tool, i};
-			}
-			float sw = renderer->ScreenWidth();
-			if (InRect(p, UndoButtonX(sw, false), kTbY, kUndoBtnW, kTbH))
-				return {ToolbarHit::Undo, 0};
-			if (InRect(p, UndoButtonX(sw, true), kTbY, kUndoBtnW, kTbH))
-				return {ToolbarHit::Redo, 0};
-			return {};
-		}
-
 		void KV6EditorView::DrawToolbar(float sw, float sh) {
 			(void)sh;
-			client::IFont& font = fontManager->GetSmallGuiFont();
-			// Match the editor's Esc menu: same font (small GUI) at full scale.
-			float s = 1.0F;
+			if (!toolbar) return;
+
+			// Set up mode buttons
+			std::vector<std::string> modeButtons = {"Object", "Edit", "Animation"};
+			toolbar->SetModeButtons(modeButtons);
+
+			// Set up tool buttons
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
-
-			// Full-width toolbar band.
-			ColorNP(MakeVector4(0.10F, 0.10F, 0.12F, 1.0F));
-			FillRect(0.0F, kRibbonH, sw, kToolbarH);
-
-			// Buttons share the game's look/behaviour via the C++ painter; `active`
-			// maps to the toggled state and the cursor drives hover, so they highlight
-			// exactly like the in-game buttons.
-			auto button = [&](float x, const char* label, bool active, bool enabled) {
-				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, kTbY, kTbBtn, kTbH);
-				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
-				                     MakeVector2(kTbBtn, kTbH), label, MakeVector2(0.5F, 0.5F), "",
-				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, active, s);
-			};
-
-			for (int i = 0; i < 3; i++)
-				button(ToolbarX(i, toolCount), kModeNames[i], int(currentMode) == i, i == 1);
-
-			if (toolCount > 0) {
-				float sx = ToolbarX(3, toolCount) - kTbSep * 0.5F - kTbGap;
-				ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
-				FillRect(sx, kTbY + 3.0F, 1.0F, kTbH - 6.0F);
-				for (int i = 0; i < toolCount; i++)
-					button(ToolbarX(3 + i, toolCount), tools[i]->Label(), activeTool == i, true);
+			std::vector<Toolbar::ToolbarButton> toolButtons;
+			for (int i = 0; i < toolCount; i++) {
+				Toolbar::ToolbarButton btn;
+				btn.label = tools[i]->Label();
+				btn.enabled = true;
+				btn.active = (activeTool == i);
+				toolButtons.push_back(btn);
 			}
+			toolbar->SetToolButtons(toolButtons);
 
-			// Undo / Redo on the right edge, greyed out when there's nothing to do.
-			auto urButton = [&](float x, const char* label, bool enabled) {
-				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, kTbY, kUndoBtnW, kTbH);
-				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
-				                     MakeVector2(kUndoBtnW, kTbH), label, MakeVector2(0.5F, 0.5F), "",
-				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, false, s);
-			};
-			urButton(UndoButtonX(sw, false), "Undo", undo.CanUndo());
-			urButton(UndoButtonX(sw, true), "Redo", undo.CanRedo());
+			// Set undo/redo state
+			toolbar->SetUndoButton(undo.CanUndo());
+			toolbar->SetRedoButton(undo.CanRedo());
+
+			// Draw the toolbar
+			toolbar->Draw(*renderer, *fontManager, softwareCursor->GetPosition(),
+					editorMenu->IsActive(), sw);
 		}
 
 		bool KV6EditorView::MirrorOn(int axis) const {
@@ -1827,130 +1623,43 @@ namespace spades {
 			return o->GetBool(ids[axis]);
 		}
 
-		int KV6EditorView::SubToolbarHitTest(const Vector2& p) {
-			EditorTool* t = ActiveTool();
-			if (!t || t->SubToolCount() == 0)
-				return -1;
-			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
-			for (int i = 0; i < t->SubToolCount(); i++) {
-				if (InRect(p, kTbX0 + float(i) * (kSubBtn + kTbGap), by, kSubBtn, kTbH))
-					return i;
-			}
-			return -1;
-		}
-
-		// X (and width via outW) of the active tool's option `i`, laid out after the
-		// sub-tool buttons. Options in a new group are preceded by a separator and,
-		// if the group is named, room for its label.
-		float KV6EditorView::OptionRect(int i, float& outW) {
-			outW = 0.0F;
-			EditorTool* t = ActiveTool();
-			ToolOptions* o = t ? t->Options() : nullptr;
-			if (!o)
-				return 0.0F;
-			float x = kTbX0 + float(t->SubToolCount()) * (kSubBtn + kTbGap);
-			std::string prevGroup;
-			bool first = true;
-			for (int k = 0; k < o->Count(); k++) {
-				const ToolOption& op = o->At(k);
-				bool newGroup = first || op.group != prevGroup;
-				if (newGroup) {
-					x += kTbSep; // separator before a new group
-					if (!op.group.empty())
-						x += kMirLabelW; // room for the group label
-				} else {
-					x += kTbGap; // gap between items in the same group
-				}
-				float w = (op.type == ToolOption::Type::Color)
-				            ? kColorW
-				            : (op.type == ToolOption::Type::Label ? kLabelW : kMirW);
-				if (k == i) {
-					outW = w;
-					return x;
-				}
-				x += w;
-				prevGroup = op.group;
-				first = false;
-			}
-			return x;
-		}
-
 		void KV6EditorView::DrawSubToolbar(float sw) {
-			client::IFont& font = fontManager->GetSmallGuiFont();
-			// Match the editor's Esc menu / main toolbar: small GUI font at full scale.
-			float s = 1.0F;
-			float bandY = kRibbonH + kToolbarH;
-			float by = bandY + (kSubBarH - kTbH) * 0.5F;
-			ColorNP(MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
-			FillRect(0.0F, bandY, sw, kSubBarH); // band is always present
+			(void)sw;
+			if (!optionBar || !ActiveTool()) return;
+
+			// Build sub-tool buttons for the option bar
+			std::vector<OptionBar::SubToolButton> subTools;
 			EditorTool* t = ActiveTool();
-			if (!t)
-				return;
 			for (int i = 0; i < t->SubToolCount(); i++) {
-				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
-				bool on = t->ActiveSubTool() == i;
-				bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, by, kSubBtn, kTbH);
-				widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(kSubBtn, kTbH),
-				                     t->SubToolLabel(i), MakeVector2(0.5F, 0.5F), "",
-				                     MakeVector2(1.0F, 0.5F), true, hover, false, on, s);
+				OptionBar::SubToolButton btn;
+				btn.label = t->SubToolLabel(i);
+				btn.active = (t->ActiveSubTool() == i);
+				subTools.push_back(btn);
 			}
+			optionBar->SetSubToolButtons(subTools);
 
-			// The tool's declarative options (toggles, colour swatch), laid out
-			// generically after the sub-tool buttons.
+			// Build options for the tool
+			std::vector<OptionBar::Option> options;
 			ToolOptions* opts = t->Options();
-			if (!opts)
-				return;
-			std::string prevGroup;
-			bool first = true;
-			for (int i = 0; i < opts->Count(); i++) {
-				const ToolOption& op = opts->At(i);
-				float w;
-				float x = OptionRect(i, w);
-				bool newGroup = first || op.group != prevGroup;
-				if (newGroup) {
-					// Separator before the group; named groups also get a label.
-					float labelW = op.group.empty() ? 0.0F : kMirLabelW;
-					ColorNP(MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-					FillRect(x - labelW - kTbSep * 0.5F, by + 2.0F, 1.0F, kTbH - 4.0F);
-					if (!op.group.empty())
-						font.Draw(op.group,
-						          MakeVector2(x - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F), s,
-						          MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
+			if (opts) {
+				for (int i = 0; i < opts->Count(); i++) {
+					const ToolOption& op = opts->At(i);
+					OptionBar::Option opt;
+					opt.group = op.group;
+					opt.label = op.label;
+					opt.type = (op.type == ToolOption::Type::Color) ? OptionBar::OptionType::Color
+							 : (op.type == ToolOption::Type::Label) ? OptionBar::OptionType::Label
+							 : OptionBar::OptionType::Bool;
+					opt.bvalue = op.bvalue;
+					opt.color = currentColor;
+					options.push_back(opt);
 				}
-				if (op.type == ToolOption::Type::Label) {
-					Vector2 ts = font.Measure(op.label);
-					font.Draw(op.label, MakeVector2(x, by + (kTbH - ts.y * s) * 0.5F), s,
-					          MakeVector4(0.85F, 0.85F, 0.9F, 1.0F));
-				} else if (op.type == ToolOption::Type::Color) {
-					ColorNP(ColorToVec(currentColor));
-					FillRect(x, by, w, kTbH);
-					StrokeRect(x, by, w, kTbH, pickerOpen ? 2.0F : 1.0F,
-					           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
-					                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
-				} else { // Bool toggle -> shared button painter, toggled when on
-					bool hover = !editorMenu->IsActive() && InRect(softwareCursor->GetPosition(), x, by, w, kTbH);
-					widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
-					                     op.label, MakeVector2(0.5F, 0.5F), "",
-					                     MakeVector2(1.0F, 0.5F), true, hover, false, op.bvalue, s);
-				}
-				prevGroup = op.group;
-				first = false;
 			}
-		}
+			optionBar->SetOptions(options);
 
-		int KV6EditorView::SubToolbarOptionAt(const Vector2& p) {
-			EditorTool* t = ActiveTool();
-			ToolOptions* o = t ? t->Options() : nullptr;
-			if (!o)
-				return -1;
-			float by = kRibbonH + kToolbarH + (kSubBarH - kTbH) * 0.5F;
-			for (int i = 0; i < o->Count(); i++) {
-				float w;
-				float x = OptionRect(i, w);
-				if (InRect(p, x, by, w, kTbH))
-					return i;
-			}
-			return -1;
+			// Draw the option bar
+			optionBar->Draw(*renderer, *fontManager, softwareCursor->GetPosition(),
+					editorMenu->IsActive(), sw);
 		}
 
 		void KV6EditorView::DrawRibbon(float sw) {
@@ -1988,8 +1697,11 @@ namespace spades {
 			}
 			softwareCursor->Accumulate(dx, dy);
 			const Vector2& cursor = softwareCursor->GetPosition();
-			if (dragPick == 1) { UpdateSV(cursor); return; }
-			if (dragPick == 2) { UpdateHue(cursor); return; }
+
+			// Forward mouse motion to color picker if it's open
+			if (colorPicker && colorPicker->IsOpen()) {
+				colorPicker->MouseMove(cursor);
+			}
 
 			// Forward cursor motion over the viewport to the active tool as a Move
 			// (no button) or Drag (button held) event.
@@ -2040,49 +1752,36 @@ namespace spades {
 
 			if (key == "LeftMouseButton") {
 				if (!down) {
-					dragPick = 0;
 					lmbHeld = false;
+					if (colorPicker)
+						colorPicker->MouseUp();
 					DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Up));
 					return;
 				}
-				ToolbarHit hit = ToolbarHitTest(cursor);
-				if (hit.kind == ToolbarHit::Mode) {
-					if (hit.index != 1)
-						SetStatus("Only Edit mode is available for KV6 models");
-					return;
-				}
-				if (hit.kind == ToolbarHit::Tool) {
-					if (hit.index != activeTool) {
-						if (EditorTool* t = ActiveTool()) t->OnDeactivate(*this);
-						activeTool = hit.index;
-						if (EditorTool* t = ActiveTool()) t->OnActivate(*this);
+
+				// Check if color picker handles this click
+				if (colorPicker && colorPicker->IsOpen()) {
+					ColorPicker::ClickResult result = colorPicker->HitTest(cursor);
+					if (result.type != ColorPicker::ClickType::None) {
+						if (result.type == ColorPicker::ClickType::Close) {
+							colorPicker->Close();
+						}
+						return;
 					}
+				}
+
+				// Check if cursor is over the bars
+				if (cursor.y < BarsH()) {
+					// Toolbar and option bar click handling is delegated to their
+					// callbacks which are wired in the constructor
 					return;
 				}
-				if (hit.kind == ToolbarHit::Undo) { Undo(); return; }
-				if (hit.kind == ToolbarHit::Redo) { Redo(); return; }
-				int sub = SubToolbarHitTest(cursor);
-				if (sub >= 0) {
-					if (EditorTool* t = ActiveTool()) t->SetSubTool(*this, sub);
-					return;
-				}
-				int opt = SubToolbarOptionAt(cursor);
-				if (opt >= 0) {
-					ToolOptions* o = ActiveTool() ? ActiveTool()->Options() : nullptr;
-					if (o) {
-						ToolOption& op = o->At(opt);
-						if (op.type == ToolOption::Type::Color)
-							pickerOpen = !pickerOpen; // open/close the colour picker
-						else if (op.type == ToolOption::Type::Bool)
-							op.bvalue = !op.bvalue; // toggle (e.g. a mirror axis)
-						// Label: read-only readout, nothing to do
-					}
-					return;
-				}
-				if (PickerMouseDown(cursor)) return;
+
+				// Check navigation cube
 				Vector3 navDir;
-				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; } // snap view
-				if (cursor.y < BarsH()) return; // over the ribbon/toolbar bars
+				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; }
+
+				// Otherwise forward to active tool
 				lmbHeld = true;
 				DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Down));
 				return;
@@ -2093,7 +1792,8 @@ namespace spades {
 					DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Up));
 					return;
 				}
-				if (CursorOverPicker(cursor)) return;
+				// Don't allow RMB actions over the UI bars or color picker
+				if (colorPicker && colorPicker->IsOverPicker(cursor)) return;
 				if (cursor.y < BarsH()) return; // over the bars
 				rmbHeld = true;
 				DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Down));
@@ -2199,9 +1899,24 @@ namespace spades {
 			DrawRibbon(sw);
 			DrawToolbar(sw, sh);
 			DrawSubToolbar(sw);
-			LayoutPicker();
+
+			// Update color picker layout
+			if (colorPicker) {
+				colorPicker->UpdateLayout(sw, sh, BarsH());
+			}
+
+			// Layout and draw navigation cube
+			float gizBox = 174.0F;
+			gizR = gizBox * 0.5F - 14.0F;
+			gizCx = sw - 16.0F - gizBox * 0.5F;
+			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
 			DrawNaviCube();
-			DrawPicker();
+
+			// Draw color picker
+			if (colorPicker) {
+				colorPicker->Draw(*renderer, *fontManager, softwareCursor->GetPosition());
+			}
+
 			if (tool)
 				tool->DrawOverlay(*this);
 

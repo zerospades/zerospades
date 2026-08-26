@@ -26,11 +26,14 @@
 #include <string>
 #include <vector>
 
+#include "ColorPicker.h"
 #include "EditorMenu.h"
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
 #include "KV6UndoStack.h"
+#include "OptionBar.h"
 #include "SoftwareCursor.h"
+#include "Toolbar.h"
 #include "View.h"
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
@@ -228,23 +231,9 @@ namespace spades {
 			void PasteClipboard(const IntVector3& anchor);
 			void DrawPastePreview();
 
-			// --- Colour picker (HSV is the source of truth) -------------------
+			// --- Colour picker (managed by ColorPicker component) ----------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
-			float hue = 0.0F, sat = 0.0F, val = 0.78F;
-			std::vector<uint32_t> presets;
-			int presetCols = 8;
-			int dragPick = 0; // 0 none, 1 SV square, 2 hue bar
-			bool pickMode = false;
-			bool pickerOpen = false; // the picker is a popup opened from the toolbar
-
-			// Picker panel geometry (recomputed each frame).
-			float pkX, pkY, pkW, pkH;
-			float svX, svY, svSize = 150.0F;
-			float hueX, hueY, hueW = 16.0F;
-			float prevX, prevY, prevW, prevH;
-			float eyeX, eyeY, eyeS;
-			float presX, presY, presSwatch;
-			float closeX, closeY, closeS; // picker close button
+			bool pickMode = false; // for eyedropper tool (not color picker UI)
 
 			// --- Mirror modelling (reflect each edit across the pivot plane) ---
 			// The X/Y/Z toggles live in the active tool's options (Draw); the edit
@@ -292,6 +281,11 @@ namespace spades {
 			// --- Menu / prompt -----------------------------------------------
 			std::unique_ptr<EditorMenu> editorMenu;
 
+			// --- UI Components (toolbar, options, color picker) -----------------
+			std::unique_ptr<Toolbar> toolbar;
+			std::unique_ptr<OptionBar> optionBar;
+			std::unique_ptr<ColorPicker> colorPicker;
+
 			// Document
 			void NewModel(int n, const std::string& path);
 			void LoadModel(const std::string& path);
@@ -319,20 +313,12 @@ namespace spades {
 			void ApplyOriginRaw(const Vector3& origin);
 			void TrimVolume();
 
-			// Colour
+			// Colour (used by the eyedropper tool)
 			uint32_t PackRGB(float r, float g, float b) const;
 			uint32_t HSV(float h, float s, float v) const;
-			void BuildPresets();
-			void RGBToHSV(uint32_t c);
-			void SyncColor();
 
 			// UI layout + hit testing
-			void LayoutPicker();
-			bool CursorOverPicker(const Vector2& p) const;
 			bool InRect(const Vector2& p, float x, float y, float w, float h) const;
-			void UpdateSV(const Vector2& p);
-			void UpdateHue(const Vector2& p);
-			bool PickerMouseDown(const Vector2& p);
 
 			// Editor overlay lines (cell/box outlines, gizmo) are drawn both as
 			// depth-tested 3D lines (bright where visible) and collected here to be
@@ -350,7 +336,6 @@ namespace spades {
 			void DrawHelpers();
 			void DrawOriginAxes();
 			void DrawMirrorPlanes();
-			void DrawPicker();
 			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
 			// rotating cube whose faces are clickable to snap the view.
 			void DrawNaviCube();
@@ -364,25 +349,12 @@ namespace spades {
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			void DrawCursor();
 
-			// Unified top toolbar: modes on the left, a separator, then the tools
-			// available in the current mode.
-			struct ToolbarHit {
-				enum Kind { None, Mode, Tool, Undo, Redo } kind = None;
-				int index = -1;
-			};
-			ToolbarHit ToolbarHitTest(const Vector2& p);
+			// Toolbar drawing (delegated to Toolbar/OptionBar components)
 			void DrawToolbar(float sw, float sh);
-			// Left edge of the Undo (redo == false) / Redo button in the toolbar.
-			float UndoButtonX(float sw, bool redo) const;
-
-			// Secondary toolbar showing the active tool's sub-tools (always shown).
-			float BarsH(); // total height of ribbon + toolbar + sub-toolbar
-			int SubToolbarHitTest(const Vector2& p);  // -1 none, else sub-tool index
-			// X / width of the active tool's option `i` in the sub-toolbar (shared by
-			// drawing and hit-testing so they stay in sync).
-			float OptionRect(int i, float& outW);
-			int SubToolbarOptionAt(const Vector2& p); // -1 none, else option index
 			void DrawSubToolbar(float sw);
+
+			// Total height of ribbon + toolbar + sub-toolbar
+			float BarsH();
 
 			// --- IEditorMenuHost (overrides) ---
 			std::string GetMenuTitle() override { return "KV6 Editor"; }
