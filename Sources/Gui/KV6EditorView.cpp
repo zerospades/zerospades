@@ -220,7 +220,8 @@ namespace spades {
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
 		                             client::FontManager* fm, const std::string& path, bool isNew)
-		    : renderer(r), audioDevice(dev), fontManager(fm), softwareCursor(*renderer) {
+		    : renderer(r), audioDevice(dev), fontManager(fm), softwareCursor(*renderer),
+		      editorMenu(*this, *renderer, *fontManager, softwareCursor) {
 			SPADES_MARK_FUNCTION();
 			io = Handle<KV6ScreenHelper>::New();
 
@@ -325,6 +326,17 @@ namespace spades {
 			} else {
 				SetStatus("Save failed");
 			}
+		}
+
+		void KV6EditorView::SaveDocument(const std::string& path) {
+			filePath = path;
+			Save();
+		}
+
+		bool KV6EditorView::OnMenuEscape() {
+			if (EditorTool* t = ActiveTool())
+				return t->OnEscape(*this);
+			return false;
 		}
 
 		// --- Camera -----------------------------------------------------------
@@ -1352,9 +1364,19 @@ namespace spades {
 			Vector3 p = GetPivot();
 			char buf[64];
 			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
-			promptText = buf;
-			promptKind = PromptKind::Pivot;
-			promptOpen = true;
+			editorMenu.OpenTextPrompt("Set pivot (x y z)", buf, [this](const std::string& s) {
+				std::string str = s;
+				for (char& c : str)
+					if (c == ',')
+						c = ' ';
+				float x, y, z;
+				if (std::sscanf(str.c_str(), "%f %f %f", &x, &y, &z) == 3) {
+					SetPivot(MakeVector3(x, y, z));
+					SetStatus("Pivot set");
+				} else {
+					SetStatus("Enter three numbers: x y z");
+				}
+			});
 		}
 
 		// Long world axes through the model's origin (pivot), which renders at
@@ -1757,7 +1779,7 @@ namespace spades {
 			// maps to the toggled state and the cursor drives hover, so they highlight
 			// exactly like the in-game buttons.
 			auto button = [&](float x, const char* label, bool active, bool enabled) {
-				bool hover = !menuOpen && !promptOpen && InRect(softwareCursor.GetPosition(), x, kTbY, kTbBtn, kTbH);
+				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, kTbY, kTbBtn, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
 				                     MakeVector2(kTbBtn, kTbH), label, MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, active, s);
@@ -1776,7 +1798,7 @@ namespace spades {
 
 			// Undo / Redo on the right edge, greyed out when there's nothing to do.
 			auto urButton = [&](float x, const char* label, bool enabled) {
-				bool hover = !menuOpen && !promptOpen && InRect(softwareCursor.GetPosition(), x, kTbY, kUndoBtnW, kTbH);
+				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, kTbY, kUndoBtnW, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, kTbY),
 				                     MakeVector2(kUndoBtnW, kTbH), label, MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, false, s);
@@ -1860,7 +1882,7 @@ namespace spades {
 			for (int i = 0; i < t->SubToolCount(); i++) {
 				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
 				bool on = t->ActiveSubTool() == i;
-				bool hover = !menuOpen && !promptOpen && InRect(softwareCursor.GetPosition(), x, by, kSubBtn, kTbH);
+				bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, by, kSubBtn, kTbH);
 				widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(kSubBtn, kTbH),
 				                     t->SubToolLabel(i), MakeVector2(0.5F, 0.5F), "",
 				                     MakeVector2(1.0F, 0.5F), true, hover, false, on, s);
@@ -1899,7 +1921,7 @@ namespace spades {
 					           pickerOpen ? MakeVector4(0.5F, 0.8F, 1.0F, 1.0F)
 					                      : MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
 				} else { // Bool toggle -> shared button painter, toggled when on
-					bool hover = !menuOpen && !promptOpen && InRect(softwareCursor.GetPosition(), x, by, w, kTbH);
+					bool hover = !editorMenu.IsActive() && InRect(softwareCursor.GetPosition(), x, by, w, kTbH);
 					widgets::PaintButton(*renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
 					                     op.label, MakeVector2(0.5F, 0.5F), "",
 					                     MakeVector2(1.0F, 0.5F), true, hover, false, op.bvalue, s);
@@ -1945,97 +1967,6 @@ namespace spades {
 
 		// --- Pause menu / Save As prompt -------------------------------------
 
-		static const char* kMenuItems[4] = {"Resume", "Save", "Save As...", "Exit to Menu"};
-
-		int KV6EditorView::MenuButtonAt(const Vector2& p) {
-			float sw = renderer->ScreenWidth();
-			float sh = renderer->ScreenHeight();
-			float w = 260.0F;
-			float x = (sw - w) * 0.5F;
-			float y = sh * 0.5F - 110.0F + 44.0F;
-			for (int i = 0; i < 4; i++) {
-				if (InRect(p, x, y, w, 36.0F))
-					return i;
-				y += 44.0F;
-			}
-			return -1;
-		}
-
-		void KV6EditorView::DrawMenu(float sw, float sh) {
-			client::IFont& font = fontManager->GetSmallGuiFont();
-			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
-			FillRect(0, 0, sw, sh);
-
-			float w = 260.0F;
-			float x = (sw - w) * 0.5F;
-			float y = sh * 0.5F - 110.0F;
-
-			Vector2 sz = font.Measure("KV6 Editor");
-			font.Draw("KV6 Editor", MakeVector2(x + (w - sz.x) * 0.5F, y), 1.0F,
-			          MakeVector4(1, 1, 1, 1));
-			y += 44.0F;
-			int hover = MenuButtonAt(softwareCursor.GetPosition());
-			for (int i = 0; i < 4; i++) {
-				widgets::PaintButton(*renderer, font, MakeVector2(x, y), MakeVector2(w, 36.0F),
-				                     kMenuItems[i], MakeVector2(0.5F, 0.5F), "",
-				                     MakeVector2(1.0F, 0.5F), true, hover == i, false, false);
-				y += 44.0F;
-			}
-		}
-
-		void KV6EditorView::DrawPrompt(float sw, float sh) {
-			client::IFont& font = fontManager->GetSmallGuiFont();
-			ColorNP(MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
-			FillRect(0, 0, sw, sh);
-
-			float w = 460.0F, h = 116.0F;
-			float x = (sw - w) * 0.5F, y = (sh - h) * 0.5F;
-			ColorNP(MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-			FillRect(x, y, w, h);
-			StrokeRect(x, y, w, h, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
-
-			const char* title =
-			  (promptKind == PromptKind::Pivot) ? "Set pivot (x y z)" : "Save As (full path)";
-			font.Draw(title, MakeVector2(x + 16.0F, y + 12.0F), 1.0F,
-			          MakeVector4(0.8F, 0.8F, 0.8F, 1.0F));
-
-			float fx = x + 16.0F, fy = y + 44.0F, fw = w - 32.0F, fh = 28.0F;
-			widgets::PaintField(*renderer, MakeVector2(fx, fy), MakeVector2(fw, fh), true, false);
-			std::string shown = promptText + "_";
-			font.Draw(shown, MakeVector2(fx + 6.0F, fy + 6.0F), 1.0F, MakeVector4(1, 1, 1, 1));
-
-			font.Draw("[Enter] OK    [Esc] cancel", MakeVector2(x + 16.0F, y + h - 24.0F), 0.9F,
-			          MakeVector4(0.7F, 0.7F, 0.7F, 1.0F));
-		}
-
-		void KV6EditorView::SubmitPrompt() {
-			if (promptKind == PromptKind::SaveAs) {
-				std::string p = promptText;
-				if (!p.empty()) {
-					if (p.size() < 4 || !EqualsIgnoringCase(p.substr(p.size() - 4), ".kv6"))
-						p += ".kv6";
-					filePath = p;
-					Save();
-				}
-				promptOpen = false;
-				menuOpen = false;
-				return;
-			}
-			// Pivot: parse three numbers (commas allowed).
-			std::string s = promptText;
-			for (char& c : s)
-				if (c == ',')
-					c = ' ';
-			float x, y, z;
-			if (std::sscanf(s.c_str(), "%f %f %f", &x, &y, &z) == 3) {
-				SetPivot(MakeVector3(x, y, z));
-				SetStatus("Pivot set");
-			} else {
-				SetStatus("Enter three numbers: x y z");
-			}
-			promptOpen = false;
-		}
-
 		// --- View interface ---------------------------------------------------
 
 		void KV6EditorView::MouseEvent(float dx, float dy) {
@@ -2064,7 +1995,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::WheelEvent(float x, float y) {
-			if (menuOpen || promptOpen)
+			if (editorMenu.IsActive())
 				return;
 			if (orbitMode)
 				orbitDist = Clampf(orbitDist * (1.0F + y * 0.1F), 2.0F, 1000.0F);
@@ -2074,36 +2005,8 @@ namespace spades {
 
 		void KV6EditorView::KeyEvent(const std::string& key, bool down) {
 			const Vector2& cursor = softwareCursor.GetPosition();
-			// Save As prompt takes priority over everything.
-			if (promptOpen) {
-				if (!down)
-					return;
-				if (key == "Escape") { promptOpen = false; }
-				else if (key == "Enter") { SubmitPrompt(); }
-				else if (key == "BackSpace") {
-					if (!promptText.empty())
-						promptText.pop_back();
-				}
+			if (editorMenu.KeyEvent(key, down))
 				return;
-			}
-
-			if (menuOpen) {
-				if (!down)
-					return;
-				if (key == "Escape") { menuOpen = false; return; }
-				if (key == "LeftMouseButton") {
-					int b = MenuButtonAt(cursor);
-					if (b == 0) menuOpen = false;            // Resume
-					else if (b == 1) { Save(); menuOpen = false; } // Save
-					else if (b == 2) { // Save As
-						promptText = filePath;
-						promptKind = PromptKind::SaveAs;
-						promptOpen = true;
-					}
-					else if (b == 3) wantsClose = true;      // Exit
-				}
-				return;
-			}
 
 			// While pasting, the mouse positions/places the clipboard; other keys
 			// (camera) fall through.
@@ -2111,17 +2014,6 @@ namespace spades {
 				if (key == "Escape") { pasteActive = false; SetStatus("Paste cancelled"); return; }
 				if (key == "RightMouseButton") { pasteActive = false; return; }
 				if (key == "LeftMouseButton") { CommitPaste(); return; }
-			}
-
-			if (down && key == "Escape") {
-				// Let the active tool abort an in-progress operation first; only
-				// open the pause menu when there's nothing to cancel.
-				if (EditorTool* t = ActiveTool()) {
-					if (t->OnEscape(*this))
-						return;
-				}
-				menuOpen = true;
-				return;
 			}
 
 			if (key == "Control") ctrlHeld = down;
@@ -2226,17 +2118,9 @@ namespace spades {
 			}
 		}
 
-		void KV6EditorView::TextInputEvent(const std::string& text) {
-			if (promptOpen)
-				promptText += text;
-		}
-		bool KV6EditorView::AcceptsTextInput() { return promptOpen; }
-		AABB2 KV6EditorView::GetTextInputRect() {
-			float sw = renderer->ScreenWidth(), sh = renderer->ScreenHeight();
-			float w = 460.0F, h = 116.0F;
-			float x = (sw - w) * 0.5F, y = (sh - h) * 0.5F;
-			return AABB2(x + 16.0F, y + 44.0F, w - 32.0F, 28.0F);
-		}
+		void KV6EditorView::TextInputEvent(const std::string& text) { editorMenu.TextInputEvent(text); }
+		bool KV6EditorView::AcceptsTextInput() { return editorMenu.AcceptsTextInput(); }
+		AABB2 KV6EditorView::GetTextInputRect() { return editorMenu.GetTextInputRect(); }
 
 		void KV6EditorView::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();
@@ -2256,7 +2140,7 @@ namespace spades {
 				}
 			}
 
-			if (!menuOpen && !promptOpen)
+			if (!editorMenu.IsActive())
 				UpdateMovement(dt);
 			if (statusTimer > 0.0F)
 				statusTimer -= dt;
@@ -2314,11 +2198,7 @@ namespace spades {
 			if (tool)
 				tool->DrawOverlay(*this);
 
-			if (menuOpen)
-				DrawMenu(sw, sh);
-			if (promptOpen)
-				DrawPrompt(sw, sh);
-
+			editorMenu.Draw();
 			softwareCursor.Draw();
 
 			// The runner is the only thing that presents, so the capture happens here

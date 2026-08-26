@@ -26,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "EditorMenu.h"
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
 #include "KV6UndoStack.h"
@@ -57,7 +58,7 @@ namespace spades {
 		 * motion to drive a spectator-style camera and tracks its own software
 		 * cursor for the 2D UI.
 		 */
-		class KV6EditorView : public View, public IEditorContext, public KV6UndoStack::Sink {
+		class KV6EditorView : public View, public IEditorContext, public KV6UndoStack::Sink, public IEditorMenuHost {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, const std::string& path, bool isNew);
@@ -286,14 +287,8 @@ namespace spades {
 			std::string statusMessage;
 			float statusTimer = 0.0F;
 
-			// --- Pause menu (Esc) + modal text prompt -------------------------
-			bool menuOpen = false;
-			bool promptOpen = false;
-			std::string promptText;
-			// What an open prompt is collecting (drives its title and what Enter does).
-			enum class PromptKind { SaveAs, Pivot };
-			PromptKind promptKind = PromptKind::SaveAs;
-			void SubmitPrompt(); // act on the prompt text per promptKind
+			// --- Menu / prompt -----------------------------------------------
+			EditorMenu editorMenu;
 
 			// Document
 			void NewModel(int n, const std::string& path);
@@ -387,10 +382,13 @@ namespace spades {
 			int SubToolbarOptionAt(const Vector2& p); // -1 none, else option index
 			void DrawSubToolbar(float sw);
 
-			// Pause menu / Save As prompt
-			int MenuButtonAt(const Vector2& p); // -1 none, else index
-			void DrawMenu(float sw, float sh);
-			void DrawPrompt(float sw, float sh);
+			// --- IEditorMenuHost (overrides) ---
+			std::string GetMenuTitle() override { return "KV6 Editor"; }
+			std::string GetDocumentPath() override { return filePath; }
+			std::string GetDocumentExtension() override { return ".kv6"; }
+			void SaveDocument(const std::string& path) override;
+			void RequestClose() override { wantsClose = true; }
+			bool OnMenuEscape() override;
 		};
 	} // namespace gui
 } // namespace spades
