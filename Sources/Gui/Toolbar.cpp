@@ -58,7 +58,8 @@ namespace spades {
 		float Toolbar::ToolbarX(int slot) const {
 			float x = kTbX0 + float(slot) * (kTbBtn + kTbGap);
 			int toolCount = int(toolButtons.size());
-			if (slot >= 3 && toolCount > 0)
+			int toolStartSlot = int(modeButtons.size());
+			if (slot >= toolStartSlot && toolCount > 0)
 				x += kTbSep;
 			return x;
 		}
@@ -77,8 +78,9 @@ namespace spades {
 				if (InRect(p, ToolbarX(i), kTbY, kTbBtn, kTbH))
 					return {ClickType::Mode, i};
 			}
+			int toolStartSlot = int(modeButtons.size());
 			for (int i = 0; i < int(toolButtons.size()); i++) {
-				if (InRect(p, ToolbarX(3 + i), kTbY, kTbBtn, kTbH))
+				if (InRect(p, ToolbarX(toolStartSlot + i), kTbY, kTbBtn, kTbH))
 					return {ClickType::Tool, i};
 			}
 			// Undo / Redo buttons on the right edge
@@ -118,12 +120,13 @@ namespace spades {
 
 			// Draw separator and tool buttons
 			if (toolCount > 0) {
-				float sx = ToolbarX(3) - kTbSep * 0.5F - kTbGap;
+				int toolStartSlot = int(modeButtons.size());
+				float sx = ToolbarX(toolStartSlot) - kTbSep * 0.5F - kTbGap;
 				OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.5F));
 				OverlayFillRect(renderer, sx, kTbY + 3.0F, 1.0F, kTbH - 6.0F);
 				for (int i = 0; i < toolCount; i++) {
 					const ToolbarButton& btn = toolButtons[i];
-					button(ToolbarX(3 + i), btn.label.c_str(), btn.active, btn.enabled);
+					button(ToolbarX(toolStartSlot + i), btn.label.c_str(), btn.active, btn.enabled);
 				}
 			}
 
