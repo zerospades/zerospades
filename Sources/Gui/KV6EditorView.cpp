@@ -23,6 +23,7 @@
 #include "KV6ScreenHelper.h"
 #include "KV6ToolRegistry.h"
 #include "UIWidgetPainter.h"
+#include "OverlayPaint.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1052,7 +1053,7 @@ namespace spades {
 		}
 
 		bool KV6EditorView::InRect(const Vector2& p, float x, float y, float w, float h) const {
-			return p.x >= x && p.x < x + w && p.y >= y && p.y < y + h;
+			return OverlayInRect(p, x, y, w, h);
 		}
 
 		void KV6EditorView::UpdateSV(const Vector2& p) {
@@ -1091,19 +1092,13 @@ namespace spades {
 
 		// --- Drawing primitives ----------------------------------------------
 
-		void KV6EditorView::ColorNP(const Vector4& c) {
-			renderer->SetColorAlphaPremultiplied(MakeVector4(c.x * c.w, c.y * c.w, c.z * c.w, c.w));
-		}
+		void KV6EditorView::ColorNP(const Vector4& c) { OverlayColorNP(*renderer, c); }
 		void KV6EditorView::FillRect(float x, float y, float w, float h) {
-			renderer->DrawImage((client::IImage*)NULL, AABB2(x, y, w, h));
+			OverlayFillRect(*renderer, x, y, w, h);
 		}
 		void KV6EditorView::StrokeRect(float x, float y, float w, float h, float t,
 		                               const Vector4& c) {
-			ColorNP(c);
-			FillRect(x, y, w, t);
-			FillRect(x, y + h - t, w, t);
-			FillRect(x, y, t, h);
-			FillRect(x + w - t, y, t, h);
+			OverlayStrokeRect(*renderer, x, y, w, h, t, c);
 		}
 		void KV6EditorView::DrawLine2D(const Vector2& a, const Vector2& b, float w,
 		                               const Vector4& col) {
