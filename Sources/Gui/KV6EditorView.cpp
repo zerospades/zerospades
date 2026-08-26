@@ -1788,6 +1788,8 @@ namespace spades {
 					if (result.type != ColorPicker::ClickType::None) {
 						if (result.type == ColorPicker::ClickType::Close) {
 							colorPicker->Close();
+						} else {
+							colorPicker->MouseDown(cursor);
 						}
 						return;
 					}

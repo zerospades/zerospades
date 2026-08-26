@@ -56,6 +56,7 @@ namespace spades {
 			void UpdateLayout(float screenWidth, float screenHeight, float topClearance);
 
 			ClickResult HitTest(const Vector2& p);
+			void MouseDown(const Vector2& p);
 			void MouseMove(const Vector2& p);
 			void MouseUp();
 

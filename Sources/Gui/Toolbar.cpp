@@ -111,10 +111,10 @@ namespace spades {
 				                     MakeVector2(1.0F, 0.5F), enabled, hover, false, active, s);
 			};
 
-			// Draw mode buttons
+			// Draw mode buttons (only Edit mode is available for now)
 			for (int i = 0; i < int(modeButtons.size()); i++) {
 				bool active = (i == activeModeButton);
-				bool enabled = true; // All modes are available (could be restricted later)
+				bool enabled = (i == 1); // Only Edit mode (index 1) is available
 				button(ToolbarX(i), modeButtons[i].c_str(), active, enabled);
 			}
 

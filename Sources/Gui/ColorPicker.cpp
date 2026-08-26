@@ -167,6 +167,35 @@ namespace spades {
 			return {ClickType::None, -1};
 		}
 
+		void ColorPicker::MouseDown(const Vector2& p) {
+			if (!open) return;
+			auto result = HitTest(p);
+			switch (result.type) {
+				case ClickType::SV:
+					dragMode = 1;
+					UpdateSV(p);
+					break;
+				case ClickType::Hue:
+					dragMode = 2;
+					UpdateHue(p);
+					break;
+				case ClickType::Eyedropper:
+					eyedropperMode = !eyedropperMode;
+					if (OnEyedropperToggled)
+						OnEyedropperToggled(eyedropperMode);
+					break;
+				case ClickType::Preset:
+					if (result.presetIndex >= 0 && result.presetIndex < int(presets.size())) {
+						SetColor(presets[result.presetIndex]);
+						if (OnColorPicked)
+							OnColorPicked(GetColor());
+					}
+					break;
+				default:
+					break;
+			}
+		}
+
 		void ColorPicker::MouseMove(const Vector2& p) {
 			if (dragMode == 1)
 				UpdateSV(p);
