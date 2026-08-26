@@ -60,7 +60,8 @@ namespace spades {
 			void SetOptions(const std::vector<Option>& options);
 
 			float OptionX(int index, float& outWidth) const;
-			float HitTest(const Vector2& p);
+			float HitTest(const Vector2& p); // returns option index or -1.0
+			bool IsSubToolButtonHit(const Vector2& p, int& outIndex) const;
 			bool IsOptionHovered(const Vector2& p, int index) const;
 
 			void Draw(client::IRenderer& renderer, client::FontManager& fontManager,

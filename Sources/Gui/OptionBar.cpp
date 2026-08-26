@@ -100,6 +100,20 @@ namespace spades {
 			return -1.0F;
 		}
 
+		bool OptionBar::IsSubToolButtonHit(const Vector2& p, int& outIndex) const {
+			float bandY = kRibbonH + kToolbarH;
+			float by = bandY + (kSubBarH - kTbH) * 0.5F;
+
+			for (int i = 0; i < int(subToolButtons.size()); i++) {
+				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
+				if (InRect(p, x, by, kSubBtn, kTbH)) {
+					outIndex = i;
+					return true;
+				}
+			}
+			return false;
+		}
+
 		bool OptionBar::IsOptionHovered(const Vector2& p, int index) const {
 			if (index < 0 || index >= int(options.size()))
 				return false;

@@ -247,6 +247,27 @@ namespace spades {
 			toolbar->OnUndoClicked = [this]() { Undo(); };
 			toolbar->OnRedoClicked = [this]() { Redo(); };
 
+			// Wire up option bar callbacks
+			optionBar->OnBoolToggled = [this](int idx) {
+				EditorTool* tool = ActiveTool();
+				if (!tool) return;
+				ToolOptions* opts = tool->Options();
+				if (!opts || idx < 0 || idx >= opts->Count()) return;
+				const ToolOption& opt = opts->At(idx);
+				if (opt.type != ToolOption::Type::Bool) return;
+				opts->At(idx).bvalue = !opts->At(idx).bvalue;
+			};
+			optionBar->OnColorClicked = [this](int idx) {
+				EditorTool* tool = ActiveTool();
+				if (!tool) return;
+				ToolOptions* opts = tool->Options();
+				if (!opts || idx < 0 || idx >= opts->Count()) return;
+				const ToolOption& opt = opts->At(idx);
+				if (opt.type != ToolOption::Type::Color) return;
+				colorPicker->SetColor(currentColor);
+				colorPicker->Open();
+			};
+
 			// Wire up color picker callbacks
 			colorPicker->OnColorChanged = [this](uint32_t c) { currentColor = c; };
 			colorPicker->OnEyedropperToggled = [this](bool enabled) {
@@ -1785,6 +1806,34 @@ namespace spades {
 								toolbar->OnUndoClicked();
 							else if (hit.type == Toolbar::ClickType::Redo && toolbar->OnRedoClicked)
 								toolbar->OnRedoClicked();
+							return;
+						}
+					}
+					// Check option bar hits (sub-tool buttons and options)
+					if (optionBar) {
+						int subToolIdx;
+						if (optionBar->IsSubToolButtonHit(cursor, subToolIdx)) {
+							if (optionBar->OnSubToolClicked)
+								optionBar->OnSubToolClicked(subToolIdx);
+							return;
+						}
+						float optionIdx = optionBar->HitTest(cursor);
+						if (optionIdx >= 0.0F) {
+							int idx = int(optionIdx);
+							EditorTool* tool = ActiveTool();
+							if (tool) {
+								ToolOptions* opts = tool->Options();
+								if (opts && idx < opts->Count()) {
+									const ToolOption& opt = opts->At(idx);
+									if (opt.type == ToolOption::Type::Bool) {
+										if (optionBar->OnBoolToggled)
+											optionBar->OnBoolToggled(idx);
+									} else if (opt.type == ToolOption::Type::Color) {
+										if (optionBar->OnColorClicked)
+											optionBar->OnColorClicked(idx);
+									}
+								}
+							}
 							return;
 						}
 					}
