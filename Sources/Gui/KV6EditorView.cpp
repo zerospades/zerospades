@@ -248,6 +248,11 @@ namespace spades {
 			toolbar->OnRedoClicked = [this]() { Redo(); };
 
 			// Wire up option bar callbacks
+			optionBar->OnSubToolClicked = [this](int idx) {
+				EditorTool* tool = ActiveTool();
+				if (!tool) return;
+				tool->SetSubTool(*this, idx);
+			};
 			optionBar->OnBoolToggled = [this](int idx) {
 				EditorTool* tool = ActiveTool();
 				if (!tool) return;
