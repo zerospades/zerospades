@@ -21,7 +21,7 @@
 
 #include "ConsoleCommand.h"
 #include "ConsoleHelper.h"
-#include "ConsoleScreen.h"
+#include <Gui/ConsoleScreen.h>
 
 #include <ZeroSpades.h>
 

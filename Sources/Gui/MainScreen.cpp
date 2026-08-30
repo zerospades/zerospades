@@ -22,10 +22,13 @@
 #include "MainScreenHelper.h"
 #include <Client/Client.h>
 #include <Client/Fonts.h>
+#include <Client/IAudioDevice.h>
+#include <Client/IRenderer.h>
 #include <Core/Exception.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Gui/UI/MainScreen/MainScreenUI.h>
+#include <ScriptBindings/ScriptManager.h>
 
 DEFINE_SPADES_SETTING(cg_playerName, "Deuce");
 

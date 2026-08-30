@@ -110,5 +110,18 @@ namespace spades {
 				UIElement::HotKey(key);
 			}
 		}
+
+		// IModalMenu implementation
+		bool ClientMenu::IsActive() const { return IsEnabled(); }
+		void ClientMenu::Open() { /* Managed by ui->SetActiveUI(this) */ }
+		void ClientMenu::Close() { if (ui) ui->SetActiveUI(nullptr); }
+		bool ClientMenu::KeyEvent(const std::string& key, bool down) {
+			if (down) KeyDown(key);
+			else KeyUp(key);
+			return true;
+		}
+		void ClientMenu::TextInputEvent(const std::string& text) { KeyPress(text); }
+		bool ClientMenu::AcceptsTextInput() const { return IsEnabled(); }
+		void ClientMenu::Draw() { Render(); }
 	} // namespace client
 } // namespace spades

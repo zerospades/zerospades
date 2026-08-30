@@ -38,7 +38,7 @@
 #include <Core/IStream.h>
 #include <Core/Settings.h>
 #include <Core/Thread.h>
-#include <Gui/PingTester.h>
+#include <Gui/Utils/PingTester.h>
 #include <ZeroSpades.h>
 
 DEFINE_SPADES_SETTING(cl_serverListUrl, "http://services.buildandshoot.com/serverlist.json");

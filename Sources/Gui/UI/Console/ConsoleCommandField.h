@@ -22,7 +22,7 @@
 
 #include <vector>
 
-#include <Gui/ConsoleCommandCandidate.h>
+#include <Gui/Utils/ConsoleCommandCandidate.h>
 #include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {

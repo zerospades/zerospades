@@ -277,9 +277,6 @@ namespace spades {
 						SelectAll();
 						return;
 					} else if (key == "V") {
-						// `Insert` raises OnChanged itself, once the text has actually
-						// changed. The deferred handler this replaces fired a frame late,
-						// and never at all when the clipboard was empty.
 						std::string clipboard = manager.Paste();
 						if (!clipboard.empty())
 							Insert(clipboard);

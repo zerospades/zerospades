@@ -24,14 +24,16 @@
 #include <Core/TMPUtils.h>
 
 #include "ConfigConsoleResponder.h"
-#include "ConsoleCommand.h"
 #include "ConsoleHelper.h"
 #include "ConsoleScreen.h"
 #include <Gui/UI/Console/ConsoleUI.h>
+#include <Gui/Utils/ConsoleCommand.h>
 
 namespace spades {
 	namespace gui {
-		static bool s_consoleOpen = false;
+		namespace {
+			bool s_consoleOpen = false;
+		}
 
 		ConsoleScreen::ConsoleScreen(Handle<client::IRenderer> renderer,
 									 Handle<client::IAudioDevice> audioDevice,

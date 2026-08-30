@@ -48,6 +48,7 @@
 #include "TCProgressView.h"
 
 #include "BloodMarks.h"
+#include <Gui/UI/Components/SoftwareCursor.h>
 #include "Corpse.h"
 #include "SmokeSpriteEntity.h"
 
@@ -96,8 +97,6 @@ namespace spades {
 			  lastOriSentTime(0.0F),
 			  lastAliveTime(0.0F),
 			  lastRespawnCount(0),
-			  lastHitWasScoped(false),
-			  lastHitWasAirborne(false),
 			  damageTaken(0),
 			  lastScore(0),
 			  curKills(0),
@@ -132,7 +131,6 @@ namespace spades {
 			  fontManager(fontManager),
 			  alertDisappearTime(-10000.0F),
 			  lastLocalCorpse(nullptr),
-			  nextScreenShotIndex(0),
 			  nextMapShotIndex(0),
 			  staffSpectating(false),
 			  spectatorPlayerNames(true) {
@@ -158,6 +156,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
+			cursor = stmp::make_unique<gui::SoftwareCursor>(*renderer);
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
@@ -179,8 +178,6 @@ namespace spades {
 			lastHurtTime = -100.0F;
 			lastHealTime = -100.0F;
 			lastHitTime = -100.0F;
-			lastHitWasScoped = false;
-			lastHitWasAirborne = false;
 			hurtRingView->ClearAll();
 			killStreaks.clear();
 

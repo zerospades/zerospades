@@ -137,3 +137,5 @@ vcpkg/
 
 # Demo recordings
 *.dem
+.claude/worktrees/
+.claude/settings.json

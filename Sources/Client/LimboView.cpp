@@ -86,16 +86,14 @@ namespace spades {
 			items.push_back(MenuItem(MenuClose,
 				AABB2(left + contentsWidth - 24.0F, top, 24.0F, 24.0F), "X"));
 
-			cursorPos = MakeVector2(sw * 0.5F, sh * 0.5F);
-
 			selectedTeam = 2;
 			selectedWeapon = RIFLE_WEAPON;
 		}
 		LimboView::~LimboView() {}
 
 		void LimboView::MouseEvent(float x, float y) {
-			cursorPos.x = Clamp(x, 0.0F, renderer.ScreenWidth());
-			cursorPos.y = Clamp(y, 0.0F, renderer.ScreenHeight());
+			if (client && client->GetCursor())
+				client->GetCursor()->SetPosition(MakeVector2(x, y));
 		}
 
 		void LimboView::KeyEvent(const std::string& key) {
@@ -144,6 +142,8 @@ namespace spades {
 			// spectator team was actually 255
 			if (selectedTeam > 2)
 				selectedTeam = 2;
+
+			Vector2 cursorPos = (client && client->GetCursor()) ? client->GetCursor()->GetPosition() : MakeVector2(0, 0);
 
 			for (size_t i = 0; i < items.size(); i++) {
 				MenuItem& item = items[i];
@@ -297,9 +297,8 @@ namespace spades {
 			}
 
 			// draw cursor
-			Handle<IImage> cursor = renderer.RegisterImage("Gfx/UI/Cursor.png");
-			renderer.SetColorAlphaPremultiplied(color);
-			renderer.DrawImage(cursor, AABB2(cursorPos.x - 8, cursorPos.y - 8, 32, 32));
+			if (client && client->GetCursor())
+				client->GetCursor()->Draw();
 		}
 	} // namespace client
 } // namespace spades

@@ -22,7 +22,7 @@
 #include <Core/RefCountedObject.h>
 #include <string>
 
-#include "ConsoleCommandCandidate.h"
+#include <Gui/Utils/ConsoleCommandCandidate.h>
 
 namespace spades {
 	namespace gui {
