@@ -20,7 +20,7 @@
 #include "Client.h"
 #include "NetClient.h"
 
-#include <Gui/ConsoleCommand.h>
+#include <Gui/Utils/ConsoleCommand.h>
 
 namespace spades {
 	namespace client {

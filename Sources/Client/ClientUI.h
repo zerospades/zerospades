@@ -27,6 +27,7 @@
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Core/RefCountedObject.h>
+#include <Gui/UI/Framework/IGameModeUI.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/FieldWithHistory.h>
 
@@ -38,7 +39,7 @@ namespace spades {
 		class ClientMenu;
 		class ChatLogWindow;
 
-		class ClientUI : public RefCountedObject {
+		class ClientUI : public gui::IGameModeUI {
 			friend class ClientUIHelper;
 			friend class ClientMenu;
 			friend class ChatLogWindow;
@@ -86,25 +87,27 @@ namespace spades {
 			ClientUI(IRenderer*, IAudioDevice*, FontManager* font, Client* client);
 			void ClientDestroyed();
 
-			client::IRenderer* GetRenderer() { return &*renderer; }
-			client::IAudioDevice* GetAudioDevice() { return &*audioDevice; }
-			FontManager& GetFontManager() { return *fontManager; }
+			client::IRenderer* GetRenderer() override { return &*renderer; }
+			client::IAudioDevice* GetAudioDevice() override { return &*audioDevice; }
+			FontManager& GetFontManager() override { return *fontManager; }
 			ClientUIHelper& GetHelper() { return *helper; }
-			gui::ui::UIManager& GetUIManager() { return *manager; }
+			gui::ui::UIManager& GetUIManager() override { return *manager; }
 			std::vector<gui::ui::CommandHistoryItem>& GetChatHistory() { return chatHistory; }
 
-			void MouseEvent(float x, float y);
-			void WheelEvent(float x, float y);
-			void KeyEvent(const std::string&, bool down);
-			void TextInputEvent(const std::string&);
+			void MouseEvent(float x, float y) override;
+			void WheelEvent(float x, float y) override;
+			void KeyEvent(const std::string&, bool down) override;
+			void TextInputEvent(const std::string&) override;
 			void TextEditingEvent(const std::string&, int start, int len);
-			bool AcceptsTextInput();
-			AABB2 GetTextInputRect();
+			bool AcceptsTextInput() override;
+			AABB2 GetTextInputRect() override;
+			bool NeedsAbsoluteMouseCoordinate() override { return true; }
 
-			void RunFrame(float dt);
-			void Closing();
+			void RunFrame(float dt) override;
+			void Closing() override;
 
 			bool WantsClientToBeClosed();
+			bool WantsToClose() override { return WantsClientToBeClosed(); }
 			bool NeedsInput();
 
 			void RecordChatLog(const std::string&, Vector4 col = {1, 1, 1, 0.8F});

@@ -23,7 +23,7 @@
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 
-#include "ConsoleCommand.h"
+#include <Gui/Utils/ConsoleCommand.h>
 
 namespace spades {
 	namespace gui {

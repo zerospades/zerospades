@@ -38,7 +38,7 @@
 #include <Core/IStream.h>
 #include <Core/Settings.h>
 #include <Core/Thread.h>
-#include <Gui/PingTester.h>
+#include <Gui/Utils/PingTester.h>
 #include <ZeroSpades.h>
 
 DEFINE_SPADES_SETTING(cl_serverListUrl, "http://services.buildandshoot.com/serverlist.json");
@@ -472,6 +472,13 @@ namespace spades {
 			if (mainScreen == NULL)
 				return "mainScreen == NULL";
 			return mainScreen->PlayDemo(filename);
+		}
+
+		std::string MainScreenHelper::OpenKV6Editor(const std::string& path, bool isNew,
+		                                            SoftwareCursor* cursor) {
+			if (mainScreen == NULL)
+				return "mainScreen == NULL";
+			return mainScreen->OpenKV6Editor(path, isNew, cursor);
 		}
 
 		bool MainScreenHelper::DeleteDemo(const std::string& filename) {

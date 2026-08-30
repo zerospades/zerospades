@@ -46,6 +46,7 @@
 #include "MapView.h"
 #include "PaletteView.h"
 #include "PieMenuView.h"
+#include "ScreenShot.h"
 #include "ScoreboardView.h"
 #include "TCProgressView.h"
 
@@ -73,7 +74,6 @@ SPADES_SETTING(cg_keyDemoRecord);
 SPADES_SETTING(cg_keyDemoSpeedUp);
 SPADES_SETTING(cg_keyDemoSlowDown);
 SPADES_SETTING(cg_keyDemoToggleHud);
-DEFINE_SPADES_SETTING(cg_screenshotFormat, "jpeg");
 DEFINE_SPADES_SETTING(cg_stats, "0");
 DEFINE_SPADES_SETTING(cg_statsSmallFont, "0");
 DEFINE_SPADES_SETTING(cg_playerStats, "0");
@@ -121,25 +121,7 @@ SPADES_SETTING(cg_minimapSize);
 namespace spades {
 	namespace client {
 
-		enum class ScreenshotFormat { JPG, TGA, PNG };
-
 		namespace {
-			ScreenshotFormat GetScreenshotFormat(const std::string& format) {
-				if (EqualsIgnoringCase(format, "jpeg")) {
-					return ScreenshotFormat::JPG;
-				} else if (EqualsIgnoringCase(format, "tga")) {
-					return ScreenshotFormat::TGA;
-				} else if (EqualsIgnoringCase(format, "png")) {
-					return ScreenshotFormat::PNG;
-				} else {
-					const auto& defaultValue = cg_screenshotFormat.GetDescriptor().defaultValue;
-					SPLog("Invalid screenshot format: \"%s\", resetting to \"%s\"",
-						format.c_str(), defaultValue.c_str());
-					cg_screenshotFormat = defaultValue;
-					return GetScreenshotFormat(defaultValue);
-				}
-			}
-
 			std::string TrKey(const std::string& name) {
 				if (name.empty()) {
 					return _Tr("Client", "Unbound");
@@ -184,11 +166,8 @@ namespace spades {
 			// Well done!
 			renderer->FrameDone();
 
-			Handle<Bitmap> bmp = renderer->ReadBitmap();
-
 			try {
-				auto name = ScreenShotPath();
-				bmp->Save(name);
+				auto name = SaveScreenShot(*renderer);
 
 				std::string msg = sceneOnly
 					? _Tr("Client", "Sceneshot saved: {0}", name)
@@ -207,33 +186,6 @@ namespace spades {
 				ShowAlert(msg, AlertType::Error);
 				SPLog("Screenshot failed: %s", ex.what());
 			}
-		}
-
-		std::string Client::ScreenShotPath() {
-			char bufJpg[32], bufTga[32], bufPng[32];
-			const int maxShotIndex = 10000;
-			for (int i = 0; i < maxShotIndex; i++) {
-				snprintf(bufJpg, sizeof(bufJpg), "Screenshots/shot%04d.jpg", nextScreenShotIndex);
-				snprintf(bufTga, sizeof(bufTga), "Screenshots/shot%04d.tga", nextScreenShotIndex);
-				snprintf(bufPng, sizeof(bufPng), "Screenshots/shot%04d.png", nextScreenShotIndex);
-				if (FileManager::FileExists(bufJpg) ||
-					FileManager::FileExists(bufTga) ||
-					FileManager::FileExists(bufPng)) {
-					nextScreenShotIndex++;
-					if (nextScreenShotIndex >= maxShotIndex)
-						nextScreenShotIndex = 0;
-					continue;
-				}
-
-				switch (GetScreenshotFormat(cg_screenshotFormat)) {
-					case ScreenshotFormat::JPG: return bufJpg;
-					case ScreenshotFormat::TGA: return bufTga;
-					case ScreenshotFormat::PNG: return bufPng;
-				}
-				SPAssert(false);
-			}
-
-			SPRaise("No free file name");
 		}
 
 #pragma mark - HUD Drawings
@@ -2058,6 +2010,10 @@ namespace spades {
 			// draw limbo view (above everything)
 			if (IsLimboViewActive() && !scriptedUI->NeedsInput())
 				limbo->Draw();
+
+			// draw cursor for limbo
+			if (cursor && IsLimboViewActive())
+				cursor->Draw();
 		}
 
 		void Client::Draw2DWithoutWorld() {

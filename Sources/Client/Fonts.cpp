@@ -80,7 +80,9 @@ namespace spades {
 			mediumFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 24.0F, 24.0F).Cast<IFont>();
 			headingFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 20.0F, 20.0F).Cast<IFont>();
 			guiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 16.0F, 20.0F).Cast<IFont>();
-			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 16.0F).Cast<IFont>();
+			// 12px gui face with line height == em height: Measure() then reports the true
+			// glyph extent instead of the padded line box, so vertical centering is tight.
+			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 12.0F).Cast<IFont>();
 			smallFont = Handle<ngclient::FTFont>::New(renderer, instance.sysFontSet, 8.0F, 10.0F).Cast<IFont>();
 		}
 

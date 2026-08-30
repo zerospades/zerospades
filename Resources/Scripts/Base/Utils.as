@@ -51,14 +51,6 @@ namespace spades {
 		return Min(a.length, b.length);
 	}
 
-	bool StringContainsCaseInsensitive(string text, string pattern) {
-		for (int i = text.length - 1; i >= 0; i--)
-			text[i] = ToLower(text[i]);
-		for (int i = pattern.length - 1; i >= 0; i--)
-			pattern[i] = ToLower(pattern[i]);
-		return text.findFirst(pattern) >= 0;
-	}
-
 	string FormatFileSize(int64 bytes) {
 		if (bytes < 0)
 			return "";

@@ -63,7 +63,6 @@ DEFINE_SPADES_SETTING(cg_hitLog, "0");
 DEFINE_SPADES_SETTING(cg_killfeedIcons, "1");
 DEFINE_SPADES_SETTING(cg_killfeedStreaks, "1");
 DEFINE_SPADES_SETTING(cg_classicSprinting, "0");
-DEFINE_SPADES_SETTING(cg_autoUnscope, "0");
 DEFINE_SPADES_SETTING(cg_spectatorNoclip, "0");
 
 SPADES_SETTING(cg_smallFont);
@@ -640,17 +639,6 @@ namespace spades {
 				// sync secondary input from the ADS toggle state
 				if (isToggleADSMode)
 					winp.secondary = aimingDownSight;
-
-				// cancel ADS on fire
-				if (cg_autoUnscope && player.GetWeaponType() != SMG_WEAPON && winp.secondary) {
-					float nextFireTime = weapon.GetTimeToNextFire();
-					float timeSinceLastShot = weapon.GetDelay() - nextFireTime;
-					if (nextFireTime > 0.0F && timeSinceLastShot < 0.1F) {
-						if (isToggleADSMode)
-							aimingDownSight = false;
-						winp.secondary = false;
-					}
-				}
 			}
 
 			// set player input
@@ -1155,7 +1143,7 @@ namespace spades {
 			spades::client::Player& victim, KillType kt) {
 
 			// only used in case of KillTypeWeapon
-			const auto& weaponType = killer.GetWeaponType();
+			const auto& weaponType = killer.GetWeapon().GetWeaponType();
 
 			const int victimId = victim.GetId();
 			const int killerId = killer.GetId();
@@ -1271,13 +1259,9 @@ namespace spades {
 			if (killfeedIcons) {
 				std::string killImg;
 				if (killerId != victimId && (kt == KillTypeWeapon || kt == KillTypeHeadshot)) {
-					bool isZoomed = killer.IsLocalPlayer() ? lastHitWasScoped : killer.GetWeaponInput().secondary;
-					bool isAirborne = killer.IsLocalPlayer() ? lastHitWasAirborne : !killer.IsOnGroundOrWade();
-					if (isAirborne) // air shots
+					if (!killer.IsOnGroundOrWade()) // air shots
 						killImg += ChatWindow::KillImage(7);
 					killImg += ChatWindow::KillImage(KillTypeWeapon, weaponType);
-					if (!isZoomed) // nonscoped shots
-						killImg += ChatWindow::KillImage(8);
 					if (kt == KillTypeHeadshot)
 						killImg += ChatWindow::KillImage(KillTypeHeadshot);
 				} else {
@@ -1435,7 +1419,7 @@ namespace spades {
 				if (isMeleeHit) { // Blunt
 					frontSpeed = 1.5F;
 				} else {
-					switch (by.GetWeaponType()) {
+					switch (by.GetWeapon().GetWeaponType()) {
 						case RIFLE_WEAPON: // Penetrating
 							frontSpeed = 1.0F;
 							backSpeed = 21.0F;
@@ -1620,8 +1604,6 @@ namespace spades {
 				hitFeedbackIconState = 1.0F;
 				hitFeedbackFriendly = by.IsTeammate(hurtPlayer);
 				lastHitTime = world->GetTime();
-				lastHitWasScoped = by.IsZoomed();
-				lastHitWasAirborne = !by.IsOnGroundOrWade();
 			}
 		}
 
@@ -1709,7 +1691,7 @@ namespace spades {
 
 			float vel;
 			bool shotgun = false;
-			switch (p.GetWeaponType()) {
+			switch (p.GetWeapon().GetWeaponType()) {
 				case RIFLE_WEAPON: vel = 700.0F; break;
 				case SMG_WEAPON: vel = 360.0F; break;
 				case SHOTGUN_WEAPON:

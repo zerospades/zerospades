@@ -24,6 +24,7 @@
 
 #include <Gui/UI/Framework/UIElement.h>
 #include <Gui/UI/Settings/PreferenceView.h>
+#include <Gui/UI/Components/IModalMenu.h>
 
 namespace spades {
 	namespace client {
@@ -31,7 +32,7 @@ namespace spades {
 		class ClientUIHelper;
 
 		/** The in-game escape menu (Back to Game / Chat Log / Setup / Disconnect). */
-		class ClientMenu : public gui::ui::UIElement {
+		class ClientMenu : public gui::ui::UIElement, public gui::IModalMenu {
 			ClientUI* ui;           // weak
 			ClientUIHelper* helper; // weak
 			// Lives for the session so reopening Setup lands on the same tab/row.
@@ -45,6 +46,15 @@ namespace spades {
 		public:
 			ClientMenu(ClientUI* ui);
 			void HotKey(const std::string& key) override;
+
+			// IModalMenu implementation (UIElement handles input/drawing)
+			bool IsActive() const override;
+			void Open() override;
+			void Close() override;
+			bool KeyEvent(const std::string& key, bool down) override;
+			void TextInputEvent(const std::string& text) override;
+			bool AcceptsTextInput() const override;
+			void Draw() override;
 		};
 	} // namespace client
 } // namespace spades

@@ -18,14 +18,18 @@
 
  */
 
+#include "UI/KV6Editor/KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/Client.h>
 #include <Client/Fonts.h>
+#include <Client/IAudioDevice.h>
+#include <Client/IRenderer.h>
 #include <Core/Exception.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Gui/UI/MainScreen/MainScreenUI.h>
+#include <ScriptBindings/ScriptManager.h>
 
 DEFINE_SPADES_SETTING(cg_playerName, "Deuce");
 
@@ -62,6 +66,19 @@ namespace spades {
 		void MainScreen::RestoreRenderer() {
 			if (ui)
 				ui->SetupRenderer();
+		}
+
+		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew,
+		                                      SoftwareCursor* cursor) {
+			try {
+				subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice, &*fontManager,
+				                                     cursor, path, isNew)
+				            .Cast<View>();
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error while opening the KV6 editor: %s", ex.what());
+				return ex.what();
+			}
+			return "";
 		}
 
 		bool MainScreen::NeedsAbsoluteMouseCoordinate() {

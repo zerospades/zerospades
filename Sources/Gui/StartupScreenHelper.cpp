@@ -42,7 +42,7 @@
 #include <Core/Settings.h>
 #include <Core/ShellApi.h>
 #include <Core/VersionInfo.h>
-#include <Gui/Icon.h>
+#include <Gui/Utils/Icon.h>
 #include <Gui/Main.h>
 #include <ZeroSpades.h>
 

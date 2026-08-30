@@ -43,6 +43,7 @@
 #include <Core/Stopwatch.h>
 #include <Core/VersionInfo.h>
 #include <Gui/View.h>
+#include <Gui/UI/Components/SoftwareCursor.h>
 
 #include "SoundIndicatorEntity.h"
 
@@ -173,6 +174,9 @@ namespace spades {
 			// pie menu
 			std::unique_ptr<PieMenuView> pieMenuView;
 
+			// unified cursor used by all UI overlays
+			std::unique_ptr<gui::SoftwareCursor> cursor;
+
 			// player state
 			PlayerInput playerInput;
 			WeaponInput weapInput;
@@ -189,8 +193,6 @@ namespace spades {
 			float lastAliveTime;
 			int lastRespawnCount;
 			float lastHitTime;
-			bool lastHitWasScoped;
-			bool lastHitWasAirborne;
 			int damageTaken;
 			int lastHealth;
 			int lastScore;
@@ -470,7 +472,6 @@ namespace spades {
 
 			std::unique_ptr<BloodMarks> bloodMarks;
 
-			int nextScreenShotIndex;
 			int nextMapShotIndex;
 
 			/** Project the specified world-space position to a screen space. */
@@ -557,7 +558,6 @@ namespace spades {
 
 			SceneDefinition CreateSceneDefinition();
 
-			std::string ScreenShotPath();
 			void TakeScreenShot(bool sceneOnly, bool scoreboardOnly = false);
 
 			// Demo helpers (see EnableDemoReplayFollow).
@@ -632,6 +632,7 @@ namespace spades {
 			IRenderer& GetRenderer() { return *renderer; }
 			SceneDefinition GetLastSceneDef() { return lastSceneDef; }
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
+			gui::SoftwareCursor* GetCursor() { return cursor.get(); }
 
 			float GetTime() { return time; }
 			const std::vector<SoundFeedbackIndicator>& GetSoundFeedbackIndicators() { return soundFeedbackIndicators; }

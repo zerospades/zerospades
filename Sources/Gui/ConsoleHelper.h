@@ -21,7 +21,7 @@
 
 #include <Core/RefCountedObject.h>
 
-#include "ConsoleCommandCandidate.h"
+#include <Gui/Utils/ConsoleCommandCandidate.h>
 
 namespace spades {
 	namespace gui {
@@ -41,9 +41,6 @@ namespace spades {
 
 			/** Produce a sequence of candidates for command name autocompletion. */
 			ConsoleCommandCandidateIterator *AutocompleteCommandName(const std::string &name);
-
-			/** Returns the application version string. */
-			std::string GetVersionString();
 
 		private:
 			~ConsoleHelper();

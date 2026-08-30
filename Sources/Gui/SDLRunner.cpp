@@ -24,7 +24,7 @@
 
 #include "SDLRunner.h"
 
-#include "Icon.h"
+#include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
 #include <Audio/NullDevice.h>

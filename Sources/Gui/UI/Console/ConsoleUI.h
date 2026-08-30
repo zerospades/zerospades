@@ -21,11 +21,9 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
-#include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
 	namespace client {
@@ -51,15 +49,6 @@ namespace spades {
 			Handle<ui::UIManager> manager;
 			bool active = false;
 			ConsoleWindow* console; // weak; owned by the UI tree
-			ConsoleHelper* helper;  // weak; outlives this UI, needed to rebuild
-
-			// The window bakes the screen extent into its layout, so a resize rebuilds
-			// it. Both of these outlive the window so the rebuilt one can be restored.
-			std::vector<ui::CommandHistoryItem> commandHistory;
-			std::vector<std::string> scrollback;
-
-			void Init();
-			void ReloadScreen();
 
 		public:
 			ConsoleUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
