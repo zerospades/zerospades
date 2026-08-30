@@ -19,7 +19,6 @@
  */
 
 #include "TextUtils.h"
-
 #include <algorithm>
 #include <cctype>
 
@@ -75,7 +74,7 @@ namespace spades {
 				return ln;
 			}
 
-			std::string FormatFileSize(int64_t bytes) {
+			std::string FormatFileSize(std::int64_t bytes) {
 				if (bytes < 0)
 					return "";
 				if (bytes < 1024)

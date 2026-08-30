@@ -21,13 +21,14 @@
 #include "ConsoleCommandField.h"
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
-#include <Gui/Utils/ConsoleHelper.h>
+#include <Gui/ConsoleHelper.h>
 #include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/DrawUtils.h>
 
 namespace spades {
 	namespace gui {
+		using ui::StringCommonPrefixLength;
 
 		// -- ConsoleCommandFieldCandidateView --
 
@@ -138,13 +139,13 @@ namespace spades {
 					bool foundOne = false;
 					while (it->MoveNext()) {
 						std::string name = it->GetCurrent().name;
-						if (ui::StringCommonPrefixLength(input, name) == input.size()) {
+						if (StringCommonPrefixLength(input, name) == input.size()) {
 							if (!foundOne) {
 								commonPart = name;
 								foundOne = true;
 							}
 
-							size_t commonLen = ui::StringCommonPrefixLength(commonPart, name);
+							size_t commonLen = StringCommonPrefixLength(commonPart, name);
 							commonPart = commonPart.substr(0, commonLen);
 						}
 					}

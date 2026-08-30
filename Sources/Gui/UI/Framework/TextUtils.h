@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace spades {
@@ -41,15 +42,8 @@ namespace spades {
 			 */
 			int GetCharIndexForString(const std::string& s, int byteIndex, int start = 0);
 
-			/**
-			 * Returns the length of the common prefix between two strings (case-insensitive).
-			 */
 			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
-
-			/**
-			 * Formats a file size in bytes as a human-readable string.
-			 */
-			std::string FormatFileSize(int64_t bytes);
+			std::string FormatFileSize(std::int64_t bytes);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades
