@@ -46,6 +46,7 @@ namespace spades {
 		    : UIElement(&ui->GetUIManager()),
 		      helper(&ui->GetHelper()),
 		      r_renderer("r_renderer", nullptr),
+		      r_vulkan("r_vulkan", nullptr),
 		      r_fullscreen("r_fullscreen", nullptr) {
 			UIManager* manager = &GetManager();
 			float mainWidth = size.x - 220.0F;
@@ -88,7 +89,7 @@ namespace spades {
 			{
 				Handle<RadioButton> e = Handle<RadioButton>::New(manager);
 				e->caption = _Tr("StartupScreen", "OpenGL");
-				e->SetBounds(AABB2(160.0F, 30.0F, 140.0F, 24.0F));
+				e->SetBounds(AABB2(110.0F, 30.0F, 90.0F, 24.0F));
 				e->groupName = "driver";
 				WatchHelp(e.GetPointerOrNull(),
 				          [this](const std::string& s) { HandleHelpText(s); },
@@ -101,8 +102,22 @@ namespace spades {
 			}
 			{
 				Handle<RadioButton> e = Handle<RadioButton>::New(manager);
+				e->caption = _Tr("StartupScreen", "Vulkan");
+				e->SetBounds(AABB2(205.0F, 30.0F, 90.0F, 24.0F));
+				e->groupName = "driver";
+				WatchHelp(e.GetPointerOrNull(),
+				          [this](const std::string& s) { HandleHelpText(s); },
+				          _Tr("StartupScreen",
+				              "Vulkan renderer uses modern graphics API for improved "
+				              "performance and compatibility on macOS via MoltenVK."));
+				e->activated = [this](UIElement& s) { OnDriverVulkan(s); };
+				AddChild(e.GetPointerOrNull());
+				driverVulkan = e.GetPointerOrNull();
+			}
+			{
+				Handle<RadioButton> e = Handle<RadioButton>::New(manager);
 				e->caption = _Tr("StartupScreen", "Software");
-				e->SetBounds(AABB2(310.0F, 30.0F, 140.0F, 24.0F));
+				e->SetBounds(AABB2(300.0F, 30.0F, 100.0F, 24.0F));
 				e->groupName = "driver";
 				WatchHelp(e.GetPointerOrNull(),
 				          [this](const std::string& s) { HandleHelpText(s); },
@@ -125,7 +140,7 @@ namespace spades {
 				        ui,
 				        Handle<StartupScreenGraphicsAntialiasConfig>::New(ui)
 				            .Cast<StartupScreenGenericConfig>(),
-				        "0|2|4|fxaa",
+				        "0|2|4|8|fxaa",
 				        _Tr("StartupScreen",
 				            "Antialiasing:Enables a technique to improve the appearance of "
 				            "high-contrast edges.\n\n"
@@ -134,7 +149,7 @@ namespace spades {
 				            "Looks best, but doesn't cope with some settings.\n\n"
 				            "FXAA: Performs antialiasing by smoothing artifacts out as a "
 				            "post-process.|"
-				            "Off|MSAA 2x|4x|FXAA"))
+				            "Off|MSAA 2x|4x|8x|FXAA"))
 				        .Cast<UIElement>());
 
 				cfg->AddRow(Handle<StartupScreenConfigCheckItemEditor>::New(
@@ -378,7 +393,7 @@ namespace spades {
 				cfg->SetHelpTextHandler([this](const std::string& s) { HandleHelpText(s); });
 				cfg->SetBounds(AABB2(0.0F, 60.0F, mainWidth, size.y - 60.0F));
 				AddChild(cfg.GetPointerOrNull());
-				configViewGL = cfg.GetPointerOrNull();
+				configViewAccelerated = cfg.GetPointerOrNull();
 			}
 
 			{
@@ -408,12 +423,23 @@ namespace spades {
 			helpView->SetText(text);
 		}
 
+		// `r_vulkan` selects the Vulkan backend on top of the GL renderer choice, so
+		// every driver button has to state it — leaving it set would silently override
+		// a switch back to OpenGL or Software.
 		void StartupScreenGraphicsTab::OnDriverOpenGL(UIElement&) {
+			r_vulkan = 0;
+			r_renderer = std::string("gl");
+			LoadConfig();
+		}
+
+		void StartupScreenGraphicsTab::OnDriverVulkan(UIElement&) {
+			r_vulkan = 1;
 			r_renderer = std::string("gl");
 			LoadConfig();
 		}
 
 		void StartupScreenGraphicsTab::OnDriverSoftware(UIElement&) {
+			r_vulkan = 0;
 			r_renderer = std::string("sw");
 			LoadConfig();
 		}
@@ -424,19 +450,27 @@ namespace spades {
 
 		void StartupScreenGraphicsTab::LoadConfig() {
 			resEdit->LoadConfig();
-			if (static_cast<std::string>(r_renderer) == "sw") {
+
+			// `r_vulkan` overrides `r_renderer` at runtime (see SDLRunner::GetRendererType),
+			// so it is checked first to keep the UI consistent with what actually runs.
+			if (static_cast<int>(r_vulkan) != 0) {
+				driverVulkan->Check();
+				configViewAccelerated->visible = true;
+				configViewSoftware->visible = false;
+			} else if (static_cast<std::string>(r_renderer) == "sw") {
 				driverSoftware->Check();
-				configViewGL->visible = false;
+				configViewAccelerated->visible = false;
 				configViewSoftware->visible = true;
 			} else {
 				driverOpenGL->Check();
-				configViewGL->visible = true;
+				configViewAccelerated->visible = true;
 				configViewSoftware->visible = false;
 			}
 			fullscreenCheck->toggled = static_cast<int>(r_fullscreen) != 0;
 			driverOpenGL->enable = helper->CheckConfigCapability("r_renderer", "gl").empty();
+			driverVulkan->enable = helper->CheckConfigCapability("r_renderer", "vulkan").empty();
 			driverSoftware->enable = helper->CheckConfigCapability("r_renderer", "sw").empty();
-			configViewGL->LoadConfig();
+			configViewAccelerated->LoadConfig();
 			configViewSoftware->LoadConfig();
 		}
 

@@ -22,20 +22,31 @@
 
 #include "GLSettings.h"
 
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_blitFramebuffer, "1");
 DEFINE_SPADES_SETTING(r_bloom, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_cameraBlur, "1");
 DEFINE_SPADES_SETTING(r_colorCorrection, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTiming, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingOutputScreen, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingOutputLog, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingAverage, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingGPUTime, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingOutputBarScale, "2");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingFlush, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingFillGap, "0");
 DEFINE_SPADES_SETTING(r_depthOfField, "0");
 DEFINE_SPADES_SETTING(r_depthOfFieldMaxCoc, "0.01");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_depthPrepass, "0");
 DEFINE_SPADES_SETTING(r_dlights, "1");
 DEFINE_SPADES_SETTING(r_exposureValue, "0");
@@ -47,25 +58,39 @@ DEFINE_SPADES_SETTING(r_hdrAutoExposureMax, "0.5");
 DEFINE_SPADES_SETTING(r_hdrAutoExposureSpeed, "1");
 DEFINE_SPADES_SETTING(r_hdrGamma, "2.2");
 DEFINE_SPADES_SETTING(r_highPrec, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_lensFlare, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_lensFlareDynamic, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_maxAnisotropy, "8");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_modelShadows, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_multisamples, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_occlusionQuery, "0");
 DEFINE_SPADES_SETTING(r_physicalLighting, "0");
 DEFINE_SPADES_SETTING(r_outlines, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_radiosity, "0");
 DEFINE_SPADES_SETTING(r_saturation, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_scale, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_scaleFilter, "1");
 DEFINE_SPADES_SETTING(r_shadowMapSize, "2048");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_sharpen, "0");
 DEFINE_SPADES_SETTING(r_softParticles, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_sparseShadowMaps, "1");
 DEFINE_SPADES_SETTING(r_srgb, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_srgb2D, "1");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_ssao, "0");
+// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_temporalAA, "0");
 DEFINE_SPADES_SETTING(r_water, "2");
 

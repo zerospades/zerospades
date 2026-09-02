@@ -7,10 +7,19 @@ file(GLOB CLIENT_FILES Client/*.cpp Client/*.h)
 file(GLOB CORE_FILES Core/*.c Core/*.cpp Core/*.h)
 file(GLOB DRAW_GL_FILES Draw/OpenGL/*.cpp Draw/OpenGL/*.h)
 file(GLOB DRAW_SW_FILES Draw/SW/*.cpp Draw/SW/*.h)
+if(USE_VULKAN)
+	file(GLOB DRAW_VK_FILES Draw/Vulkan/*.cpp Draw/Vulkan/*.h)
+endif()
 file(GLOB ENET_FILES ENet/*.c ENet/*.h)
 file(GLOB ENET_INCLUDE ENet/include/enet/*.h)
 file(GLOB GUI_FILES Gui/*.cpp Gui/*.h)
 file(GLOB_RECURSE GUI_UI_FILES Gui/UI/*.cpp Gui/UI/*.h)
+
+# Exclude Vulkan device files if Vulkan is disabled
+if(NOT USE_VULKAN)
+	file(GLOB GUI_VULKAN_FILES Gui/SDLVulkanDevice.cpp Gui/SDLVulkanDevice.h)
+	list(REMOVE_ITEM GUI_FILES ${GUI_VULKAN_FILES})
+endif()
 file(GLOB IMPORTS_FILES Imports/*.h)
 file(GLOB KISS_FILES kiss_fft130/*.c kiss_fft130/*.h)
 file(GLOB JSON_FILES json/*.cpp json/*.h json/*.inl)
@@ -58,7 +67,7 @@ endif()
 
 add_executable(ZeroSpades
 	${AUDIO_FILES} ${AUDIO_AL_FILES} ${BINPACK_FILES} ${CLIENT_FILES}
-	${CORE_FILES} ${PLATFORM_FILES} ${DRAW_GL_FILES} ${DRAW_SW_FILES} ${ENET_FILES}
+	${CORE_FILES} ${PLATFORM_FILES} ${DRAW_GL_FILES} ${DRAW_SW_FILES} ${DRAW_VK_FILES} ${ENET_FILES}
 	${ENET_INCLUDE} ${GUI_FILES} ${GUI_UI_FILES} ${IMPORTS_FILES} ${KISS_FILES}
 	${JSON_FILES} ${JSON_INCLUDE} ${UNZIP_FILES} ${SCRIPTBINDING_FILES}
 	${RESOURCE_FILES})
@@ -169,6 +178,7 @@ source_group("Core" FILES ${CORE_FILES})
 source_group("Platform-specific" FILES ${PLATFORM_FILES})
 source_group("Draw\\OpenGL" FILES ${DRAW_GL_FILES})
 source_group("Draw\\SW" FILES ${DRAW_SW_FILES})
+source_group("Draw\\Vulkan" FILES ${DRAW_VK_FILES})
 source_group("libs\\Enet" FILES ${ENET_FILES})
 source_group("libs\\Enet\\include" FILES ${ENET_INCLUDE})
 source_group("Gui" FILES ${GUI_FILES})
@@ -187,6 +197,29 @@ target_link_libraries(ZeroSpades
 if(NOT APPLE)
 	target_link_libraries(ZeroSpades ${GLEW_LIBRARY})
 endif()
+
+# Link Vulkan libraries if enabled
+if(USE_VULKAN)
+	if(APPLE AND MOLTENVK_LIBRARY)
+		# Link directly to MoltenVK on macOS (no Vulkan loader needed)
+		target_link_libraries(ZeroSpades ${MOLTENVK_LIBRARY})
+	else()
+		target_link_libraries(ZeroSpades Vulkan::Vulkan)
+	endif()
+	if(Vulkan_INCLUDE_DIRS)
+		target_include_directories(ZeroSpades PRIVATE ${Vulkan_INCLUDE_DIRS})
+	endif()
+
+	# Link spirv-cross if available
+	if(HAVE_SPIRV_CROSS)
+		target_link_libraries(ZeroSpades ${SPIRV_CROSS_LIBRARIES})
+		if(SPIRV_CROSS_INCLUDE_DIR)
+			target_include_directories(ZeroSpades PRIVATE ${SPIRV_CROSS_INCLUDE_DIR})
+		endif()
+		target_compile_definitions(ZeroSpades PRIVATE HAVE_SPIRV_CROSS=1)
+	endif()
+endif()
+
 if(USE_VCPKG)
 	target_link_libraries(ZeroSpades Ogg::ogg Opus::opus)
 endif()
@@ -239,19 +272,24 @@ if(APPLE)
 		COMMENT "Embedding OpenAL Soft into macOS bundle"
 	)
 
-	# Add optional code signing (can be configured via MACOSX_CODESIGN_IDENTITY)
+	# Bundle all third-party dylibs into the .app and fix load paths.
+	# This handles MoltenVK, glslang, spirv-cross, and any transitive dependencies.
+	add_custom_command(TARGET ZeroSpades POST_BUILD
+		COMMAND bash "${CMAKE_SOURCE_DIR}/cmake/bundle_macos_dylibs.sh"
+			"$<TARGET_FILE:ZeroSpades>"
+			"$<TARGET_BUNDLE_CONTENT_DIR:ZeroSpades>/Frameworks"
+		COMMENT "Bundling third-party dylibs into macOS app"
+	)
+
+
+	# Optional Developer ID signing (for distribution).
 	# To sign: cmake -DMACOSX_CODESIGN_IDENTITY="Developer ID Application: Your Name" ..
-	# Note: Code signing must happen AFTER all binary modifications (install_name_tool, etc.)
+	# Local builds get ad-hoc signing inside bundle_macos_dylibs.sh — that's
+	# enough for the binary to launch on Apple Silicon.
 	if(MACOSX_CODESIGN_IDENTITY)
 		add_custom_command(TARGET ZeroSpades POST_BUILD
 			COMMAND codesign --force --deep --sign "${MACOSX_CODESIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:ZeroSpades>"
 			COMMENT "Code signing macOS bundle with identity: ${MACOSX_CODESIGN_IDENTITY}"
-		)
-	else()
-		# Ad-hoc signing for local development (allows the app to run without Gatekeeper issues)
-		add_custom_command(TARGET ZeroSpades POST_BUILD
-			COMMAND codesign --force --deep --sign - "$<TARGET_BUNDLE_DIR:ZeroSpades>" || echo "Warning: Code signing failed"
-			COMMENT "Ad-hoc code signing macOS bundle for local development"
 		)
 	endif()
 endif()

@@ -41,7 +41,7 @@ namespace spades {
 			bool m_hasSystemMenu;
 
 		protected:
-			enum class RendererType { GL, SW };
+			enum class RendererType { GL, Vulkan, SW };
 
 			virtual RendererType GetRendererType();
 
