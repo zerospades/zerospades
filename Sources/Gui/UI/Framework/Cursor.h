@@ -26,14 +26,18 @@
 namespace spades {
 	namespace client {
 		class IImage;
-	}
+		class IRenderer;
+	} // namespace client
 	namespace gui {
 		namespace ui {
-			class UIManager;
-
-			/** A mouse cursor image with a hot spot, rendered by `UIManager`. */
+			/**
+			 * A mouse cursor image with a hot spot, and the single place where the
+			 * cursor's look is defined. Every UI that draws a pointer — the UI
+			 * framework and the in-game overlays alike — paints it through here so
+			 * they cannot drift apart.
+			 */
 			class Cursor : public RefCountedObject {
-				UIManager* manager; // weak; the manager owns the cursor
+				Handle<client::IRenderer> renderer;
 				Handle<client::IImage> image;
 				Vector2 hotSpot;
 
@@ -41,9 +45,20 @@ namespace spades {
 				~Cursor();
 
 			public:
-				Cursor(UIManager* manager, client::IImage* image, Vector2 hotSpot);
+				Cursor(client::IRenderer& renderer, client::IImage* image, Vector2 hotSpot);
 
-				void Render(Vector2 pos);
+				/** Creates the standard UI pointer. */
+				static Handle<Cursor> CreateDefault(client::IRenderer& renderer);
+
+				/**
+				 * Draws the cursor at `pos`.
+				 *
+				 * `time` is the owner's seconds clock, and drives the shared hue cycle.
+				 * It is passed in rather than kept here because cursors are short-lived
+				 * — widgets build a fresh one on every `MouseEnter` — so an internal
+				 * clock would restart the hue each time one is hovered.
+				 */
+				void Render(Vector2 pos, float time) const;
 			};
 		} // namespace ui
 	} // namespace gui

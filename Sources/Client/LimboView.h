@@ -20,62 +20,28 @@
 
 #pragma once
 
-#include <vector>
-
 #include "GameConstants.h"
-#include <Core/Math.h>
 
 namespace spades {
 	namespace client {
-		class Client;
-		class IRenderer;
 
+		/**
+		 * The team/weapon choice the limbo menu edits and `SpawnPressed` reads.
+		 * Layout, input and drawing live in `gui::LimboMenu`; this is state only.
+		 */
 		class LimboView {
-			enum MenuType {
-				MenuTeam1,
-				MenuTeam2,
-				MenuTeamSpectator,
-				MenuWeaponRifle,
-				MenuWeaponSMG,
-				MenuWeaponShotgun,
-				MenuSpawn,
-				MenuClose
-			};
-			struct MenuItem {
-				MenuType type;
-				AABB2 rect;
-				std::string text;
-				bool hover;
-				bool visible;
-
-				MenuItem() {}
-				MenuItem(MenuType type, AABB2 rt, std::string txt)
-				    : type(type), rect(rt), text(txt), hover(false) {}
-			};
-			Client* client;
-			IRenderer& renderer;
-
-			std::vector<MenuItem> items;
-
-			Vector2 cursorPos;
-
 			int selectedTeam;
 			WeaponType selectedWeapon;
 
 		public:
-			LimboView(Client* client);
+			LimboView();
 			~LimboView();
-
-			void Update(float dt);
-			void MouseEvent(float x, float y);
-			void KeyEvent(const std::string&);
 
 			int GetSelectedTeam() { return selectedTeam; }
 			WeaponType GetSelectedWeapon() { return selectedWeapon; }
-			void SetSelectedTeam(int team) { selectedTeam = team; }
+			/** The protocol spells spectator 255, but everything here expects 2. */
+			void SetSelectedTeam(int team) { selectedTeam = (team > 2) ? 2 : team; }
 			void SetSelectedWeapon(WeaponType type) { selectedWeapon = type; }
-
-			void Draw();
 		};
 	} // namespace client
 } // namespace spades

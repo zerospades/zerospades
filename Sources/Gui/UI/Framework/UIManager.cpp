@@ -48,10 +48,7 @@ namespace spades {
 				rootElement = Handle<UIElement>::New(this);
 				rootElement->size = MakeVector2(screenWidth, screenHeight);
 
-				Handle<client::IImage> cursorImage =
-				    this->renderer->RegisterImage("Gfx/UI/Cursor.png");
-				defaultCursor = Handle<Cursor>::New(this, cursorImage.GetPointerOrNull(),
-				                                     MakeVector2(8.0F, 8.0F));
+				defaultCursor = Cursor::CreateDefault(*this->renderer);
 				mouseCursorPosition = MakeVector2(screenWidth * 0.5F, screenHeight * 0.5F);
 
 				keyRepeater.handler = [this](const std::string& key) { HandleKeyInner(key); };
@@ -329,7 +326,7 @@ namespace spades {
 
 				Cursor* c = GetCurrentCursor();
 				if (c)
-					c->Render(mouseCursorPosition);
+					c->Render(mouseCursorPosition, time);
 			}
 
 			void UIManager::Copy(const std::string& text) { SDL_SetClipboardText(text.c_str()); }

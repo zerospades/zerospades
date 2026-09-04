@@ -270,8 +270,9 @@ namespace spades {
 
 			void TextViewer::MouseEnter() {
 				if (textmodel) {
-					Handle<Cursor> ibeam = Handle<Cursor>::New(&GetManager(), image.GetPointerOrNull(),
-					                                           MakeVector2(16.0F, 16.0F));
+					Handle<Cursor> ibeam =
+					  Handle<Cursor>::New(GetManager().GetRenderer(), image.GetPointerOrNull(),
+					                      MakeVector2(16.0F, 16.0F));
 					SetCursor(ibeam.GetPointerOrNull());
 				}
 			}

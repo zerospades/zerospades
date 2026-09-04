@@ -21,26 +21,42 @@
 #include <algorithm>
 
 #include "Cursor.h"
-#include "UIManager.h"
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
 
 namespace spades {
 	namespace gui {
 		namespace ui {
-			Cursor::Cursor(UIManager* manager, client::IImage* image, Vector2 hotSpot)
-			    : manager(manager), image(image), hotSpot(hotSpot) {}
+			namespace {
+				const char* const kDefaultCursorImage = "Gfx/UI/Cursor.png";
+
+				/** Hot spot of `kDefaultCursorImage`, in pixels from its top left corner. */
+				const Vector2 kDefaultCursorHotSpot = MakeVector2(8.0F, 8.0F);
+
+				/** Hue cycles per second of the cursor's rainbow tint. */
+				constexpr float kCursorHueCycleSpeed = 0.1F;
+			} // namespace
+
+			Cursor::Cursor(client::IRenderer& renderer, client::IImage* image, Vector2 hotSpot)
+			    : renderer(&renderer), image(image), hotSpot(hotSpot) {}
 
 			Cursor::~Cursor() {}
 
-			void Cursor::Render(Vector2 pos) {
-				client::IRenderer& r = manager->GetRenderer();
+			Handle<Cursor> Cursor::CreateDefault(client::IRenderer& renderer) {
+				Handle<client::IImage> image = renderer.RegisterImage(kDefaultCursorImage);
+				return Handle<Cursor>::New(renderer, image.GetPointerOrNull(),
+				                           kDefaultCursorHotSpot);
+			}
 
-				// slowly cycling rainbow tint, matching the original UI framework
-				Vector3 rgb = HSV2RGB(std::max(manager->time * 0.1F, 0.0F), 1.0F, 1.0F);
-				r.SetColorAlphaPremultiplied(MakeVector4(rgb.x, rgb.y, rgb.z, 1.0F));
-				r.DrawImage(image.GetPointerOrNull(),
-				            MakeVector2(pos.x - hotSpot.x, pos.y - hotSpot.y));
+			void Cursor::Render(Vector2 pos, float time) const {
+				if (!image)
+					return;
+
+				// slowly cycling rainbow tint
+				Vector3 rgb = HSV2RGB(std::max(time, 0.0F) * kCursorHueCycleSpeed, 1.0F, 1.0F);
+				renderer->SetColorAlphaPremultiplied(MakeVector4(rgb.x, rgb.y, rgb.z, 1.0F));
+				renderer->DrawImage(image.GetPointerOrNull(),
+				                    MakeVector2(pos.x - hotSpot.x, pos.y - hotSpot.y));
 			}
 		} // namespace ui
 	} // namespace gui

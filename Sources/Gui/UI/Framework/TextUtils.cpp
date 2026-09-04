@@ -18,10 +18,9 @@
 
  */
 
+#include "TextUtils.h"
 #include <algorithm>
 #include <cctype>
-
-#include "TextUtils.h"
 
 namespace spades {
 	namespace gui {

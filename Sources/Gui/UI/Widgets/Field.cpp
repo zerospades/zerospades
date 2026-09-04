@@ -38,7 +38,8 @@ namespace spades {
 
 				Handle<client::IImage> img = GetManager().GetRenderer().RegisterImage("Gfx/UI/IBeam.png");
 				Handle<Cursor> ibeam =
-				    Handle<Cursor>::New(&GetManager(), img.GetPointerOrNull(), MakeVector2(16, 16));
+				  Handle<Cursor>::New(GetManager().GetRenderer(), img.GetPointerOrNull(),
+				                      MakeVector2(16, 16));
 				SetCursor(ibeam.GetPointerOrNull());
 			}
 
@@ -282,9 +283,6 @@ namespace spades {
 						SelectAll();
 						return;
 					} else if (key == "V") {
-						// `Insert` raises OnChanged itself, once the text has actually
-						// changed. The deferred handler this replaces fired a frame late,
-						// and never at all when the clipboard was empty.
 						std::string clipboard = manager.Paste();
 						if (!clipboard.empty())
 							Insert(clipboard);

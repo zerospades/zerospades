@@ -46,6 +46,12 @@ namespace spades {
         /** Makes the specified voxel solid, and sets its color. */
         void SetSolid(int x, int y, int z, uint color) {}
 
+        /**
+         * Saves the voxel model to the specified file in the KV6 format.
+         * @return `true` on success, `false` if writing failed.
+         */
+        bool Save(const string @path) {}
+
         /** Retrieves the width of the voxel model. */
         int Width {
             get {}

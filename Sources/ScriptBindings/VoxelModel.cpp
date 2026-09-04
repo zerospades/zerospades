@@ -90,6 +90,16 @@ namespace spades {
 			}
 			m->SetSolid(x, y, z, col);
 		}
+		static bool Save(const std::string& fn, VoxelModel* m) {
+			try {
+				std::unique_ptr<spades::IStream> stream{FileManager::OpenForWriting(fn.c_str())};
+				m->SaveKV6(*stream);
+				return true;
+			} catch (const std::exception& ex) {
+				ScriptContextUtils().SetNativeException(ex);
+				return false;
+			}
+		}
 
 	public:
 		VoxelModelRegistrar() : ScriptObjectRegistrar("VoxelModel") {}
@@ -135,6 +145,9 @@ namespace spades {
 					  eng->RegisterObjectMethod("VoxelModel", "void SetSolid(int, int, int, uint)",
 					                            asFUNCTION(SetSolid), asCALL_CDECL_OBJLAST);
 					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("VoxelModel", "bool Save(const string& in)",
+					                              asFUNCTION(Save), asCALL_CDECL_OBJLAST);
+					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "int get_Width() property",
 					                              asMETHOD(VoxelModel, GetWidth), asCALL_THISCALL);
 					manager->CheckError(r);
@@ -143,6 +156,12 @@ namespace spades {
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "int get_Depth() property",
 					                              asMETHOD(VoxelModel, GetDepth), asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("VoxelModel", "Vector3 get_Origin() property",
+					                              asMETHOD(VoxelModel, GetOrigin), asCALL_THISCALL);
+					manager->CheckError(r);
+					r = eng->RegisterObjectMethod("VoxelModel", "void set_Origin(Vector3) property",
+					                              asMETHOD(VoxelModel, SetOrigin), asCALL_THISCALL);
 					manager->CheckError(r);
 					break;
 				default: break;

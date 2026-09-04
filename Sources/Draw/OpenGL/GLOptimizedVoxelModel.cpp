@@ -524,8 +524,6 @@ namespace spades {
 				}
 				EmitSlice(slice.data(), w, h, 0, 0, z + 1, 1, 0, 0, 0, 1, 0, 0, 0, z, true, model);
 			}
-
-			printf("%d vertices emit\n", (int)indices.size());
 		}
 
 		void GLOptimizedVoxelModel::Prerender(

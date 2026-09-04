@@ -10,6 +10,8 @@ file(GLOB DRAW_SW_FILES Draw/SW/*.cpp Draw/SW/*.h)
 file(GLOB ENET_FILES ENet/*.c ENet/*.h)
 file(GLOB ENET_INCLUDE ENet/include/enet/*.h)
 file(GLOB GUI_FILES Gui/*.cpp Gui/*.h)
+file(GLOB_RECURSE GUI_COMPONENTS_FILES Gui/UI/Components/*.cpp Gui/UI/Components/*.h)
+file(GLOB_RECURSE GUI_UTILS_FILES Gui/Utils/*.cpp Gui/Utils/*.h)
 file(GLOB_RECURSE GUI_UI_FILES Gui/UI/*.cpp Gui/UI/*.h)
 file(GLOB IMPORTS_FILES Imports/*.h)
 file(GLOB KISS_FILES kiss_fft130/*.c kiss_fft130/*.h)
@@ -59,7 +61,7 @@ endif()
 add_executable(ZeroSpades
 	${AUDIO_FILES} ${AUDIO_AL_FILES} ${BINPACK_FILES} ${CLIENT_FILES}
 	${CORE_FILES} ${PLATFORM_FILES} ${DRAW_GL_FILES} ${DRAW_SW_FILES} ${ENET_FILES}
-	${ENET_INCLUDE} ${GUI_FILES} ${GUI_UI_FILES} ${IMPORTS_FILES} ${KISS_FILES}
+	${ENET_INCLUDE} ${GUI_FILES} ${GUI_COMPONENTS_FILES} ${GUI_UTILS_FILES} ${GUI_UI_FILES} ${IMPORTS_FILES} ${KISS_FILES}
 	${JSON_FILES} ${JSON_INCLUDE} ${UNZIP_FILES} ${SCRIPTBINDING_FILES}
 	${RESOURCE_FILES})
 
@@ -172,6 +174,8 @@ source_group("Draw\\SW" FILES ${DRAW_SW_FILES})
 source_group("libs\\Enet" FILES ${ENET_FILES})
 source_group("libs\\Enet\\include" FILES ${ENET_INCLUDE})
 source_group("Gui" FILES ${GUI_FILES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Gui/UI/Components PREFIX "Gui\\UI\\Components" FILES ${GUI_COMPONENTS_FILES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Gui/Utils PREFIX "Gui\\Utils" FILES ${GUI_UTILS_FILES})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/Gui/UI PREFIX "Gui\\UI" FILES ${GUI_UI_FILES})
 source_group("Imports" FILES ${IMPORTS_FILES})
 source_group("libs\\kiss_fft130" FILES ${KISS_FILES})

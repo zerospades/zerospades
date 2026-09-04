@@ -22,7 +22,7 @@
 
 #include <Core/Bitmap.h>
 #include <Core/MemoryStream.h>
-#include "Icon.h"
+#include <Gui/Utils/Icon.h>
 
 static const unsigned char splashImage[] = {
 #include "SplashImage.inc"

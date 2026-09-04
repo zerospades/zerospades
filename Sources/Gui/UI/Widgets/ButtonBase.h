@@ -40,9 +40,6 @@ namespace spades {
 				float lastActivate = -1.0F;
 				Vector2 lastActivatePosition;
 
-			protected:
-				~ButtonBase();
-
 			public:
 				bool pressed = false;
 				bool hover = false;
@@ -58,6 +55,7 @@ namespace spades {
 				std::string activateHotKey;
 
 				ButtonBase(UIManager* manager);
+				~ButtonBase();
 
 				virtual void PlayMouseEnterSound();
 				virtual void PlayActivateSound();
