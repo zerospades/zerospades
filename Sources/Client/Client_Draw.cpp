@@ -1771,7 +1771,7 @@ namespace spades {
 			const Vector4 color = GetHUDColor(p);
 			float luminosity = color.x + color.y + color.z;
 
-			const Vector4 shadow = MakeVector4(0, 0, 0, 0.65F);
+			const Vector4 shadow = MakeVector4(0, 0, 0, 0.8F);
 			const Vector4 gray = MakeVector4(0.4F, 0.4F, 0.4F, 1);
 			const Vector4 bgColor = (luminosity > 0.9F) ? color * gray : gray;
 
@@ -1812,7 +1812,19 @@ namespace spades {
 
 			// draw labels and ticks
 			static const char* cardinalLabels[] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-			for (int deg = 0; deg < 360; deg += 10) {
+			auto drawLabel = [&](const char* label, float px, float alpha) {
+				Vector2 size = font.Measure(label);
+				float tx = floorf(px - size.x * 0.5F);
+				float ty = floorf(barY + (barH - size.y) * 0.5F);
+				Vector4 colorLabel = MakeVector4(color.x, color.y, color.z, color.w * alpha);
+				Vector4 shadowLabel = MakeVector4(shadow.x, shadow.y, shadow.z, shadow.w * alpha);
+				font.DrawOutline(label, MakeVector2(tx, ty), 1.0F, colorLabel, shadowLabel);
+			};
+
+			const int tickStep = 5;
+			const int cardinalStep = 45;
+			const int intermediateOffset = (int)roundf(cardinalStep / 2.0F / tickStep) * tickStep;
+			for (int deg = 0; deg < 360; deg += tickStep) {
 				float delta = std::remainderf((float)deg - roundf(yawDeg), 360.0F);
 				if (fabsf(delta) > range * 0.5F)
 					continue;
@@ -1822,8 +1834,8 @@ namespace spades {
 				float edgeFade = 1.0F - (fabsf(delta) - fadeStart) / (fadeEnd - fadeStart);
 				edgeFade = Clamp(edgeFade, 0.0F, 1.0F);
 
-				bool isCardinal = (deg % 45) == 0;
-
+				const int degOffset = deg % cardinalStep;
+				bool isCardinal = degOffset == 0;
 				float px = roundf(barX + barW * 0.5F + (delta / range) * barW);
 				float tH = isCardinal ? barH * 0.55F : barH * 0.3F;
 
@@ -1835,19 +1847,22 @@ namespace spades {
 
 				// draw cardinal labels
 				if (isCardinal) {
-					const auto& label = cardinalLabels[deg / 45];
-					Vector2 size = font.Measure(label);
-					float tx = floorf(px - size.x * 0.5F);
-					float ty = floorf(barY + (barH - tH - size.y) * 0.5F + 1.0F);
-					Vector4 colorLabel = MakeVector4(color.x, color.y, color.z, color.w * edgeFade);
-					Vector4 shadowLabel = MakeVector4(shadow.x, shadow.y, shadow.z, shadow.w * edgeFade);
-					font.DrawOutline(label, MakeVector2(tx, ty), 1.0F, colorLabel, shadowLabel);
+					const auto& label = cardinalLabels[deg / cardinalStep];
+					drawLabel(label, px, edgeFade);
+					continue;
+				}
+
+				// draw intermediate degree labels
+				if (degOffset == intermediateOffset) {
+					char degLabel[8];
+					snprintf(degLabel, sizeof(degLabel), "%d", deg);
+					drawLabel(degLabel, px, edgeFade * 0.5F);
 				}
 			}
 
 			// draw heading degrees
 			char degBuf[8];
-			snprintf(degBuf, sizeof(degBuf), "%d\xC2\xB0", (int)roundf(yawDeg) % 360);
+			snprintf(degBuf, sizeof(degBuf), "%d", (int)roundf(yawDeg) % 360);
 			Vector2 degSize = font.Measure(degBuf);
 			float degX = floorf(barX + barW * 0.5F - degSize.x * 0.5F);
 			float degY = barY + barH + 3.0F;
