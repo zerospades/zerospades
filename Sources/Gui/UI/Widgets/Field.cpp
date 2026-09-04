@@ -49,6 +49,11 @@ namespace spades {
 
 			void FieldBase::SetText(const std::string& value) {
 				text = value;
+				// Clamp the cursor/mark to the new text's length. Without this, a
+				// shorter (or empty) text leaves a stale position that later causes
+				// std::string::substr() to throw std::out_of_range on the next edit.
+				markPosition = ClampCursorPosition(markPosition);
+				cursorPosition = ClampCursorPosition(cursorPosition);
 				EraseUndoHistory();
 			}
 
