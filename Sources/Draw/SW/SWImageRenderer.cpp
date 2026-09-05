@@ -21,6 +21,7 @@
 #include "SWImageRenderer.h"
 #include "SWImage.h"
 #include <Core/Bitmap.h>
+#include <cstring>
 
 namespace spades {
 	namespace draw {
@@ -967,11 +968,29 @@ namespace spades {
 				__m128i mulInv = _mm_set1_epi16(256 - (mulA + (mulA >> 7)));
 				mulCol = _mm_slli_epi16(mulCol, 8);
 
-				auto drawPixel = [mulCol, mulInv](uint32_t& dest, float& destDepth, float inDepth) {
+				// When mulA == 255, mulInv is exactly 0, so the blend below already
+				// reduces mathematically to a plain overwrite. Precomputing the result
+				// and storing it directly skips the blend arithmetic without changing
+				// a single output bit.
+				const bool solidOpaque = (mulA == 255);
+				const uint32_t opaqueColor = static_cast<uint32_t>(mulB) |
+				                              (static_cast<uint32_t>(mulG) << 8) |
+				                              (static_cast<uint32_t>(mulR) << 16) |
+				                              (static_cast<uint32_t>(mulA) << 24);
+				const uint64_t opaqueColorPair =
+				  static_cast<uint64_t>(opaqueColor) | (static_cast<uint64_t>(opaqueColor) << 32);
+
+				auto drawPixel = [mulCol, mulInv, solidOpaque, opaqueColor](
+				                    uint32_t& dest, float& destDepth, float inDepth) {
 					if (depthTest) {
 						if (inDepth > destDepth) {
 							return;
 						}
+					}
+
+					if (solidOpaque) {
+						dest = opaqueColor;
+						return;
 					}
 
 					// load [u8.8x4]8bw
@@ -998,8 +1017,9 @@ namespace spades {
 					_mm_store_ss(reinterpret_cast<float*>(&dest), _mm_castsi128_ps(dcol));
 				};
 
-				auto drawPixel2 = [mulCol, mulInv, &drawPixel](uint32_t* dest, float* destDepth,
-				                                               float inDepth1, float inDepth2) {
+				auto drawPixel2 = [mulCol, mulInv, solidOpaque, opaqueColorPair,
+				                   &drawPixel](uint32_t* dest, float* destDepth,
+				                               float inDepth1, float inDepth2) {
 					if (depthTest) {
 						if (inDepth1 > destDepth[0]) {
 							drawPixel(dest[1], destDepth[1], inDepth2);
@@ -1009,6 +1029,11 @@ namespace spades {
 							drawPixel(dest[0], destDepth[0], inDepth2);
 							return;
 						}
+					}
+
+					if (solidOpaque) {
+						std::memcpy(dest, &opaqueColorPair, sizeof(opaqueColorPair));
+						return;
 					}
 
 					// load [u8.8 x 4 x 2]
@@ -1034,6 +1059,7 @@ namespace spades {
 					// store.
 					_mm_store_sd(reinterpret_cast<double*>(dest), _mm_castsi128_pd(dcol));
 				};
+
 
 				auto drawScanline = [bmp, fbW, depthBuffer, &drawPixel, &drawPixel2, &r](int y, int x1, int x2,
 					const SWImageVarying& vary1, const SWImageVarying& vary2, float z1, float z2) {

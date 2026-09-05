@@ -358,9 +358,12 @@ namespace spades {
 			renderer->RegisterImage("Gfx/Killfeed/l-Domination.png");
 			renderer->RegisterImage("Gfx/Killfeed/m-Revenge.png");
 			renderer->RegisterImage("Gfx/Ball.png");
+			renderer->RegisterImage("Gfx/DotSight.tga");
 			renderer->RegisterImage("Gfx/HurtRing.png");
 			renderer->RegisterImage("Gfx/HurtSprite.png");
 			renderer->RegisterImage("Gfx/ReflexSight.png");
+			renderer->RegisterImage("Gfx/Rifle.png");
+			renderer->RegisterImage("Gfx/Sight.tga");
 			renderer->RegisterImage("Gfx/Spotlight.jpg");
 			renderer->RegisterImage("Gfx/White.tga");
 			renderer->RegisterImage("Textures/Fluid.png");

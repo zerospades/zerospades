@@ -383,9 +383,9 @@ namespace spades {
 			if (minPitch >= maxPitch)
 				return;
 
-			std::array<float, 65> zval; // precompute (z - cz) * some
-			for (size_t i = 0; i < zval.size(); i++)
-				zval[i] = (static_cast<float>(i) - cz);
+			std::uint_fast32_t emptyCount = static_cast<std::uint_fast32_t>(lineResolution);
+
+			const std::array<float, 65>& zval = frameZVal; // precomputed (z - cz)
 
 			float vmax = lineResolution + 0.5F;
 			auto transform = [&zval, &transOffset, vmax, &transScale](float invDist, int z) {
@@ -401,9 +401,7 @@ namespace spades {
 			// Z value -> view Z value factor
 			float heightScale = sceneDef.viewAxis[2].z;
 
-			std::array<float, 65> heightScaleVal; // precompute (heightScale * z)
-			for (size_t i = 0; i < zval.size(); i++)
-				heightScaleVal[i] = (static_cast<float>(i) * heightScale);
+			const std::array<float, 65>& heightScaleVal = frameHeightScaleVal;
 
 			float depthBias = -cz * heightScale;
 
@@ -582,14 +580,17 @@ namespace spades {
 							if (z > icz) {
 								std::uint_fast16_t p1 = transform(invDist, z);
 								std::uint_fast16_t p2 = transform(oldInvDist, z);
-								LinePixel px = BuildLinePixel(oirx, oiry, z,
-									Face::NegZ, medDist + heightScaleVal[z]);
+								if (p1 < p2) {
+									LinePixel px = BuildLinePixel(oirx, oiry, z,
+										Face::NegZ, medDist + heightScaleVal[z]);
 
-								for (std::uint_fast16_t j = p1; j < p2; j++) {
-									auto& p = pixels[j];
-									if (!p.IsEmpty())
-										continue;
-									p.Set(px);
+									for (std::uint_fast16_t j = p1; j < p2; j++) {
+										auto& p = pixels[j];
+										if (!p.IsEmpty())
+											continue;
+										p.Set(px);
+										emptyCount--;
+									}
 								}
 							}
 							ptr++;
@@ -600,14 +601,17 @@ namespace spades {
 							if (z < icz) {
 								std::uint_fast16_t p1 = transform(invDist, z + 1);
 								std::uint_fast16_t p2 = transform(oldInvDist, z + 1);
-								LinePixel px = BuildLinePixel(oirx, oiry, z,
-									Face::PosZ, medDist + heightScaleVal[z + 1]);
+								if (p2 < p1) {
+									LinePixel px = BuildLinePixel(oirx, oiry, z,
+										Face::PosZ, medDist + heightScaleVal[z + 1]);
 
-								for (std::uint_fast16_t j = p2; j < p1; j++) {
-									auto& p = pixels[j];
-									if (!p.IsEmpty())
-										continue;
-									p.Set(px);
+									for (std::uint_fast16_t j = p2; j < p1; j++) {
+										auto& p = pixels[j];
+										if (!p.IsEmpty())
+											continue;
+										p.Set(px);
+										emptyCount--;
+									}
 								}
 							}
 							ptr++;
@@ -638,17 +642,25 @@ namespace spades {
 						savedZ = z + 1;
 						savedP = p2;
 
-						LinePixel px = BuildLinePixel(irx, iry, z, wallFace, medDist + heightScaleVal[z]);
+						if (p1 < p2) {
+							LinePixel px =
+							  BuildLinePixel(irx, iry, z, wallFace, medDist + heightScaleVal[z]);
 
-						for (std::uint_fast16_t j = p1; j < p2; j++) {
-							auto& p = pixels[j];
-							if (!p.IsEmpty())
-								continue;
-							p.Set(px);
+							for (std::uint_fast16_t j = p1; j < p2; j++) {
+								auto& p = pixels[j];
+								if (!p.IsEmpty())
+									continue;
+								p.Set(px);
+								emptyCount--;
+							}
 						}
 					}
 
 				} // add wall - end
+
+				// every pixel of this line written; nothing more can appear
+				if (emptyCount == 0)
+					break;
 
 				// check pitch cull
 				if ((--count) == 0) {
@@ -754,13 +766,9 @@ namespace spades {
 					uint32_t* fb2 = fb + fx + fy * fw;
 					float* db2 = depthBuf + fx + fy * fw;
 
-					if (v2.z > 0.99F || v2.z < -0.99F)
-						goto FastBlockPath; // near to pole. cannot be approximated by piecewise
-
-				FastBlockPath : {
 					// Use bi-linear interpolation for faster yaw/pitch
 					// computation.
-
+					{
 					auto calcYawindex = [yawMin2](Vector3 v) {
 						std::int32_t yawIndex;
 						{
@@ -808,23 +816,33 @@ namespace spades {
 						std::int32_t pitchC = pitchA;
 						std::int32_t pitchDelta = (pitchB - pitchA) / blockSize;
 
+						std::uint32_t cachedYawIndex = 0xFFFFFFFFu;
+						const LinePixel* pixels = nullptr;
+						std::int32_t cachedPitchTanMinI = 0;
+						std::int32_t cachedPitchScaleI = 0;
+
 						for (unsigned int y = 0; y < blockSize; y++) {
 							std::uint32_t yawIndex =
 							  static_cast<unsigned int>(yawIndexC << 8 >> 16);
 							yawIndex = (yawIndex * yawScale2) >> 16;
 							yawIndex = (yawIndex * numLines) >> 16;
-							auto& line = lineList[yawIndex];
-							auto* pixels = line.pixels.data();
+							if (yawIndex != cachedYawIndex) {
+								auto& line = lineList[yawIndex];
+								pixels = line.pixels.data();
+								cachedPitchTanMinI = line.pitchTanMinI;
+								cachedPitchScaleI = line.pitchScaleI;
+								cachedYawIndex = yawIndex;
+							}
 
 							// solve pitch
 							std::int32_t pitchIndex;
 
 							{
 								pitchIndex = pitchC >> 13;
-								pitchIndex -= line.pitchTanMinI;
+								pitchIndex -= cachedPitchTanMinI;
 								pitchIndex =
 								  static_cast<int>((static_cast<int64_t>(pitchIndex) *
-								                    static_cast<int64_t>(line.pitchScaleI)) >>
+								                    static_cast<int64_t>(cachedPitchScaleI)) >>
 								                   32);
 								// pitch = (pitch - line.pitchTanMin) * line.pitchScale;
 								// pitchIndex = static_cast<int>(pitch);
@@ -982,6 +1000,15 @@ namespace spades {
 					float y = horiz.x * s + horiz.y * c;
 					horiz.x = x;
 					horiz.y = y;
+				}
+			}
+
+			{
+				float cz = def.viewOrigin.z;
+				float heightScale = def.viewAxis[2].z;
+				for (size_t i = 0; i < frameZVal.size(); i++) {
+					frameZVal[i] = static_cast<float>(i) - cz;
+					frameHeightScaleVal[i] = static_cast<float>(i) * heightScale;
 				}
 			}
 
