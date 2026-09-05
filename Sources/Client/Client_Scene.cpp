@@ -223,6 +223,11 @@ namespace spades {
 
 				def.blurVignette = 0.0F;
 
+				// Asked here, before a single model is submitted, because the renderer
+				// decides whether to run the x-ray pass at all from the scene it is
+				// given rather than from what turns up in it.
+				def.allowPlayerXRay = HasRevealedPlayers();
+
 				auto cameraMode = GetCameraMode();
 				switch (cameraMode) {
 					case ClientCameraMode::None: SPUnreachable();

@@ -59,7 +59,11 @@ enum ChatType {
 	ChatTypeBig,
 	ChatTypeInfo,
 	ChatTypeWarning,
-	ChatTypeError
+	ChatTypeError,
+
+	// only through the ExtendedTeamplay extension: a line the server sends to one
+	// player alone, the sender carried by the packet's own player id
+	ChatTypeDirect
 };
 
 enum WeaponType { RIFLE_WEAPON, SMG_WEAPON, SHOTGUN_WEAPON };

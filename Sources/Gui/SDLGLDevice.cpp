@@ -888,7 +888,8 @@ namespace spades {
 				case RGBA: return GL_RGBA;
 				case DepthComponent: return GL_DEPTH_COMPONENT;
 				case DepthComponent24: return GL_DEPTH_COMPONENT24;
-				case StencilIndex: return GL_STENCIL_INDEX;
+				case Depth24Stencil8: return GL_DEPTH24_STENCIL8;
+				case DepthStencil: return GL_DEPTH_STENCIL;
 				case RGB10A2: return GL_RGB10_A2;
 				case RGB16F: return GL_RGB16F;
 				case RGBA16F: return GL_RGBA16F;
@@ -912,7 +913,7 @@ namespace spades {
 				case RGBA: return GL_RGBA;
 				case BGRA: return GL_BGRA;
 				case DepthComponent: return GL_DEPTH_COMPONENT;
-				case StencilIndex: return GL_STENCIL_INDEX;
+				case DepthStencil: return GL_DEPTH_STENCIL;
 				default: SPInvalidEnum("v", v);
 			}
 		}
@@ -930,6 +931,7 @@ namespace spades {
 				case UnsignedShort5551: return GL_UNSIGNED_SHORT_5_5_5_1;
 				case UnsignedShort1555Rev: return GL_UNSIGNED_SHORT_1_5_5_5_REV;
 				case UnsignedInt2101010Rev: return GL_UNSIGNED_INT_2_10_10_10_REV;
+				case UnsignedInt248: return GL_UNSIGNED_INT_24_8;
 				default: SPInvalidEnum("v", v);
 			}
 		}
@@ -1961,7 +1963,7 @@ namespace spades {
 				case draw::IGLDevice::ColorAttachment6: a = GL_COLOR_ATTACHMENT6; break;
 				case draw::IGLDevice::ColorAttachment7: a = GL_COLOR_ATTACHMENT7; break;
 				case draw::IGLDevice::DepthAttachment: a = GL_DEPTH_ATTACHMENT; break;
-				case draw::IGLDevice::StencilAttachment: a = GL_STENCIL_ATTACHMENT; break;
+				case draw::IGLDevice::DepthStencilAttachment: a = GL_DEPTH_STENCIL_ATTACHMENT; break;
 				default: SPInvalidEnum("attachment", attachment);
 			}
 #if GLEW
@@ -2122,7 +2124,7 @@ namespace spades {
 				case draw::IGLDevice::ColorAttachment6: a = GL_COLOR_ATTACHMENT6; break;
 				case draw::IGLDevice::ColorAttachment7: a = GL_COLOR_ATTACHMENT7; break;
 				case draw::IGLDevice::DepthAttachment: a = GL_DEPTH_ATTACHMENT; break;
-				case draw::IGLDevice::StencilAttachment: a = GL_STENCIL_ATTACHMENT; break;
+				case draw::IGLDevice::DepthStencilAttachment: a = GL_DEPTH_STENCIL_ATTACHMENT; break;
 				default: SPInvalidEnum("attachment", attachment);
 			}
 #if GLEW

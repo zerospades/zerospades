@@ -33,6 +33,11 @@ namespace spades {
 			float zNear, zFar;
 			bool skipWorld;
 
+			/** Whether the frame may draw models flagged `xray` through the world. The
+			 * renderer skips the whole pass when this is clear, so it has to be set on
+			 * any frame where a model asks to be revealed. */
+			bool allowPlayerXRay;
+
 			float depthOfFieldFocalLength;
 			float depthOfFieldNearBlurStrength;
 			float depthOfFieldFarBlurStrength;
@@ -56,6 +61,7 @@ namespace spades {
 				viewAxis[2] = MakeVector3(0, 0, 1);
 				zNear = zFar = 0.0F;
 				skipWorld = false;
+				allowPlayerXRay = false;
 				depthOfFieldFocalLength = 0.0F;
 				depthOfFieldNearBlurStrength = 1.0F;
 				depthOfFieldFarBlurStrength = 0.0F;

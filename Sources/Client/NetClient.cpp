@@ -27,6 +27,7 @@
 
 #include "CTFGameMode.h"
 #include "Client.h"
+#include "ExtendedTeamplay.h"
 #include "GameMap.h"
 #include "NetProtocol.h"
 #include "GameMapLoader.h"
@@ -175,6 +176,12 @@ namespace spades {
 
 			void WriteString(std::string str) {
 				str = EncodeString(str);
+				data.insert(data.end(), str.begin(), str.end());
+			}
+
+			/** Writes the bytes as they are, for a field the protocol defines as UTF-8
+			 * text rather than as the base protocol's Code Page 437 with a UTF-8 escape. */
+			void WriteRawString(const std::string& str) {
 				data.insert(data.end(), str.begin(), str.end());
 			}
 
@@ -576,6 +583,14 @@ namespace spades {
 		// Max chat packet is 255 bytes: type + playerId + chatType + msg → 252 msg bytes.
 		static constexpr size_t kKickReasonMaxBytes = 252;
 
+		/** Whether a world position falls inside the fixed Ace of Spades map volume.
+		 * Used to reject nonsensical coordinates before they reach the renderer. */
+		static bool IsInsideMapBounds(const Vector3& v) {
+			return v.x >= 0.0F && v.x <= (float)GameMap::DefaultWidth &&
+				   v.y >= 0.0F && v.y <= (float)GameMap::DefaultHeight &&
+				   v.z >= 0.0F && v.z <= (float)GameMap::DefaultDepth;
+		}
+
 		void NetClient::CaptureKickReason(spades::client::NetPacketReader& r) {
 			std::string msg = StripNewlines(TrimSpaces(r.ReadRemainingString()));
 			customKickReasonString = msg.substr(0, kKickReasonMaxBytes);
@@ -603,6 +618,11 @@ namespace spades {
 			switch (r.GetType()) {
 				case PacketTypeHandShakeInit: SendHandShakeValid(r.ReadInt()); return true;
 				case PacketTypeExtensionInfo: HandleExtensionPacket(r); return true;
+				// Handled here rather than in HandleGamePacket so the server may send a
+				// Config as soon as the extension is negotiated: during the Connecting
+				// stage anything but MapStart is treated as an unexpected packet, and
+				// during a map transfer it would be parked until the world exists.
+				case PacketTypeExtendedTeamplay: HandleExtendedTeamplayPacket(r); return true;
 				case PacketTypeVersionGet: {
 					if (r.GetNumRemainingBytes() > 0) {
 						// Enhanced variant
@@ -657,6 +677,99 @@ namespace spades {
 			}
 
 			SendSupportedExtensions();
+		}
+
+		void NetClient::HandleExtendedTeamplayPacket(spades::client::NetPacketReader& r) {
+			SPADES_MARK_FUNCTION();
+
+			// A server that never negotiated the extension has no business sending its
+			// packets; ignoring them keeps the client's state defined by the handshake.
+			if (!HasExtension(ExtensionTypeExtendedTeamplay)) {
+				SPLog("Ignoring an Extended Teamplay packet from a server that did not "
+					  "negotiate the extension");
+				return;
+			}
+
+			switch (r.ReadByte()) { // sub packet id
+				case ExtendedTeamplaySubConfig: {
+					client->ExtendedTeamplayConfigured(r.ReadByte());
+				} break;
+				case ExtendedTeamplaySubPing: {
+					int pId = r.ReadByte();
+					Vector3 pos = r.ReadVector3();
+					float duration = r.ReadFloat();
+					uint8_t surfaces = r.ReadByte();
+
+					// The marker colour, in the Blue-Green-Red order the base protocol
+					// already uses. The server chose it; the client draws it as sent.
+					IntVector3 color = r.ReadIntColor();
+
+					uint8_t messageId = r.ReadByte();
+
+					// The Reason occupies the rest of the packet, is plain UTF-8 rather
+					// than the base protocol's Code Page 437, and may be empty.
+					std::string reason =
+					  ExtendedTeamplay::SanitizeReason(r.ReadRemainingData());
+
+					// The Message ID is reserved and unimplemented: a value from a later
+					// version is ignored rather than taken as a reason to drop a ping
+					// that is otherwise perfectly renderable.
+					if (messageId != ExtendedTeamplay::kReservedMessageId) {
+						SPLog("Ignoring the message id %u on an Extended Teamplay ping",
+							  (unsigned int)messageId);
+					}
+
+					if (!ExtendedTeamplay::IsValidDuration(duration)) {
+						SPLog("Dropped an Extended Teamplay ping with an invalid duration");
+						break;
+					}
+
+					// The server is authoritative on placement, but a NaN or a wildly
+					// out-of-bounds position would corrupt the projection maths, so it
+					// is rejected rather than drawn. A removal carries no place to check.
+					if (duration != 0.0F && (pos.IsNaN() || !IsInsideMapBounds(pos))) {
+						SPLog("Dropped an Extended Teamplay ping at an invalid position");
+						break;
+					}
+
+					client->ExtendedTeamplayPingReceived(pId, pos, duration, surfaces,
+														 color, std::move(reason));
+				} break;
+				case ExtendedTeamplaySubESPMark: {
+					int pId = r.ReadByte();
+					float duration = r.ReadFloat();
+					uint8_t surfaces = r.ReadByte();
+					uint8_t flags = r.ReadByte();
+
+					// The outline colour, in the Blue-Green-Red order the base protocol
+					// already uses. Black asks for the marked player's team colour.
+					IntVector3 color = r.ReadIntColor();
+
+					uint8_t messageId = r.ReadByte();
+
+					std::string reason =
+					  ExtendedTeamplay::SanitizeReason(r.ReadRemainingData());
+
+					// Reserved and unimplemented, as on the ping: ignored, not fatal.
+					if (messageId != ExtendedTeamplay::kReservedMessageId) {
+						SPLog("Ignoring the message id %u on an Extended Teamplay mark",
+							  (unsigned int)messageId);
+					}
+
+					if (!ExtendedTeamplay::IsValidDuration(duration)) {
+						SPLog("Dropped an Extended Teamplay mark with an invalid duration");
+						break;
+					}
+
+					client->ExtendedTeamplayMarkReceived(pId, duration, surfaces, flags,
+														 color, std::move(reason));
+				} break;
+				default:
+					// Sub packets are the extension's own versioning seam: an unknown one
+					// belongs to a newer version and is skipped, not treated as an error.
+					SPLog("Ignoring an unknown Extended Teamplay sub packet");
+					break;
+			}
 		}
 
 		void NetClient::HandleGamePacket(spades::client::NetPacketReader& r) {
@@ -1112,6 +1225,12 @@ namespace spades {
 						client->ServerSentMessage(false, CHATPREFIX_WARNING + msg);
 					} else if (type == ChatTypeError) {
 						client->ServerSentMessage(false, CHATPREFIX_ERROR + msg);
+					} else if (type == ChatTypeDirect &&
+							   HasExtension(ExtensionTypeExtendedTeamplay)) {
+						// The packet needs no field for the recipient — it is us — and
+						// carries the sender in its own player id, 255 for the server.
+						stmp::optional<Player&> p = GetPlayerOrNull(playerId);
+						client->ServerSentDirectMessage(p ? (*p).GetName() : std::string(), msg);
 					}
 				} break;
 				case PacketTypeMapStart: {
@@ -1641,6 +1760,43 @@ namespace spades {
 			w.WriteString(osInfo);
 
 			SPLog("Sending version back.");
+			enet_peer_send(peer, 0, w.CreatePacket());
+		}
+
+		void NetClient::SendTeamplayPing(Vector3 position, const std::string& reason) {
+			SPADES_MARK_FUNCTION();
+
+			// The caller is expected to have checked the feature bits, but the
+			// negotiation is this class's own business, so it is enforced here.
+			if (!HasExtension(ExtensionTypeExtendedTeamplay))
+				return;
+
+			NetPacketWriter w(PacketTypeExtendedTeamplay);
+			w.WriteByte((uint8_t)ExtendedTeamplaySubPing);
+
+			// The Player ID is ignored in this direction; the server fills it in
+			// authoritatively. Sent as 255 so a server reading it sees "unset" rather
+			// than a plausible-looking impersonation of some other player.
+			w.WriteByte((uint8_t)ExtendedTeamplay::kServerPlayerId);
+
+			w.WriteVector3(position);
+
+			// How long the ping lasts is the server's call alone, so a client sends `0`
+			// and the server fills in what it thinks the ping is worth. Where it is
+			// shown is the server's call too, and `0` asks it to decide.
+			w.WriteFloat(0.0F);
+			w.WriteByte((uint8_t)0);
+
+			// Only the server sets a ping's colour, so these three go out empty and are
+			// ignored on arrival like the two fields above them.
+			w.WriteColor(MakeIntVector3(0, 0, 0));
+
+			w.WriteByte(ExtendedTeamplay::kReservedMessageId);
+
+			// The Reason is UTF-8 text, not the base protocol's Code Page 437, so the
+			// bytes go out as they are.
+			w.WriteRawString(ExtendedTeamplay::SanitizeReason(reason));
+
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 

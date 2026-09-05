@@ -42,6 +42,7 @@
 #include "Weapon.h"
 #include "World.h"
 
+#include "ExtendedTeamplay.h"
 #include "NetClient.h"
 #include <Gui/ConsoleScreen.h>
 
@@ -97,6 +98,10 @@ DEFINE_SPADES_SETTING(cg_debugCorpse, "0");
 DEFINE_SPADES_SETTING(cg_keySpawnCorpse, "p");
 
 DEFINE_SPADES_SETTING(cg_keyPieMenu, "MiddleMouseButton");
+
+// Extended Teamplay protocol extension
+DEFINE_SPADES_SETTING(cg_keyTeamOverlay, "Alt");
+DEFINE_SPADES_SETTING(cg_keyTeamPing, "q");
 
 SPADES_SETTING(cg_manualFocus);
 DEFINE_SPADES_SETTING(cg_keyAutoFocus, "MiddleMouseButton");
@@ -679,8 +684,31 @@ namespace spades {
 				bool localPlayerIsSpectating = localPlayerIsSpectator || staffSpectating;
 				bool isStaff = activeNet->GetGameProperties()->isStaff;
 
+				// Extended Teamplay: hold to reveal teammates, tap to ping. Both are
+				// gated server-side by the extension's feature bits, which the draw and
+				// send paths check; the bindings themselves stay live so they keep
+				// working across a server that changes its policy mid-game.
+				if (CheckKey(cg_keyTeamOverlay, name) && !localPlayerIsSpectating) {
+					// Say so rather than swallowing the key: a server that does not
+					// permit TEAM_ESP, or does not speak the extension at all, would
+					// otherwise make the binding look broken.
+					if (down && !teamplay->IsTeamESPEnabled()) {
+						ShowAlert(_Tr("Client", "This server does not allow showing teammates."),
+								  AlertType::Notice);
+						return;
+					}
+					teamOverlayHeld = down;
+					return;
+				}
+				if (CheckKey(cg_keyTeamPing, name) && !localPlayerIsSpectating) {
+					if (down)
+						SendTeamplayPingAtCrosshair();
+					return;
+				}
+
 				// Pie menu: hold to open, release to commit.
-				// Aim at a teammate to send a DM; otherwise broadcast on team chat.
+				// Aim at a teammate to send a DM; otherwise broadcast on team chat, or
+				// drop a ping when the slice has a reason and the server allows it.
 				if (CheckKey(cg_keyPieMenu, name) && localPlayerIsAlive && !localPlayerIsSpectating) {
 					if (down && !pieMenuView->IsOpen()) {
 						auto hot = HotTrackedPlayer();
@@ -690,22 +718,38 @@ namespace spades {
 						} else {
 							pieMenuView->Open(PieMenuView::Variant::World);
 						}
+
+						// Freeze what the player was pointing at, along with the rest of
+						// the context the menu resolves once at open.
+						pieMenuPingValid = ResolveCrosshairWorldPos(pieMenuPingPos);
+
 						weapInput = WeaponInput();
 					} else if (!down && pieMenuView->IsOpen()) {
 						PieMenuView::Variant v = pieMenuView->GetVariant();
 						int targetId = pieMenuView->GetTargetPlayerId();
 						const auto& labels = pieMenuView->GetLabels();
+						bool slicePings = pieMenuView->SlicePings(pieMenuView->GetSelection());
 						int sel = pieMenuView->Close();
 						if (sel >= 0 && sel < PieMenuView::kSliceCount && net) {
-							const std::string& msg = labels[static_cast<size_t>(sel)];
+							size_t idx = static_cast<size_t>(sel);
+							const std::string& msg = labels[idx];
 							if (v == PieMenuView::Variant::Player && targetId >= 0) {
 								char cmd[128];
 								std::snprintf(cmd, sizeof(cmd), "/pm #%d %s", targetId, msg.c_str());
 								net->SendChat(cmd, false);
 							} else if (v == PieMenuView::Variant::World) {
-								net->SendChat(msg, false);
+								// The marker says it better than the message does, but
+								// the message is what reaches a server without the
+								// extension — so the chat is the fallback, not a double.
+								// Either way the same words go out, as the ping's reason
+								// or as the chat line.
+								bool pinged = slicePings && pieMenuPingValid &&
+											  SendTeamplayPing(pieMenuPingPos, msg);
+								if (!pinged)
+									net->SendChat(msg, false);
 							}
 						}
+						pieMenuPingValid = false;
 					}
 					return;
 				}

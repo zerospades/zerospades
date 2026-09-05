@@ -74,6 +74,19 @@ namespace spades {
 	namespace draw {
 		// TODO: raise error for any calls after Shutdown().
 
+		namespace {
+			/**
+			 * Stencil bit the world's own pixels are stamped with while the scene is
+			 * drawn, so the x-ray pass can tell "hidden behind the world" apart from
+			 * "hidden behind another model".
+			 *
+			 * The scene's stencil buffer is cleared with the colour and depth buffers
+			 * and used by nothing else, so this bit is the whole allocation. The 2D
+			 * clipping stencil runs after the scene and clears the buffer for itself.
+			 */
+			constexpr int kStencilBitWorld = 1 << 0;
+		} // namespace
+
 		GLRenderer::GLRenderer(Handle<IGLDevice> _device)
 			: device(std::move(_device)),
 			  map(NULL),
@@ -640,8 +653,25 @@ namespace spades {
 				GLProfiler::Context p(*profiler, "Sunlight Pass");
 
 				device->DepthFunc(IGLDevice::LessOrEqual);
-				if (!sceneDef.skipWorld && mapRenderer)
+
+				// Stamp the world's own pixels with the stencil bit that RenderXRayPass
+				// reads: a model is revealed where the world is in front of it, and this
+				// is what marks where the world actually ended up on screen.
+				if (!sceneDef.skipWorld && mapRenderer) {
+					device->Enable(IGLDevice::StencilTest, true);
+					device->StencilMask(kStencilBitWorld);
+					device->StencilFunc(IGLDevice::Always, kStencilBitWorld, 0xFF);
+					device->StencilOp(IGLDevice::Keep, IGLDevice::Keep, IGLDevice::Replace);
+
 					mapRenderer->RenderSunlightPass();
+
+					// Back to the open mask this renderer rests at: with the test off
+					// nothing writes to the stencil buffer anyway, and a mask left
+					// closed would silently swallow the next clear of it.
+					device->Enable(IGLDevice::StencilTest, false);
+					device->StencilMask(0xFF);
+				}
+
 				modelRenderer->RenderSunlightPass(false);
 			}
 
@@ -698,6 +728,40 @@ namespace spades {
 				device->PolygonOffset(0.0F, 0.0F);
 				device->LineWidth(1.0F);
 			}
+		}
+
+		void GLRenderer::RenderXRayPass() {
+			SPADES_MARK_FUNCTION();
+
+			GLProfiler::Context p(*profiler, "X-Ray Pass");
+
+			// `Greater` keeps exactly the fragments something else is already in front
+			// of, and the stencil narrows that to the fragments hidden by the world
+			// itself, so a model is not revealed through another model.
+			device->Enable(IGLDevice::StencilTest, true);
+			device->StencilMask(0x0);
+			device->StencilFunc(IGLDevice::Equal, kStencilBitWorld, kStencilBitWorld);
+			device->StencilOp(IGLDevice::Keep, IGLDevice::Keep, IGLDevice::Keep);
+
+			// Depth writes stay off: this is a second look at models the scene has
+			// already drawn, and it must not push the depth buffer around.
+			device->Enable(IGLDevice::DepthTest, true);
+			device->DepthFunc(IGLDevice::Greater);
+			device->DepthMask(false);
+
+			device->Enable(IGLDevice::CullFace, true);
+			device->Enable(IGLDevice::Blend, true);
+			device->BlendFunc(IGLDevice::SrcAlpha, IGLDevice::OneMinusSrcAlpha,
+							  IGLDevice::Zero, IGLDevice::One);
+
+			modelRenderer->RenderXRayPass();
+
+			device->Enable(IGLDevice::StencilTest, false);
+			device->StencilMask(0xFF);
+			device->DepthFunc(IGLDevice::Less);
+			device->DepthMask(true);
+			device->Enable(IGLDevice::Blend, false);
+			device->Enable(IGLDevice::CullFace, false);
 		}
 
 		void GLRenderer::RenderGhosts() {
@@ -815,7 +879,8 @@ namespace spades {
 
 						device->ClearColor(bgCol.x, bgCol.y, bgCol.z, 1.0F);
 						device->Clear(
-						  (IGLDevice::Enum)(IGLDevice::ColorBufferBit | IGLDevice::DepthBufferBit));
+						  (IGLDevice::Enum)(IGLDevice::ColorBufferBit | IGLDevice::DepthBufferBit |
+											IGLDevice::StencilBufferBit));
 					}
 
 					device->FrontFace(IGLDevice::CCW);
@@ -868,7 +933,8 @@ namespace spades {
 
 				device->ClearColor(bgCol.x, bgCol.y, bgCol.z, 1.0F);
 				device->Clear(
-				  (IGLDevice::Enum)(IGLDevice::ColorBufferBit | IGLDevice::DepthBufferBit));
+				  (IGLDevice::Enum)(IGLDevice::ColorBufferBit | IGLDevice::DepthBufferBit |
+									IGLDevice::StencilBufferBit));
 			}
 
 			device->FrontFace(IGLDevice::CW);
@@ -895,6 +961,12 @@ namespace spades {
 				RenderDebugLines();
 				device->Enable(IGLDevice::Blend, false);
 			}
+
+			// Revealing a player has no meaning in a mirror's reflection of them, so
+			// this runs on the real scene alone, once everything that can hide them has
+			// been drawn.
+			if (sceneDef.allowPlayerXRay)
+				RenderXRayPass();
 
 			{
 				GLProfiler::Context p(*profiler, "Ghosts");

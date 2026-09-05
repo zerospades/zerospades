@@ -118,6 +118,19 @@ namespace spades {
 			}
 		}
 
+		void GLModelRenderer::RenderXRayPass() {
+			SPADES_MARK_FUNCTION();
+
+			GLProfiler::Context profiler(renderer.GetGLProfiler(),
+				"Model [%d model(s), %d unique model type(s)]",
+				modelCount, (int)models.size());
+
+			for (const auto& m : models) {
+				GLModel* model = m.model;
+				model->RenderXRayPass(m.params);
+			}
+		}
+
 		void GLModelRenderer::Clear() {
 			// last phase: clear scene
 			for (const auto& m : models) {

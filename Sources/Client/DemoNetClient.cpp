@@ -25,6 +25,7 @@
 #include "CTFGameMode.h"
 #include "Client.h"
 #include "DemoNetClient.h"
+#include "ExtendedTeamplay.h"
 #include "NetProtocol.h"
 #include "GameMap.h"
 #include "GameMapLoader.h"
@@ -484,6 +485,10 @@ namespace spades {
 
 					if (!seekingMode)
 						client->PlayerSpawned(pRef);
+					else
+						// A seek replays the marks to rebuild what was in force at the
+						// destination, so it has to replay what ends them too.
+						client->ExtendedTeamplayPlayerSpawned(pId);
 				} break;
 				case PacketTypeBlockAction: {
 					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
@@ -679,6 +684,13 @@ namespace spades {
 							} else {
 								client->ServerSentMessage((type == 1), msg);
 							}
+						} else if (type == ChatTypeDirect) {
+							// Recorded from the ExtendedTeamplay extension: the line was
+							// sent to the recording player alone, by the player this
+							// packet names or by the server itself.
+							stmp::optional<Player&> p = GetPlayerOrNull(playerId);
+							client->ServerSentDirectMessage(p ? (*p).GetName() : std::string(),
+															msg);
 						}
 					}
 				} break;
@@ -842,6 +854,57 @@ namespace spades {
 						p->Restock(hp, grenades, blocks);
 					w.Restock(clip, reserve);
 					GetWorld()->GetPlayerPersistent(pId).score = score;
+				} break;
+				case PacketTypeExtendedTeamplay: {
+					switch (r.ReadByte()) { // sub packet id
+						case ExtendedTeamplaySubConfig:
+							client->ExtendedTeamplayConfigured(r.ReadByte());
+							break;
+						case ExtendedTeamplaySubPing: {
+							int pId = r.ReadByte();
+							Vector3 pos = r.ReadVector3();
+							float duration = r.ReadFloat();
+							uint8_t surfaces = r.ReadByte();
+							IntVector3 color = r.ReadIntColor();
+							uint8_t messageId = r.ReadByte();
+							std::string reason =
+							  ExtendedTeamplay::SanitizeReason(r.ReadRemainingData());
+
+							// The message id is reserved and ignored, so only a malformed
+							// duration is a reason not to replay the ping.
+							(void)messageId;
+							if (!ExtendedTeamplay::IsValidDuration(duration))
+								break;
+
+							// A ping is a momentary event, so replaying the whole demo to
+							// reach a seek target would otherwise pop every ping ever sent
+							// at the destination. A removal is state and is kept.
+							if (!seekingMode || duration == 0.0F)
+								client->ExtendedTeamplayPingReceived(pId, pos, duration, surfaces,
+																	 color, std::move(reason));
+						} break;
+						case ExtendedTeamplaySubESPMark: {
+							int pId = r.ReadByte();
+							float duration = r.ReadFloat();
+							uint8_t surfaces = r.ReadByte();
+							uint8_t flags = r.ReadByte();
+							IntVector3 color = r.ReadIntColor();
+							uint8_t messageId = r.ReadByte();
+							std::string reason =
+							  ExtendedTeamplay::SanitizeReason(r.ReadRemainingData());
+
+							(void)messageId; // reserved and ignored, as on the ping
+							if (!ExtendedTeamplay::IsValidDuration(duration))
+								break;
+
+							// Marks are state rather than events, so they are replayed
+							// during a seek to rebuild what was in force. Their timers
+							// restart from the seek, which a fast replay cannot avoid.
+							client->ExtendedTeamplayMarkReceived(pId, duration, surfaces, flags,
+																 color, std::move(reason));
+						} break;
+						default: break; // a sub packet from a newer extension version
+					}
 				} break;
 				default:
 					SPLog("Demo: dropped unknown packet %d", (int)r.GetType());

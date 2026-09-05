@@ -149,6 +149,7 @@ namespace spades {
 			void SendReload() override {}
 			void SendTeamChange(int) override {}
 			void SendWeaponChange(WeaponType) override {}
+			void SendTeamplayPing(Vector3, const std::string&) override {}
 
 		};
 	} // namespace client

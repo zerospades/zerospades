@@ -90,6 +90,17 @@ namespace spades {
 			virtual void SendTeamChange(int team) = 0;
 			virtual void SendWeaponChange(WeaponType) = 0;
 
+			/**
+			 * Pings a world position for the rest of the team, using the *Extended
+			 * Teamplay* extension. The server is authoritative on placement and on who
+			 * receives the relay, and silently drops the request when the extension or
+			 * the ping features are not enabled.
+			 *
+			 * `reason` is a free-form UTF-8 string; an empty one means a neutral
+			 * "look here" marker.
+			 */
+			virtual void SendTeamplayPing(Vector3 position, const std::string& reason) = 0;
+
 		};
 
 	} // namespace client

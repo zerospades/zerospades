@@ -78,6 +78,15 @@ namespace spades {
 			PacketTypeVersionSend = 34,    // C2S
 			PacketTypeExtensionInfo = 60,
 			PacketTypePlayerProperties = 64,
+			PacketTypeExtendedTeamplay = 66, // S2C2P, extension id 2 (`64 + extension id`)
+		};
+
+		/** Sub packet ids of `PacketTypeExtendedTeamplay`. Every extension packet
+		 * carries one as its second byte, even when the extension needs only one. */
+		enum ExtendedTeamplaySubPacketType {
+			ExtendedTeamplaySubConfig = 0,  // S2C
+			ExtendedTeamplaySubPing = 1,    // C2S2P
+			ExtendedTeamplaySubESPMark = 2, // S2C
 		};
 
 		inline PlayerInput ParsePlayerInput(uint8_t bits) {

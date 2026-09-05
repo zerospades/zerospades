@@ -76,6 +76,7 @@ namespace spades {
 		class BloodMarks;
 		class ClientUI;
 		class PieMenuView;
+		class ExtendedTeamplay;
 
 		class Client : public IWorldListener, public gui::View {
 			friend class ScoreboardView;
@@ -172,6 +173,11 @@ namespace spades {
 
 			// pie menu
 			std::unique_ptr<PieMenuView> pieMenuView;
+
+			// Extended Teamplay protocol extension (team ESP, pings, ESP marks).
+			// Always allocated; it simply stays empty when the server does not
+			// negotiate the extension.
+			std::unique_ptr<ExtendedTeamplay> teamplay;
 
 			// player state
 			PlayerInput playerInput;
@@ -550,6 +556,88 @@ namespace spades {
 			void UpdateDamageIndicators(float dt);
 			void DrawDamageIndicators();
 
+			// ── Extended Teamplay ───────────────────────────────────────────
+			/** True while the team overlay key is held. */
+			bool teamOverlayHeld;
+			/** Eased `teamOverlayHeld`, so the overlay fades instead of snapping. */
+			float teamOverlayAlpha;
+			/** When the local player last sent a ping, for the client-side rate limit. */
+			float lastTeamplayPingTime;
+
+			/** The team colour the extension mandates for a `TEAM_ESP` highlight: the
+			 * one the server sent in State Data, not the player's block colour. */
+			Vector4 GetTeamplayTeamColor(Player&, float alpha);
+
+			/** A chevron above a player's head, with their class weapon, their name when
+			 * `showName`, and `note` above it when there is one. Used for the team
+			 * overlay, which the extension leaves to the client. */
+			void DrawPlayerChevron(Player&, const Vector4& color, bool showWeapon,
+								   bool showName = true,
+								   const std::string& note = std::string());
+
+			/** Whether a player's name is already drawn by a teamplay chevron, so the
+			 * ordinary name label must not draw it a second time lower down. */
+			bool HasTeamplayChevronName(Player&);
+
+			/**
+			 * Whether this player is currently revealed through walls, and in what
+			 * colour. Called by `ClientPlayer` as it submits the player's models, so the
+			 * renderer draws their body and weapon where the world hides them. The
+			 * extension requires the body shape itself for an ESP Mark.
+			 */
+			bool ShouldRevealPlayer(Player&, Vector3& outColor);
+
+			/** Whether anything at all could be revealed this frame, asked of the same
+			 * two sources as `ShouldRevealPlayer` before any player is examined. */
+			bool HasRevealedPlayers();
+
+			/** Which half of the blink a marked teammate is in, so every surface
+			 * alternates together. */
+			bool IsMarkBlinkPhase() const;
+
+			/** Whether `TEAM_ESP` is revealing this player to the local player right
+			 * now, which is the permission the overlay key spends. */
+			bool IsTeamESPRevealing(Player&);
+
+			/**
+			 * The colour a mark on this player is drawn in this frame, on every surface
+			 * it named: the colour the server chose, alternating with the team colour
+			 * while `TEAM_ESP` is revealing the same player.
+			 *
+			 * Both colours are true at once on a marked teammate — one says they are
+			 * yours, the other says what the server is telling you about them — so the
+			 * mark blinks between them instead of throwing either away.
+			 */
+			Vector3 ResolveMarkColor(Player&, const IntVector3& markColor);
+
+			/** Teammates revealed through `TEAM_ESP`, while the overlay key is held. */
+			void DrawTeamOverlay();
+			/** Players the server marked, which are drawn whatever `TEAM_ESP` says. */
+			void DrawEspMarks();
+			/** A notice when the server marked the local player to somebody. */
+			void DrawLocalPlayerMarkedIndicator();
+			/** Relayed pings, as markers anchored to their world position. */
+			void DrawTeamplayPings();
+
+			/** The world position the local player's crosshair points at. Returns false
+			 * when the ray hits nothing usable. */
+			bool ResolveCrosshairWorldPos(Vector3& out);
+
+			/** Sends a ping, honouring the server's feature bits and the client-side
+			 * rate limit. Returns whether it was actually sent, so a caller with
+			 * something else to say can fall back to it. */
+			bool SendTeamplayPing(const Vector3& position, const std::string& reason);
+
+			/** Sends a neutral ping at whatever the crosshair points at. Bound to a key;
+			 * reports why nothing happened when the server does not allow pings. */
+			void SendTeamplayPingAtCrosshair();
+
+			/** Where the pie menu will ping, frozen when it opens. The menu takes the
+			 * mouse for itself, but the player can still move, so resolving the target
+			 * again on release would drift away from what they were pointing at. */
+			Vector3 pieMenuPingPos;
+			bool pieMenuPingValid;
+
 			void DrawScene();
 			void AddGrenadeToScene(Grenade&);
 			void AddDebugObjectToScene(const OBB3&, const Vector4& col = MakeVector4(1, 1, 1, 1));
@@ -643,6 +731,33 @@ namespace spades {
 
 			void PlayerSentChatMessage(Player&, bool global, const std::string&);
 			void ServerSentMessage(bool system, const std::string&);
+
+			/** Adds a line to the chat as a private message: green, tagged, and with the
+			 * chat beep, unless the player asked to ignore private messages. */
+			void AddPrivateMessage(const std::string&);
+
+			/** A line the server sent to this client alone, through the *Extended
+			 * Teamplay* extension's `CHAT_DIRECT` type. `sender` is empty when the
+			 * server itself is speaking. Rendered where a private message already goes,
+			 * which is all the extension asks of a client. */
+			void ServerSentDirectMessage(const std::string& sender, const std::string&);
+
+			// ── Extended Teamplay, called by the net client ─────────────────
+			/** The server announced which of the extension's features it permits. */
+			void ExtendedTeamplayConfigured(uint8_t features);
+			/** A ping was relayed to us. `playerId` is `255` for a server-origin ping,
+			 * and a `duration` of `0` removes that player's ping. */
+			void ExtendedTeamplayPingReceived(int playerId, Vector3 position, float duration,
+											  uint8_t surfaces, const IntVector3& color,
+											  std::string reason);
+			/** The server marked (or, with a `0` duration, unmarked) a player. */
+			void ExtendedTeamplayMarkReceived(int playerId, float duration, uint8_t surfaces,
+											  uint8_t flags, const IntVector3& color,
+											  std::string reason);
+			/** A player spawned, which ends a mark that was flagged to end there. Split
+			 * out of `PlayerSpawned` because a demo seek skips the rest of that work but
+			 * still has to rebuild the marks in force at the destination. */
+			void ExtendedTeamplayPlayerSpawned(int playerId);
 
 			void PlayerCapturedIntel(Player&);
 			void PlayerPickedIntel(Player&);

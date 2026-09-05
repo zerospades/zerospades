@@ -39,6 +39,7 @@
 #include "ChatWindow.h"
 #include "ClientPlayer.h"
 #include "ClientUI.h"
+#include "ExtendedTeamplay.h"
 #include "HurtRingView.h"
 #include "LimboView.h"
 #include "MapView.h"
@@ -135,7 +136,11 @@ namespace spades {
 			  nextScreenShotIndex(0),
 			  nextMapShotIndex(0),
 			  staffSpectating(false),
-			  spectatorPlayerNames(true) {
+			  spectatorPlayerNames(true),
+			  teamOverlayHeld(false),
+			  teamOverlayAlpha(0.0F),
+			  lastTeamplayPingTime(-100.0F),
+			  pieMenuPingValid(false) {
 			SPADES_MARK_FUNCTION();
 			SPLog("Initializing...");
 
@@ -158,6 +163,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
+			teamplay = stmp::make_unique<ExtendedTeamplay>();
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
@@ -183,6 +189,12 @@ namespace spades {
 			lastHitWasAirborne = false;
 			hurtRingView->ClearAll();
 			killStreaks.clear();
+
+			// Marks and pings do not survive a map change, but the server's feature
+			// policy does until it sends a new Config.
+			teamplay->ClearTransientState();
+			teamOverlayHeld = false;
+			teamOverlayAlpha = 0.0F;
 
 			// reset on new map
 			placedBlocks = 0;
@@ -1132,6 +1144,146 @@ namespace spades {
 			}
 		}
 
+#pragma mark - Extended Teamplay
+
+		void Client::ExtendedTeamplayConfigured(uint8_t features) {
+			SPADES_MARK_FUNCTION();
+
+			teamplay->SetFeatures(features);
+			NetLog("Extended Teamplay features: 0x%02x", (unsigned int)teamplay->GetFeatures());
+		}
+
+		void Client::ExtendedTeamplayPingReceived(int playerId, Vector3 position, float duration,
+												  uint8_t surfaces, const IntVector3& color,
+												  std::string reason) {
+			SPADES_MARK_FUNCTION();
+
+			// No feature bit gates this: a relayed ping is drawn on the surfaces the
+			// packet names, and a server that wants one unseen does not send it.
+			std::string who = (playerId == ExtendedTeamplay::kServerPlayerId)
+				? _Tr("Client", "The server")
+				: world ? world->GetPlayerName(playerId) : std::string();
+
+			NetLog("[Ping] %s @ (%.1f, %.1f, %.1f) for %.1fs: %s", who.c_str(),
+				   position.x, position.y, position.z, duration, reason.c_str());
+
+			// A client shows who pinged, and the marker under the crosshair is where it
+			// normally says so. A ping that never asked for the world surface has no
+			// marker to carry a name, so it is announced in the chat log instead — one
+			// of the places the extension names for exactly this.
+			uint8_t placed = ExtendedTeamplay::ResolveSurfaces(surfaces);
+			if (duration != 0.0F && !(placed & ExtendedTeamplay::SurfaceWorld)) {
+				// Never the server: `255` is no player, and a client that looked it up
+				// in its roster would put the callout under a stranger's name.
+				std::string line = (playerId == ExtendedTeamplay::kServerPlayerId)
+					? std::string()
+					: who;
+
+				if (!reason.empty())
+					line += line.empty() ? reason : ": " + reason;
+				if (!line.empty())
+					chatWindow->AddMessage(line);
+			}
+
+			teamplay->SetPing(playerId, position, duration, surfaces, color, std::move(reason));
+
+			// A ping is a callout: it has to register even when the player is looking
+			// somewhere else, so it gets an audible cue as well as a marker. Taking one
+			// away is not a callout and stays silent.
+			if (duration != 0.0F && !IsMuted()) {
+				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Beep1.opus");
+				audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+			}
+		}
+
+		void Client::ExtendedTeamplayMarkReceived(int playerId, float duration, uint8_t surfaces,
+												  uint8_t flags, const IntVector3& color,
+												  std::string reason) {
+			SPADES_MARK_FUNCTION();
+
+			NetLog("[ESP Mark] player %d, duration %.1f, surfaces 0x%02x, flags 0x%02x, "
+				   "colour (%d, %d, %d): %s", playerId, duration, (unsigned int)surfaces,
+				   (unsigned int)flags, color.x, color.y, color.z, reason.c_str());
+
+			teamplay->SetMark(playerId, duration, surfaces, flags, color, std::move(reason));
+		}
+
+		void Client::ExtendedTeamplayPlayerSpawned(int playerId) {
+			teamplay->PlayerSpawned(playerId);
+		}
+
+		bool Client::ResolveCrosshairWorldPos(Vector3& out) {
+			SPADES_MARK_FUNCTION();
+
+			if (!world)
+				return false;
+
+			auto maybePlayer = world->GetLocalPlayer();
+			if (!maybePlayer)
+				return false;
+
+			Player& p = maybePlayer.value();
+			if (p.IsSpectator() || !p.IsAlive())
+				return false;
+
+			World::WeaponRayCastResult res =
+			  world->WeaponRayCast(p.GetEye(), p.GetFront(), p.GetId());
+			if (!res.hit || res.startSolid)
+				return false;
+
+			out = res.hitPos;
+			return true;
+		}
+
+		bool Client::SendTeamplayPing(const Vector3& position, const std::string& reason) {
+			SPADES_MARK_FUNCTION();
+
+			if (!teamplay->CanSendPing())
+				return false;
+
+			// A dead player does not ping: waiting to respawn is not a vantage point,
+			// and a corpse pointing at things the living cannot see is a way of
+			// spectating the enemy. The server drops such a ping anyway.
+			if (!world)
+				return false;
+			auto maybePlayer = world->GetLocalPlayer();
+			if (!maybePlayer || !maybePlayer.value().IsAlive())
+				return false;
+
+			// Rate-limited on the client too. The server is expected to rate-limit as
+			// well, but there is no reason to make it drop packets we chose to send.
+			constexpr float kMinPingInterval = 1.0F;
+			if (time - lastTeamplayPingTime < kMinPingInterval)
+				return false;
+
+			lastTeamplayPingTime = time;
+			activeNet->SendTeamplayPing(position, reason);
+			return true;
+		}
+
+		void Client::SendTeamplayPingAtCrosshair() {
+			SPADES_MARK_FUNCTION();
+
+			// The extension gates pinging on the server's policy, and a server that
+			// never negotiated the extension leaves every bit clear. Say so instead of
+			// swallowing the key, so the binding never looks broken.
+			if (!teamplay->CanSendPing()) {
+				ShowAlert(_Tr("Client", "This server does not allow team pings."),
+						  AlertType::Notice);
+				return;
+			}
+
+			Vector3 pos;
+			if (!ResolveCrosshairWorldPos(pos))
+				return;
+
+			// The reason is deliberately left empty — a neutral "look here" marker.
+			// Deriving it from what the crosshair is on would turn the ping key into a
+			// confirmation that an enemy is under the crosshair with line of sight. The
+			// pie menu is where a player says what they mean, deliberately.
+			SendTeamplayPing(pos, std::string());
+		}
+
 		void Client::ServerSentMessage(bool system, const std::string& msg) {
 			NetLog("%s", msg.c_str());
 			scriptedUI->RecordChatLog(msg);
@@ -1160,24 +1312,39 @@ namespace spades {
 
 			// Display private messages in green
 			if (msg.substr(0, 8) == "PM from ") {
-				if (cg_ignorePrivateMessages)
-					return;
-
-				// play chat sound
-				if (!IsMuted()) {
-					Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Chat.opus");
-					AudioParam params;
-					params.volume = (float)cg_chatBeep;
-					audioDevice->PlayLocal(c.GetPointerOrNull(), params);
-				}
-
-				std::string s = _Tr("Client", "[PM] ");
-				s += ChatWindow::ColoredMessage(msg.substr(8), MsgColorGreen);
-				chatWindow->AddMessage(s);
+				AddPrivateMessage(msg.substr(8));
 				return;
 			}
 
 			chatWindow->AddMessage(msg);
+		}
+
+		void Client::ServerSentDirectMessage(const std::string& sender,
+											 const std::string& msg) {
+			NetLog("[Direct] %s: %s", sender.empty() ? "The server" : sender.c_str(),
+				   msg.c_str());
+			scriptedUI->RecordChatLog(msg);
+
+			// The extension asks for nothing new here: a direct line lands where this
+			// client already puts a private one, sender first when there is one.
+			AddPrivateMessage(sender.empty() ? msg : sender + ": " + msg);
+		}
+
+		void Client::AddPrivateMessage(const std::string& text) {
+			if (cg_ignorePrivateMessages)
+				return;
+
+			// play chat sound
+			if (!IsMuted()) {
+				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Chat.opus");
+				AudioParam params;
+				params.volume = (float)cg_chatBeep;
+				audioDevice->PlayLocal(c.GetPointerOrNull(), params);
+			}
+
+			std::string s = _Tr("Client", "[PM] ");
+			s += ChatWindow::ColoredMessage(text, MsgColorGreen);
+			chatWindow->AddMessage(s);
 		}
 
 #pragma mark - Follow / Spectate

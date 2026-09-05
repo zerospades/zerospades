@@ -23,6 +23,7 @@
 
 #include "CTFGameMode.h"
 #include "Client.h"
+#include "ExtendedTeamplay.h"
 #include "Fonts.h"
 #include "GameMap.h"
 #include "IImage.h"
@@ -907,6 +908,87 @@ namespace spades {
 					Vector4 teamColorF = ModifyColor(teamColor) * largeMapAlpha;
 					DrawIcon(t.pos.GetXY(), *baseIcon, teamColorF);
 				}
+			}
+
+			DrawTeamplayPings(largeMapAlpha);
+			DrawTeamplayMarks(largeMapAlpha);
+		}
+
+		void MapView::DrawTeamplayPings(float mapAlpha) {
+			const ExtendedTeamplay& teamplay = *client->teamplay;
+			if (!teamplay.HasPings())
+				return;
+
+			World* world = client->GetWorld();
+			if (!world)
+				return;
+
+			for (const auto& entry : teamplay.GetPings()) {
+				const ExtendedTeamplay::Ping& ping = entry.second;
+
+				// The packet decides where it is shown; this is the minimap.
+				if (!(ping.surfaces & ExtendedTeamplay::SurfaceMinimap))
+					continue;
+
+				// Match the world marker's fade so a ping does not linger on the minimap
+				// after it has gone from the view, or the other way round.
+				constexpr float kFadeOutTime = 0.75F;
+				float alpha = ping.GetFadeAlpha(kFadeOutTime) * mapAlpha;
+				if (alpha <= 0.0F)
+					continue;
+
+				// The colour the server chose, drawn as sent.
+				Vector3 pingCol = ExtendedTeamplay::ToRenderColor(ping.color);
+				Vector4 color = MakeVector4(pingCol.x, pingCol.y, pingCol.z, alpha);
+				color.x *= alpha;
+				color.y *= alpha;
+				color.z *= alpha;
+
+				// A ring that shrinks as the ping ages, so a fresh callout catches the
+				// eye and an old one does not compete with the player icons.
+				constexpr float kOuterRadius = 7.0F;
+				constexpr float kInnerRadius = 2.5F;
+				float radius = Mix(kOuterRadius, kInnerRadius, ping.GetAgeFraction());
+
+				// The map is flat, so a ping's height plays no part in where it lands.
+				const Vector2 pingPos = ping.position.GetXY();
+				DrawMapCircle(pingPos, color, radius, 1.5F);
+				DrawMapCircle(pingPos, color, kInnerRadius * 0.5F, 1.5F);
+			}
+		}
+
+		void MapView::DrawTeamplayMarks(float mapAlpha) {
+			const ExtendedTeamplay& teamplay = *client->teamplay;
+			if (!teamplay.HasMarks())
+				return;
+
+			World* world = client->GetWorld();
+			if (!world)
+				return;
+
+			for (const auto& entry : teamplay.GetMarks()) {
+				const ExtendedTeamplay::Mark& mark = entry.second;
+				if (!(mark.surfaces & ExtendedTeamplay::SurfaceMinimap))
+					continue;
+
+				auto maybePlayer = world->GetPlayer(static_cast<unsigned int>(entry.first));
+				if (!maybePlayer)
+					continue;
+
+				Player& p = maybePlayer.value();
+				if (p.IsSpectator() || !p.IsAlive())
+					continue;
+
+				// A mark on the minimap is a dot at the player, in the mark's colour —
+				// the same colour the outline uses, blink and all, so every surface the
+				// mark named says the same thing at the same moment.
+				Vector3 col = client->ResolveMarkColor(p, mark.color);
+
+				Vector4 color = MakeVector4(col.x * mapAlpha, col.y * mapAlpha,
+											col.z * mapAlpha, mapAlpha);
+
+				constexpr float kRadius = 4.0F;
+				DrawMapCircle(p.GetPosition().GetXY(), color, kRadius, 1.5F);
 			}
 		}
 

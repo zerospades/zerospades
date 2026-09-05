@@ -56,6 +56,8 @@ namespace spades {
 
 			std::array<std::string, kSliceCount> worldLabels;
 			std::array<std::string, kSliceCount> playerLabels;
+			std::array<bool, kSliceCount> worldSlicePings;
+			std::array<bool, kSliceCount> playerSlicePings;
 			std::array<std::string, kSliceCount> worldDisplayLabels;
 			std::array<std::string, kSliceCount> playerDisplayLabels;
 
@@ -79,6 +81,22 @@ namespace spades {
 			const std::string& GetSelectionLabel() const;
 			const std::array<std::string, kSliceCount>& GetLabels() const {
 				return (variant == Variant::Player) ? playerLabels : worldLabels;
+			}
+
+			/**
+			 * Whether a slice drops an *Extended Teamplay* ping rather than sending its
+			 * message on chat. The ping carries the slice's `GetLabels()` entry as its
+			 * reason, so the wire text is the same either way.
+			 *
+			 * Only the World variant pings: it is aimed at a place, whereas the Player
+			 * variant is aimed at a person and has nowhere to put a marker.
+			 */
+			bool SlicePings(int index) const {
+				if (index < 0 || index >= kSliceCount)
+					return false;
+				const auto& pings = (variant == Variant::Player) ? playerSlicePings
+																 : worldSlicePings;
+				return pings[static_cast<size_t>(index)];
 			}
 
 			void HandleMouseDelta(float dx, float dy);
