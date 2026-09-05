@@ -121,74 +121,74 @@ namespace spades {
 					case PhaseObjectMember:
 						r =
 						  eng->RegisterObjectBehaviour("GameMap", asBEHAVE_ADDREF, "void f()",
-						                               asMETHOD(GameMap, AddRef), asCALL_THISCALL);
+						                               asMETHOD(GameMap, AddRef), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectBehaviour("GameMap", asBEHAVE_RELEASE, "void f()",
-						                               asMETHOD(GameMap, Release), asCALL_THISCALL);
+						                               asMETHOD(GameMap, Release), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("GameMap", asBEHAVE_FACTORY,
 						                                 "GameMap @f(int, int, int)",
-						                                 asFUNCTION(Factory), asCALL_CDECL);
+						                                 asFUNCTION(Factory), SPADES_ASCC_CDECL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("GameMap", asBEHAVE_FACTORY,
 						                                 "GameMap @f(const string& in)",
-						                                 asFUNCTION(LoadFactory), asCALL_CDECL);
+						                                 asFUNCTION(LoadFactory), SPADES_ASCC_CDECL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "uint GetColor(int, int, int)",
-						                              asFUNCTION(GetColor), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(GetColor), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "bool IsSolid(int, int, int)",
-						                              asFUNCTION(IsSolid), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(IsSolid), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "uint GetColorWrapped(int, int, int)",
-						  asFUNCTION(GetColorWrapped), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(GetColorWrapped), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "bool IsSolidWrapped(int, int, int)",
-						  asFUNCTION(IsSolidWrapped), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(IsSolidWrapped), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "void SetAir(int, int, int)",
-						                              asFUNCTION(SetAir), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(SetAir), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectMethod("GameMap", "void SetSolid(int, int, int, uint)",
-						                            asFUNCTION(SetSolid), asCALL_CDECL_OBJLAST);
+						                            asFUNCTION(SetSolid), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "int get_Width() property",
-						                              asMETHOD(GameMap, Width), asCALL_THISCALL);
+						                              asMETHOD(GameMap, Width), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "int get_Height() property",
-						                              asMETHOD(GameMap, Height), asCALL_THISCALL);
+						                              asMETHOD(GameMap, Height), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("GameMap", "int get_Depth() property",
-						                              asMETHOD(GameMap, Depth), asCALL_THISCALL);
+						                              asMETHOD(GameMap, Depth), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "bool ClipBox(int, int, int)",
 						  asMETHODPR(GameMap, ClipBox, (int, int, int) const, bool),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "bool ClipWorld(int, int, int)",
 						  asMETHODPR(GameMap, ClipBox, (int, int, int) const, bool),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "bool ClipBox(float, float, float)",
 						  asMETHODPR(GameMap, ClipBox, (float, float, float) const, bool),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap", "bool ClipWorld(float, float, float)",
 						  asMETHODPR(GameMap, ClipBox, (float, float, float) const, bool),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "GameMap",
 						  "GameMapRayCastResult CastRay(const Vector3& in, const Vector3& in, int)",
-						  asFUNCTION(CastRay), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(CastRay), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 
 						r = eng->RegisterObjectProperty("GameMapRayCastResult", "bool hit",

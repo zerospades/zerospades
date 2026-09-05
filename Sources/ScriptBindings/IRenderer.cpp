@@ -239,11 +239,11 @@ namespace spades {
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Renderer", asBEHAVE_ADDREF, "void f()",
 						                                 asMETHOD(IRenderer, AddRef),
-						                                 asCALL_THISCALL);
+						                                 SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Renderer", asBEHAVE_RELEASE, "void f()",
 						                                 asMETHOD(IRenderer, Release),
-						                                 asCALL_THISCALL);
+						                                 SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 
 						r = eng->RegisterObjectType("ModelRenderParam", sizeof(ModelRenderParam),
@@ -272,7 +272,7 @@ namespace spades {
 
 						r = eng->RegisterObjectBehaviour(
 						  "ModelRenderParam", asBEHAVE_CONSTRUCT, "void f()",
-						  asFUNCTION(ModelRenderParamFactory), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(ModelRenderParamFactory), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectProperty("ModelRenderParam", "Matrix4 matrix",
 						                                asOFFSET(ModelRenderParam, matrix));
@@ -295,20 +295,20 @@ namespace spades {
 
 						r = eng->RegisterObjectBehaviour(
 						  "DynamicLightParam", asBEHAVE_CONSTRUCT, "void f()",
-						  asFUNCTION(DynamicLightParamFactory), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DynamicLightParamFactory), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("DynamicLightParam", asBEHAVE_CONSTRUCT,
 						                                 "void f(const DynamicLightParam& in)",
 						                                 asFUNCTION(DynamicLightParamFactory2),
-						                                 asCALL_CDECL_OBJLAST);
+						                                 SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour(
 						  "DynamicLightParam", asBEHAVE_DESTRUCT, "void f()",
-						  asFUNCTION(DynamicLightParamDestructor), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DynamicLightParamDestructor), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "DynamicLightParam", "void opAssign(const DynamicLightParam& in)",
-						  asFUNCTION(DynamicLightParamAssign), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DynamicLightParamAssign), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectProperty("DynamicLightParam", "DynamicLightType type",
@@ -347,7 +347,7 @@ namespace spades {
 
 						r = eng->RegisterObjectBehaviour(
 						  "SceneDefinition", asBEHAVE_CONSTRUCT, "void f()",
-						  asFUNCTION(SceneDefinitionFactory), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(SceneDefinitionFactory), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectProperty("SceneDefinition", "int viewportLeft",
 						                                asOFFSET(SceneDefinition, viewportLeft));
@@ -409,25 +409,25 @@ namespace spades {
 						manager->CheckError(r);
 
 						r = eng->RegisterObjectMethod("Renderer", "void Init()",
-						                              asMETHOD(IRenderer, Init), asCALL_THISCALL);
+						                              asMETHOD(IRenderer, Init), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 
 						r =
 						  eng->RegisterObjectMethod("Renderer", "void Shutdown()",
-						                            asMETHOD(IRenderer, Shutdown), asCALL_THISCALL);
+						                            asMETHOD(IRenderer, Shutdown), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "Image@ RegisterImage(const string& in)",
-						  asFUNCTION(RegisterImage), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(RegisterImage), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "Model@ RegisterModel(const string& in)",
-						  asFUNCTION(RegisterModel), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(RegisterModel), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void ClearCache()",
 						                              asMETHOD(IRenderer, ClearCache),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						// OpenSpades' C++ functions increase the reference count of a passed object
 						// when storing it (just like the convention of Objective C), so we must
@@ -435,123 +435,123 @@ namespace spades {
 						// (https://github.com/yvt/openspades/issues/687).
 						r =
 						  eng->RegisterObjectMethod("Renderer", "Image@ CreateImage(Bitmap@+)",
-						                            asFUNCTION(CreateImage), asCALL_CDECL_OBJLAST);
+						                            asFUNCTION(CreateImage), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectMethod("Renderer", "Model@ CreateModel(VoxelModel@+)",
-						                            asFUNCTION(CreateModel), asCALL_CDECL_OBJLAST);
+						                            asFUNCTION(CreateModel), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void set_GameMap(GameMap@+) property",
-						                              asFUNCTION(SetGameMap), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(SetGameMap), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void set_FogDistance(float) property",
 						                              asMETHOD(IRenderer, SetFogDistance),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void set_FogColor(const Vector3& in) property",
-						  asFUNCTION(SetFogColor), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(SetFogColor), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void StartScene(const SceneDefinition& in)",
-						  asMETHOD(IRenderer, StartScene), asCALL_THISCALL);
+						  asMETHOD(IRenderer, StartScene), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void AddLight(const DynamicLightParam& in)",
-						  asMETHOD(IRenderer, AddLight), asCALL_THISCALL);
+						  asMETHOD(IRenderer, AddLight), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void AddModel(Model@+, const ModelRenderParam& in)",
-						  asFUNCTION(RenderModel), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(RenderModel), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer",
 						  "void AddDebugLine(const Vector3&in, const Vector3&in, const Vector4&in)",
-						  asFUNCTION(AddDebugLine), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(AddDebugLine), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void AddSprite(Image@+, const Vector3&in, float, float)",
-						  asFUNCTION(AddSprite), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(AddSprite), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer",
 						                              "void AddLongSprite(Image@+, const Vector3& "
 						                              "in, const Vector3& in, float)",
 						                              asFUNCTION(AddLongSprite),
-						                              asCALL_CDECL_OBJLAST);
+						                              SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectMethod("Renderer", "void EndScene()",
-						                            asMETHOD(IRenderer, EndScene), asCALL_THISCALL);
+						                            asMETHOD(IRenderer, EndScene), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void MultiplyScreenColor(const Vector3& in)",
-						  asFUNCTION(MultiplyScreenColor), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(MultiplyScreenColor), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =
 						  eng->RegisterObjectMethod("Renderer", "void set_Color(const Vector4&in) property",
-						                            asFUNCTION(SetColor), asCALL_CDECL_OBJLAST);
+						                            asFUNCTION(SetColor), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void set_ColorOpaque(const Vector3&in) property",
-						  asFUNCTION(SetColorOpaque), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(SetColorOpaque), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void set_ColorP(const Vector4&in) property",
-						  asFUNCTION(SetColorAlphaPremultiplied), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(SetColorAlphaPremultiplied), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void set_ColorNP(const Vector4&in) property",
-						  asFUNCTION(SetColorAlphaNonPremultiplied), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(SetColorAlphaNonPremultiplied), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer",
 						                              "void DrawImage(Image@+, const Vector2& in)",
-						                              asFUNCTION(DrawImage1), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(DrawImage1), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer",
 						                              "void DrawImage(Image@+, const AABB2& in)",
-						                              asFUNCTION(DrawImage2), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(DrawImage2), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void DrawImage(Image@+, const Vector2&in, const AABB2& in)",
-						  asFUNCTION(DrawImage3), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DrawImage3), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void DrawImage(Image@+, const AABB2&in, const AABB2& in)",
-						  asFUNCTION(DrawImage4), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DrawImage4), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer",
 						  "void DrawImage(Image@+, const Vector2&in, const Vector2&in, const "
 						  "Vector2&in, const AABB2& in)",
-						  asFUNCTION(DrawImage5), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(DrawImage5), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void DrawFilledRect(float, float, float, float)",
-							asMETHODPR(IRenderer, DrawFilledRect, (float, float, float, float), void), asCALL_THISCALL);
+							asMETHODPR(IRenderer, DrawFilledRect, (float, float, float, float), void), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void DrawOutlinedRect(float, float, float, float, int thickness = 1)",
-							asMETHODPR(IRenderer, DrawOutlinedRect, (float, float, float, float, int), void), asCALL_THISCALL);
+							asMETHODPR(IRenderer, DrawOutlinedRect, (float, float, float, float, int), void), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void DrawFlatGameMap(const AABB2&in, const AABB2& in)",
-						  asMETHODPR(IRenderer, DrawFlatGameMap, (const AABB2&, const AABB2&), void), asCALL_THISCALL);
+						  asMETHODPR(IRenderer, DrawFlatGameMap, (const AABB2&, const AABB2&), void), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void FrameDone()",
 						                              asMETHOD(IRenderer, FrameDone),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "void Flip()",
-						                              asMETHOD(IRenderer, Flip), asCALL_THISCALL);
+						                              asMETHOD(IRenderer, Flip), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "Bitmap@ ReadBitmap()",
-						                              asFUNCTION(ReadBitmap), asCALL_CDECL_OBJLAST);
+						                              asFUNCTION(ReadBitmap), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenWidth() property property",
 						                              asMETHOD(IRenderer, ScreenWidth),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenHeight() property property",
 						                              asMETHOD(IRenderer, ScreenHeight),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						break;
 					default: break;

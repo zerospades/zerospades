@@ -105,44 +105,44 @@ namespace spades {
 					break;
 				case PhaseObjectMember:
 					r = eng->RegisterObjectBehaviour("VoxelModel", asBEHAVE_ADDREF, "void f()",
-					                                 asMETHOD(VoxelModel, AddRef), asCALL_THISCALL);
+					                                 asMETHOD(VoxelModel, AddRef), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectBehaviour("VoxelModel", asBEHAVE_RELEASE, "void f()",
-					                               asMETHOD(VoxelModel, Release), asCALL_THISCALL);
+					                               asMETHOD(VoxelModel, Release), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour("VoxelModel", asBEHAVE_FACTORY,
 					                                 "VoxelModel @f(int, int, int)",
-					                                 asFUNCTION(Factory), asCALL_CDECL);
+					                                 asFUNCTION(Factory), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour("VoxelModel", asBEHAVE_FACTORY,
 					                                 "VoxelModel @f(const string& in)",
-					                                 asFUNCTION(LoadFactory), asCALL_CDECL);
+					                                 asFUNCTION(LoadFactory), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "uint GetSolidBits(int, int)",
-					                              asFUNCTION(GetSolidBits), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(GetSolidBits), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "uint GetColor(int, int, int)",
-					                              asFUNCTION(GetColor), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(GetColor), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "bool IsSolid(int, int, int)",
-					                              asFUNCTION(IsSolid), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(IsSolid), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "void SetAir(int, int, int)",
-					                              asFUNCTION(SetAir), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(SetAir), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectMethod("VoxelModel", "void SetSolid(int, int, int, uint)",
-					                            asFUNCTION(SetSolid), asCALL_CDECL_OBJLAST);
+					                            asFUNCTION(SetSolid), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "int get_Width() property",
-					                              asMETHOD(VoxelModel, GetWidth), asCALL_THISCALL);
+					                              asMETHOD(VoxelModel, GetWidth), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "int get_Height() property",
-					                              asMETHOD(VoxelModel, GetHeight), asCALL_THISCALL);
+					                              asMETHOD(VoxelModel, GetHeight), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("VoxelModel", "int get_Depth() property",
-					                              asMETHOD(VoxelModel, GetDepth), asCALL_THISCALL);
+					                              asMETHOD(VoxelModel, GetDepth), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					break;
 				default: break;

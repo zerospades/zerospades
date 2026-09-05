@@ -101,6 +101,59 @@ jobs:
             !${{ runner.workspace }}\**\*.pdb
           if-no-files-found: warn
 
+  build-windows-arm64:
+    name: Build (Windows ARM64)
+    runs-on: windows-11-vs2026-arm
+    # NOTE: AngelScript uses C++ implementation for ARM64 (not optimized .asm) because:
+    # - as_callfunc_arm64_msvc.asm requires armasm64.exe (ARM64 Assembler), not MASM (ml64.exe)
+    # - CMake's built-in ASM_MASM language only supports ml64.exe (x64)
+    # - Custom CMake config for armasm64.exe can be added in future for performance optimization
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - name: Cache vcpkg and dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            vcpkg/installed
+            vcpkg/buildtrees
+          key: windows-arm64-${{ hashFiles('vcpkg_x86-windows.txt', '.gitmodules') }}
+          restore-keys: windows-arm64-
+
+      - name: Bootstrap vcpkg
+        run: vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Install dependencies
+        run: |
+          (Get-Content vcpkg_x86-windows.txt) -replace 'x86-windows-static', 'arm64-windows-static' | Set-Content vcpkg_arm64-windows.txt
+          vcpkg\vcpkg install @vcpkg_arm64-windows.txt
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B "${{ runner.workspace }}\zerospades.mk" `
+            -A ARM64 `
+            -D CMAKE_BUILD_TYPE=Release `
+            -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
+            -D VCPKG_TARGET_TRIPLET=arm64-windows-static `
+            -D CMAKE_CXX_STANDARD=17
+
+      - name: Build application
+        run: cmake --build "${{ runner.workspace }}\zerospades.mk" --config Release --parallel 8
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: zerospades-windows-arm64
+          path: |
+            ${{ runner.workspace }}\zerospades.mk\bin\Release
+            !${{ runner.workspace }}\**\*.lib
+            !${{ runner.workspace }}\**\*.exp
+            !${{ runner.workspace }}\**\*.pdb
+          if-no-files-found: warn
+
   build-macos-intel:
     name: Build (macOS Intel)
     runs-on: macos-14
@@ -272,6 +325,7 @@ jobs:
     needs:
       - build-windows-x86
       - build-windows-x64
+      - build-windows-arm64
       - build-macos-intel
       - build-macos-arm
       - build-linux-nix
@@ -318,6 +372,7 @@ jobs:
               zerospades-macos-arm64) desc="for Apple Silicon Macs (M1 and later)." ;;
               zerospades-windows-x64) desc="for 64-bit Windows." ;;
               zerospades-windows-x86) desc="for 32-bit Windows." ;;
+              zerospades-windows-arm64) desc="for Windows ARM64 (Snapdragon X, etc)." ;;
               *) desc="binary package." ;;
             esac
             printf -v list_line '* **%s.zip**: %s\n' "$zip_name" "$desc"

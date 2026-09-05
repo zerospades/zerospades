@@ -56,47 +56,47 @@ namespace spades {
 					case PhaseObjectMember:
 						r = eng->RegisterObjectBehaviour("AudioDevice", asBEHAVE_ADDREF, "void f()",
 						                                 asMETHOD(IAudioDevice, AddRef),
-						                                 asCALL_THISCALL);
+						                                 SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour(
 						  "AudioDevice", asBEHAVE_RELEASE, "void f()",
-						  asMETHOD(IAudioDevice, Release), asCALL_THISCALL);
+						  asMETHOD(IAudioDevice, Release), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "AudioDevice", "AudioChunk@ RegisterSound(const string& in)",
-						  asFUNCTION(RegisterSound), asCALL_CDECL_OBJLAST);
+						  asFUNCTION(RegisterSound), SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("AudioDevice", "void set_GameMap(GameMap@+) property",
 						                              asMETHOD(IAudioDevice, SetGameMap),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "AudioDevice",
 						  "void Play(AudioChunk@+, const Vector3& in, const AudioParam& in)",
-						  asMETHOD(IAudioDevice, Play), asCALL_THISCALL);
+						  asMETHOD(IAudioDevice, Play), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "AudioDevice",
 						  "void PlayLocal(AudioChunk@+, const Vector3& in, const AudioParam& in)",
 						  asMETHODPR(IAudioDevice, PlayLocal,
 						             (IAudioChunk*, const Vector3&, const AudioParam&), void),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "AudioDevice", "void PlayLocal(AudioChunk@+, const AudioParam& in)",
 						  asMETHODPR(IAudioDevice, PlayLocal, (IAudioChunk*, const AudioParam&),
 						             void),
-						  asCALL_THISCALL);
+						  SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("AudioDevice",
 						                              "void Respatialize(const Vector3& in, const "
 						                              "Vector3& in, const Vector3& in)",
 						                              asMETHOD(IAudioDevice, Respatialize),
-						                              asCALL_THISCALL);
+						                              SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("AudioParam", asBEHAVE_CONSTRUCT,
 						                                 "void f()", asFUNCTION(AudioParamFactory),
-						                                 asCALL_CDECL_OBJLAST);
+						                                 SPADES_ASCC_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectProperty("AudioParam", "float volume",
 						                                asOFFSET(AudioParam, volume));

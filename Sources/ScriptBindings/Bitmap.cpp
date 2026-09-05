@@ -76,33 +76,33 @@ namespace spades {
 					break;
 				case PhaseObjectMember:
 					r = eng->RegisterObjectBehaviour("Bitmap", asBEHAVE_ADDREF, "void f()",
-					                                 asMETHOD(Bitmap, AddRef), asCALL_THISCALL);
+					                                 asMETHOD(Bitmap, AddRef), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour("Bitmap", asBEHAVE_RELEASE, "void f()",
-					                                 asMETHOD(Bitmap, Release), asCALL_THISCALL);
+					                                 asMETHOD(Bitmap, Release), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour("Bitmap", asBEHAVE_FACTORY,
 					                                 "Bitmap @f(int, int)", asFUNCTION(Factory),
-					                                 asCALL_CDECL);
+					                                 SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour("Bitmap", asBEHAVE_FACTORY,
 					                                 "Bitmap @f(const string& in)",
-					                                 asFUNCTION(LoadFactory), asCALL_CDECL);
+					                                 asFUNCTION(LoadFactory), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("Bitmap", "void Save(const string& in)",
-					                              asFUNCTION(Save), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(Save), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("Bitmap", "uint GetPixel(int, int)",
-					                              asFUNCTION(GetPixel), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(GetPixel), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("Bitmap", "void SetPixel(int, int, uint)",
-					                              asFUNCTION(SetPixel), asCALL_CDECL_OBJLAST);
+					                              asFUNCTION(SetPixel), SPADES_ASCC_CDECL_OBJLAST);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("Bitmap", "int get_Width() property",
-					                              asMETHOD(Bitmap, GetWidth), asCALL_THISCALL);
+					                              asMETHOD(Bitmap, GetWidth), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("Bitmap", "int get_Height() property",
-					                              asMETHOD(Bitmap, GetHeight), asCALL_THISCALL);
+					                              asMETHOD(Bitmap, GetHeight), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					break;

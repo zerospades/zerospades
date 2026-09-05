@@ -251,162 +251,162 @@ namespace spades {
 					break;
 				case PhaseObjectMember:
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_FACTORY, F("array<%s>@ f()"),
-					                                 asFUNCTION(ArrayType::Factory1), asCALL_CDECL);
+					                                 asFUNCTION(ArrayType::Factory1), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectBehaviour(ATN(), asBEHAVE_FACTORY, F("array<%s>@ f(uint)"),
-					                               asFUNCTION(ArrayType::Factory2), asCALL_CDECL);
+					                               asFUNCTION(ArrayType::Factory2), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_FACTORY,
 					                                 F("array<%s>@ f(uint, %s)"),
-					                                 asFUNCTION(ArrayType::Factory3), asCALL_CDECL);
+					                                 asFUNCTION(ArrayType::Factory3), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_LIST_FACTORY,
 					                                 F("array<%s>@ f(int&in list) {repeat %s}"),
-					                                 asFUNCTION(ArrayType::Factory4), asCALL_CDECL);
+					                                 asFUNCTION(ArrayType::Factory4), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_ADDREF, F("void f()"),
-					                                 asMETHOD(ArrayType, AddRef), asCALL_THISCALL);
+					                                 asMETHOD(ArrayType, AddRef), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_RELEASE, F("void f()"),
-					                                 asMETHOD(ArrayType, Release), asCALL_THISCALL);
+					                                 asMETHOD(ArrayType, Release), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectBehaviour(ATN(), asBEHAVE_SETGCFLAG, F("void f()"),
-					                               asMETHOD(ArrayType, SetGCFlag), asCALL_THISCALL);
+					                               asMETHOD(ArrayType, SetGCFlag), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectBehaviour(ATN(), asBEHAVE_GETGCFLAG, F("bool f()"),
-					                               asMETHOD(ArrayType, GetGCFlag), asCALL_THISCALL);
+					                               asMETHOD(ArrayType, GetGCFlag), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_GETREFCOUNT, F("int f()"),
 					                                 asMETHOD(ArrayType, GetRefCount),
-					                                 asCALL_THISCALL);
+					                                 SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(ATN(), asBEHAVE_ENUMREFS, F("void f(int& in)"),
 					                                 asMETHOD(ArrayType, EnumReferences),
-					                                 asCALL_THISCALL);
+					                                 SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(
 					  ATN(), asBEHAVE_RELEASEREFS, F("void f(int& in)"),
-					  asMETHOD(ArrayType, ReleaseAllReferences), asCALL_THISCALL);
+					  asMETHOD(ArrayType, ReleaseAllReferences), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("%s& opIndex(uint)"),
 					                              asMETHODPR(ArrayType, At, (asUINT), T&),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("const %s& opIndex(uint) const"),
-					  asMETHODPR(ArrayType, At, (asUINT) const, const T&), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, At, (asUINT) const, const T&), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("array<%s> &opAssign(const array<%s>&)"),
 					  asMETHODPR(ArrayType, operator=, (const ArrayType&), ArrayType&),
-					  asCALL_THISCALL);
+					  SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("void insertAt(uint, const %s& in)"),
-					  asMETHODPR(ArrayType, InsertAt, (asUINT, const T&), void), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, InsertAt, (asUINT, const T&), void), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void removeAt(uint)"),
-					                              asMETHOD(ArrayType, RemoveAt), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, RemoveAt), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void insertLast(const %s& in)"),
-					                              asMETHOD(ArrayType, InsertLast), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, InsertLast), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void removeLast()"),
-					                              asMETHOD(ArrayType, RemoveLast), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, RemoveLast), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("uint length()"),
-					                              asMETHOD(ArrayType, GetSize), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, GetSize), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void resize(uint)"),
-					                              asMETHOD(ArrayType, Resize), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, Resize), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void reserve(uint)"),
-					                              asMETHOD(ArrayType, Reserve), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, Reserve), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void sortAsc()"),
 					                              asMETHODPR(ArrayType, SortAsc, (), void),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("void sortAsc(uint, uint)"),
-					  asMETHODPR(ArrayType, SortAsc, (asUINT, asUINT), void), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, SortAsc, (asUINT, asUINT), void), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void sortDesc()"),
 					                              asMETHODPR(ArrayType, SortDesc, (), void),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("void sortDesc(uint, uint)"),
-					  asMETHODPR(ArrayType, SortDesc, (asUINT, asUINT), void), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, SortDesc, (asUINT, asUINT), void), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("int find(const %s& in) const"),
-					  asMETHODPR(ArrayType, Find, (const T&) const, int), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, Find, (const T&) const, int), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("int find(uint, const %s& in) const"),
-					  asMETHODPR(ArrayType, Find, (asUINT, const T&) const, int), asCALL_THISCALL);
+					  asMETHODPR(ArrayType, Find, (asUINT, const T&) const, int), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(
 					  ATN(), F("bool opEquals(const array<%s>&) const"),
 					  asMETHODPR(ArrayType, operator==, (const ArrayType&) const, bool),
-					  asCALL_THISCALL);
+					  SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					// Note: length property is now automatically provided by AngelScript
 					// for all array types, so we don't need to register it manually
 					// r = eng->RegisterObjectMethod(ATN(), F("uint get_length() property"),
-					//                               asMETHOD(ArrayType, GetSize), asCALL_THISCALL);
+					//                               asMETHOD(ArrayType, GetSize), SPADES_ASCC_THISCALL);
 					// manager->CheckError(r);
 
 					// r = eng->RegisterObjectMethod(ATN(), F("void set_length(uint) property"),
-					//                               asMETHOD(ArrayType, Resize), asCALL_THISCALL);
+					//                               asMETHOD(ArrayType, Resize), SPADES_ASCC_THISCALL);
 					// manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("bool isEmpty()"),
-					                              asMETHOD(ArrayType, IsEmpty), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, IsEmpty), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					// STL name
 
 					r = eng->RegisterObjectMethod(ATN(), F("uint size()"),
-					                              asMETHOD(ArrayType, GetSize), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, GetSize), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("bool empty()"),
-					                              asMETHOD(ArrayType, IsEmpty), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, IsEmpty), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void push_back(const %s& in)"),
-					                              asMETHOD(ArrayType, InsertLast), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, InsertLast), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void pop_back()"),
-					                              asMETHOD(ArrayType, RemoveLast), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, RemoveLast), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterObjectMethod(ATN(), F("void erase(uint)"),
-					                              asMETHOD(ArrayType, RemoveAt), asCALL_THISCALL);
+					                              asMETHOD(ArrayType, RemoveAt), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					break;
 				default: break;

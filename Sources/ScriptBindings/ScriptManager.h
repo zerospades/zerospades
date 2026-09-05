@@ -25,6 +25,21 @@
 #define AS_USE_ACCESSORS 1
 
 #include <AngelScript/include/angelscript.h>
+
+// Calling conventions used by every binding registration below.
+//
+// Every target we build (x86/x64, macOS/Linux/Windows ARM64) provides AngelScript's
+// native calling conventions, so these map straight onto them.
+//
+// These must stay native as long as registrations pass asFUNCTION()/asMETHOD():
+// DetectCallingConvention() (as_callfunc.cpp) rejects a plain function pointer or a
+// class-method pointer combined with asCALL_GENERIC and returns asWRONG_CALLING_CONV.
+// A genuine AS_MAX_PORTABILITY build would additionally have to route every
+// registration through the WRAP_FN/WRAP_MFN macros in addons/aswrappedcall.h, which
+// emit real void(asIScriptGeneric*) thunks.
+#define SPADES_ASCC_CDECL asCALL_CDECL
+#define SPADES_ASCC_THISCALL asCALL_THISCALL
+#define SPADES_ASCC_CDECL_OBJLAST asCALL_CDECL_OBJLAST
 #include <AngelScript/addons/scriptany.h>
 #include <AngelScript/addons/scriptarray.h>
 #include <AngelScript/addons/scriptbuilder.h>

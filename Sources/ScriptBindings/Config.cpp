@@ -126,76 +126,76 @@ namespace spades {
 					break;
 				case PhaseObjectMember:
 					r = eng->RegisterObjectBehaviour("ConfigItem", asBEHAVE_ADDREF, "void f()",
-					                                 asMETHOD(ConfigItem, AddRef), asCALL_THISCALL);
+					                                 asMETHOD(ConfigItem, AddRef), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectBehaviour("ConfigItem", asBEHAVE_RELEASE, "void f()",
-					                               asMETHOD(ConfigItem, Release), asCALL_THISCALL);
+					                               asMETHOD(ConfigItem, Release), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(
 					  "ConfigItem", asBEHAVE_FACTORY, "ConfigItem @f(const string& in)",
 					  asFUNCTIONPR(ConfigItem::Construct, (const std::string&), ConfigItem*),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectBehaviour(
 					  "ConfigItem", asBEHAVE_FACTORY,
 					  "ConfigItem @f(const string& in, const string& in)",
 					  asFUNCTIONPR(ConfigItem::Construct, (const std::string&, const std::string&),
 					               ConfigItem*),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "ConfigItem", "ConfigItem@ opAssign(float)",
-					  asMETHODPR(ConfigItem, operator=, (float), ConfigItem*), asCALL_THISCALL);
+					  asMETHODPR(ConfigItem, operator=, (float), ConfigItem*), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "ConfigItem", "ConfigItem@ opAssign(int)",
-					  asMETHODPR(ConfigItem, operator=, (int), ConfigItem*), asCALL_THISCALL);
+					  asMETHODPR(ConfigItem, operator=, (int), ConfigItem*), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "ConfigItem", "ConfigItem@ opAssign(const string& in)",
 					  asMETHODPR(ConfigItem, operator=, (const std::string&), ConfigItem*),
-					  asCALL_THISCALL);
+					  SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "void set_IntValue(int) property",
 					                              asMETHODPR(ConfigItem, SetValue, (int), void),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "void set_FloatValue(float) property",
 					                              asMETHODPR(ConfigItem, SetValue, (float), void),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "ConfigItem", "void set_StringValue(const string& in) property",
 					  asMETHODPR(ConfigItem, SetValue, (const std::string&), void),
-					  asCALL_THISCALL);
+					  SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r =
 					  eng->RegisterObjectMethod("ConfigItem", "int get_IntValue() property property",
-					                            asMETHOD(ConfigItem, GetIntValue), asCALL_THISCALL);
+					                            asMETHOD(ConfigItem, GetIntValue), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "bool get_BoolValue() property property",
 					                              asMETHOD(ConfigItem, GetBoolValue),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "float get_FloatValue() property property",
 					                              asMETHOD(ConfigItem, GetFloatValue),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "string get_StringValue() property property",
 					                              asMETHOD(ConfigItem, GetStringValue),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "string get_DefaultValue() property",
 					                              asMETHOD(ConfigItem, GetDefaultValue),
-					                              asCALL_THISCALL);
+					                              SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("ConfigItem", "bool get_IsUnknown() property",
-					                              asMETHOD(ConfigItem, IsUnknown), asCALL_THISCALL);
+					                              asMETHOD(ConfigItem, IsUnknown), SPADES_ASCC_THISCALL);
 					manager->CheckError(r);
 
 					r = eng->RegisterGlobalFunction("array<string>@ GetAllConfigNames()",
-					                                asFUNCTION(GetAllConfigNames), asCALL_CDECL);
+					                                asFUNCTION(GetAllConfigNames), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					break;
 				default: break;

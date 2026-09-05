@@ -449,6 +449,41 @@ namespace spades {
 			}
 		}
 
+		namespace {
+			/**
+			 * Applies the configured GL swap interval, degrading to a weaker mode when the
+			 * driver refuses it.
+			 *
+			 * Adaptive vsync (a negative interval) requires EXT_swap_control_tear, and even
+			 * plain vsync requires swap control support at all. Neither is guaranteed —
+			 * notably under the GL-on-D3D translation layers used on Windows on ARM — and
+			 * the mode cannot be probed before a context exists, so the startup screen
+			 * cannot rule the option out in advance. A presentation preference must never
+			 * take the client down, so an unsupported mode is logged and downgraded.
+			 */
+			void ApplySwapInterval(int requested) {
+				constexpr int Immediate = 0;
+				constexpr int VSync = 1;
+
+				if (SDL_GL_SetSwapInterval(requested) == 0)
+					return;
+
+				SPLog("Swap interval %d rejected by the driver: %s", requested, SDL_GetError());
+
+				if (requested < Immediate && SDL_GL_SetSwapInterval(VSync) == 0) {
+					SPLog("Adaptive vsync unavailable; using standard vsync");
+					return;
+				}
+
+				if (requested != Immediate && SDL_GL_SetSwapInterval(Immediate) == 0) {
+					SPLog("No synchronised swap mode accepted; vsync disabled");
+					return;
+				}
+
+				SPLog("Keeping the driver's default swap interval: %s", SDL_GetError());
+			}
+		} // namespace
+
 		void SDLRunner::Run(int width, int height) {
 			SPADES_MARK_FUNCTION();
 
@@ -532,8 +567,7 @@ namespace spades {
 
 					if (rtype == RendererType::GL) {
 						int vsync = r_vsync;
-						if (SDL_GL_SetSwapInterval(vsync) != 0)
-							SPRaise("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
+						ApplySwapInterval(vsync);
 					}
 
 					RunClientLoop(window, renderer.GetPointerOrNull(), audio.GetPointerOrNull());

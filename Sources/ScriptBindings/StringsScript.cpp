@@ -78,58 +78,58 @@ namespace spades {
 
 					r = eng->RegisterGlobalFunction(
 					  "string _Tr(const string&in,const string&in)",
-					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr), std::string), asCALL_CDECL);
+					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr), std::string), SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _Tr(const string&in,const string&in, const string&in)",
 					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr, RCStr), std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _Tr(const string&in,const string&in, const string&in, const "
 					  "string&in)",
 					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr, RCStr, RCStr), std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _Tr(const string&in,const string&in, const string&in, const "
 					  "string&in, const string&in)",
 					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr, RCStr, RCStr, RCStr),
 					               std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _Tr(const string&in,const string&in, const string&in, const "
 					  "string&in, const string&in, const string&in)",
 					  asFUNCTIONPR(DefaultTranslate, (RCStr, RCStr, RCStr, RCStr, RCStr, RCStr),
 					               std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _TrN(const string&in,const string&in, const string&in, int)",
 					  asFUNCTIONPR(DefaultTranslateN, (RCStr, RCStr, RCStr, int), std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction("string _TrN(const string&in,const string&in, "
 					                                "const string&in, int, const string& in)",
 					                                asFUNCTIONPR(DefaultTranslateN,
 					                                             (RCStr, RCStr, RCStr, int, RCStr),
 					                                             std::string),
-					                                asCALL_CDECL);
+					                                SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _TrN(const string&in,const string&in, const string&in, int, const "
 					  "string& in, const string& in)",
 					  asFUNCTIONPR(DefaultTranslateN, (RCStr, RCStr, RCStr, int, RCStr, RCStr),
 					               std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 					r = eng->RegisterGlobalFunction(
 					  "string _TrN(const string&in,const string&in, const string&in, int, const "
 					  "string& in, const string& in, const string& in)",
 					  asFUNCTIONPR(DefaultTranslateN,
 					               (RCStr, RCStr, RCStr, int, RCStr, RCStr, RCStr), std::string),
-					  asCALL_CDECL);
+					  SPADES_ASCC_CDECL);
 					manager->CheckError(r);
 
 					break;

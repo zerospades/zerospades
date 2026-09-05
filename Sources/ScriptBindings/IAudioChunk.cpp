@@ -37,11 +37,11 @@ namespace spades {
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("AudioChunk", asBEHAVE_ADDREF, "void f()",
 						                                 asMETHOD(IAudioChunk, AddRef),
-						                                 asCALL_THISCALL);
+						                                 SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("AudioChunk", asBEHAVE_RELEASE, "void f()",
 						                                 asMETHOD(IAudioChunk, Release),
-						                                 asCALL_THISCALL);
+						                                 SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 
 						break;

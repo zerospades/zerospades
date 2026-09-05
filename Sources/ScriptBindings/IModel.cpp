@@ -36,10 +36,10 @@ namespace spades {
 						r = eng->RegisterObjectType("Model", 0, asOBJ_REF);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Model", asBEHAVE_ADDREF, "void f()",
-						                                 asMETHOD(IModel, AddRef), asCALL_THISCALL);
+						                                 asMETHOD(IModel, AddRef), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Model", asBEHAVE_RELEASE, "void f()",
-						                               asMETHOD(IModel, Release), asCALL_THISCALL);
+						                               asMETHOD(IModel, Release), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						break;
 					case PhaseObjectMember: break;

@@ -137,3 +137,4 @@ vcpkg/
 
 # Demo recordings
 *.dem
+.claude/

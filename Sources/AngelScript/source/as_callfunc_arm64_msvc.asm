@@ -53,7 +53,7 @@
     ALIGN   4
 GetHFAReturnDouble PROC
     adr     x9, |populateDoubles|
-    sub     x9, x9, x1, lsr 1 ; x9 -= returnSize >> 1; (/2 because double is 2x instruction size)
+    sub     x9, x9, x2, lsr 1 ; x9 -= returnSize >> 1; (/2 because double is 2x instruction size)
     br      x9
 
     str     d3, [x0, #0x18]
@@ -91,7 +91,7 @@ GetHFAReturnFloat PROC
 CallARM64Double PROC
     stp     fp, lr, [sp,#-0x10]!
     bl      CallARM64
-    ldp     fp, lr, [sp,#-0x10]!
+    ldp     fp, lr, [sp],#0x10
     ret
     ENDP ; CallARM64Double
 
@@ -99,7 +99,7 @@ CallARM64Double PROC
 CallARM64Float PROC
     stp     fp, lr, [sp,#-0x10]!
     bl      CallARM64
-    ldp     fp, lr, [sp,#-0x10]!
+    ldp     fp, lr, [sp],#0x10
     ret
     ENDP ; CallARM64Float
 

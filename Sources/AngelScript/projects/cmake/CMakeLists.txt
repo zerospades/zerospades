@@ -38,13 +38,17 @@ set(ANGELSCRIPT_SOURCE
         ../../source/as_variablescope.cpp
 )
 
-if(MSVC AND CMAKE_CL_64)
-            enable_language(ASM_MASM)
-            if(CMAKE_ASM_MASM_COMPILER_WORKS)
-                            set(ANGELSCRIPT_SOURCE ${ANGELSCRIPT_SOURCE} ../../source/as_callfunc_x64_msvc_asm.asm)
-            else()
-                            message(FATAL ERROR "MSVC x86_64 target requires a working assembler")
-            endif()
+# Enable optimized x64/IA64 MASM assembly (ml64.exe)
+# MASM (ml64.exe) only supports x64 and IA64. ARM64 requires armasm64.exe (different tool).
+# MSVC_CXX_ARCHITECTURE_ID can be "X64", "x64", "IA64", "ia64", "amd64", "ARM64", "arm64" etc. depending on CMake/MSVC version.
+# Use CMAKE_CL_64 (reliable for all 64-bit compilers) but explicitly exclude ARM64 (case-insensitive).
+if(MSVC AND CMAKE_CL_64 AND NOT MSVC_CXX_ARCHITECTURE_ID MATCHES "^(ARM64|arm64)")
+	enable_language(ASM_MASM)
+	if(CMAKE_ASM_MASM_COMPILER_WORKS)
+		set(ANGELSCRIPT_SOURCE ${ANGELSCRIPT_SOURCE} ../../source/as_callfunc_x64_msvc_asm.asm)
+	else()
+		message(FATAL_ERROR "MASM x64/IA64 target requires a working assembler")
+	endif()
 endif()
 
 if(ANDROID)
@@ -76,6 +80,35 @@ if(UNIX AND NOT APPLE AND NOT ANDROID AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|
         else()
                 message(FATAL_ERROR "Linux ARM64 target requires a working assembler")
         endif()
+endif()
+
+# Add ARM64 support for Windows (MSVC)
+# as_config.h defines AS_ARM64 whenever _M_ARM64 is set, so AngelScript expects the
+# native ARM64 implementation to be present. That implementation is
+# as_callfunc_arm64.cpp plus as_callfunc_arm64_msvc.asm, which is assembled by
+# armasm64.exe (CMake exposes it as the ASM_MARMASM language, available since 3.26).
+#
+# Do NOT substitute AS_MAX_PORTABILITY here: it compiles as_callfunc_arm64.cpp out
+# (the file is guarded by #ifndef AS_MAX_PORTABILITY) and restricts the engine to
+# asCALL_GENERIC, which every asFUNCTION()/asMETHOD() registration rejects with
+# asWRONG_CALLING_CONV in DetectCallingConvention() (as_callfunc.cpp).
+include(${CMAKE_SOURCE_DIR}/cmake/DetectARM64.cmake)
+if(IS_ARM64)
+	if(CMAKE_VERSION VERSION_LESS 3.26)
+		message(FATAL_ERROR
+			"Windows ARM64 requires CMake 3.26 or newer for ASM_MARMASM (armasm64) support. "
+			"Detected CMake ${CMAKE_VERSION}.")
+	endif()
+
+	enable_language(ASM_MARMASM)
+	if(NOT CMAKE_ASM_MARMASM_COMPILER_WORKS)
+		message(FATAL_ERROR "Windows ARM64 target requires a working armasm64 assembler")
+	endif()
+
+	set(ANGELSCRIPT_SOURCE ${ANGELSCRIPT_SOURCE}
+		../../source/as_callfunc_arm64.cpp
+		../../source/as_callfunc_arm64_msvc.asm)
+	message(STATUS "[AngelScript] Building with native ARM64 support for Windows")
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64")
@@ -140,8 +173,13 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 find_package(Threads)
 target_link_libraries(Angelscript ${CMAKE_THREAD_LIBS_INIT})
 
+# /MP is a cl.exe switch. A target-wide COMPILE_FLAGS is emitted into every compile
+# item, including the assembler ones, and armasm64.exe aborts on an unrecognised
+# argument (error A2029). Scope it to the C/C++ sources so the assembly stays clean.
 if(MSVC)
-        set_target_properties(Angelscript PROPERTIES COMPILE_FLAGS "/MP")
+        set(ANGELSCRIPT_CL_SOURCE ${ANGELSCRIPT_SOURCE})
+        list(FILTER ANGELSCRIPT_CL_SOURCE EXCLUDE REGEX "\\.(asm|S)$")
+        set_source_files_properties(${ANGELSCRIPT_CL_SOURCE} PROPERTIES COMPILE_FLAGS "/MP")
 endif(MSVC)
 
 set(RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../../bin)

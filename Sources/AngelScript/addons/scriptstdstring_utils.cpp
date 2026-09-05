@@ -122,8 +122,8 @@ void RegisterStdStringUtils(asIScriptEngine *engine)
 	}
 	else
 	{
-		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in) const", asFUNCTION(StringSplit), asCALL_CDECL_OBJLAST); assert(r >= 0);
-		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in)", asFUNCTION(StringJoin), asCALL_CDECL); assert(r >= 0);
+		r = engine->RegisterObjectMethod("string", "array<string>@ split(const string &in) const", asFUNCTION(StringSplit), ADDON_CC_CDECL_OBJLAST); assert(r >= 0);
+		r = engine->RegisterGlobalFunction("string join(const array<string> &in, const string &in)", asFUNCTION(StringJoin), ADDON_CC_CDECL); assert(r >= 0);
 	}
 }
 

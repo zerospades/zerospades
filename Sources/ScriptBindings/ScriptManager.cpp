@@ -113,7 +113,7 @@ namespace spades {
 			SPLog("Configuring");
 			engine->SetEngineProperty(asEP_REQUIRE_ENUM_SCOPE, 1);
 			engine->SetEngineProperty(asEP_DISALLOW_GLOBAL_VARS, 1);
-			engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
+			engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, SPADES_ASCC_CDECL);
 			SPLog("Registering standard libray functions");
 			RegisterScriptAny(engine);
 			RegisterScriptWeakRef(engine);
@@ -380,11 +380,11 @@ namespace spades {
 			switch (phase) {
 				case PhaseGlobalFunction:
 					eng->RegisterGlobalFunction("void Raise(const string& in)", asFUNCTION(Raise),
-					                            asCALL_CDECL);
+					                            SPADES_ASCC_CDECL);
 					eng->RegisterGlobalFunction("void Assert(bool cond)", asFUNCTION(Assert),
-					                            asCALL_CDECL);
+					                            SPADES_ASCC_CDECL);
 					eng->RegisterGlobalFunction("void NotImplemented()", asFUNCTION(NotImplemented),
-					                            asCALL_CDECL);
+					                            SPADES_ASCC_CDECL);
 					break;
 				default: break;
 			}

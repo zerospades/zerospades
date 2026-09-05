@@ -122,6 +122,16 @@ if(USE_INTERNAL_OPENAL)
 	option(ALSOFT_INSTALL_AMBDEC_PRESETS "Install AmbiDec preset files" OFF)
 	option(ALSOFT_INSTALL_EXAMPLES "Install example programs (alplay, alstream, ...)" OFF)
 	option(ALSOFT_INSTALL_UTILS "Install utility programs (openal-info, alsoft-config, ...)" OFF)
+
+	# Disable x86-specific optimizations for ARM64
+	include(cmake/DetectARM64.cmake)
+	if(IS_ARM64)
+		set(ALSOFT_CPUEXT_SSE OFF CACHE BOOL "")
+		set(ALSOFT_CPUEXT_SSE2 OFF CACHE BOOL "")
+		set(ALSOFT_CPUEXT_SSE3 OFF CACHE BOOL "")
+		set(ALSOFT_CPUEXT_SSE4_1 OFF CACHE BOOL "")
+	endif()
+
 	add_subdirectory(openal-soft)
 	if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 		foreach(OPENAL_TARGET OpenAL alsoft.common alsoft.fmt)

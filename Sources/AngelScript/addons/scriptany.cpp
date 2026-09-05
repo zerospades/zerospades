@@ -150,22 +150,22 @@ void RegisterScriptAny_Native(asIScriptEngine *engine)
 	r = engine->RegisterObjectBehaviour("any", asBEHAVE_FACTORY, "any@ f(const int64&in) explicit", asFUNCTION(ScriptAnyFactory2_Generic), asCALL_GENERIC); assert(r >= 0);
 	r = engine->RegisterObjectBehaviour("any", asBEHAVE_FACTORY, "any@ f(const double&in) explicit", asFUNCTION(ScriptAnyFactory2_Generic), asCALL_GENERIC); assert(r >= 0);
 
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_ADDREF, "void f()", asMETHOD(CScriptAny,AddRef), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_RELEASE, "void f()", asMETHOD(CScriptAny,Release), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "any &opAssign(any&in)", asFUNCTION(ScriptAnyAssignment), asCALL_CDECL_OBJLAST); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "void store(?&in)", asMETHODPR(CScriptAny,Store,(void*,int),void), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "void store(const int64&in)", asMETHODPR(CScriptAny,Store,(asINT64&),void), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "void store(const double&in)", asMETHODPR(CScriptAny,Store,(double&),void), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(?&out) const", asMETHODPR(CScriptAny,Retrieve,(void*,int) const,bool), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(int64&out) const", asMETHODPR(CScriptAny,Retrieve,(asINT64&) const,bool), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectMethod("any", "bool retrieve(double&out) const", asMETHODPR(CScriptAny,Retrieve,(double&) const,bool), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_ADDREF, "void f()", asMETHOD(CScriptAny,AddRef), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_RELEASE, "void f()", asMETHOD(CScriptAny,Release), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "any &opAssign(any&in)", asFUNCTION(ScriptAnyAssignment), ADDON_CC_CDECL_OBJLAST); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "void store(?&in)", asMETHODPR(CScriptAny,Store,(void*,int),void), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "void store(const int64&in)", asMETHODPR(CScriptAny,Store,(asINT64&),void), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "void store(const double&in)", asMETHODPR(CScriptAny,Store,(double&),void), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(?&out) const", asMETHODPR(CScriptAny,Retrieve,(void*,int) const,bool), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(int64&out) const", asMETHODPR(CScriptAny,Retrieve,(asINT64&) const,bool), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectMethod("any", "bool retrieve(double&out) const", asMETHODPR(CScriptAny,Retrieve,(double&) const,bool), ADDON_CC_THISCALL); assert( r >= 0 );
 
 	// Register GC behaviours
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(CScriptAny,GetRefCount), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_SETGCFLAG, "void f()", asMETHOD(CScriptAny,SetFlag), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_GETGCFLAG, "bool f()", asMETHOD(CScriptAny,GetFlag), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_ENUMREFS, "void f(int&in)", asMETHOD(CScriptAny,EnumReferences), asCALL_THISCALL); assert( r >= 0 );
-	r = engine->RegisterObjectBehaviour("any", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(CScriptAny,ReleaseAllHandles), asCALL_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_GETREFCOUNT, "int f()", asMETHOD(CScriptAny,GetRefCount), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_SETGCFLAG, "void f()", asMETHOD(CScriptAny,SetFlag), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_GETGCFLAG, "bool f()", asMETHOD(CScriptAny,GetFlag), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_ENUMREFS, "void f(int&in)", asMETHOD(CScriptAny,EnumReferences), ADDON_CC_THISCALL); assert( r >= 0 );
+	r = engine->RegisterObjectBehaviour("any", asBEHAVE_RELEASEREFS, "void f(int&in)", asMETHOD(CScriptAny,ReleaseAllHandles), ADDON_CC_THISCALL); assert( r >= 0 );
 }
 
 void RegisterScriptAny_Generic(asIScriptEngine *engine)

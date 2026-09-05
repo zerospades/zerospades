@@ -36,18 +36,18 @@ namespace spades {
 						r = eng->RegisterObjectType("Image", 0, asOBJ_REF);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Image", asBEHAVE_ADDREF, "void f()",
-						                                 asMETHOD(IImage, AddRef), asCALL_THISCALL);
+						                                 asMETHOD(IImage, AddRef), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectBehaviour("Image", asBEHAVE_RELEASE, "void f()",
-						                               asMETHOD(IImage, Release), asCALL_THISCALL);
+						                               asMETHOD(IImage, Release), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						break;
 					case PhaseObjectMember:
 						r = eng->RegisterObjectMethod("Image", "float get_Width() property property",
-						                              asMETHOD(IImage, GetWidth), asCALL_THISCALL);
+						                              asMETHOD(IImage, GetWidth), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("Image", "float get_Height() property property",
-						                              asMETHOD(IImage, GetHeight), asCALL_THISCALL);
+						                              asMETHOD(IImage, GetHeight), SPADES_ASCC_THISCALL);
 						manager->CheckError(r);
 						break;
 					default: break;
