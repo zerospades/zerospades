@@ -40,6 +40,15 @@ DEFINE_SPADES_SETTING(cg_classicWeaponRecoil, "1");
 namespace spades {
 	namespace client {
 
+		// Time for a remote player's rendered orientation to cover half of the
+		// distance to the one the server last reported. Larger is smoother but lags
+		// further behind; this value reproduces the rate the filter settled at back
+		// when the game happened to run at exactly 60fps, which is what it was
+		// originally tuned against.
+		constexpr float kOrientationSmoothingHalfLife = 0.11F;
+		static_assert(kOrientationSmoothingHalfLife > 0.0F,
+					  "half-life drives a division and must be positive");
+
 		Player::Player(World& w, int pId, WeaponType wType, int tId) : world(w) {
 			SPADES_MARK_FUNCTION();
 
@@ -55,6 +64,7 @@ namespace spades {
 			velocity = MakeVector3(0, 0, 0);
 			orientation = MakeVector3((tId == 1) ? -1.0F : 1.0F, 0, 0);
 			orientationSmoothed = orientation;
+			hasNetworkOrientation = false;
 			moveDistance = 0.0F;
 			moveSteps = 0;
 
@@ -328,6 +338,15 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			orientation = v;
+
+			// Players are constructed facing their team's default direction, which
+			// is unrelated to where they actually spawn looking. Adopt the first
+			// reported orientation outright so that arbitrary heading is never
+			// smoothed through on screen.
+			if (!hasNetworkOrientation) {
+				orientationSmoothed = v;
+				hasNetworkOrientation = true;
+			}
 		}
 
 		void Player::Turn(float longitude, float latitude) {
@@ -357,12 +376,36 @@ namespace spades {
 		void Player::UpdateSmooth(float dt) {
 			SPADES_MARK_FUNCTION();
 
-			// Smooth the player orientation
-			if (!IsLocalPlayer()) {
-				orientationSmoothed = orientationSmoothed * powf(0.9F, dt * 60.0F) +
-									  orientation * powf(0.1F, dt * 60.0F);
-				orientationSmoothed = orientationSmoothed.Normalize();
+			// The local player aims with the mouse, not with the network; filtering
+			// it would show up directly as crosshair lag.
+			if (IsLocalPlayer())
+				return;
+
+			if (!(dt > 0.0F))
+				return; // paused, or a degenerate frame time
+
+			// Exponential filter expressed as a half-life: half of the error between
+			// the smoothed and the networked orientation is removed every
+			// kOrientationSmoothingHalfLife seconds. Deriving the blend factor from
+			// the time actually elapsed, rather than assuming a fixed step, is what
+			// keeps the settling rate identical no matter how often this is called.
+			float const blend = 1.0F - powf(0.5F, dt / kOrientationSmoothingHalfLife);
+
+			// Near-antipodal orientations have no meaningful linear interpolation:
+			// the blend passes through the origin and the direction is lost. Snap,
+			// which is also the sanest depiction of an instant about-face.
+			if (Vector3::Dot(orientationSmoothed, orientation) <= -0.999F) {
+				orientationSmoothed = orientation;
+				return;
 			}
+
+			orientationSmoothed += (orientation - orientationSmoothed) * blend;
+
+			// Guard the renormalization: a collapsed blend would otherwise leave a
+			// zero vector behind and every consumer would inherit it.
+			float const length = orientationSmoothed.GetLength();
+			orientationSmoothed =
+			  (length > 0.0F) ? orientationSmoothed * (1.0F / length) : orientation;
 		}
 
 		void Player::Update(float dt) {

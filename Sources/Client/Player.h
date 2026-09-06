@@ -74,6 +74,7 @@ namespace spades {
 			Vector3 velocity;
 			Vector3 orientation;
 			Vector3 orientationSmoothed;
+			bool hasNetworkOrientation;
 			Vector3 eye;
 			PlayerInput input;
 			WeaponInput weapInput;

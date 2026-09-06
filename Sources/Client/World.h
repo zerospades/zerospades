@@ -106,7 +106,12 @@ namespace spades {
 			IntVector3 GetFogColor() { return fogColor; }
 			void SetFogColor(IntVector3 v) { fogColor = v; }
 
-			void UpdatePlayer(float dt, bool locked);
+			/** Steps player physics and game logic. Must be driven at the fixed
+			 * rate the server simulates at, or the client will diverge from it. */
+			void UpdatePlayers(float dt);
+			/** Advances view-only orientation smoothing for remote players. Safe to
+			 * drive at any rate; it affects presentation, not simulation. */
+			void UpdatePlayersSmooth(float dt);
 			void Advance(float dt);
 
 			void AddGrenade(std::unique_ptr<Grenade>);
