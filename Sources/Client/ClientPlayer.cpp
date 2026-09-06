@@ -53,6 +53,7 @@
 SPADES_SETTING(cg_ragdoll);
 DEFINE_SPADES_SETTING(cg_animations, "1");
 SPADES_SETTING(cg_shake);
+SPADES_SETTING(cg_everyoneFlashlight);
 SPADES_SETTING(r_hdr);
 DEFINE_SPADES_SETTING(cg_environmentalAudio, "1");
 DEFINE_SPADES_SETTING(cg_classicPlayerModels, "0");
@@ -524,17 +525,19 @@ namespace spades {
 						softLimitFunc(viewWeaponOffset.z, 0, limitY);
 					}
 				}
-
-				// Smooth the flashlight's movement
-				if (client.flashlightOn && isLocalPlayer) {
-					Vector3 diff = front - flashlightOrientation;
-					float dist = diff.GetLength();
-					if (dist > 0.1F)
-						flashlightOrientation += diff.Normalize() * (dist - 0.1F);
-					flashlightOrientation = Mix(flashlightOrientation, front, 1.0F - powf(1.0E-6F, dt));
-					flashlightOrientation = flashlightOrientation.Normalize();
-				}
 			}
+
+			// Smooth the flashlight's movement (for all players). Follow the same
+			// interpolated orientation the head is rendered from, so a remote player's
+			// cone doesn't lead their head and snap on every network update.
+			// `GetFront` returns the raw orientation for the local player either way.
+			Vector3 lightFront = player.GetFront(cg_orientationSmoothing);
+			Vector3 diff = lightFront - flashlightOrientation;
+			float dist = diff.GetLength();
+			if (dist > 0.1F)
+				flashlightOrientation += diff.Normalize() * (dist - 0.1F);
+			flashlightOrientation = Mix(flashlightOrientation, lightFront, 1.0F - powf(1.0E-6F, dt));
+			flashlightOrientation = flashlightOrientation.Normalize();
 
 			// FIXME: should do for non-active skins?
 			asIScriptObject* curSkin = GetCurrentSkin(!isThirdPerson);
@@ -641,11 +644,62 @@ namespace spades {
 		}
 
 		std::array<Vector3, 3> ClientPlayer::GetFlashlightAxes() {
+			// Roll the cone around its own direction rather than around the player's
+			// raw up vector: the two are equivalent while the player faces the way the
+			// lamp points, but the raw one snaps with every network update and is
+			// undefined when looking straight up or down.
+			static const Vector3 worldUp = MakeVector3(0, 0, -1);
+
 			std::array<Vector3, 3> axes;
 			axes[2] = flashlightOrientation;
-			axes[0] = Vector3::Cross(axes[2], player.GetUp()).Normalize();
+			axes[0] = Vector3::Cross(axes[2], worldUp);
+			if (axes[0].GetSquaredLength() < 1.0E-6F) // pointing straight up or down
+				axes[0] = Vector3::Cross(axes[2], MakeVector3(0, 1, 0));
+			axes[0] = axes[0].Normalize();
 			axes[1] = Vector3::Cross(axes[0], axes[2]);
 			return axes;
+		}
+
+		bool ClientPlayer::IsLampBuried(const Vector3& lightOrigin) {
+			World* world = client.GetWorld();
+			if (!world)
+				return false;
+
+			GameMap* map = world->GetMap().GetPointerOrNull();
+			if (!map)
+				return false;
+
+			IntVector3 block = lightOrigin.Floor();
+			return map->IsSolidWrapped(block.x, block.y, block.z);
+		}
+
+		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
+			Player& p = player;
+			IRenderer& renderer = client.GetRenderer();
+
+			// Every player is lit from the same per-player state, which only the local
+			// player can toggle until the synchronous flashlight extension lands.
+			// cg_everyoneFlashlight overrides it for remote players, so the extension
+			// can be previewed without a server that speaks it.
+			const bool forced = cg_everyoneFlashlight && !p.IsLocalPlayer();
+			if (!p.IsFlashlightOn() && !forced)
+				return;
+
+			// Fade in when the flashlight is switched on.
+			float brightness = p.GetWorld().GetTime() - p.GetFlashlightOnTime();
+			brightness = 1.0F - expf(-brightness * 5.0F);
+			brightness *= r_hdr ? 3.0F : 1.5F;
+
+			DynamicLightParam light;
+			light.type = DynamicLightTypeSpotlight;
+			light.origin = lightOrigin;
+			light.radius = 60.0F;
+			light.color = MakeVector3(1.0F, 0.7F, 0.5F) * brightness;
+			light.spotAngle = DEG2RAD(90);
+			light.spotAxis = GetFlashlightAxes();
+			Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
+			light.image = img.GetPointerOrNull();
+			renderer.AddLight(light);
 		}
 
 		void ClientPlayer::AddToSceneFirstPersonView() {
@@ -669,30 +723,8 @@ namespace spades {
 			sandboxedRenderer->SetClipBox(clip);
 			sandboxedRenderer->SetAllowDepthHack(true); // allow depthhack
 
-			// no flashlight if spectating other players while dead
-			if (client.flashlightOn && p.IsLocalPlayer()) {
-				float brightness = client.time - client.flashlightOnTime;
-				brightness = 1.0F - expf(-brightness * 5.0F);
-				brightness *= r_hdr ? 3.0F : 1.5F;
-
-				// add flash light
-				DynamicLightParam light;
-				light.type = DynamicLightTypeSpotlight;
-				light.origin = eyeMatrix.GetOrigin();
-				light.radius = 60.0F;
-				light.color = MakeVector3(1.0F, 0.7F, 0.5F) * brightness;
-				light.spotAngle = DEG2RAD(90);
-				light.spotAxis = GetFlashlightAxes();
-				Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
-				light.image = img.GetPointerOrNull();
-				renderer.AddLight(light);
-
-				light.type = DynamicLightTypePoint;
-				light.radius = 10.0F;
-				light.color *= 0.3F;
-				light.image = nullptr;
-				renderer.AddLight(light);
-			}
+			// This path also runs for a remote player the camera is following.
+			AddFlashlightToScene(eyeMatrix.GetOrigin());
 
 			Vector3 leftHand, rightHand;
 			leftHand = MakeVector3(0, 0, 0);
@@ -1253,6 +1285,11 @@ namespace spades {
 					renderer.RenderModel(*model, param);
 				}
 			}
+
+			// Emit from the eye, so the lamp matches the first-person one and doesn't
+			// shift when the observer changes camera mode or the player crouches.
+			if (!IsLampBuried(p.GetEye()))
+				AddFlashlightToScene(p.GetEye());
 
 			// third person player rendering, done
 		}

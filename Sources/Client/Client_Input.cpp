@@ -96,6 +96,8 @@ DEFINE_SPADES_SETTING(cg_switchToolByWheel, "1");
 DEFINE_SPADES_SETTING(cg_debugCorpse, "0");
 DEFINE_SPADES_SETTING(cg_keySpawnCorpse, "p");
 
+DEFINE_SPADES_SETTING(cg_everyoneFlashlight, "0");
+
 DEFINE_SPADES_SETTING(cg_keyPieMenu, "MiddleMouseButton");
 
 SPADES_SETTING(cg_manualFocus);
@@ -1022,8 +1024,7 @@ namespace spades {
 				} else if (CheckKey(cg_keyFlashlight, name) && down) {
 					// spectators and dead players shouldn't be able to toggle the flashlight
 					if (!localPlayerIsSpectator && localPlayerIsAlive) {
-						flashlightOn = !flashlightOn;
-						flashlightOnTime = time;
+						p.SetFlashlightOn(!p.IsFlashlightOn());
 						Handle<IAudioChunk> c =
 						  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
 						audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
