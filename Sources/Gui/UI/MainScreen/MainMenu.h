@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <Gui/UI/MainScreen/DemoListView.h>
+#include <Gui/UI/MainScreen/KV6BrowserPanel.h>
 #include <Gui/UI/MainScreen/ModListView.h>
 #include <Gui/UI/MainScreen/ServerListView.h>
 #include <Gui/UI/Widgets/Button.h>
@@ -127,6 +128,9 @@ namespace spades {
 			float demoMapColWidth;
 			float demoSizeColWidth;
 			float demoContentsWidth;
+
+			// Editor tab state (self-contained file-browser panel)
+			KV6BrowserPanel* editorPanel;
 
 			// Mods tab state
 			Handle<ModsScreenHelper> modsHelper;
