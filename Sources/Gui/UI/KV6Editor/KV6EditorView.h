@@ -255,14 +255,16 @@ namespace spades {
 			float pitch = -M_PI_F * 0.30F;
 			float targetYaw = 0.0F, targetPitch = 0.0F; // navicube animates toward these
 			bool camAnim = false;
-			bool orbitMode = true;
-			Vector3 freePos;
 			Vector3 orbitTarget;
 			float orbitDist = 56.0F;
 			bool lookActive = false;
 			bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
 			bool keyUp = false, keyDown = false;
 			bool ctrlHeld = false, altHeld = false, shiftHeld = false;
+			bool keySprint = false; // cg_keySprint held (tracked like the modifiers)
+			// Distance the Ctrl-bound descend key moved the view during the current
+			// Ctrl press; a Ctrl shortcut subtracts it so shortcuts don't move the view.
+			Vector3 ctrlDescent = MakeVector3(0.0F, 0.0F, 0.0F);
 			bool lmbHeld = false, rmbHeld = false; // for move/drag pointer events
 
 			// Build a typed pointer/key event stamped with the current cursor and
@@ -292,8 +294,13 @@ namespace spades {
 			// Camera
 			Vector3 Forward() const;
 			Vector3 CameraEye() const;
-			void ToggleCameraMode();
+			// Move the orbit target with cg_keyMove*, cg_keyJump (up) and
+			// cg_keyCrouch (down); faster while cg_keySprint is held.
 			void UpdateMovement(float dt);
+			// Shift + wheel-button drag: slide the view along the screen axes.
+			void PanView(float dx, float dy);
+			// Forget held movement/look keys whose release a modal may swallow.
+			void ReleaseHeldInput();
 			client::SceneDefinition SetupScene(float vpX, float vpY, float vpW, float vpH);
 
 			// Editing
