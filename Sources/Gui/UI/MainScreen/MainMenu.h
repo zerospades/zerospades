@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <Gui/UI/MainScreen/DemoListView.h>
+#include <Gui/UI/MainScreen/KV6BrowserPanel.h>
 #include <Gui/UI/MainScreen/ModListView.h>
 #include <Gui/UI/MainScreen/ServerListView.h>
 #include <Gui/UI/Widgets/Button.h>
@@ -54,26 +55,6 @@ namespace spades {
 		class TabPanel : public ui::UIElement {
 		public:
 			TabPanel(ui::UIManager* manager) : ui::UIElement(manager) {}
-		};
-
-		/** Modal dialog for renaming a demo file. */
-		class RenameScreen : public ui::UIElement {
-			ui::UIElement* owner; // weak
-			ui::Field* nameField; // weak; owned as a child
-
-			void OnConfirm(ui::UIElement& sender);
-			void OnCancel(ui::UIElement& sender);
-
-		public:
-			ui::EventHandler closed;
-			bool result = false;
-			std::string newName;
-
-			RenameScreen(ui::UIElement* owner, const std::string& currentName);
-
-			void Close();
-			void Run();
-			void HotKey(const std::string& key) override;
 		};
 
 		/**
@@ -127,6 +108,9 @@ namespace spades {
 			float demoMapColWidth;
 			float demoSizeColWidth;
 			float demoContentsWidth;
+
+			// Editor tab state (self-contained file-browser panel)
+			KV6BrowserPanel* editorPanel;
 
 			// Mods tab state
 			Handle<ModsScreenHelper> modsHelper;
