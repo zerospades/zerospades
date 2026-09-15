@@ -19,6 +19,7 @@
  */
 
 #include "TextUtils.h"
+
 #include <algorithm>
 #include <cctype>
 #include <Client/IFont.h>
