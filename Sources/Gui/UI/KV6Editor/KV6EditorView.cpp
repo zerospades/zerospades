@@ -48,6 +48,7 @@ SPADES_SETTING(cg_keyMoveLeft);
 SPADES_SETTING(cg_keyMoveRight);
 SPADES_SETTING(cg_keyJump);
 SPADES_SETTING(cg_keyCrouch);
+SPADES_SETTING(cg_keySprint);
 SPADES_SETTING(cg_keyScreenshot);
 
 namespace spades {
@@ -64,7 +65,19 @@ namespace spades {
 				return EqualsIgnoringCase(cfg, input);
 			}
 
+			// Keys that form an editor shortcut together with Ctrl.
+			bool IsCtrlShortcut(const std::string& key) {
+				for (const char* k : {"s", "c", "x", "v", "z", "y"}) {
+					if (EqualsIgnoringCase(key, k))
+						return true;
+				}
+				return false;
+			}
+
 			float Clampf(float v, float lo, float hi) { return std::max(lo, std::min(hi, v)); }
+
+			// Camera speed factor while the sprint key (cg_keySprint) is held.
+			constexpr float kSprintMultiplier = 3.0F;
 
 			// Top UI bands (full width): a title ribbon above the toolbar. The 3D
 			// viewport is inset below them by kBarsH.
@@ -309,7 +322,6 @@ namespace spades {
 			orbitDist =
 			  float(std::max(model->GetWidth(), std::max(model->GetHeight(), model->GetDepth()))) *
 			  1.8F;
-			freePos = CameraEye();
 		}
 
 		void KV6EditorView::NewModel(int n, const std::string& path) {
@@ -399,46 +411,59 @@ namespace spades {
 			return MakeVector3(cp * cosf(yaw), cp * sinf(yaw), -sinf(pitch));
 		}
 
-		Vector3 KV6EditorView::CameraEye() const {
-			if (orbitMode)
-				return orbitTarget - Forward() * orbitDist;
-			return freePos;
-		}
-
-		void KV6EditorView::ToggleCameraMode() {
-			Vector3 eye = CameraEye();
-			if (orbitMode) {
-				freePos = eye;
-				orbitMode = false;
-			} else {
-				orbitTarget = eye + Forward() * orbitDist;
-				orbitMode = true;
-			}
-		}
+		Vector3 KV6EditorView::CameraEye() const { return orbitTarget - Forward() * orbitDist; }
 
 		void KV6EditorView::UpdateMovement(float dt) {
-			if (orbitMode)
-				return;
 			Vector3 fwd = Forward();
 			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
-			Vector3 right = Vector3::Cross(fwd, up).Normalize();
+			// Cross(fwd, up) normalised, derived from the heading so it stays valid
+			// when looking straight up/down (navicube top/bottom), where the cross
+			// product collapses. Matches the camera side axis in SetupScene.
+			Vector3 right = MakeVector3(-sinf(yaw), cosf(yaw), 0.0F);
 
-			Vector3 move = MakeVector3(0, 0, 0);
-			if (keyFwd) move += fwd;
-			if (keyBack) move -= fwd;
-			if (keyRight) move += right;
-			if (keyLeft) move -= right;
-			if (keyUp) move += up;
-			if (keyDown) move -= up;
+			float step = float(cubeSize) * 0.7F * (keySprint ? kSprintMultiplier : 1.0F) * dt;
+			auto displacement = [&](bool withDescend) {
+				Vector3 move = MakeVector3(0, 0, 0);
+				if (keyFwd) move += fwd;
+				if (keyBack) move -= fwd;
+				if (keyRight) move += right;
+				if (keyLeft) move -= right;
+				if (keyUp) move += up;
+				if (withDescend && keyDown) move -= up;
+				if (move.x == 0.0F && move.y == 0.0F && move.z == 0.0F)
+					return MakeVector3(0, 0, 0);
+				return move.Normalize() * step;
+			};
 
-			if (move.x != 0.0F || move.y != 0.0F || move.z != 0.0F)
-				freePos += move.Normalize() * (float(cubeSize) * 0.7F * dt);
+			Vector3 delta = displacement(true);
+			// Moving the orbited point carries the whole view along with it.
+			orbitTarget += delta;
+
+			// While Ctrl is both the descend key and held, remember how far the
+			// descend part alone moved us, so a Ctrl shortcut can take it back.
+			if (keyDown && ctrlHeld && KV6CheckKey(cg_keyCrouch, "Control"))
+				ctrlDescent += delta - displacement(false);
+		}
+
+		void KV6EditorView::PanView(float dx, float dy) {
+			if (camSH <= 0.0F)
+				return;
+			// World units per screen pixel at the orbit distance, so the point under
+			// the cursor follows the drag at any zoom level.
+			float unitsPerPixel = 2.0F * orbitDist * tanf(camFovY * 0.5F) / camSH;
+			orbitTarget += camRight * (-dx * unitsPerPixel) + camUp * (dy * unitsPerPixel);
+		}
+
+		void KV6EditorView::ReleaseHeldInput() {
+			keyFwd = keyBack = keyLeft = keyRight = keyUp = keyDown = false;
+			ctrlDescent = MakeVector3(0, 0, 0);
+			lookActive = false;
 		}
 
 		client::SceneDefinition KV6EditorView::SetupScene(float vpX, float vpY, float vpW, float vpH) {
 			client::SceneDefinition sceneDef;
 			Vector3 eye = CameraEye();
-			Vector3 at = orbitMode ? orbitTarget : (eye + Forward());
+			Vector3 at = orbitTarget;
 			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
 
 			Vector3 dir = (at - eye).Normalize();
@@ -637,7 +662,6 @@ namespace spades {
 			dst->SetOrigin(model->GetOrigin() - shift);
 			model = dst;
 			orbitTarget += shift;
-			freePos += shift;
 			cubeSize = std::max(nw, std::max(nh, nd));
 			ShiftSelection(ox, oy, oz); // keep selected voxel coords aligned
 		}
@@ -1561,7 +1585,6 @@ namespace spades {
 			targetYaw = ty;
 			targetPitch = tp;
 			camAnim = true;
-			orbitMode = true; // navicube clicks orbit around the model
 		}
 
 		void KV6EditorView::DrawOverlay(float sw, float sh) {
@@ -1575,7 +1598,7 @@ namespace spades {
 				font.Draw(statusMessage, MakeVector2(16.0F, sh - 50.0F), 1.0F,
 				          MakeVector4(0.5F, 1.0F, 0.6F, 1.0F));
 
-			font.Draw("[LMB] use tool  |  [RMB] delete/cancel  |  [MMB] look  |  [WASD/Space/Ctrl] move"
+			font.Draw("[LMB] use tool  |  [RMB] delete/cancel  |  [MMB] look  |  [Shift+MMB] pan  |  [WASD/Space/Ctrl] move (+Shift faster)"
 			          "  |  [Wheel] zoom  |  [Ctrl+C/X/V] copy/cut/paste  |  [Ctrl+Z/Y] undo/redo"
 			          "  |  [Esc] menu",
 			          MakeVector2(16.0F, sh - 28.0F), 1.0F, grey);
@@ -1704,8 +1727,7 @@ namespace spades {
 			font.Draw(name + "   (" + std::to_string(voxelCount) + " voxels)",
 			          MakeVector2(120.0F, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
 
-			std::string cam = std::string(orbitMode ? "Orbit" : "Free-fly") +
-			                  "   [Tab] camera   [Ctrl+S] save";
+			std::string cam = "[Ctrl+S] save";
 			Vector2 cs = font.Measure(cam);
 			font.Draw(cam, MakeVector2(sw - 12.0F - cs.x * 0.8F, 5.0F), 0.8F,
 			          MakeVector4(0.6F, 0.6F, 0.63F, 1.0F));
@@ -1716,6 +1738,13 @@ namespace spades {
 		// --- View interface ---------------------------------------------------
 
 		void KV6EditorView::MouseEvent(float dx, float dy) {
+			if (lookActive && shiftHeld) { // Shift + wheel-button drag pans
+				// The cursor travels with the drag, staying on the grabbed spot
+				// (it stops at the screen edge while the pan carries on).
+				softwareCursor->Accumulate(dx, dy);
+				PanView(dx, dy);
+				return;
+			}
 			if (lookActive) {
 				camAnim = false; // manual look cancels a navicube animation
 				float sens = 0.003F;
@@ -1746,16 +1775,25 @@ namespace spades {
 		void KV6EditorView::WheelEvent(float x, float y) {
 			if (ui->GetEditorMenu()->IsActive())
 				return;
-			if (orbitMode)
-				orbitDist = Clampf(orbitDist * (1.0F + y * 0.1F), 2.0F, 1000.0F);
-			else
-				freePos += Forward() * (-y * float(cubeSize) * 0.1F);
+			orbitDist = Clampf(orbitDist * (1.0F + y * 0.1F), 2.0F, 1000.0F);
 		}
 
 		void KV6EditorView::KeyEvent(const std::string& key, bool down) {
 			const Vector2& cursor = softwareCursor->GetPosition();
-			if (ui->GetEditorMenu()->KeyEvent(key, down))
+
+			// Modifier state must track the keyboard even while a modal swallows
+			// keys, or a Ctrl released during the menu stays "held" afterwards.
+			if (key == "Control") ctrlHeld = down;
+			if (key == "Alt") altHeld = down;
+			if (key == "Shift") shiftHeld = down;
+			if (KV6CheckKey(cg_keySprint, key)) keySprint = down;
+
+			if (ui->GetEditorMenu()->KeyEvent(key, down)) {
+				// Releases are swallowed too while the menu is up: drop held
+				// movement/look so nothing keeps going once it closes.
+				ReleaseHeldInput();
 				return;
+			}
 
 			// While pasting, the mouse positions/places the clipboard; other keys
 			// (camera) fall through.
@@ -1765,18 +1803,23 @@ namespace spades {
 				if (key == "LeftMouseButton") { CommitPaste(); return; }
 			}
 
-			if (key == "Control") ctrlHeld = down;
-			if (key == "Alt") altHeld = down;
-			if (key == "Shift") shiftHeld = down;
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "s")) { Save(); return; }
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "c")) { CopySelection(); return; }
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "x")) { CutSelection(); return; }
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "v")) { StartPaste(); return; }
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "z")) {
-				if (shiftHeld) Redo(); else Undo();
+			if (down && ctrlHeld && IsCtrlShortcut(key)) {
+				// Ctrl is also the default descend key (cg_keyCrouch), so the view
+				// has been sinking since Ctrl went down: undo that drift and stop
+				// descending for the rest of this press.
+				if (KV6CheckKey(cg_keyCrouch, "Control")) {
+					orbitTarget -= ctrlDescent;
+					ctrlDescent = MakeVector3(0, 0, 0);
+					keyDown = false;
+				}
+				if (EqualsIgnoringCase(key, "s")) Save();
+				else if (EqualsIgnoringCase(key, "c")) CopySelection();
+				else if (EqualsIgnoringCase(key, "x")) CutSelection();
+				else if (EqualsIgnoringCase(key, "v")) StartPaste();
+				else if (EqualsIgnoringCase(key, "z")) { if (shiftHeld) Redo(); else Undo(); }
+				else Redo(); // "y"
 				return;
 			}
-			if (down && ctrlHeld && EqualsIgnoringCase(key, "y")) { Redo(); return; }
 
 			if (key == "MiddleMouseButton") { lookActive = down; return; }
 
@@ -1879,8 +1922,6 @@ namespace spades {
 				return;
 			}
 
-			if (down && key == "Tab") { ToggleCameraMode(); return; }
-
 			if (down && KV6CheckKey(cg_keyScreenshot, key)) { wantScreenShot = true; return; }
 
 			std::string fwd = cg_keyMoveForward, bk = cg_keyMoveBackward, lf = cg_keyMoveLeft;
@@ -1890,7 +1931,11 @@ namespace spades {
 			if (KV6CheckKey(lf, key)) { keyLeft = down; return; }
 			if (KV6CheckKey(rt, key)) { keyRight = down; return; }
 			if (KV6CheckKey(jp, key)) { keyUp = down; return; }
-			if (KV6CheckKey(cr, key)) { keyDown = down; return; }
+			if (KV6CheckKey(cr, key)) {
+				keyDown = down;
+				ctrlDescent = MakeVector3(0, 0, 0); // a new press, or a finished one
+				return;
+			}
 
 			// Remaining keys go to the active tool (e.g. Select's [L]).
 			if (EditorTool* t = ActiveTool()) {
