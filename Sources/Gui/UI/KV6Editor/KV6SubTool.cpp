@@ -314,7 +314,18 @@ namespace spades {
 
 		void MoveSubTool::OnActivate(IEditorContext& ed) {
 			grabAxis = -1;
-			ed.SetStatus("Move: drag an axis handle to move the selection");
+			if (ed.HasPlacement())
+				return; // a paste or import is already waiting to be positioned
+			if (ed.BeginPlacementFromSelection())
+				ed.SetStatus("Move: drag a handle or use the arrows; leaving Move applies it");
+			else
+				ed.SetStatus("Move: select some voxels first");
+		}
+
+		void MoveSubTool::OnDeactivate(IEditorContext& ed) {
+			grabAxis = -1;
+			// Leaving the tool is what writes the voxels into the document.
+			ed.ApplyPlacement();
 		}
 
 		int MoveSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const {
@@ -356,7 +367,7 @@ namespace spades {
 				return;
 			if (e.IsDown()) {
 				Vector3 c;
-				if (!ed.SelectionCentroid(c))
+				if (!ed.PlacementCentroid(c))
 					return;
 				int best = HitAxis(ed, c);
 				if (best >= 0) { grabAxis = best; grabCursor = ed.CursorPos(); curOffset = 0; }
@@ -364,26 +375,45 @@ namespace spades {
 				if (grabAxis < 0)
 					return;
 				Vector3 c;
-				int off = ed.SelectionCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
+				int off = ed.PlacementCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
 				if (off != 0) {
 					int d[3] = {0, 0, 0};
 					d[grabAxis] = off;
-					ed.MoveSelection(d[0], d[1], d[2]);
+					ed.MovePlacement(d[0], d[1], d[2]); // still only a pending move
 				}
 				grabAxis = -1;
 			}
 		}
 
-		bool MoveSubTool::OnEscape(IEditorContext&) {
-			if (grabAxis < 0)
-				return false;
-			grabAxis = -1; // cancel the drag (no move committed)
-			return true;
+		void MoveSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
+			if (e.phase != KeyPhase::Down || !ed.HasPlacement())
+				return;
+			int d[3] = {0, 0, 0};
+			if (e.key == "Left") d[0] = -1;
+			else if (e.key == "Right") d[0] = 1;
+			else if (e.key == "Down") d[1] = -1;
+			else if (e.key == "Up") d[1] = 1;
+			else if (e.key == "PageDown") d[2] = -1;
+			else if (e.key == "PageUp") d[2] = 1;
+			else return;
+			ed.MovePlacement(d[0], d[1], d[2]);
+		}
+
+		bool MoveSubTool::OnEscape(IEditorContext& ed) {
+			if (grabAxis >= 0) {
+				grabAxis = -1; // cancel the drag, keep the placement where it was
+				return true;
+			}
+			if (ed.HasPlacement()) {
+				ed.CancelPlacement(); // nothing was written, so nothing to undo
+				return true;
+			}
+			return false;
 		}
 
 		void MoveSubTool::DrawScene(IEditorContext& ed) {
 			Vector3 c;
-			if (!ed.SelectionCentroid(c))
+			if (!ed.PlacementCentroid(c))
 				return;
 			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, c, grabAxis) : 0;
 			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
@@ -395,13 +425,13 @@ namespace spades {
 			if (grabAxis >= 0 && curOffset != 0) {
 				int d[3] = {0, 0, 0};
 				d[grabAxis] = curOffset;
-				ed.DrawSelectionOffset(d[0], d[1], d[2], MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+				ed.DrawPlacementOffset(d[0], d[1], d[2], MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
 			}
 		}
 
 		void MoveSubTool::DrawOverlay(IEditorContext& ed) {
 			Vector3 c;
-			if (!ed.SelectionCentroid(c))
+			if (!ed.PlacementCentroid(c))
 				return;
 			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
 			for (int a = 0; a < 3; a++) {

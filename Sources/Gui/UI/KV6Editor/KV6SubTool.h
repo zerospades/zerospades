@@ -122,12 +122,22 @@ namespace spades {
 			void CellsOf(const std::vector<IntVector3>& pts, std::vector<IntVector3>& out) const;
 		};
 
-		// Move the current selection by dragging a 3-axis gizmo at its centroid.
+		/**
+		 * Positions pending voxels by dragging a 3-axis gizmo, or with the arrow
+		 * keys (Page Up/Down for the third axis).
+		 *
+		 * Entering the tool lifts the selection into a placement, and a paste or an
+		 * import arrives with one already pending. Nothing is written to the
+		 * document until the tool is left, so voxels dragged over others never
+		 * destroy them; Escape drops the placement instead.
+		 */
 		class MoveSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Move"; }
 			void OnActivate(IEditorContext&) override;
+			void OnDeactivate(IEditorContext&) override;
 			void OnPointer(IEditorContext&, const PointerInput&) override;
+			void OnKey(IEditorContext&, const KeyInput&) override;
 			bool OnEscape(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
 			void DrawOverlay(IEditorContext&) override;

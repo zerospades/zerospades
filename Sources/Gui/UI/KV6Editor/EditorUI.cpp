@@ -26,6 +26,7 @@
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/UI/Components/Toolbar.h>
+#include <Gui/UI/Components/UIOverlayHost.h>
 #include <Core/Debug.h>
 
 namespace spades {
@@ -34,10 +35,11 @@ namespace spades {
 		                   client::FontManager* _fontManager, KV6EditorView* _editor,
 		                   SoftwareCursor* cursor)
 		    : renderer(_renderer), audioDevice(_audioDevice), fontManager(_fontManager),
-		      uiManager(new ui::UIManager(_renderer, _audioDevice)),
 		      editor(_editor) {
 			SPADES_MARK_FUNCTION();
 			try {
+				overlay = std::make_unique<UIOverlayHost>(*_renderer, _audioDevice, *_fontManager,
+				                                          *cursor);
 				toolbar = std::make_unique<Toolbar>(_audioDevice);
 				optionBar = std::make_unique<OptionBar>(_audioDevice);
 				colorPicker = std::make_unique<ColorPicker>();
@@ -51,6 +53,8 @@ namespace spades {
 		EditorUI::~EditorUI() {
 			EditorDestroyed();
 		}
+
+		ui::UIManager& EditorUI::GetUIManager() { return overlay->GetUIManager(); }
 
 		void EditorUI::EditorDestroyed() {
 			SPADES_MARK_FUNCTION();

@@ -69,6 +69,7 @@ namespace spades {
 			void WheelEvent(float x, float y) override;
 			void KeyEvent(const std::string&, bool down) override;
 			void TextInputEvent(const std::string&) override;
+			void TextEditingEvent(const std::string&, int start, int len) override;
 			bool AcceptsTextInput() override;
 			AABB2 GetTextInputRect() override;
 			bool NeedsAbsoluteMouseCoordinate() override { return false; }
@@ -93,6 +94,13 @@ namespace spades {
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			// Selection move (used by the move gizmo).
 			bool SelectionCentroid(Vector3& out) const override;
+			bool HasPlacement() const override { return placementActive; }
+			bool BeginPlacementFromSelection() override;
+			void MovePlacement(int dx, int dy, int dz) override;
+			bool PlacementCentroid(Vector3& out) const override;
+			void ApplyPlacement() override;
+			void CancelPlacement() override;
+			void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) override;
 			void MoveSelection(int dx, int dy, int dz) override;
 			void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) override;
 			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
@@ -208,26 +216,59 @@ namespace spades {
 			std::vector<std::unique_ptr<EditorTool>> tools;
 			int activeTool = 0;
 			EditorTool* ActiveTool(); // active tool in Edit mode, else null
+			// Switching tools or modes deactivates the outgoing tool, which is where
+			// a pending placement is applied.
+			void SetActiveTool(int index);
+			void SetMode(EditorMode mode);
 
 			// --- Selection ----------------------------------------------------
 			std::set<int64_t> selection; // packed voxel keys
 			void DrawSelection();
 			void ShiftSelection(int ox, int oy, int oz); // keep keys valid on resize
 
-			// --- Clipboard / paste --------------------------------------------
+			// --- Clipboard / placement ----------------------------------------
+			// Placing voxels (paste, import) is one mechanism: a buffer of voxels
+			// follows the cursor until it is dropped. The clipboard is just one
+			// source for that buffer, so an import never disturbs a copy.
 			struct ClipVoxel {
-				IntVector3 rel; // position relative to the clipboard's min corner
+				IntVector3 rel; // position relative to the buffer's min corner
 				uint32_t color;
 			};
-			std::vector<ClipVoxel> clipboard;
-			bool pasteActive = false;
-			IntVector3 pasteAnchor; // where the clipboard's min lands (follows cursor)
+			std::vector<ClipVoxel> clipboard; // Ctrl+C / Ctrl+X store
+
+			/**
+			 * Voxels waiting to be placed (a paste, an import, or a lifted
+			 * selection being moved).
+			 *
+			 * Nothing here has touched the document yet: the voxels are drawn as a
+			 * preview and written only when the placement is applied, which is what
+			 * keeps a move from destroying whatever it is dragged across. `lifted`
+			 * holds the document voxels to clear at that point (empty for a paste or
+			 * an import, which take nothing away).
+			 */
+			struct Placement {
+				std::vector<ClipVoxel> voxels; // relative to `anchor`
+				IntVector3 anchor;             // min corner, in document coords
+				std::vector<IntVector3> lifted;
+				std::string label = "Move"; // undo step name
+			};
+			bool placementActive = false;
+			Placement placement;
+
 			void CopySelection();
 			bool CutSelection(); // returns false if it would empty the document
 			void StartPaste();
-			void CommitPaste();
-			void PasteClipboard(const IntVector3& anchor);
-			void DrawPastePreview();
+			// Starts a placement of `voxels` with its min corner at `anchor`, and
+			// switches to the Move tool so it can be positioned.
+			void StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
+			                    const IntVector3& anchor);
+			void DrawPlacementPreview();
+			// Switch to the Move sub-tool (where a placement is positioned).
+			bool ActivateMoveTool();
+			// Loads `path` and starts placing its voxels in the current document.
+			void ImportModel(const std::string& path);
+			/** Asks for a model with the shared file browser, then imports it. */
+			void OpenImportDialog();
 
 			// --- Colour picker (managed by ColorPicker component) ----------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
@@ -360,11 +401,15 @@ namespace spades {
 
 			// --- IEditorMenuHost (overrides) ---
 			std::string GetMenuTitle() override { return "KV6 Editor"; }
-			std::string GetDocumentPath() override { return filePath; }
-			std::string GetDocumentExtension() override { return ".kv6"; }
-			void SaveDocument(const std::string& path) override;
-			void RequestClose() override { wantsClose = true; }
+			std::vector<EditorMenuItem> GetMenuItems() override;
 			bool OnMenuEscape() override;
+
+			// --- Document commands behind the menu items ---
+			std::string GetDocumentPath() const { return filePath; }
+			std::string GetDocumentExtension() const { return ".kv6"; }
+			void SaveDocument(const std::string& path);
+			/** Asks for a path with the shared file browser, then saves to it. */
+			void OpenSaveAsDialog();
 		};
 	} // namespace gui
 } // namespace spades

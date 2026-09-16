@@ -39,6 +39,7 @@ namespace spades {
 			void SetSubTool(IEditorContext&, int) override;
 
 			void OnActivate(IEditorContext&) override;
+			void OnDeactivate(IEditorContext&) override;
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
 			bool OnEscape(IEditorContext&) override;
