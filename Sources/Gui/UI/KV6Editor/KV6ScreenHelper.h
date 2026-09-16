@@ -29,38 +29,30 @@
 namespace spades {
 	class VoxelModel;
 	namespace gui {
+		/** Extensions of the voxel model files the editor lists. */
+		const std::vector<std::string>& KV6ModelExtensions();
+		/** True if `name` is a directly editable model file (currently `.kv6`). */
+		bool KV6IsEditable(const std::string& name);
 
 		/**
-		 * Backend for the KV6 editor's file explorer.
+		 * Loads and saves KV6 models by absolute path, and names the folder the
+		 * editor opens in.
 		 *
-		 * All paths are absolute, so the explorer can browse the whole
-		 * filesystem (not just the game's data directory). KV6 files are loaded
-		 * and saved directly by absolute path, bypassing the FileManager mounts.
+		 * Browsing and other file operations belong to `LocalFileSystem`; this only
+		 * covers what is specific to KV6 documents.
 		 */
 		class KV6ScreenHelper : public RefCountedObject {
 		public:
 			KV6ScreenHelper();
 
-			// Subfolder names directly under `absDir` (sorted, case-insensitive).
-			std::vector<std::string> GetFolders(const std::string& absDir);
-			// Model file names (.kv6/.2kv6/.vxl) under `absDir` (sorted).
-			std::vector<std::string> GetFiles(const std::string& absDir);
-
-			bool Exists(const std::string& absPath);
-			bool IsFolder(const std::string& absPath);
-			int64_t GetFileSize(const std::string& absPath);
-
-			bool CreateFolder(const std::string& absPath);
-			bool Delete(const std::string& absPath);
-			bool Rename(const std::string& absOld, const std::string& absNew);
-
-			// The default folder to open in (absolute): the data dir's kv6/.
+			/** The folder to open in (absolute): the data dir's kv6/. */
 			std::string DefaultDir();
-			// The parent directory of `absPath` (stops at the filesystem root).
-			std::string ParentDir(const std::string& absPath);
 
-			// Load / save a KV6 model by absolute path. `Load` returns null on
-			// failure (e.g. missing or corrupt file) rather than throwing.
+			/**
+			 * Load / save a KV6 model by absolute path. `Load` returns null on
+			 * failure (e.g. missing or corrupt file) rather than throwing; `Save`
+			 * writes through a temp file so a failure cannot truncate the target.
+			 */
 			VoxelModel* Load(const std::string& absPath);
 			bool Save(VoxelModel* model, const std::string& absPath);
 
@@ -70,6 +62,5 @@ namespace spades {
 		private:
 			std::string defaultDirAbs; // <user data dir>/kv6
 		};
-
 	} // namespace gui
 } // namespace spades

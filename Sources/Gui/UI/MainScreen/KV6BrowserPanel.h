@@ -22,10 +22,9 @@
 
 #include <string>
 
+#include <Gui/UI/Components/FileBrowser/FileBrowserView.h>
 #include <Gui/UI/KV6Editor/KV6ScreenHelper.h>
-#include <Gui/UI/MainScreen/EditorListView.h>
 #include <Gui/UI/Widgets/Button.h>
-#include <Gui/UI/Widgets/Field.h>
 #include <Gui/UI/Widgets/Label.h>
 
 namespace spades {
@@ -53,56 +52,40 @@ namespace spades {
 		};
 
 		/**
-		 * The KV6 editor's entry point: a filesystem explorer tab that browses
-		 * folders and voxel model files and launches the editor on the chosen one.
+		 * The KV6 editor's entry point in the main menu: a `FileBrowserView` over
+		 * the whole filesystem that launches the editor on the chosen model.
 		 *
-		 * A self-contained panel so the main menu only has to place it in the tab
-		 * strip; all browser state and actions live here rather than in the menu.
+		 * Everything browser-shaped lives in the shared component, so this panel
+		 * only supplies the model file types, the "New" action, and what to do with
+		 * the path that comes back.
 		 */
 		class KV6BrowserPanel : public ui::UIElement {
 			MainScreenHelper* helper;  // weak; provides OpenKV6Editor
 			ui::UIElement* modalOwner; // weak; modal dialogs disable and cover it
 			Handle<KV6ScreenHelper> fs;
+			FileBrowserView* browser; // weak; owned as a child
 
-			ui::Field* pathField; // weak; owned as a child
-			ui::ListView* list;   // weak; owned as a child
-			Handle<EditorListModel> currentModel;
-
-			std::string dir;              // current folder (absolute)
-			std::string selected;         // selected entry name within `dir`
-			bool selectedIsFolder = false;
-
-			std::string Child(const std::string& name) const;
-			// Error message if `name` cannot be created in `dir`, else empty.
-			std::string ValidateNewName(const std::string& name) const;
-			// `name` with the .kv6 extension appended if it lacks one.
-			static std::string ModelFileName(const std::string& name);
-			void Reload();
 			void OpenModel(const std::string& absPath, bool isNew);
-			void NotImplemented();
-
-			void OnItemActivated(const std::string& name, bool isFolder);
-			void OnItemDoubleClicked(const std::string& name, bool isFolder);
-			void OnHome(ui::UIElement& sender);
-			void OnUp(ui::UIElement& sender);
-			void OnNewFolder(ui::UIElement& sender);
-			void OnNewFolderClosed(ui::UIElement& sender);
-			void OnNewModel(ui::UIElement& sender);
+			void OnEntryRejected(const FileBrowserEntry& entry);
+			void OnNewModel();
 			void OnNewModelTypeClosed(ui::UIElement& sender);
 			void OnNewModelNameClosed(ui::UIElement& sender);
-			void OnDelete(ui::UIElement& sender);
-			void OnDeleteClosed(ui::UIElement& sender);
+
+			/** Error message if `name` cannot be created in the browsed folder. */
+			std::string ValidateNewName(const std::string& name) const;
+			/** `name` with the .kv6 extension appended if it lacks one. */
+			static std::string ModelFileName(const std::string& name);
 
 		public:
 			KV6BrowserPanel(ui::UIManager* manager, MainScreenHelper* helper,
 			                ui::UIElement* modalOwner, float contentsLeft, float contentsWidth,
 			                float headerPos, float headerHeight, float listPos, float footerPos);
 
-			/** Navigate to / open the absolute path typed in the field (on Enter). */
-			void SubmitPath();
+			/** React to Enter: open the selected model, or the typed path. */
+			void SubmitDefault();
 
 			/** Rebuild the listing; call when the tab becomes visible. */
-			void Refresh() { Reload(); }
+			void Refresh();
 		};
 	} // namespace gui
 } // namespace spades

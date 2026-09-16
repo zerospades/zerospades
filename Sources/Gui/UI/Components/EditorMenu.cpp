@@ -35,19 +35,37 @@
 namespace spades {
     namespace gui {
         namespace {
-            const char* kMenuItems[4] = {"Resume", "Save", "Save As...", "Exit to Menu"};
-
-            bool EndsWithIgnoreCase(const std::string& s, const std::string& suffix) {
-                return s.size() >= suffix.size() &&
-                       EqualsIgnoringCase(s.substr(s.size() - suffix.size()), suffix);
-            }
+            const float kItemW = 260.0F;
+            const float kItemH = 36.0F;
+            const float kItemPitch = 44.0F;
         } // namespace
 
         EditorMenu::EditorMenu(IEditorMenuHost& h, client::IRenderer& r, client::FontManager& fm,
                                SoftwareCursor& c, client::IAudioDevice* ad)
             : host(h), renderer(&r), fontManager(&fm), cursor(c), audioDevice(ad) {}
 
-        void EditorMenu::Open() { menuOpen = true; selectedItem = 0; }
+        void EditorMenu::Open() {
+            RebuildItems();
+            menuOpen = true;
+            selectedItem = 0;
+        }
+
+        void EditorMenu::RebuildItems() {
+            items.clear();
+            items.push_back(EditorMenuItem{"Resume", [this] { menuOpen = false; }, true});
+            for (EditorMenuItem& item : host.GetMenuItems())
+                items.push_back(std::move(item));
+        }
+
+        void EditorMenu::Activate(int index) {
+            if (index < 0 || index >= int(items.size()) || !items[index].enabled)
+                return;
+            // The command may open a prompt of its own, so close the menu first.
+            std::function<void()> run = items[index].run;
+            menuOpen = false;
+            if (run)
+                run();
+        }
         void EditorMenu::Close() { menuOpen = false; }
 
         void EditorMenu::OpenTextPrompt(const std::string& title, const std::string& initial,
@@ -61,13 +79,12 @@ namespace spades {
         int EditorMenu::MenuButtonAt(const Vector2& p) const {
             float sw = renderer->ScreenWidth();
             float sh = renderer->ScreenHeight();
-            float w = 260.0F;
-            float x = (sw - w) * 0.5F;
-            float y = sh * 0.5F - 110.0F + 44.0F;
-            for (int i = 0; i < 4; i++) {
-                if (OverlayInRect(p, x, y, w, 36.0F))
+            float x = (sw - kItemW) * 0.5F;
+            float y = sh * 0.5F - 110.0F + kItemPitch;
+            for (int i = 0; i < int(items.size()); i++) {
+                if (OverlayInRect(p, x, y, kItemW, kItemH))
                     return i;
-                y += 44.0F;
+                y += kItemPitch;
             }
             return -1;
         }
@@ -77,14 +94,14 @@ namespace spades {
             OverlayColorNP(*renderer, MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
             OverlayFillRect(*renderer, 0, 0, sw, sh);
 
-            float w = 260.0F;
-            float x = (sw - w) * 0.5F;
+            float x = (sw - kItemW) * 0.5F;
             float y = sh * 0.5F - 110.0F;
 
             std::string title = host.GetMenuTitle();
             Vector2 sz = font.Measure(title);
-            font.Draw(title, MakeVector2(x + (w - sz.x) * 0.5F, y), 1.0F, MakeVector4(1, 1, 1, 1));
-            y += 44.0F;
+            font.Draw(title, MakeVector2(x + (kItemW - sz.x) * 0.5F, y), 1.0F,
+                      MakeVector4(1, 1, 1, 1));
+            y += kItemPitch;
 
             int hover = MenuButtonAt(cursor.GetPosition());
             if (hover >= 0)
@@ -97,11 +114,12 @@ namespace spades {
                 prevSelectedItem = selectedItem;
             }
 
-            for (int i = 0; i < 4; i++) {
-                widgets::PaintButton(*renderer, font, MakeVector2(x, y), MakeVector2(w, 36.0F),
-                                     kMenuItems[i], MakeVector2(0.5F, 0.5F), "",
-                                     MakeVector2(1.0F, 0.5F), true, selectedItem == i, false, false);
-                y += 44.0F;
+            for (int i = 0; i < int(items.size()); i++) {
+                widgets::PaintButton(*renderer, font, MakeVector2(x, y),
+                                     MakeVector2(kItemW, kItemH), items[i].caption,
+                                     MakeVector2(0.5F, 0.5F), "", MakeVector2(1.0F, 0.5F),
+                                     items[i].enabled, selectedItem == i, false, false);
+                y += kItemPitch;
             }
         }
 
@@ -156,31 +174,17 @@ namespace spades {
                 if (!down)
                     return true;
                 if (key == "Escape") { menuOpen = false; return true; }
-                if (key == "Up") { selectedItem = (selectedItem + 3) % 4; return true; }
-                if (key == "Down") { selectedItem = (selectedItem + 1) % 4; return true; }
+                int count = int(items.size());
+                if (key == "Up") { selectedItem = (selectedItem + count - 1) % count; return true; }
+                if (key == "Down") { selectedItem = (selectedItem + 1) % count; return true; }
                 if (key == "Enter" || key == "LeftMouseButton") {
                     int b = (key == "LeftMouseButton") ? MenuButtonAt(cursor.GetPosition()) : selectedItem;
-                    if (b >= 0 && audioDevice) {
+                    if (b >= 0 && items[b].enabled && audioDevice) {
                         Handle<client::IAudioChunk> chunk(
                             audioDevice->RegisterSound("Sounds/Feedback/Limbo/Select.opus"));
                         audioDevice->PlayLocal(chunk.GetPointerOrNull(), client::AudioParam());
                     }
-                    if (b == 0) menuOpen = false;                                   // Resume
-                    else if (b == 1) { host.SaveDocument(host.GetDocumentPath()); menuOpen = false; } // Save
-                    else if (b == 2) {                                              // Save As
-                        std::string ext = host.GetDocumentExtension();
-                        OpenTextPrompt("Save As (full path)", host.GetDocumentPath(),
-                            [this, ext](const std::string& p) {
-                                std::string path = p;
-                                if (!path.empty()) {
-                                    if (!EndsWithIgnoreCase(path, ext))
-                                        path += ext;
-                                    host.SaveDocument(path);
-                                }
-                            });
-                    } else if (b == 3) {
-                        host.RequestClose();
-                    }
+                    Activate(b);
                     return true;
                 }
                 return true;   // swallow everything else while the menu is open (matches old behavior)

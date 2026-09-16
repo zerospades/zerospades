@@ -64,8 +64,12 @@ namespace spades {
 		// Restores renderer's state (game map, fog color)
 		// after returning from the game client.
 		void MainScreen::RestoreRenderer() {
-			if (ui)
+			if (ui) {
 				ui->SetupRenderer();
+				// A subview may have written files the visible tab lists (a saved
+				// model, a recorded demo), so the listing is re-read here.
+				ui->OnReturnedToMenu();
+			}
 		}
 
 		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew,

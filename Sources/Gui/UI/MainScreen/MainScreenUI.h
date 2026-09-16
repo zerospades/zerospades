@@ -76,6 +76,9 @@ namespace spades {
 
 			void SetupRenderer();
 
+			/** Called when a subview (game, demo, editor) returns to the menu. */
+			void OnReturnedToMenu();
+
 			void MouseEvent(float x, float y);
 			void WheelEvent(float x, float y);
 			void KeyEvent(const std::string& key, bool down);

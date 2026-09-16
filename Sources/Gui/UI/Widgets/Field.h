@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/UI/Framework/UIElement.h>
 
 namespace spades {
@@ -40,10 +41,7 @@ namespace spades {
 			};
 
 			/** Which end of an over-long text is elided with ".." while not focused. */
-			enum class FieldElision {
-				End,  // "/Users/name/Libr.."  (keeps the beginning)
-				Start // "..Resources/kv6/gun" (keeps the end, e.g. paths)
-			};
+			using FieldElision = TextElision;
 
 			/**
 			 * A single-line editable text field with selection, clipboard, IME and

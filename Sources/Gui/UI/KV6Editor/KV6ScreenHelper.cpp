@@ -20,7 +20,6 @@
 
 #include "KV6ScreenHelper.h"
 
-#include <algorithm>
 #include <cstdio>
 
 #include <Core/LocalFileSystem.h>
@@ -32,76 +31,24 @@ namespace spades {
 	namespace gui {
 		namespace fs = LocalFileSystem;
 
-		namespace {
-			// Model files the explorer lists (.kv6 is editable; .2kv6/.vxl are
-			// shown but not yet supported).
-			bool IsModelFile(const std::string& s) {
-				return fs::HasExtension(s, ".kv6") || fs::HasExtension(s, ".2kv6") ||
-				       fs::HasExtension(s, ".vxl");
-			}
+		const std::vector<std::string>& KV6ModelExtensions() {
+			// .kv6 is editable; .2kv6/.vxl are listed but not supported yet.
+			static const std::vector<std::string> extensions = {".kv6", ".2kv6", ".vxl"};
+			return extensions;
+		}
 
-			std::string ToLower(const std::string& s) {
-				std::string out = s;
-				for (char& c : out)
-					c = (c >= 'A' && c <= 'Z') ? char(c - 'A' + 'a') : c;
-				return out;
-			}
-
-			// Names of the entries in `absDir` matching `wantFolders`/`accept`,
-			// sorted case-insensitively.
-			template <class Pred>
-			std::vector<std::string> ListNames(const std::string& absDir, bool wantFolders,
-			                                   Pred accept) {
-				std::vector<fs::DirEntry> entries;
-				fs::ListDirectory(absDir, entries, false);
-				std::vector<std::string> out;
-				for (const fs::DirEntry& e : entries) {
-					if (e.isFolder == wantFolders && accept(e.name))
-						out.push_back(e.name);
-				}
-				std::sort(out.begin(), out.end(), [](const std::string& a, const std::string& b) {
-					return ToLower(a) < ToLower(b);
-				});
-				return out;
-			}
-		} // namespace
+		bool KV6IsEditable(const std::string& name) { return fs::HasExtension(name, ".kv6"); }
 
 		KV6ScreenHelper::KV6ScreenHelper() {
 			// Home is a dedicated `kv6/` folder inside the app-data dir (alongside
 			// Mods/, Demos/, ...), created on demand. The parent already exists (the
-			// game creates it at startup), so a single mkdir is enough. The explorer
-			// can still browse freely up to the filesystem root from there.
+			// game creates it at startup), so a single mkdir is enough.
 			defaultDirAbs = fs::Join(std::string(spades::g_userResourceDirectory), "kv6");
 			if (!fs::IsFolder(defaultDirAbs))
 				fs::CreateFolder(defaultDirAbs);
 		}
 
 		KV6ScreenHelper::~KV6ScreenHelper() {}
-
-		std::vector<std::string> KV6ScreenHelper::GetFolders(const std::string& absDir) {
-			return ListNames(absDir, true, [](const std::string&) { return true; });
-		}
-
-		std::vector<std::string> KV6ScreenHelper::GetFiles(const std::string& absDir) {
-			return ListNames(absDir, false, IsModelFile);
-		}
-
-		bool KV6ScreenHelper::Exists(const std::string& absPath) { return fs::Exists(absPath); }
-		bool KV6ScreenHelper::IsFolder(const std::string& absPath) { return fs::IsFolder(absPath); }
-
-		int64_t KV6ScreenHelper::GetFileSize(const std::string& absPath) {
-			return fs::GetFileSize(absPath);
-		}
-
-		bool KV6ScreenHelper::CreateFolder(const std::string& absPath) {
-			return fs::CreateFolder(absPath);
-		}
-
-		bool KV6ScreenHelper::Delete(const std::string& absPath) { return fs::Delete(absPath); }
-
-		bool KV6ScreenHelper::Rename(const std::string& absOld, const std::string& absNew) {
-			return fs::Rename(absOld, absNew, false);
-		}
 
 		std::string KV6ScreenHelper::DefaultDir() {
 			// Fall back to the app-data root if the kv6/ folder couldn't be created
@@ -110,10 +57,6 @@ namespace spades {
 			if (fs::IsFolder(defaultDirAbs))
 				return defaultDirAbs;
 			return std::string(spades::g_userResourceDirectory);
-		}
-
-		std::string KV6ScreenHelper::ParentDir(const std::string& absPath) {
-			return fs::ParentDir(absPath);
 		}
 
 		VoxelModel* KV6ScreenHelper::Load(const std::string& absPath) {

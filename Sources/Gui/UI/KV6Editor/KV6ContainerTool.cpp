@@ -29,6 +29,9 @@ namespace spades {
 		void ContainerTool::SetSubTool(IEditorContext& ed, int i) {
 			if (i == active || i < 0 || i >= int(subs.size()))
 				return;
+			// The outgoing sub-tool finishes what it had in progress first.
+			if (EditorTool* s = Cur())
+				s->OnDeactivate(ed);
 			active = i;
 			if (EditorTool* s = Cur())
 				s->OnActivate(ed);
@@ -37,6 +40,10 @@ namespace spades {
 		void ContainerTool::OnActivate(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->OnActivate(ed);
+		}
+		void ContainerTool::OnDeactivate(IEditorContext& ed) {
+			if (EditorTool* s = Cur())
+				s->OnDeactivate(ed);
 		}
 		void ContainerTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
 			if (EditorTool* s = Cur())

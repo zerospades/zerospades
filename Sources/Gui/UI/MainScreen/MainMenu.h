@@ -135,6 +135,12 @@ namespace spades {
 			float modsSizeColWidth;
 
 			void OnTabChanged(ui::UIElement& sender);
+
+		public:
+			/** Re-reads the listing of the tab currently on screen. */
+			void RefreshVisibleTab();
+
+		private:
 			int EnabledIndex(const std::vector<std::string>& enabled, const std::string& name);
 			void UpdateModsStatus();
 			void OnDownloadModsPressed(ui::UIElement& sender);
