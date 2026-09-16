@@ -285,16 +285,12 @@ namespace spades {
 					auto* db2 = db;
 
 					for (int x = lightWidth; x > 0; x--) {
-						Vector3 pos;
+						float pz = *db2;
+						float dz = pz - lightCenter.z;
+						float dx = vx2 * pz - lightCenter.x;
+						float dy = vy * pz - lightCenter.y;
 
-						pos.z = *db2;
-						pos.x = vx2 * pos.z;
-						pos.y = vy * pos.z;
-
-						pos -= lightCenter;
-
-						float dist = pos.GetSquaredLength();
-						dist *= invRadius2;
+						float dist = (dx * dx + dy * dy + dz * dz) * invRadius2;
 
 						if (dist < 1.0F) {
 							float strength = 1.0F - dist;
