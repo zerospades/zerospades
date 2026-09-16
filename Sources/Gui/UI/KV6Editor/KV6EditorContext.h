@@ -105,6 +105,24 @@ namespace spades {
 			virtual void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                                    const Vector4& color) = 0;
 			virtual void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) = 0;
+
+			// --- Pending placement (floating voxels) --------------------------
+			// Paste, import and move park their voxels here first: nothing reaches
+			// the document until the placement is applied, so dragging voxels over
+			// others never destroys what they pass across. Leaving the Move tool
+			// applies the placement; Escape drops it.
+			virtual bool HasPlacement() const = 0;
+			/** Lifts the selection into a placement; false if nothing solid is selected. */
+			virtual bool BeginPlacementFromSelection() = 0;
+			virtual void MovePlacement(int dx, int dy, int dz) = 0;
+			/** Centre of the pending voxels, for a gizmo; false if none pending. */
+			virtual bool PlacementCentroid(Vector3& out) const = 0;
+			/** Writes the pending voxels into the document as one undo step. */
+			virtual void ApplyPlacement() = 0;
+			/** Drops the pending voxels, changing nothing. */
+			virtual void CancelPlacement() = 0;
+			/** Outlines the pending voxels as they would land `d` voxels further on. */
+			virtual void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) = 0;
 			// Opaque, shaded cube of half-size `half` centred at `center` (a solid
 			// gizmo handle). This is a 2D overlay fill, so call it from a tool's
 			// DrawOverlay (not DrawScene).

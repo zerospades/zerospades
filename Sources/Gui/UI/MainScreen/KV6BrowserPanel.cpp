@@ -34,6 +34,14 @@
 
 DEFINE_SPADES_SETTING(cl_kv6EditorFolder, ""); // remembered folder (absolute)
 
+namespace {
+	// The tab's own layout: the action row sits at y=200 and the list header at
+	// `headerPos`, with the browser's error line fitting under the list.
+	const float kActionRowY = 200.0F;
+	const float kActionRowH = 30.0F;
+	const float kErrorRowH = 25.0F;
+} // namespace
+
 namespace spades {
 	namespace gui {
 		using ui::Button;
@@ -136,110 +144,71 @@ namespace spades {
 
 			SetBounds(AABB2(0.0F, 0.0F, manager->screenWidth, manager->screenHeight));
 
-			// Restore the last-used folder; fall back to the home (data) folder if
-			// unset or gone.
-			dir = static_cast<std::string>(cl_kv6EditorFolder);
-			if (dir.empty() || !fs->IsFolder(dir))
-				dir = fs->DefaultDir();
-
-			{
-				Handle<Field> field = Handle<Field>::New(manager);
-				pathField = field.GetPointerOrNull();
-				pathField->SetBounds(AABB2(contentsLeft, 200.0F, contentsWidth - 480.0F, 30.0F));
-				pathField->placeholder = _Tr("MainScreen", "Type a path and press [Enter]");
-				// The end of a path (current folder / file name) matters most.
-				pathField->elision = ui::FieldElision::Start;
-				AddChild(pathField);
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "Home");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 470.0F, 200.0F, 55.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnHome(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "Up");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 410.0F, 200.0F, 55.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnUp(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "New Folder");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 350.0F, 200.0F, 100.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnNewFolder(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "New");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 245.0F, 200.0F, 105.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnNewModel(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "Delete");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 135.0F, 200.0F, 135.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnDelete(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Label> header = Handle<Label>::New(manager);
-				header->text = _Tr("MainScreen", "Name");
-				header->SetBounds(AABB2(contentsLeft, headerPos, contentsWidth, headerHeight));
-				header->alignment = MakeVector2(0.0F, 0.5F);
-				AddChild(header.GetPointerOrNull());
-			}
-			{
-				Handle<ListView> listView = Handle<ListView>::New(manager);
-				list = listView.GetPointerOrNull();
-				list->SetBounds(
-				    AABB2(contentsLeft, listPos, contentsWidth, footerPos - listPos - 44.0F));
-				AddChild(list);
-			}
-
-			Reload();
-		}
-
-		std::string KV6BrowserPanel::Child(const std::string& name) const {
-			if (dir.empty())
-				return name;
-			char last = dir[dir.size() - 1];
-			if (last == '/' || last == '\\')
-				return dir + name;
-			return dir + "/" + name;
-		}
-
-		void KV6BrowserPanel::Reload() {
-			// Folders first, then files.
-			std::vector<EditorEntry> entries;
-			for (const std::string& name : fs->GetFolders(dir))
-				entries.push_back(EditorEntry{name, true});
-			for (const std::string& name : fs->GetFiles(dir))
-				entries.push_back(EditorEntry{name, false});
-
-			Handle<EditorListModel> model =
-			    Handle<EditorListModel>::New(&GetManager(), std::move(entries));
-			model->itemActivated = [this](const std::string& n, bool f) { OnItemActivated(n, f); };
-			model->itemDoubleClicked = [this](const std::string& n, bool f) {
-				OnItemDoubleClicked(n, f);
+			FileBrowserOptions options;
+			options.purpose = FileBrowserPurpose::Open;
+			options.target = FileBrowserTarget::Files;
+			// Restore the last-used folder; the browser falls back to Home if it is
+			// gone.
+			options.initialDir = static_cast<std::string>(cl_kv6EditorFolder);
+			options.homeDir = fs->DefaultDir();
+			options.filters.push_back(
+			  FileFilter{_Tr("MainScreen", "Voxel models"), KV6ModelExtensions()});
+			options.allowCreateFolder = true;
+			options.allowRename = true;
+			options.allowDelete = true;
+			options.showFooter = false;    // the tab itself has no OK/Cancel row
+			options.showListHeader = true; // "Name", like the other tabs
+			// Line the rows up with the tab's own layout (action row, header, list).
+			options.listTopGap = headerPos - kActionRowY - kActionRowH;
+			// Only .kv6 can be edited so far; the rest are listed but greyed out.
+			options.describeEntry = [](const LocalFileSystem::DirEntry& entry) {
+				FileEntryInfo info;
+				if (!entry.isFolder && !KV6IsEditable(entry.name)) {
+					info.accepted = false;
+					info.hint = _Tr("MainScreen", "(not implemented)");
+				}
+				return info;
 			};
-			list->SetModel(model.GetPointerOrNull());
-			currentModel = model;
+			{
+				FileBrowserAction action;
+				action.caption = _Tr("MainScreen", "New");
+				action.width = 105.0F;
+				action.run = [this] { OnNewModel(); };
+				options.extraActions.push_back(std::move(action));
+			}
 
-			pathField->SetText(dir);
-			cl_kv6EditorFolder = dir; // remember for next time
-			selected = "";
-			selectedIsFolder = false;
+			Handle<FileBrowserView> view =
+			  Handle<FileBrowserView>::New(manager, std::move(options), modalOwner);
+			browser = view.GetPointerOrNull();
+			browser->SetBounds(AABB2(contentsLeft, kActionRowY, contentsWidth,
+			                         (footerPos - 44.0F + kErrorRowH) - kActionRowY));
+			browser->accepted = [this](const FileBrowserResult& result) {
+				if (!result.paths.empty())
+					OpenModel(result.paths.front(), false);
+			};
+			browser->directoryChanged = [](const std::string& dir) {
+				cl_kv6EditorFolder = dir; // remember for next time
+			};
+			browser->entryRejected = [this](const FileBrowserEntry& entry) {
+				OnEntryRejected(entry);
+			};
+			// Typing a path that does not exist yet creates that model, as the old
+			// explorer did.
+			browser->unknownPathSubmitted = [this](const std::string& path) {
+				OpenModel(ModelFileName(path), true);
+			};
+			AddChild(browser);
+
+			// The browser may have fallen back to another folder (the remembered one
+			// could be gone), and it settles that before anyone can subscribe.
+			cl_kv6EditorFolder = browser->GetDirectory();
+
+			(void)headerHeight;
+			(void)listPos;
 		}
+
+		void KV6BrowserPanel::SubmitDefault() { browser->SubmitDefault(); }
+		void KV6BrowserPanel::Refresh() { browser->Refresh(); }
 
 		void KV6BrowserPanel::OpenModel(const std::string& absPath, bool isNew) {
 			std::string msg = helper->OpenKV6Editor(absPath, isNew);
@@ -249,100 +218,28 @@ namespace spades {
 			}
 		}
 
-		void KV6BrowserPanel::NotImplemented() {
+		void KV6BrowserPanel::OnEntryRejected(const FileBrowserEntry&) {
 			Handle<AlertScreen> al = Handle<AlertScreen>::New(
-			    modalOwner,
-			    _Tr("MainScreen",
-			        "This file type is not supported yet. Only .kv6 files can be edited."),
-			    120.0F);
+			  modalOwner,
+			  _Tr("MainScreen", "This file type is not supported yet. Only .kv6 files can be edited."),
+			  120.0F);
 			al->Run();
-		}
-
-		void KV6BrowserPanel::OnItemActivated(const std::string& name, bool isFolder) {
-			selected = name;
-			selectedIsFolder = isFolder;
-			// Show the full path so the user can read or edit it directly.
-			pathField->SetText(Child(name) + (isFolder ? "/" : ""));
-		}
-
-		void KV6BrowserPanel::OnItemDoubleClicked(const std::string& name, bool isFolder) {
-			if (isFolder) {
-				dir = Child(name);
-				Reload();
-			} else if (!EditorIsEditable(name)) {
-				NotImplemented();
-			} else {
-				OpenModel(Child(name), false);
-			}
-		}
-
-		void KV6BrowserPanel::SubmitPath() {
-			std::string p = pathField->GetText();
-			// Trim trailing separators (but keep a lone root "/").
-			while (p.size() > 1 && (p[p.size() - 1] == '/' || p[p.size() - 1] == '\\'))
-				p.erase(p.size() - 1);
-
-			if (p.empty())
-				return;
-			if (fs->IsFolder(p)) {
-				dir = p;
-				Reload();
-				return;
-			}
-
-			if (EditorIsModelFile(p) && !EditorIsEditable(p)) {
-				NotImplemented();
-				return;
-			}
-			// Treat as a .kv6 file (open existing, or create if it does not exist).
-			if (!EditorIsEditable(p))
-				p += ".kv6";
-			OpenModel(p, !fs->Exists(p));
-		}
-
-		void KV6BrowserPanel::OnHome(UIElement&) {
-			dir = fs->DefaultDir();
-			Reload();
-		}
-
-		void KV6BrowserPanel::OnUp(UIElement&) {
-			dir = fs->ParentDir(dir);
-			Reload();
 		}
 
 		std::string KV6BrowserPanel::ValidateNewName(const std::string& name) const {
 			std::string reason;
 			if (!LocalFileSystem::IsValidFileName(name, &reason))
 				return reason;
-			if (LocalFileSystem::Exists(Child(name)))
+			if (LocalFileSystem::Exists(LocalFileSystem::Join(browser->GetDirectory(), name)))
 				return _Tr("MainScreen", "An item named '{0}' already exists.", name);
 			return std::string();
 		}
 
-		void KV6BrowserPanel::OnNewFolder(UIElement&) {
-			TextPromptScreen::Options options;
-			options.title = _Tr("MainScreen", "New Folder");
-			options.validate = [this](const std::string& name) { return ValidateNewName(name); };
-			Handle<TextPromptScreen> prompt =
-			    Handle<TextPromptScreen>::New(modalOwner, std::move(options));
-			prompt->closed = [this](UIElement& s) { OnNewFolderClosed(s); };
-			prompt->Run();
+		std::string KV6BrowserPanel::ModelFileName(const std::string& name) {
+			return KV6IsEditable(name) ? name : name + ".kv6";
 		}
 
-		void KV6BrowserPanel::OnNewFolderClosed(UIElement& sender) {
-			TextPromptScreen* p = dynamic_cast<TextPromptScreen*>(&sender);
-			if (!p || !p->GetResult())
-				return;
-			std::string error;
-			if (!LocalFileSystem::CreateFolder(Child(p->GetText()), &error)) {
-				Handle<AlertScreen> al = Handle<AlertScreen>::New(
-				    modalOwner, _Tr("MainScreen", "Could not create the folder: {0}", error));
-				al->Run();
-			}
-			Reload();
-		}
-
-		void KV6BrowserPanel::OnNewModel(UIElement&) {
+		void KV6BrowserPanel::OnNewModel() {
 			Handle<KV6ModelTypePrompt> prompt = Handle<KV6ModelTypePrompt>::New(modalOwner);
 			prompt->closed = [this](UIElement& s) { OnNewModelTypeClosed(s); };
 			prompt->Run();
@@ -382,28 +279,9 @@ namespace spades {
 			TextPromptScreen* p = dynamic_cast<TextPromptScreen*>(&sender);
 			if (!p || !p->GetResult())
 				return;
-			OpenModel(Child(ModelFileName(p->GetText())), true);
-		}
-
-		std::string KV6BrowserPanel::ModelFileName(const std::string& name) {
-			return EditorIsEditable(name) ? name : name + ".kv6";
-		}
-
-		void KV6BrowserPanel::OnDelete(UIElement&) {
-			if (selected.empty())
-				return;
-			Handle<ConfirmScreen> prompt = Handle<ConfirmScreen>::New(
-			    modalOwner, _Tr("MainScreen", "Delete '{0}'?", selected));
-			prompt->closed = [this](UIElement& s) { OnDeleteClosed(s); };
-			prompt->Run();
-		}
-
-		void KV6BrowserPanel::OnDeleteClosed(UIElement& sender) {
-			ConfirmScreen* p = dynamic_cast<ConfirmScreen*>(&sender);
-			if (!p || !p->GetResult() || selected.empty())
-				return;
-			fs->Delete(Child(selected));
-			Reload();
+			OpenModel(LocalFileSystem::Join(browser->GetDirectory(),
+			                                ModelFileName(p->GetText())),
+			          true);
 		}
 	} // namespace gui
 } // namespace spades

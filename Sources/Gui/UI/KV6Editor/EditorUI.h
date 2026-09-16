@@ -37,6 +37,7 @@ namespace spades {
 		class OptionBar;
 		class SoftwareCursor;
 		class Toolbar;
+		class UIOverlayHost;
 
 		/**
 		 * UI management for the KV6 editor.
@@ -47,7 +48,7 @@ namespace spades {
 			Handle<client::IRenderer> renderer;
 			Handle<client::IAudioDevice> audioDevice;
 			Handle<client::FontManager> fontManager;
-			Handle<ui::UIManager> uiManager;
+			std::unique_ptr<UIOverlayHost> overlay;
 
 			std::unique_ptr<Toolbar> toolbar;
 			std::unique_ptr<OptionBar> optionBar;
@@ -72,7 +73,7 @@ namespace spades {
 			client::IRenderer* GetRenderer() override { return &*renderer; }
 			client::IAudioDevice* GetAudioDevice() override { return &*audioDevice; }
 			client::FontManager& GetFontManager() override { return *fontManager; }
-			ui::UIManager& GetUIManager() override { return *uiManager; }
+			ui::UIManager& GetUIManager() override;
 
 			void MouseEvent(float x, float y) override;
 			void WheelEvent(float x, float y) override;
@@ -91,6 +92,8 @@ namespace spades {
 			OptionBar* GetOptionBar() { return optionBar.get(); }
 			ColorPicker* GetColorPicker() { return colorPicker.get(); }
 			EditorMenu* GetEditorMenu() { return editorMenu.get(); }
+			/** Hosts modal `spades::ui` dialogs (the file browser) over the editor. */
+			UIOverlayHost* GetOverlay() { return overlay.get(); }
 		};
 	} // namespace gui
 } // namespace spades
