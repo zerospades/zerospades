@@ -93,14 +93,15 @@ namespace spades {
 			// Project a world point to screen pixels. `ok` is false if behind the camera.
 			Vector2 WorldToScreen(const Vector3& w, bool& ok) const override;
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
-			// Selection move (used by the move gizmo).
+			// Pending placement (positioned by the Transform tool).
 			bool HasPlacement() const override { return placementActive; }
 			bool BeginPlacementFromSelection() override;
-			void MovePlacement(int dx, int dy, int dz) override;
-			bool PlacementCentroid(Vector3& out) const override;
+			void TransformPlacement(const PlacementTransform& t) override;
+			bool PlacementPivot(IntVector3& out) const override;
 			void ApplyPlacement() override;
 			void CancelPlacement() override;
-			void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) override;
+			void DrawPlacementTransformed(const PlacementTransform& t,
+			                              const Vector4& color) override;
 			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
 			GizmoView GetGizmoView() const override;
 			void DrawGizmo(const TransformGizmo& gizmo) override;
@@ -113,7 +114,10 @@ namespace spades {
 			void AddSelect(int x, int y, int z) override;
 			bool IsSelected(int x, int y, int z) const override;
 			void ClearSelection() override;
-			int SelectionCount() const override { return int(selection.size()); }
+			// Voxels lifted by Transform are still what is selected; they only float.
+			int SelectionCount() const override {
+				return int(selection.size() + (placementActive ? placement.lifted.size() : 0));
+			}
 			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
 			void SelectLinkedColor(int x, int y, int z) override;
 
@@ -196,6 +200,9 @@ namespace spades {
 			KV6UndoStack undo{*this};
 			long savedGeomId = -1;
 			bool IsDirty() const { return undo.GeometryStateId() != savedGeomId; }
+			// What saving would change: the journaled edits, plus voxels still
+			// waiting to be placed somewhere new.
+			bool HasUnsavedChanges() const { return IsDirty() || PlacementChangesDocument(); }
 
 			// KV6UndoStack::Sink — apply primitives the stack replays on undo/redo.
 			void UndoApplyVoxel(int x, int y, int z, bool solid, uint32_t color) override;
@@ -249,35 +256,90 @@ namespace spades {
 			 * preview and written only when the placement is applied, which is what
 			 * keeps a move from destroying whatever it is dragged across. `lifted`
 			 * holds the document voxels to clear at that point (empty for a paste or
-			 * an import, which take nothing away).
+			 * an import, which take nothing away). A placement only ever sits
+			 * where it fits the model size limit, so applying it never fails.
 			 */
 			struct Placement {
-				std::vector<ClipVoxel> voxels; // relative to `anchor`
-				IntVector3 anchor;             // min corner, in document coords
+				// Relative to `anchor`. Parallel to `lifted` when that is not empty:
+				// voxel i was taken from lifted[i], whatever turns it made since.
+				std::vector<ClipVoxel> voxels;
+				IntVector3 anchor = IntVector3::Make(0, 0, 0); // min corner, document coords
+				// The voxel turns go round, in document coords. It starts at the
+				// middle of the voxels and moves only with a shift, so turning back
+				// always returns them exactly where they were.
+				IntVector3 pivot = IntVector3::Make(0, 0, 0);
 				std::vector<IntVector3> lifted;
-				std::string label = "Move"; // undo step name
+				// Whether some voxel would land elsewhere than where it was lifted.
+				bool displaced = false;
+				std::string label = "Transform"; // undo step name
 			};
 			bool placementActive = false;
 			Placement placement;
+			// Whether applying the placement would change the document: always for
+			// a paste or an import, and for a lifted selection once it is displaced.
+			bool PlacementChangesDocument() const {
+				return placementActive && (placement.lifted.empty() || placement.displaced);
+			}
+			// Starts `placement` as `voxels` (relative to `anchor`), pivoting about
+			// their middle; `lifted` names where each came from, if anywhere.
+			void BeginPlacement(std::vector<ClipVoxel> voxels, const IntVector3& anchor,
+			                    std::vector<IntVector3> lifted, const std::string& label);
+			// The placement `t` would make of the current one, kept within the model
+			// size limit (`clamped` says whether that held it back); false if it
+			// fits nowhere.
+			bool TransformedPlacement(const PlacementTransform& t, Placement& out,
+			                          bool& clamped) const;
+			// Voxels in the document, counting those lifted by Transform (they only float).
+			int DocumentVoxelCount() const {
+				return voxelCount + (placementActive ? int(placement.lifted.size()) : 0);
+			}
 			// The pending voxels as a renderable model, so they are drawn solid at
 			// their temporary position while the document shows the gap they left.
 			Handle<client::IModel> placementModel;
 			void RebuildPlacementModel();
-			// Take the pending voxels out of / put them back into the document
-			// without journaling: applying does the journaled edit in one step.
+			// Size of the box holding `voxels` (at least one voxel each way).
+			static IntVector3 ExtentOf(const std::vector<ClipVoxel>& voxels);
+			// Moves `anchor` to the nearest spot where `voxels` land without the
+			// document outgrowing the model size limit; false if none exists.
+			bool ClampPlacementAnchor(const std::vector<ClipVoxel>& voxels,
+			                          IntVector3& anchor) const;
+			// Take the lifted voxels, and their selection, out of / back into the
+			// document without journaling: applying does the journaled edit in one
+			// step, starting from the document exactly as it was before the lift.
 			void LiftPlacementVoxels();
 			void RestorePlacementVoxels();
+
+			/**
+			 * Scope of a command that edits the document or the selection, or reads
+			 * them as a whole (copy, save). The outermost one applies a pending
+			 * placement first, so the command acts on the document as it stands,
+			 * and tells the active tool once it is done, so Transform can lift what is
+			 * selected then. Nested commands (Cut copies) act as one.
+			 */
+			class DocumentCommand {
+			public:
+				explicit DocumentCommand(KV6EditorView& editor);
+				~DocumentCommand();
+				DocumentCommand(const DocumentCommand&) = delete;
+				DocumentCommand& operator=(const DocumentCommand&) = delete;
+
+			private:
+				KV6EditorView& editor;
+			};
+			int documentCommandDepth = 0;
+			// The document or the selection changed: let the active tool catch up.
+			void NotifyDocumentChanged();
 
 			void CopySelection();
 			bool CutSelection(); // returns false if it would empty the document
 			void StartPaste();
 			// Starts a placement of `voxels` with its min corner at `anchor`, and
-			// switches to the Move tool so it can be positioned.
+			// switches to the Transform tool so it can be positioned.
 			void StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
 			                    const IntVector3& anchor);
 			void DrawPlacementPreview();
-			// Switch to the placement Move sub-tool (where a placement is positioned).
-			bool ActivateMoveTool();
+			// Switch to the placement Transform sub-tool (where a placement is positioned).
+			bool ActivateTransformTool();
 			// Loads `path` and starts placing its voxels in the current document.
 			void ImportModel(const std::string& path);
 			/** Asks for a model with the shared file browser, then imports it. */
