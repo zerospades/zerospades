@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <Core/Math.h>
+#include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 
 #include "KV6ClickSequence.h"
 #include "KV6EditorTool.h"
@@ -123,7 +124,48 @@ namespace spades {
 		};
 
 		/**
-		 * Positions pending voxels by dragging a 3-axis gizmo, or with the arrow
+		 * Base for sub-tools driven by a transform gizmo.
+		 *
+		 * Routes the pointer to the gizmo (a left drag moves it; a right click or
+		 * Escape during a drag cancels), highlights and draws it, and leaves the
+		 * subclass to say where it sits and what a drag does to the document.
+		 */
+		class GizmoSubTool : public EditorTool {
+		public:
+			void OnActivate(IEditorContext&) override;
+			void OnDeactivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void CancelInteraction(IEditorContext&) override;
+			void DrawOverlay(IEditorContext&) override;
+
+		protected:
+			/** `translationStep`: the snap increment of a move, in voxels. */
+			explicit GizmoSubTool(float translationStep);
+
+			TransformGizmo gizmo;
+
+			/**
+			 * Where the gizmo is now: the handled thing's position with whatever
+			 * this drag already did to it applied. False hides the gizmo (nothing
+			 * to handle), and cancels a drag in progress.
+			 */
+			virtual bool CurrentPose(IEditorContext& ed, GizmoPose& pose) = 0;
+			virtual void OnGizmoBegin(IEditorContext&) {}
+			/** The drag moved on; `gizmo.Total()` and `gizmo.Step()` hold the change. */
+			virtual void OnGizmoDrag(IEditorContext&) {}
+			/** The drag was released after changing things by `total`. */
+			virtual void OnGizmoEnd(IEditorContext&, const GizmoTransform& total) { (void)total; }
+			/** The drag was abandoned; `undo` reverses every step it reported. */
+			virtual void OnGizmoCancel(IEditorContext&, const GizmoTransform& undo) { (void)undo; }
+
+		private:
+			bool SyncPose(IEditorContext& ed);
+			void CancelDrag(IEditorContext& ed);
+		};
+
+		/**
+		 * Positions pending voxels with the gizmo (whole voxels), or with the arrow
 		 * keys (Page Up/Down for the third axis).
 		 *
 		 * Entering the tool lifts the selection into a placement, and a paste or an
@@ -131,68 +173,54 @@ namespace spades {
 		 * document until the tool is left, so voxels dragged over others never
 		 * destroy them; Escape drops the placement instead.
 		 */
-		class MoveSubTool : public EditorTool {
+		class MoveSubTool : public GizmoSubTool {
 		public:
+			MoveSubTool();
 			const char* Label() const override { return "Move"; }
 			void OnActivate(IEditorContext&) override;
 			void OnDeactivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
 			bool OnEscape(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
-			void DrawOverlay(IEditorContext&) override;
 
-		private:
-			int grabAxis = -1;   // 0/1/2 while dragging a handle, else -1
-			Vector2 grabCursor;  // cursor at grab start
-			int curOffset = 0;   // current preview offset along grabAxis
-			int OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
-			// Axis whose handle the cursor is over (line or tip cube), else -1.
-			int HitAxis(IEditorContext& ed, const Vector3& c) const;
+		protected:
+			// A drag only previews: the placement moves once, on release.
+			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
+			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
 		};
 
-		// Move the model pivot by dragging a 3-axis gizmo, snapped to 0.1 steps.
-		// Voxels stay put; only the pivot moves. Commits on release.
-		class PivotGizmoSubTool : public EditorTool {
+		// Moves the model pivot with the gizmo, in 0.1 steps. Voxels stay put. The
+		// pivot follows the drag live and is committed as one undo step on release.
+		class PivotGizmoSubTool : public GizmoSubTool {
 		public:
+			PivotGizmoSubTool();
 			const char* Label() const override { return "Gizmo"; }
 			void OnActivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			bool OnEscape(IEditorContext&) override;
-			void DrawScene(IEditorContext&) override;
-			void DrawOverlay(IEditorContext&) override;
+
+		protected:
+			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
+			void OnGizmoBegin(IEditorContext& ed) override;
+			void OnGizmoDrag(IEditorContext& ed) override;
+			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
+			void OnGizmoCancel(IEditorContext& ed, const GizmoTransform& undo) override;
 
 		private:
-			int grabAxis = -1;  // 0/1/2 while dragging a handle, else -1
-			Vector2 grabCursor; // cursor at grab start
-			Vector3 grabPivot;  // pivot at grab start (drag is relative to this)
-			int HitAxis(IEditorContext& ed, const Vector3& c) const;
-			// Drag distance along `axis` in voxel units, snapped to 0.1.
-			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
+			Vector3 startPivot; // pivot at the grab
 		};
 
-		// Move the mirror planes by dragging a 3-axis gizmo, snapped to 0.5 — the
-		// step at which a reflection actually shifts. The planes follow the drag
-		// live; Escape during a drag takes it back.
-		class MirrorGizmoSubTool : public EditorTool {
+		// Moves the mirror planes with the gizmo, in 0.5 steps — the step at which
+		// a reflection actually shifts. The planes follow the drag live.
+		class MirrorGizmoSubTool : public GizmoSubTool {
 		public:
+			MirrorGizmoSubTool();
 			const char* Label() const override { return "Move"; }
 			void OnActivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			bool OnEscape(IEditorContext&) override;
-			void DrawScene(IEditorContext&) override;
-			void DrawOverlay(IEditorContext&) override;
 
-		private:
-			int grabAxis = -1;          // 0/1/2 while dragging a handle, else -1
-			Vector2 grabCursor;         // cursor at grab start
-			Vector3 grabAnchor;         // plane at grab start, to measure the drag on screen
-			float appliedOffset = 0.0F; // how far this drag has moved the plane so far
-			int HitAxis(IEditorContext& ed, const Vector3& c) const;
-			// Drag distance along `axis` in voxel units, snapped to 0.5.
-			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
-			// Move the plane along the grabbed axis so the drag's total is `offset`.
-			void ApplyOffset(IEditorContext& ed, float offset);
+		protected:
+			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
+			// Applied step by step, so a resize shifting the planes mid-drag stands.
+			void OnGizmoDrag(IEditorContext& ed) override;
+			void OnGizmoCancel(IEditorContext& ed, const GizmoTransform& undo) override;
 		};
 
 		// Set the pivot by typing exact values into a prompt.

@@ -84,7 +84,7 @@ namespace spades {
 			bool HasPick() const override { return pickHit; }
 			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
 			IntVector3 PickSolid() const override { return MakeIntVector3(pickHX, pickHY, pickHZ); }
-			Vector3 ViewDir() const override { return camFwd; }
+			Vector3 ViewDir() const override { return camera.forward; }
 			const Vector2& CursorPos() const override { return softwareCursor->GetPosition(); }
 			// Voxel whose centre is nearest where the cursor ray meets the plane
 			// (planePoint, normal). Lets tools place points in empty space.
@@ -102,6 +102,8 @@ namespace spades {
 			void CancelPlacement() override;
 			void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) override;
 			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
+			GizmoView GetGizmoView() const override;
+			void DrawGizmo(const TransformGizmo& gizmo) override;
 			bool InBounds(int x, int y, int z) const override;
 			VoxelModel& Model() override { return *model; }
 			uint32_t CurrentColor() const override { return currentColor; }
@@ -310,9 +312,9 @@ namespace spades {
 			bool pickHit = false;
 			int pickHX, pickHY, pickHZ; // solid voxel hit
 			int pickPX, pickPY, pickPZ; // adjacent empty cell (placement)
-			Vector3 camEye, camRight, camUp, camFwd;
-			float camFovX, camFovY, camSW, camSH; // camSW/SH = viewport size
-			float camVpX, camVpY;                 // viewport top-left (below the bars)
+			// The camera of the last frame drawn. Picking, projection, panning and
+			// the transform gizmo all go through it, so they agree on every pixel.
+			GizmoView camera;
 
 			// --- Camera -------------------------------------------------------
 			float yaw = -M_PI_F * 0.25F;
@@ -340,6 +342,8 @@ namespace spades {
 			PointerInput MakePointer(PointerButton b, PointerPhase ph,
 			                         const Vector2& delta = MakeVector2(0, 0)) const;
 			void DispatchPointer(const PointerInput& e);
+			// Drop the active tool's gesture in progress before acting behind its back.
+			void CancelToolInteraction();
 
 			// --- Cursor / status ----------------------------------------------
 			SoftwareCursor* softwareCursor = nullptr;
@@ -414,7 +418,7 @@ namespace spades {
 			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
 			// rotating cube whose faces are clickable to snap the view.
 			void DrawNaviCube();
-			// Filled triangle (corner bevels), via horizontal parallelogram strips.
+			// Hard-edged filled triangle, for shapes tiled from several triangles.
 			void FillTri(const Vector2& a, const Vector2& b, const Vector2& c, const Vector4& col);
 			// View direction for the cursor's spot on the cube (face / bevel edge /
 			// corner -> ortho / 45deg / isometric). Returns false if not over the cube.
