@@ -496,8 +496,8 @@ namespace spades {
 			} else if (e.IsDrag()) {
 				if (grabAxis < 0)
 					return;
-				// Move the pivot for real (marker, mirror planes and the toolbar
-				// readout all follow) but without journaling it.
+				// Move the pivot for real (marker and toolbar readout follow) but
+				// without journaling it.
 				float off = OffsetAlong(ed, grabPivot, grabAxis);
 				ed.PreviewPivot(grabPivot + AxisUnit(grabAxis) * off);
 			} else if (e.IsUp()) {
@@ -531,6 +531,110 @@ namespace spades {
 
 		void PivotGizmoSubTool::DrawOverlay(IEditorContext& ed) {
 			Vector3 c = ed.GetPivot();
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
+			for (int a = 0; a < 3; a++) {
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
+			}
+		}
+
+		// --- MirrorGizmoSubTool (drag the mirror planes) ---------------------
+
+		void MirrorGizmoSubTool::OnActivate(IEditorContext& ed) {
+			grabAxis = -1;
+			ed.SetStatus("Mirror: drag a handle to move the planes (0.5 steps)");
+		}
+
+		int MirrorGizmoSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
+			bool ok0;
+			Vector2 s0 = ed.WorldToScreen(c, ok0);
+			if (!ok0)
+				return -1;
+			Vector2 cur = ed.CursorPos();
+			int best = -1;
+			float bestDist = 14.0F; // pixels
+			for (int a = 0; a < 3; a++) {
+				bool ok1;
+				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
+				if (!ok1)
+					continue;
+				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
+				if (d < bestDist) { bestDist = d; best = a; }
+			}
+			return best;
+		}
+
+		float MirrorGizmoSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c,
+		                                      int axis) const {
+			bool ok1, ok2;
+			Vector2 s0 = ed.WorldToScreen(c, ok1);
+			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
+			if (!ok1 || !ok2)
+				return 0.0F;
+			Vector2 da = sa - s0;
+			float dl = da.GetLength();
+			if (dl < 0.5F)
+				return 0.0F; // axis ~parallel to the view
+			Vector2 m = ed.CursorPos() - grabCursor;
+			float raw = Vector2::Dot(m, da) / (dl * dl);
+			return std::round(raw * 2.0F) * 0.5F; // snap to 0.5
+		}
+
+		void MirrorGizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			if (!e.IsLeft())
+				return;
+			if (e.IsDown()) {
+				Vector3 c = ed.MirrorPlane();
+				int best = HitAxis(ed, c);
+				if (best >= 0) {
+					grabAxis = best;
+					grabCursor = ed.CursorPos();
+					grabAnchor = c;
+					appliedOffset = 0.0F;
+				}
+			} else if (e.IsDrag()) {
+				if (grabAxis < 0)
+					return;
+				// The planes are editor state, not document state, so the drag moves
+				// them directly, with nothing to journal.
+				ApplyOffset(ed, OffsetAlong(ed, grabAnchor, grabAxis));
+			} else if (e.IsUp()) {
+				grabAxis = -1;
+			}
+		}
+
+		void MirrorGizmoSubTool::ApplyOffset(IEditorContext& ed, float offset) {
+			// Only the change since the last step is added onto the live plane, never
+			// an absolute position rebuilt from the grab: an undo or redo mid-drag
+			// can resize the volume and shift the plane, and that shift must stand.
+			float delta = offset - appliedOffset;
+			if (delta == 0.0F)
+				return;
+			ed.SetMirrorPlane(ed.MirrorPlane() + AxisUnit(grabAxis) * delta);
+			appliedOffset = offset;
+		}
+
+		bool MirrorGizmoSubTool::OnEscape(IEditorContext& ed) {
+			if (grabAxis < 0)
+				return false;
+			ApplyOffset(ed, 0.0F); // take back what this drag moved, nothing more
+			grabAxis = -1;
+			return true;
+		}
+
+		void MirrorGizmoSubTool::DrawScene(IEditorContext& ed) {
+			Vector3 c = ed.MirrorPlane();
+			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
+			for (int a = 0; a < 3; a++) {
+				bool active = (grabAxis == a) || (hover == a);
+				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
+				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
+			}
+		}
+
+		void MirrorGizmoSubTool::DrawOverlay(IEditorContext& ed) {
+			Vector3 c = ed.MirrorPlane();
 			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
 			for (int a = 0; a < 3; a++) {
 				bool active = (grabAxis == a) || (hover == a);

@@ -83,8 +83,6 @@ namespace spades {
 			virtual int SelectionCount() const = 0;
 			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
 			virtual void SelectLinkedColor(int x, int y, int z) = 0;
-			virtual bool SelectionCentroid(Vector3& out) const = 0;
-			virtual void MoveSelection(int dx, int dy, int dz) = 0;
 			// Add every solid voxel in [lo, hi] to the selection.
 			virtual void SelectBox(const IntVector3& lo, const IntVector3& hi) = 0;
 			// Add / remove the solid voxels among `cells`.
@@ -100,11 +98,22 @@ namespace spades {
 			virtual void DrawCellOutline(int x, int y, int z, const Vector4& color) = 0;
 			virtual void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
 			                            const Vector4& color) = 0;
+			// --- Mirror modelling ---------------------------------------------
+			// Which axes reflect, and the plane each reflects across (in voxel
+			// coordinates). Held by the editor rather than by a tool, so an edit
+			// mirrors whichever tool made it.
+			virtual bool MirrorEnabled(int axis) const = 0;
+			virtual void SetMirrorEnabled(int axis, bool on) = 0;
+			virtual Vector3 MirrorPlane() const = 0;
+			/** Moves the planes; each coordinate is quantised to 0.5. */
+			virtual void SetMirrorPlane(const Vector3& plane) = 0;
+			/** Puts the planes back on the pivot, where they start. */
+			virtual void ResetMirrorPlane() = 0;
+
 			// As above, but also drawing the mirror images for the enabled axes.
 			virtual void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) = 0;
 			virtual void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                                    const Vector4& color) = 0;
-			virtual void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) = 0;
 
 			// --- Pending placement (floating voxels) --------------------------
 			// Paste, import and move park their voxels here first: nothing reaches
@@ -130,8 +139,9 @@ namespace spades {
 
 			// --- Pivot --------------------------------------------------------
 			// The model's pivot point (in editor grid coordinates). Moving it keeps
-			// the voxels fixed; the pivot marker / mirror planes follow and it is
-			// written to the file on save. Float-valued.
+			// the voxels fixed; the pivot marker follows and it is written to the
+			// file on save. The mirror planes start here but do not follow (see
+			// ResetMirrorPlane). Float-valued.
 			virtual Vector3 GetPivot() const = 0;
 			virtual void SetPivot(const Vector3& pivot) = 0;
 			// Move the pivot live without recording undo — for a drag in progress.

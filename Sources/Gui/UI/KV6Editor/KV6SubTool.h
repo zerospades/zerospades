@@ -152,7 +152,7 @@ namespace spades {
 		};
 
 		// Move the model pivot by dragging a 3-axis gizmo, snapped to 0.1 steps.
-		// Voxels stay put; only the pivot/mirror anchor moves. Commits on release.
+		// Voxels stay put; only the pivot moves. Commits on release.
 		class PivotGizmoSubTool : public EditorTool {
 		public:
 			const char* Label() const override { return "Gizmo"; }
@@ -169,6 +169,30 @@ namespace spades {
 			int HitAxis(IEditorContext& ed, const Vector3& c) const;
 			// Drag distance along `axis` in voxel units, snapped to 0.1.
 			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
+		};
+
+		// Move the mirror planes by dragging a 3-axis gizmo, snapped to 0.5 — the
+		// step at which a reflection actually shifts. The planes follow the drag
+		// live; Escape during a drag takes it back.
+		class MirrorGizmoSubTool : public EditorTool {
+		public:
+			const char* Label() const override { return "Move"; }
+			void OnActivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
+			bool OnEscape(IEditorContext&) override;
+			void DrawScene(IEditorContext&) override;
+			void DrawOverlay(IEditorContext&) override;
+
+		private:
+			int grabAxis = -1;          // 0/1/2 while dragging a handle, else -1
+			Vector2 grabCursor;         // cursor at grab start
+			Vector3 grabAnchor;         // plane at grab start, to measure the drag on screen
+			float appliedOffset = 0.0F; // how far this drag has moved the plane so far
+			int HitAxis(IEditorContext& ed, const Vector3& c) const;
+			// Drag distance along `axis` in voxel units, snapped to 0.5.
+			float OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const;
+			// Move the plane along the grabbed axis so the drag's total is `offset`.
+			void ApplyOffset(IEditorContext& ed, float offset);
 		};
 
 		// Set the pivot by typing exact values into a prompt.

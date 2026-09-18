@@ -35,6 +35,9 @@ namespace spades {
 		public:
 			int SubToolCount() const override { return int(subs.size()); }
 			const char* SubToolLabel(int i) const override { return subs[i]->Label(); }
+			EditorTool* SubTool(int i) override {
+				return (i >= 0 && i < int(subs.size())) ? subs[i].get() : nullptr;
+			}
 			int ActiveSubTool() const override { return active; }
 			void SetSubTool(IEditorContext&, int) override;
 

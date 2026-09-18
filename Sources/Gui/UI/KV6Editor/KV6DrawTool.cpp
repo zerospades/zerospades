@@ -35,11 +35,8 @@ namespace spades {
 			subs.push_back(std::unique_ptr<EditorTool>(new BlockSubTool()));
 			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", fill, erase, true)));
 
-			// Mirror each edit across the pivot plane for the enabled axes, then the
-			// brush colour swatch (opens the picker).
-			options.AddBool("mirror.x", "X", "Mirror");
-			options.AddBool("mirror.y", "Y", "Mirror");
-			options.AddBool("mirror.z", "Z", "Mirror");
+			// The brush colour swatch (opens the picker). Mirroring is the Mirror
+			// tool's business now; edits made here reflect whenever it is armed.
 			options.AddColor("color");
 
 			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after

@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -93,7 +94,6 @@ namespace spades {
 			Vector2 WorldToScreen(const Vector3& w, bool& ok) const override;
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			// Selection move (used by the move gizmo).
-			bool SelectionCentroid(Vector3& out) const override;
 			bool HasPlacement() const override { return placementActive; }
 			bool BeginPlacementFromSelection() override;
 			void MovePlacement(int dx, int dy, int dz) override;
@@ -101,8 +101,6 @@ namespace spades {
 			void ApplyPlacement() override;
 			void CancelPlacement() override;
 			void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) override;
-			void MoveSelection(int dx, int dy, int dz) override;
-			void DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) override;
 			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
 			bool InBounds(int x, int y, int z) const override;
 			VoxelModel& Model() override { return *model; }
@@ -144,6 +142,11 @@ namespace spades {
 			// 3D wireframe over the inclusive voxel range [lo, hi].
 			void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
 			                    const Vector4& color) override;
+			bool MirrorEnabled(int axis) const override;
+			void SetMirrorEnabled(int axis, bool on) override;
+			Vector3 MirrorPlane() const override { return mirrorPlane; }
+			void SetMirrorPlane(const Vector3& plane) override;
+			void ResetMirrorPlane() override;
 			// As above, but also drawing the mirror images for the enabled axes.
 			void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) override;
 			void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
@@ -254,6 +257,14 @@ namespace spades {
 			};
 			bool placementActive = false;
 			Placement placement;
+			// The pending voxels as a renderable model, so they are drawn solid at
+			// their temporary position while the document shows the gap they left.
+			Handle<client::IModel> placementModel;
+			void RebuildPlacementModel();
+			// Take the pending voxels out of / put them back into the document
+			// without journaling: applying does the journaled edit in one step.
+			void LiftPlacementVoxels();
+			void RestorePlacementVoxels();
 
 			void CopySelection();
 			bool CutSelection(); // returns false if it would empty the document
@@ -263,7 +274,7 @@ namespace spades {
 			void StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
 			                    const IntVector3& anchor);
 			void DrawPlacementPreview();
-			// Switch to the Move sub-tool (where a placement is positioned).
+			// Switch to the placement Move sub-tool (where a placement is positioned).
 			bool ActivateMoveTool();
 			// Loads `path` and starts placing its voxels in the current document.
 			void ImportModel(const std::string& path);
@@ -272,13 +283,25 @@ namespace spades {
 
 			// --- Colour picker (managed by ColorPicker component) ----------------
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
-			int colorOptionIdx = -1;  // tracks which tool option is being edited (-1 = none)
+			// What the open picker edits: the shared brush colour when null, else
+			// swatch `colorTargetOption` of that tool. Held by identity rather than
+			// by option index, since an index shifts as a tool's options change
+			// and names a different option in whichever tool is active when the
+			// picker reports.
+			EditorTool* colorTargetTool = nullptr;
+			std::string colorTargetOption;
 			bool pickMode = false; // for eyedropper tool (not color picker UI)
 
-			// --- Mirror modelling (reflect each edit across the pivot plane) ---
-			// The X/Y/Z toggles live in the active tool's options (Draw); the edit
-			// and preview code reads them through MirrorOn().
-			bool MirrorOn(int axis) const; // axis 0/1/2 -> mirror.x/y/z option
+			// --- Mirror modelling (reflect each edit across the mirror planes) ---
+			// Owned here rather than by a tool, so an edit mirrors whichever tool
+			// made it and the planes survive switching tools. The Mirror tool is
+			// the UI over this state.
+			bool mirrorEnabled[3] = {false, false, false};
+			// Plane position per axis, in voxel coordinates. Starts on the pivot.
+			// MirrorIdx only sees whole half steps, so SetMirrorPlane keeps it on
+			// that grid, and ReframeRaw shifts it along with the voxels.
+			Vector3 mirrorPlane = MakeVector3(0.0F, 0.0F, 0.0F);
+			bool MirrorOn(int axis) const; // shorthand for MirrorEnabled
 
 			// Orientation gizmo.
 			float gizCx, gizCy, gizR;
@@ -303,6 +326,10 @@ namespace spades {
 			bool keyUp = false, keyDown = false;
 			bool ctrlHeld = false, altHeld = false, shiftHeld = false;
 			bool keySprint = false; // cg_keySprint held (tracked like the modifiers)
+			// When the descend key went down, for the grace period that keeps a
+			// Ctrl chord from moving the camera at all.
+			float descendPressTime = 0.0F;
+			bool DescendKeyIsActive() const;
 			// Distance the Ctrl-bound descend key moved the view during the current
 			// Ctrl press; a Ctrl shortcut subtracts it so shortcuts don't move the view.
 			Vector3 ctrlDescent = MakeVector3(0.0F, 0.0F, 0.0F);
@@ -330,11 +357,14 @@ namespace spades {
 			int CountSolids();
 			void RebuildRenderModel();
 			void FrameCamera();
-			void Save();
+			/** Writes the document to its path; false if there is none, or on error. */
+			bool Save();
 
 			// Camera
 			Vector3 Forward() const;
 			Vector3 CameraEye() const;
+			// Far-plane / fog distance, scaled so zooming out never clips the scene.
+			float ViewDistance() const;
 			// Move the orbit target with cg_keyMove*, cg_keyJump (up) and
 			// cg_keyCrouch (down); faster while cg_keySprint is held.
 			void UpdateMovement(float dt);
@@ -345,8 +375,10 @@ namespace spades {
 			client::SceneDefinition SetupScene(float vpX, float vpY, float vpW, float vpH);
 
 			// Editing
-			int MirrorIdx(int i, float pivot) const;
-			// Append each cell's mirror images for the enabled axes (Draw edits).
+			// Index that voxel `i` reflects to across a mirror plane at `plane`.
+			int MirrorIdx(int i, float plane) const;
+			// Append each cell's mirror images for the enabled axes (Draw and Paint
+			// edits).
 			void ExpandMirrors(std::vector<IntVector3>& cells) const;
 			// Resize/relabel the volume. `ReframeRaw` does the work; `RebuildVolume`
 			// also journals it for undo (used by the live mutators).
@@ -407,9 +439,17 @@ namespace spades {
 			// --- Document commands behind the menu items ---
 			std::string GetDocumentPath() const { return filePath; }
 			std::string GetDocumentExtension() const { return ".kv6"; }
-			void SaveDocument(const std::string& path);
-			/** Asks for a path with the shared file browser, then saves to it. */
-			void OpenSaveAsDialog();
+			bool SaveDocument(const std::string& path);
+			/** Asks for a path with the shared file browser, then saves to it.
+			 *  `after` runs only once the document has actually been written. */
+			void OpenSaveAsDialog(std::function<void()> after = std::function<void()>());
+			/** Opens another model in place of this one, guarding unsaved changes. */
+			void OpenDocument();
+			/**
+			 * Runs `proceed` once it is safe to lose the current document: right
+			 * away when it is clean, otherwise after the user picks Save or Discard.
+			 */
+			void ConfirmDiscardChanges(std::function<void()> proceed);
 		};
 	} // namespace gui
 } // namespace spades

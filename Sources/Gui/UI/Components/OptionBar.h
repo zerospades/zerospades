@@ -40,7 +40,7 @@ namespace spades {
 		 */
 		class OptionBar {
 		public:
-			enum class OptionType { Bool, Color, Label };
+			enum class OptionType { Bool, Color, Label, Action };
 
 			struct Option {
 				std::string group;
@@ -60,6 +60,9 @@ namespace spades {
 			void SetSubToolButtons(const std::vector<SubToolButton>& buttons);
 			void SetOptions(const std::vector<Option>& options);
 
+			/** On-screen width of an option of this type. */
+			static float OptionWidth(OptionType type);
+
 			float OptionX(int index, float& outWidth) const;
 			float HitTest(const Vector2& p); // returns option index or -1.0
 			bool IsSubToolButtonHit(const Vector2& p, int& outIndex) const;
@@ -73,6 +76,7 @@ namespace spades {
 			std::function<void(int)> OnSubToolClicked;
 			std::function<void(int)> OnBoolToggled;
 			std::function<void(int)> OnColorClicked;
+			std::function<void(int)> OnActionClicked;
 
 		private:
 			client::IAudioDevice* audioDevice = nullptr;
