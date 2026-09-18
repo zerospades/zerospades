@@ -528,21 +528,10 @@ namespace spades {
 			}
 
 			std::string FieldBase::TruncateToFit(const std::string& t) const {
-				if (FitsInBox(t))
+				client::IFont* font = GetFont();
+				if (!font)
 					return t;
-
-				std::string suffix = "..";
-				int charLen = GetCharIndexForString(t, static_cast<int>(t.size()));
-
-				while (charLen > 0) {
-					charLen--;
-					int byteIdx = GetByteIndexForString(t, charLen);
-					std::string candidate = t.substr(0, byteIdx) + suffix;
-					if (FitsInBox(candidate))
-						return candidate;
-				}
-
-				return suffix;
+				return ElideText(*font, t, size.x - textOrigin.x, textScale, TextElision::End);
 			}
 
 			void FieldBase::Render() {

@@ -34,10 +34,8 @@ namespace spades {
 			subs.push_back(std::unique_ptr<EditorTool>(
 			  new RectSubTool("Rect", paint, paint, true, "Painted", "Painted")));
 
-			// Mirror each recolour across the pivot plane, then the brush swatch.
-			options.AddBool("mirror.x", "X", "Mirror");
-			options.AddBool("mirror.y", "Y", "Mirror");
-			options.AddBool("mirror.z", "Z", "Mirror");
+			// The brush swatch. Mirroring is the Mirror tool's business now;
+			// recolours made here reflect whenever it is armed.
 			options.AddColor("color");
 
 			// Sub-tools contributed by scripts (targeting Paint), appended after the

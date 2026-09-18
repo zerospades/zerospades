@@ -30,6 +30,16 @@ namespace spades {
 			SelectTool();
 			const char* Label() const override { return "Select"; }
 			EditorRole Role() const override { return EditorRole::Select; }
+
+			ToolOptions* Options() override;
+			void OnAction(IEditorContext& ed, const std::string& id) override;
+			// Escape drops the selection once whatever is in progress has had it.
+			bool OnEscape(IEditorContext& ed) override;
+
+			static void SelectAll(IEditorContext& ed);
+
+		private:
+			ToolOptions options;
 		};
 	} // namespace gui
 } // namespace spades

@@ -388,6 +388,9 @@ namespace spades {
 						r = eng->RegisterObjectProperty("SceneDefinition", "bool skipWorld",
 						                                asOFFSET(SceneDefinition, skipWorld));
 						manager->CheckError(r);
+						r = eng->RegisterObjectProperty("SceneDefinition", "bool skipWater",
+						                                asOFFSET(SceneDefinition, skipWater));
+						manager->CheckError(r);
 						r = eng->RegisterObjectProperty(
 						  "SceneDefinition", "float depthOfFieldFocalLength",
 						  asOFFSET(SceneDefinition, depthOfFieldFocalLength));

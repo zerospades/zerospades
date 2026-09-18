@@ -43,6 +43,10 @@ namespace spades {
 		static const float kMirLabelW = 50.0F;
 		static const float kColorW = 46.0F;
 		static const float kLabelW = 190.0F;
+		// An action carries a phrase, not an axis letter, and is deliberately wider
+		// than the kSubBtn sub-tool buttons it sits beside: near-identical widths
+		// would read as one more mode button that just failed to latch.
+		static const float kActionW = 104.0F;
 
 		OptionBar::OptionBar(client::IAudioDevice* audioDevice) : audioDevice(audioDevice) {}
 
@@ -70,6 +74,16 @@ namespace spades {
 			return OverlayInRect(p, x, y, w, h);
 		}
 
+		float OptionBar::OptionWidth(OptionType type) {
+			switch (type) {
+				case OptionType::Color: return kColorW;
+				case OptionType::Label: return kLabelW;
+				case OptionType::Action: return kActionW;
+				case OptionType::Bool: break;
+			}
+			return kMirW;
+		}
+
 		float OptionBar::OptionX(int i, float& outW) const {
 			outW = 0.0F;
 			if (i < 0 || i >= int(options.size()))
@@ -91,8 +105,7 @@ namespace spades {
 					x += kTbGap; // gap between items in the same group
 				}
 
-				float w = (op.type == OptionType::Color) ? kColorW
-				                                        : (op.type == OptionType::Label ? kLabelW : kMirW);
+				float w = OptionWidth(op.type);
 				if (k == i) {
 					outW = w;
 					return x;
@@ -206,15 +219,17 @@ namespace spades {
 					OverlayFillRect(renderer, x, by, w, kTbH);
 					OverlayStrokeRect(renderer, x, by, w, kTbH, 1.0F,
 					                 MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
-				} else { // Bool toggle
+				} else { // Bool toggle or Action button
 					bool hover = !menuActive && InRect(cursorPos, x, by, w, kTbH);
 					// Play sound on hover transition (false → true)
 					if (hover && !previousOptionHoverState[i])
 						PlayHoverSound();
 					previousOptionHoverState[i] = hover;
+					// An action holds no state, so it never draws as toggled.
+					bool toggled = (op.type == OptionType::Bool) && op.bvalue;
 					widgets::PaintButton(renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
 					                     op.label.c_str(), MakeVector2(0.5F, 0.5F), "",
-					                     MakeVector2(1.0F, 0.5F), true, hover, false, op.bvalue, s);
+					                     MakeVector2(1.0F, 0.5F), true, hover, false, toggled, s);
 				}
 
 				prevGroup = op.group;
