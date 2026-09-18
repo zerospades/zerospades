@@ -63,6 +63,19 @@ namespace spades {
 
 			/** Specifies the opacity of the model. Ignored if `ghost` is `false`. */
 			float opacity = 1.0F;
+
+			/**
+			 * Draws the model again where it is hidden from the camera — behind world
+			 * geometry — as a lit, tinted shape, and leaves it alone where it is in
+			 * plain sight. Used to reveal a player through walls.
+			 *
+			 * This is drawn in addition to the model's normal appearance, not instead of
+			 * it. Backends that do not implement it ignore the flag.
+			 */
+			bool xray = false;
+
+			/** The colour the model is tinted with where `xray` reveals it. */
+			Vector3 xrayColor = MakeVector3(1, 1, 1);
 		};
 
 		enum DynamicLightType {

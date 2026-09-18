@@ -31,6 +31,7 @@
 #include <Core/Debug.h>
 #include <Core/Exception.h>
 #include <Core/Math.h>
+#include <Core/TMPUtils.h>
 
 namespace spades {
 	namespace client {
@@ -78,7 +79,27 @@ namespace spades {
 			PacketTypeVersionSend = 34,    // C2S
 			PacketTypeExtensionInfo = 60,
 			PacketTypePlayerProperties = 64,
+			PacketTypeTeamplay = 112, // S2C2P, extension id 48 (`64 + extension id`)
 		};
+
+		/** Sub packet ids of `PacketTypeTeamplay`. Every extension packet
+		 * carries one as its second byte, even when the extension needs only one. */
+		enum TeamplaySubPacketType : std::uint8_t {
+			TeamplaySubConfig = 0,  // S2C
+			TeamplaySubPing = 1,    // C2S2P
+			TeamplaySubESPMark = 2, // S2C
+		};
+
+		/** The fixed part of each Teamplay sub packet, in bytes, counted from just after
+		 * the sub packet id. Each is followed by a Reason that runs to the end of the
+		 * packet and may be empty, so these are minimum lengths. A reader checks its own
+		 * before reading: a short packet is ignored, while reading past the end would
+		 * raise and take the connection down with it. */
+		constexpr std::size_t kTeamplayConfigBytes = 1 + 4 + 4;   // features, north x/y
+		constexpr std::size_t kTeamplayPingBytes =
+		  1 + 12 + 4 + 1 + 3 + 1; // player, position, duration, surfaces, colour, message
+		constexpr std::size_t kTeamplayMarkBytes =
+		  1 + 4 + 1 + 1 + 3 + 1; // player, duration, surfaces, flags, colour, message
 
 		inline PlayerInput ParsePlayerInput(uint8_t bits) {
 			PlayerInput inp;
@@ -230,6 +251,16 @@ namespace spades {
 				SPLog("%s", str.c_str());
 			}
 		};
+
+		/** The sub packet id of a `PacketTypeTeamplay` packet, or nothing when the
+		 * packet is of another type or is too short to carry one. Reads without moving
+		 * the reader's cursor, so the packet can still be dispatched or stored whole. */
+		inline stmp::optional<TeamplaySubPacketType>
+		PeekTeamplaySubPacket(const NetPacketReader& r) {
+			if (r.GetType() != PacketTypeTeamplay || r.GetNumRemainingBytes() < 1)
+				return {};
+			return static_cast<TeamplaySubPacketType>(r.Peek(0));
+		}
 
 	} // namespace client
 } // namespace spades

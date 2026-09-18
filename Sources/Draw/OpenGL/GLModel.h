@@ -53,6 +53,10 @@ namespace spades {
 
 			virtual void RenderOutlinePass(std::vector<client::ModelRenderParam> params) = 0;
 
+			/** Renders the models flagged `xray` again in their x-ray colour. The caller
+			 * has set the depth test to keep only the fragments the world hides. */
+			virtual void RenderXRayPass(std::vector<client::ModelRenderParam> params) = 0;
+
 		private:
 			// members used when rendering by GLModelRenderer
 			int renderId;

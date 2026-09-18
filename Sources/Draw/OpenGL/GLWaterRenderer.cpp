@@ -461,9 +461,11 @@ namespace spades {
 
 			tempDepthTexture = device.GenTexture();
 			device.BindTexture(IGLDevice::Texture2D, tempDepthTexture);
-			device.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::DepthComponent24,
+			// Packed like the scene's own depth buffer: the scene is blitted in here,
+			// and a depth blit between mismatched formats is an error.
+			device.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::Depth24Stencil8,
 			                  renderer.GetRenderWidth(), renderer.GetRenderHeight(), 0,
-			                  IGLDevice::DepthComponent, IGLDevice::UnsignedInt, NULL);
+			                  IGLDevice::DepthStencil, IGLDevice::UnsignedInt248, NULL);
 			device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter, IGLDevice::Nearest);
 			device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter, IGLDevice::Nearest);
 			device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::ClampToEdge);
@@ -472,7 +474,7 @@ namespace spades {
 
 			tempFramebuffer = device.GenFramebuffer();
 			device.BindFramebuffer(IGLDevice::Framebuffer, tempFramebuffer);
-			device.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthAttachment,
+			device.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthStencilAttachment,
 			                            IGLDevice::Texture2D, tempDepthTexture, 0);
 
 			// create water color texture

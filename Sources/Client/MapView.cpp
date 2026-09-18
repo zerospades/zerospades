@@ -30,6 +30,8 @@
 #include "MapView.h"
 #include "Player.h"
 #include "TCGameMode.h"
+#include "Teamplay.h"
+#include "TeamplayMarker.h"
 #include "Weapon.h"
 #include "World.h"
 #include <Core/Settings.h>
@@ -329,24 +331,31 @@ namespace spades {
 			font.DrawShadow(s, scrPos, 1.0F, col, MakeVector4(0, 0, 0, col.w));
 		}
 
-		void MapView::DrawMapCircle(const Vector2& pos, const Vector4& col, float radius, float thickness) {
-			Vector2 scrPos;
+		stmp::optional<Vector2> MapView::ProjectVisible(const Vector2& pos) const {
 			if (circularMap) {
-				scrPos = Project(pos, true);
+				Vector2 scrPos = Project(pos, true);
 				Vector2 rel = scrPos - scrCenter;
 				if (rel.GetSquaredLength() > scrRadius*scrRadius)
-					return;
+					return {};
+				return scrPos;
 			} else if (rotatingMap) {
-				scrPos = Project(pos, true);
+				Vector2 scrPos = Project(pos, true);
 				if (!outRect.Contains(scrPos))
-					return;
+					return {};
+				return scrPos;
 			} else {
 				if (!inRect.Contains(pos))
-					return;
-				scrPos = Project(pos);
+					return {};
+				return Project(pos);
 			}
+		}
+
+		void MapView::DrawMapCircle(const Vector2& pos, const Vector4& col, float radius, float thickness) {
+			stmp::optional<Vector2> scrPos = ProjectVisible(pos);
+			if (!scrPos)
+				return;
 			renderer.SetColorAlphaPremultiplied(col);
-			renderer.DrawOutlinedCircle(scrPos, radius, thickness);
+			renderer.DrawOutlinedCircle(*scrPos, radius, thickness);
 		}
 
 		void MapView::SwitchScale() {
@@ -907,6 +916,94 @@ namespace spades {
 					Vector4 teamColorF = ModifyColor(teamColor) * largeMapAlpha;
 					DrawIcon(t.pos.GetXY(), *baseIcon, teamColorF);
 				}
+			}
+
+			DrawTeamplayPings(largeMapAlpha);
+			DrawTeamplayMarks(largeMapAlpha);
+		}
+
+		void MapView::DrawTeamplayPings(float mapAlpha) {
+			const Teamplay& teamplay = *client->teamplay;
+			if (!teamplay.HasPings())
+				return;
+
+			World* world = client->GetWorld();
+			if (!world)
+				return;
+
+			// A ping's pulse rings reach well past the marker, so keep them inside the
+			// map window the way the map itself is kept, rather than washing over the
+			// HUD around it.
+			if (circularMap)
+				renderer.BeginClippingCircle(scrCenter, scrRadius);
+			else
+				renderer.BeginClippingRect(outRect);
+
+			for (const auto& entry : teamplay.GetPings()) {
+				const Teamplay::Ping& ping = entry.second;
+
+				// The packet decides where it is shown; this is the minimap.
+				if (!(ping.surfaces & Teamplay::SurfaceMinimap))
+					continue;
+
+				// Match the world marker's fade so a ping does not linger on the minimap
+				// after it has gone from the view, or the other way round.
+				constexpr float kFadeOutTime = 0.75F;
+				float alpha = ping.GetFadeAlpha(kFadeOutTime) * mapAlpha;
+				if (alpha <= 0.0F)
+					continue;
+
+				// The map is flat, so a ping's height plays no part in where it lands.
+				stmp::optional<Vector2> scrPos = ProjectVisible(ping.position.GetXY());
+				if (!scrPos)
+					continue;
+
+				// The same diamond the ping wears in the world and on the compass, in
+				// the colour the server chose, drawn as sent. Screen-aligned whatever
+				// the map's rotation, so it reads the same on every map mode.
+				constexpr float kMapPingHalfSize = 6.0F;
+				DrawPingDiamond(renderer, *scrPos, kMapPingHalfSize,
+								Teamplay::ToRenderColor(ping.color), alpha, ping.age);
+			}
+
+			if (circularMap)
+				renderer.EndClippingCircle();
+			else
+				renderer.EndClippingRect();
+		}
+
+		void MapView::DrawTeamplayMarks(float mapAlpha) {
+			const Teamplay& teamplay = *client->teamplay;
+			if (!teamplay.HasMarks())
+				return;
+
+			World* world = client->GetWorld();
+			if (!world)
+				return;
+
+			for (const auto& entry : teamplay.GetMarks()) {
+				const Teamplay::Mark& mark = entry.second;
+				if (!(mark.surfaces & Teamplay::SurfaceMinimap))
+					continue;
+
+				auto maybePlayer = world->GetPlayer(static_cast<unsigned int>(entry.first));
+				if (!maybePlayer)
+					continue;
+
+				Player& p = maybePlayer.value();
+				if (p.IsSpectator() || !p.IsAlive())
+					continue;
+
+				// A mark on the minimap is a dot at the player, in the mark's colour —
+				// the same colour the outline uses, blink and all, so every surface the
+				// mark named says the same thing at the same moment.
+				Vector3 col = client->ResolveMarkColor(p, mark.color);
+
+				Vector4 color = MakeVector4(col.x * mapAlpha, col.y * mapAlpha,
+											col.z * mapAlpha, mapAlpha);
+
+				constexpr float kRadius = 4.0F;
+				DrawMapCircle(p.GetPosition().GetXY(), color, kRadius, 1.5F);
 			}
 		}
 

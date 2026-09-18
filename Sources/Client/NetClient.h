@@ -52,6 +52,7 @@ namespace spades {
 
 		enum NetExtensionType {
 			ExtensionTypePlayerProperties = 0,
+			ExtensionTypeTeamplay = 48,
 			ExtensionTypePlayerLimit = 192,
 			ExtensionTypeMessageTypes = 193,
 			ExtensionTypeKickReason = 194,
@@ -98,6 +99,7 @@ namespace spades {
 			/** Extensions implemented in this client (map of extension id → version) */
 			std::unordered_map<uint8_t, uint8_t> implementedExtensions{
 			  {ExtensionTypePlayerProperties, 1},
+			  {ExtensionTypeTeamplay, 1},
 			  {ExtensionTypePlayerLimit, 1},
 			  {ExtensionTypeMessageTypes, 1},
 			  {ExtensionTypeKickReason, 1}};
@@ -133,6 +135,13 @@ namespace spades {
 
 			bool HandleHandshakePackets(NetPacketReader&);
 			void HandleExtensionPacket(NetPacketReader&);
+			void HandleTeamplayPacket(NetPacketReader&);
+
+			/** Whether the server negotiated the given extension during the handshake. */
+			bool HasExtension(NetExtensionType type) const {
+				return extensions.find(static_cast<uint8_t>(type)) != extensions.end();
+			}
+
 			void HandleGamePacket(NetPacketReader&);
 			stmp::optional<World&> GetWorld();
 			Player& GetPlayer(int);
@@ -148,6 +157,10 @@ namespace spades {
 
 			/** Writes the initial game state to the demo recorder (map, players, etc.) */
 			void WriteInitialDemoState();
+
+			/** Writes the Teamplay Config and the ESP marks in force, which the server sent
+			 * before the recording started. Nothing when the extension is not negotiated. */
+			void WriteInitialTeamplayDemoState();
 
 			void SendMapCached();
 			void SendVersion();
@@ -205,6 +218,7 @@ namespace spades {
 			void SendReload() override;
 			void SendTeamChange(int team) override;
 			void SendWeaponChange(WeaponType) override;
+			void SendTeamplayPing(Vector3 position, const std::string& reason) override;
 			void SendHandShakeValid(int challenge);
 
 			double GetDownlinkBps() override { return bandwidthMonitor->GetDownlinkBps(); }

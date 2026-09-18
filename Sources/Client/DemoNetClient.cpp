@@ -32,6 +32,7 @@
 #include "Grenade.h"
 #include "Player.h"
 #include "TCGameMode.h"
+#include "Teamplay.h"
 #include "Weapon.h"
 #include "World.h"
 #include <Core/Debug.h>
@@ -195,6 +196,12 @@ namespace spades {
 						}
 
 						HandleGamePacket(reader);
+					} else if (PeekTeamplaySubPacket(reader) == TeamplaySubPing) {
+						// A ping marks a place in the world it was sent in, and this map
+						// is replacing that world, so it goes no further — the same
+						// decision the live client made while recording. Without this a
+						// recording that began at the connection would replay it into
+						// the loaded world, at coordinates belonging to another map.
 					} else {
 						// Save packet for later processing
 						preMapPackets.push_back(reader.GetData());
@@ -484,6 +491,10 @@ namespace spades {
 
 					if (!seekingMode)
 						client->PlayerSpawned(pRef);
+					else
+						// A seek replays the marks to rebuild what was in force at the
+						// destination, so it has to replay what ends them too.
+						client->TeamplayPlayerSpawned(pId);
 				} break;
 				case PacketTypeBlockAction: {
 					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
@@ -842,6 +853,72 @@ namespace spades {
 						p->Restock(hp, grenades, blocks);
 					w.Restock(clip, reserve);
 					GetWorld()->GetPlayerPersistent(pId).score = score;
+				} break;
+				case PacketTypeTeamplay: {
+					switch (r.ReadByte()) { // sub packet id
+						case TeamplaySubConfig: {
+							if (r.GetNumRemainingBytes() < kTeamplayConfigBytes)
+								break;
+
+							uint8_t features = r.ReadByte();
+							float northX = r.ReadFloat();
+							float northY = r.ReadFloat();
+							client->TeamplayConfigured(features, northX, northY);
+						} break;
+						case TeamplaySubPing: {
+							if (r.GetNumRemainingBytes() < kTeamplayPingBytes)
+								break;
+
+							int pId = r.ReadByte();
+							Vector3 pos = r.ReadVector3();
+							float duration = r.ReadFloat();
+							uint8_t surfaces = r.ReadByte();
+							IntVector3 color = r.ReadIntColor();
+							uint8_t messageId = r.ReadByte();
+							std::string reason =
+							  Teamplay::SanitizeReason(r.ReadRemainingData());
+
+							// The same position and duration checks as a live ping, so a
+							// replay never draws one the live client rejected. The
+							// message id is reserved and ignored.
+							(void)messageId;
+							if (!Teamplay::IsValidDuration(duration))
+								break;
+							if (duration != 0.0F && !Teamplay::IsValidPingPosition(pos))
+								break;
+
+							// A ping is a momentary event, so replaying the whole demo to
+							// reach a seek target would otherwise pop every ping ever sent
+							// at the destination. A removal is state and is kept.
+							if (!seekingMode || duration == 0.0F)
+								client->TeamplayPingReceived(pId, pos, duration, surfaces,
+																	 color, std::move(reason));
+						} break;
+						case TeamplaySubESPMark: {
+							if (r.GetNumRemainingBytes() < kTeamplayMarkBytes)
+								break;
+
+							int pId = r.ReadByte();
+							float duration = r.ReadFloat();
+							uint8_t surfaces = r.ReadByte();
+							uint8_t flags = r.ReadByte();
+							IntVector3 color = r.ReadIntColor();
+							uint8_t messageId = r.ReadByte();
+							std::string reason =
+							  Teamplay::SanitizeReason(r.ReadRemainingData());
+
+							(void)messageId; // reserved and ignored, as on the ping
+							if (!Teamplay::IsValidDuration(duration))
+								break;
+
+							// Marks are state rather than events, so they are replayed
+							// during a seek to rebuild what was in force. Their timers
+							// restart from the seek, which a fast replay cannot avoid.
+							client->TeamplayMarkReceived(pId, duration, surfaces, flags,
+																 color, std::move(reason));
+						} break;
+						default: break; // a sub packet from a newer extension version
+					}
 				} break;
 				default:
 					SPLog("Demo: dropped unknown packet %d", (int)r.GetType());

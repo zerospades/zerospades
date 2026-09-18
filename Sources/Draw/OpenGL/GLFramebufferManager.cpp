@@ -86,6 +86,10 @@ namespace spades {
 				// for multisample rendering, use
 				// multisample renderbuffer for scene
 				// rendering.
+				//
+				// Depth and stencil share one packed renderbuffer: the scene needs a
+				// stencil buffer for the x-ray pass, and a packed attachment is the
+				// form every driver accepts.
 
 				multisampledFramebuffer = dev.GenFramebuffer();
 				dev.BindFramebuffer(IGLDevice::Framebuffer, multisampledFramebuffer);
@@ -93,10 +97,11 @@ namespace spades {
 				multisampledDepthRenderbuffer = dev.GenRenderbuffer();
 				dev.BindRenderbuffer(IGLDevice::Renderbuffer, multisampledDepthRenderbuffer);
 				dev.RenderbufferStorage(IGLDevice::Renderbuffer, (int)settings.r_multisamples,
-				                        IGLDevice::DepthComponent24, renderWidth, renderHeight);
-				SPLog("MSAA Depth Buffer Allocated");
+				                        IGLDevice::Depth24Stencil8, renderWidth, renderHeight);
+				SPLog("MSAA Depth+Stencil Buffer Allocated");
 
-				dev.FramebufferRenderbuffer(IGLDevice::Framebuffer, IGLDevice::DepthAttachment,
+				dev.FramebufferRenderbuffer(IGLDevice::Framebuffer,
+				                            IGLDevice::DepthStencilAttachment,
 				                            IGLDevice::Renderbuffer, multisampledDepthRenderbuffer);
 
 				multisampledColorRenderbuffer = dev.GenRenderbuffer();
@@ -171,23 +176,27 @@ namespace spades {
 			// in multisampled rendering,
 			// we must first copy to non-multismapled
 			// framebuffer to use it in shader as a texture.
+			//
+			// Depth and stencil share one packed texture, for the same reason as the
+			// multisampled renderbuffer above: a depth texture paired with a separate
+			// stencil renderbuffer is what drivers reject as unsupported.
 
 			renderFramebuffer = dev.GenFramebuffer();
 			dev.BindFramebuffer(IGLDevice::Framebuffer, renderFramebuffer);
 
 			renderDepthTexture = dev.GenTexture();
 			dev.BindTexture(IGLDevice::Texture2D, renderDepthTexture);
-			dev.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::DepthComponent24, renderWidth,
-			               renderHeight, 0, IGLDevice::DepthComponent, IGLDevice::UnsignedInt,
+			dev.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::Depth24Stencil8, renderWidth,
+			               renderHeight, 0, IGLDevice::DepthStencil, IGLDevice::UnsignedInt248,
 			               NULL);
-			SPLog("Depth Buffer Allocated");
+			SPLog("Depth+Stencil Buffer Allocated");
 			dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter, IGLDevice::Nearest);
 			dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter, IGLDevice::Nearest);
 			dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::ClampToEdge);
 			dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, IGLDevice::ClampToEdge);
 			dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureCompareMode, IGLDevice::None);
 
-			dev.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthAttachment,
+			dev.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthStencilAttachment,
 			                         IGLDevice::Texture2D, renderDepthTexture, 0);
 
 			renderColorTexture = dev.GenTexture();
@@ -297,11 +306,13 @@ namespace spades {
 				SPLog("Creating Mirror depth texture");
 				mirrorDepthTexture = dev.GenTexture();
 				dev.BindTexture(IGLDevice::Texture2D, mirrorDepthTexture);
-				dev.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::DepthComponent24, renderWidth,
-				               renderHeight, 0, IGLDevice::DepthComponent, IGLDevice::UnsignedInt,
+				// Packed like the scene's own depth buffer: the two are blitted into
+				// each other, and a depth blit between mismatched formats is an error.
+				dev.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::Depth24Stencil8, renderWidth,
+				               renderHeight, 0, IGLDevice::DepthStencil, IGLDevice::UnsignedInt248,
 				               NULL);
 
-				SPLog("Depth Buffer Allocated");
+				SPLog("Depth+Stencil Buffer Allocated");
 				dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter,
 				                 IGLDevice::Nearest);
 				dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter,
@@ -313,7 +324,7 @@ namespace spades {
 				dev.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureCompareMode,
 				                 IGLDevice::None);
 
-				dev.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthAttachment,
+				dev.FramebufferTexture2D(IGLDevice::Framebuffer, IGLDevice::DepthStencilAttachment,
 				                         IGLDevice::Texture2D, mirrorDepthTexture, 0);
 
 				IGLDevice::Enum status = dev.CheckFramebufferStatus(IGLDevice::Framebuffer);
@@ -386,6 +397,11 @@ namespace spades {
 
 			device.Enable(IGLDevice::DepthTest, true);
 			device.DepthMask(true);
+			// The scene's stencil buffer is written by the x-ray pass's world marking
+			// and cleared with the rest of the scene, so leave the mask open and the
+			// clear value at the "no world here" state.
+			device.StencilMask(0xFF);
+			device.ClearStencil(0);
 			device.Viewport(0, 0, renderWidth, renderHeight);
 		}
 
@@ -405,7 +421,10 @@ namespace spades {
 			int h = renderHeight;
 			device.BindFramebuffer(IGLDevice::ReadFramebuffer, multisampledFramebuffer);
 			device.BindFramebuffer(IGLDevice::DrawFramebuffer, renderFramebuffer);
-			device.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, IGLDevice::DepthBufferBit,
+			// Depth and stencil share one attachment, so they resolve together.
+			device.BlitFramebuffer(0, 0, w, h, 0, 0, w, h,
+			                       (IGLDevice::Enum)(IGLDevice::DepthBufferBit |
+			                                         IGLDevice::StencilBufferBit),
 			                       IGLDevice::Nearest);
 			device.BindFramebuffer(IGLDevice::ReadFramebuffer, 0);
 			device.BindFramebuffer(IGLDevice::DrawFramebuffer, 0);
@@ -575,7 +594,10 @@ namespace spades {
 					device.BindFramebuffer(IGLDevice::DrawFramebuffer, renderFramebuffer);
 					device.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, IGLDevice::ColorBufferBit,
 					                       IGLDevice::Nearest);
-					device.BlitFramebuffer(0, 0, w, h, 0, 0, w, h, IGLDevice::DepthBufferBit,
+					// Depth and stencil share one attachment, so they resolve together.
+					device.BlitFramebuffer(0, 0, w, h, 0, 0, w, h,
+					                       (IGLDevice::Enum)(IGLDevice::DepthBufferBit |
+					                                         IGLDevice::StencilBufferBit),
 					                       IGLDevice::Nearest);
 					device.BindFramebuffer(IGLDevice::ReadFramebuffer, 0);
 					device.BindFramebuffer(IGLDevice::DrawFramebuffer, 0);

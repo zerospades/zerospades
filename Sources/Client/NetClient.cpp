@@ -19,6 +19,7 @@
 
  */
 
+#include <limits>
 #include <math.h>
 #include <string.h>
 #include <vector>
@@ -35,6 +36,7 @@
 #include "NetClient.h"
 #include "Player.h"
 #include "TCGameMode.h"
+#include "Teamplay.h"
 #include "Weapon.h"
 #include "World.h"
 #include <Core/CP437.h>
@@ -175,6 +177,12 @@ namespace spades {
 
 			void WriteString(std::string str) {
 				str = EncodeString(str);
+				data.insert(data.end(), str.begin(), str.end());
+			}
+
+			/** Writes the bytes as they are, for a field the protocol defines as UTF-8
+			 * text rather than as the base protocol's Code Page 437 with a UTF-8 escape. */
+			void WriteRawString(const std::string& str) {
 				data.insert(data.end(), str.begin(), str.end());
 			}
 
@@ -603,6 +611,57 @@ namespace spades {
 			switch (r.GetType()) {
 				case PacketTypeHandShakeInit: SendHandShakeValid(r.ReadInt()); return true;
 				case PacketTypeExtensionInfo: HandleExtensionPacket(r); return true;
+				case PacketTypeTeamplay: {
+					auto sub = PeekTeamplaySubPacket(r);
+
+					// Too short to name a sub packet: dropped here rather than failing
+					// the connection, which is what reading past the end would do.
+					if (!sub) {
+						SPLog("Ignoring a truncated Teamplay packet");
+						return true;
+					}
+
+					// Once the world exists, every sub packet is ordinary game traffic.
+					if (status == NetClientStatusConnected)
+						return false;
+
+					// The Config belongs to the connection, so it is applied whenever it
+					// arrives: during the Connecting stage anything but MapStart is an
+					// unexpected packet, and parking it would leave the new world
+					// without it until the transfer ends.
+					if (*sub == TeamplaySubConfig) {
+						HandleTeamplayPacket(r);
+						return true;
+					}
+
+					// A ping marks a place in the world it was sent in. That world is
+					// being replaced, and its coordinates mean nothing in the next one,
+					// so a ping that arrives during a map load is dropped rather than
+					// popping up, beeping, somewhere else entirely once the map is in.
+					if (*sub == TeamplaySubPing)
+						return true;
+
+					// A mark is state: it names a player and outlives the map it arrived
+					// on, so it waits with the other world packets and is replayed once
+					// the world exists. The Connecting stage parks it here itself, since
+					// its own branch treats anything but MapStart as a protocol error
+					// rather than saving it.
+					if (status == NetClientStatusConnecting) {
+						// Nothing drains these until a map arrives, so a server that
+						// never sends one cannot make this grow without end. The cap is
+						// far above the handful of marks a real server could have in
+						// force before the first map.
+						constexpr size_t kMaxPreMapMarks = 64;
+						if (savedPackets.size() >= kMaxPreMapMarks) {
+							SPLog("Ignoring a Teamplay mark: too many arrived before the map");
+							return true;
+						}
+
+						savedPackets.push_back(r.GetData());
+						return true;
+					}
+					return false;
+				}
 				case PacketTypeVersionGet: {
 					if (r.GetNumRemainingBytes() > 0) {
 						// Enhanced variant
@@ -659,10 +718,125 @@ namespace spades {
 			SendSupportedExtensions();
 		}
 
+		void NetClient::HandleTeamplayPacket(spades::client::NetPacketReader& r) {
+			SPADES_MARK_FUNCTION();
+
+			// A server that never negotiated the extension has no business sending its
+			// packets; ignoring them keeps the client's state defined by the handshake.
+			if (!HasExtension(ExtensionTypeTeamplay)) {
+				SPLog("Ignoring a Teamplay packet from a server that did not "
+					  "negotiate the extension");
+				return;
+			}
+
+			auto hasBytes = [&r](size_t needed) {
+				if (r.GetNumRemainingBytes() >= needed)
+					return true;
+				SPLog("Ignoring a truncated Teamplay sub packet");
+				return false;
+			};
+
+			switch (r.ReadByte()) { // sub packet id
+				case TeamplaySubConfig: {
+					if (!hasBytes(kTeamplayConfigBytes))
+						break;
+
+					uint8_t features = r.ReadByte();
+
+					// North, in the map plane. Normalised and checked by Teamplay, which
+					// falls back on a malformed one and still applies the bitmask.
+					float northX = r.ReadFloat();
+					float northY = r.ReadFloat();
+
+					client->TeamplayConfigured(features, northX, northY);
+				} break;
+				case TeamplaySubPing: {
+					if (!hasBytes(kTeamplayPingBytes))
+						break;
+
+					int pId = r.ReadByte();
+					Vector3 pos = r.ReadVector3();
+					float duration = r.ReadFloat();
+					uint8_t surfaces = r.ReadByte();
+
+					// The marker colour, in the Blue-Green-Red order the base protocol
+					// already uses. The server chose it; the client draws it as sent.
+					IntVector3 color = r.ReadIntColor();
+
+					uint8_t messageId = r.ReadByte();
+
+					// The Reason occupies the rest of the packet, is plain UTF-8 rather
+					// than the base protocol's Code Page 437, and may be empty.
+					std::string reason =
+					  Teamplay::SanitizeReason(r.ReadRemainingData());
+
+					// The Message ID is reserved and unimplemented: a value from a later
+					// version is ignored rather than taken as a reason to drop a ping
+					// that is otherwise perfectly renderable.
+					if (messageId != Teamplay::kReservedMessageId) {
+						SPLog("Ignoring the message id %u on a Teamplay ping",
+							  (unsigned int)messageId);
+					}
+
+					if (!Teamplay::IsValidDuration(duration)) {
+						SPLog("Dropped a Teamplay ping with an invalid duration");
+						break;
+					}
+
+					// A removal carries no place to check.
+					if (duration != 0.0F && !Teamplay::IsValidPingPosition(pos)) {
+						SPLog("Dropped a Teamplay ping at an invalid position");
+						break;
+					}
+
+					client->TeamplayPingReceived(pId, pos, duration, surfaces,
+														 color, std::move(reason));
+				} break;
+				case TeamplaySubESPMark: {
+					if (!hasBytes(kTeamplayMarkBytes))
+						break;
+
+					int pId = r.ReadByte();
+					float duration = r.ReadFloat();
+					uint8_t surfaces = r.ReadByte();
+					uint8_t flags = r.ReadByte();
+
+					// The outline colour, in the Blue-Green-Red order the base protocol
+					// already uses. The server chose it; the client draws it as sent.
+					IntVector3 color = r.ReadIntColor();
+
+					uint8_t messageId = r.ReadByte();
+
+					std::string reason =
+					  Teamplay::SanitizeReason(r.ReadRemainingData());
+
+					// Reserved and unimplemented, as on the ping: ignored, not fatal.
+					if (messageId != Teamplay::kReservedMessageId) {
+						SPLog("Ignoring the message id %u on a Teamplay mark",
+							  (unsigned int)messageId);
+					}
+
+					if (!Teamplay::IsValidDuration(duration)) {
+						SPLog("Dropped a Teamplay mark with an invalid duration");
+						break;
+					}
+
+					client->TeamplayMarkReceived(pId, duration, surfaces, flags,
+														 color, std::move(reason));
+				} break;
+				default:
+					// Sub packets are the extension's own versioning seam: an unknown one
+					// belongs to a newer version and is skipped, not treated as an error.
+					SPLog("Ignoring an unknown Teamplay sub packet");
+					break;
+			}
+		}
+
 		void NetClient::HandleGamePacket(spades::client::NetPacketReader& r) {
 			SPADES_MARK_FUNCTION();
 
 			switch (r.GetType()) {
+				case PacketTypeTeamplay: HandleTeamplayPacket(r); break;
 				case PacketTypePositionData: {
 					Player& p = GetLocalPlayer();
 					if (r.GetLength() != 13) {
@@ -1644,6 +1818,43 @@ namespace spades {
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
+		void NetClient::SendTeamplayPing(Vector3 position, const std::string& reason) {
+			SPADES_MARK_FUNCTION();
+
+			// The caller is expected to have checked the feature bits, but the
+			// negotiation is this class's own business, so it is enforced here.
+			if (!HasExtension(ExtensionTypeTeamplay))
+				return;
+
+			NetPacketWriter w(PacketTypeTeamplay);
+			w.WriteByte((uint8_t)TeamplaySubPing);
+
+			// The Player ID is ignored in this direction; the server fills it in
+			// authoritatively. Sent as 255 so a server reading it sees "unset" rather
+			// than a plausible-looking impersonation of some other player.
+			w.WriteByte((uint8_t)Teamplay::kServerPlayerId);
+
+			w.WriteVector3(position);
+
+			// How long the ping lasts is the server's call alone, so a client sends `0`
+			// and the server fills in what it thinks the ping is worth. Where it is
+			// shown is the server's call too, and `0` asks it to decide.
+			w.WriteFloat(0.0F);
+			w.WriteByte((uint8_t)0);
+
+			// Only the server sets a ping's colour, so these three go out empty and are
+			// ignored on arrival like the two fields above them.
+			w.WriteColor(MakeIntVector3(0, 0, 0));
+
+			w.WriteByte(Teamplay::kReservedMessageId);
+
+			// The Reason is UTF-8 text, not the base protocol's Code Page 437, so the
+			// bytes go out as they are.
+			w.WriteRawString(Teamplay::SanitizeReason(reason));
+
+			enet_peer_send(peer, 0, w.CreatePacket());
+		}
+
 		void NetClient::SendSupportedExtensions() {
 			SPADES_MARK_FUNCTION();
 
@@ -1938,7 +2149,58 @@ namespace spades {
 				demoRecorder->RecordPacket(data.data(), data.size());
 			}
 
+			WriteInitialTeamplayDemoState();
+
 			SPLog("Initial demo state written successfully");
+		}
+
+		void NetClient::WriteInitialTeamplayDemoState() {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypeTeamplay))
+				return;
+
+			const Teamplay& teamplay = client->GetTeamplay();
+
+			// The Config belongs to the connection and was sent before a recording that
+			// starts mid-game, so the demo opens with the one in force.
+			{
+				NetPacketWriter w(PacketTypeTeamplay);
+				w.WriteByte((uint8_t)TeamplaySubConfig);
+				w.WriteByte(teamplay.GetFeatures());
+				w.WriteFloat(teamplay.GetNorth().x);
+				w.WriteFloat(teamplay.GetNorth().y);
+
+				const auto& data = w.GetData();
+				demoRecorder->RecordPacket(data.data(), data.size());
+			}
+
+			// Marks are state, so each one in force goes in with the time it has left,
+			// the way a server re-sends an active mark to a player who joins late. Pings
+			// are events and are not carried over.
+			for (const auto& entry : teamplay.GetMarks()) {
+				const Teamplay::Mark& mark = entry.second;
+
+				uint8_t flags = 0;
+				if (mark.clearOnRespawn)
+					flags |= Teamplay::MarkFlagClearOnRespawn;
+				if (mark.showName)
+					flags |= Teamplay::MarkFlagShowName;
+
+				NetPacketWriter w(PacketTypeTeamplay);
+				w.WriteByte((uint8_t)TeamplaySubESPMark);
+				w.WriteByte(static_cast<uint8_t>(entry.first));
+				w.WriteFloat(mark.endless ? std::numeric_limits<float>::infinity()
+										  : mark.timeLeft);
+				w.WriteByte(mark.sentSurfaces);
+				w.WriteByte(flags);
+				w.WriteColor(mark.color);
+				w.WriteByte(Teamplay::kReservedMessageId);
+				w.WriteRawString(mark.reason);
+
+				const auto& data = w.GetData();
+				demoRecorder->RecordPacket(data.data(), data.size());
+			}
 		}
 
 		bool NetClient::StartDemoRecording(const std::string& filename, const std::string& context) {

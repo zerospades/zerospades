@@ -39,6 +39,7 @@
 #include "ILocalEntity.h"
 #include "MapView.h"
 #include "PieMenuView.h"
+#include "Teamplay.h"
 #include "Tracer.h"
 
 #include "GameMap.h"
@@ -239,6 +240,7 @@ namespace spades {
 					reloadKeyPressed = false;
 					debugHitTestZoom = false;
 					spectatorZoom = false;
+					teamOverlayHeld = false;
 				}
 
 				if (localPlayerIsSpectator) {
@@ -437,6 +439,22 @@ namespace spades {
 				hitFeedbackIconState -= dt * 4.0F;
 				if (hitFeedbackIconState < 0.0F)
 					hitFeedbackIconState = 0.0F;
+			}
+
+			// Ping and mark lifetimes are counted by the client: a finite Duration needs
+			// no removal packet from the server, so they are expired here.
+			teamplay->Update(dt);
+
+			{
+				// Ease the team overlay so releasing the key does not snap it away.
+				constexpr float kTeamOverlayFadeRate = 14.0F;
+				float target = teamOverlayHeld ? 1.0F : 0.0F;
+				teamOverlayAlpha += (target - teamOverlayAlpha) *
+									std::min(1.0F, dt * kTeamOverlayFadeRate);
+				if (teamOverlayAlpha < 0.001F)
+					teamOverlayAlpha = 0.0F;
+				if (teamOverlayAlpha > 0.999F)
+					teamOverlayAlpha = 1.0F;
 			}
 
 			if (debugHitTestZoom) {

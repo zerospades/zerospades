@@ -47,6 +47,7 @@
 #include "PieMenuView.h"
 #include "ScoreboardView.h"
 #include "TCProgressView.h"
+#include "Teamplay.h"
 
 #include "BloodMarks.h"
 #include <Gui/UI/Components/SoftwareCursor.h>
@@ -134,7 +135,10 @@ namespace spades {
 			  lastLocalCorpse(nullptr),
 			  nextMapShotIndex(0),
 			  staffSpectating(false),
-			  spectatorPlayerNames(true) {
+			  spectatorPlayerNames(true),
+			  teamOverlayHeld(false),
+			  teamOverlayAlpha(0.0F),
+			  pieMenuPingValid(false) {
 			SPADES_MARK_FUNCTION();
 			SPLog("Initializing...");
 
@@ -186,6 +190,7 @@ namespace spades {
 			limboMenu = stmp::make_unique<gui::LimboMenu>(
 				Handle<gui::ILimboMenuHost>(hostAdapter.GetPointerOrNull()), *renderer,
 				*fontManager, *cursor);
+			teamplay = stmp::make_unique<Teamplay>();
 			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
 				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
@@ -209,6 +214,12 @@ namespace spades {
 			lastHitTime = -100.0F;
 			hurtRingView->ClearAll();
 			killStreaks.clear();
+
+			// Marks and pings do not survive a map change. The Config belongs to the
+			// connection, so its bitmask and north carry into the new world.
+			teamplay->ClearTransientState();
+			teamOverlayHeld = false;
+			teamOverlayAlpha = 0.0F;
 
 			// reset on new map
 			placedBlocks = 0;
@@ -1217,6 +1228,140 @@ namespace spades {
 				params.volume = (float)cg_chatBeep;
 				audioDevice->PlayLocal(c.GetPointerOrNull(), params);
 			}
+		}
+
+#pragma mark - Teamplay
+
+		void Client::TeamplayConfigured(uint8_t features, float northX, float northY) {
+			SPADES_MARK_FUNCTION();
+
+			teamplay->ApplyConfig(features, northX, northY);
+
+			const Vector2& north = teamplay->GetNorth();
+			NetLog("Teamplay config: features 0x%02x, north (%.3f, %.3f)",
+				   (unsigned int)teamplay->GetFeatures(), north.x, north.y);
+		}
+
+		void Client::TeamplayPingReceived(int playerId, Vector3 position, float duration,
+												  uint8_t surfaces, const IntVector3& color,
+												  std::string reason) {
+			SPADES_MARK_FUNCTION();
+
+			// No feature bit gates this: a relayed ping is drawn on the surfaces the
+			// packet names, and a server that wants one unseen does not send it.
+			std::string who = (playerId == Teamplay::kServerPlayerId)
+				? _Tr("Client", "The server")
+				: world ? world->GetPlayerName(playerId) : std::string();
+
+			NetLog("[Ping] %s @ (%.1f, %.1f, %.1f) for %.1fs: %s", who.c_str(),
+				   position.x, position.y, position.z, duration, reason.c_str());
+
+			// A client shows who pinged, and where the name goes is its own business: the
+			// world marker normally carries it. A player's ping that never asked for the
+			// world surface has no marker to carry a name, so the chat log names the
+			// sender instead. A server ping (`255`) has no sender to show, so it stays on
+			// exactly the surfaces its packet named.
+			uint8_t placed = Teamplay::ResolveSurfaces(surfaces);
+			if (duration != 0.0F && !(placed & Teamplay::SurfaceWorld) &&
+				playerId != Teamplay::kServerPlayerId) {
+				std::string line = who;
+				if (!reason.empty())
+					line += line.empty() ? reason : ": " + reason;
+				if (!line.empty())
+					chatWindow->AddMessage(line);
+			}
+
+			teamplay->SetPing(playerId, position, duration, surfaces, color, std::move(reason));
+
+			// A ping is a callout: it has to register even when the player is looking
+			// somewhere else, so it gets an audible cue as well as a marker. Taking one
+			// away is not a callout and stays silent.
+			if (duration != 0.0F && !IsMuted()) {
+				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Feedback/Beep1.opus");
+				audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+			}
+		}
+
+		void Client::TeamplayMarkReceived(int playerId, float duration, uint8_t surfaces,
+												  uint8_t flags, const IntVector3& color,
+												  std::string reason) {
+			SPADES_MARK_FUNCTION();
+
+			NetLog("[ESP Mark] player %d, duration %.1f, surfaces 0x%02x, flags 0x%02x, "
+				   "colour (%d, %d, %d): %s", playerId, duration, (unsigned int)surfaces,
+				   (unsigned int)flags, color.x, color.y, color.z, reason.c_str());
+
+			teamplay->SetMark(playerId, duration, surfaces, flags, color, std::move(reason));
+		}
+
+		void Client::TeamplayPlayerSpawned(int playerId) {
+			teamplay->PlayerSpawned(playerId);
+		}
+
+		bool Client::ResolveCrosshairWorldPos(Vector3& out) {
+			SPADES_MARK_FUNCTION();
+
+			if (!world)
+				return false;
+
+			auto maybePlayer = world->GetLocalPlayer();
+			if (!maybePlayer)
+				return false;
+
+			Player& p = maybePlayer.value();
+			if (p.IsSpectator() || !p.IsAlive())
+				return false;
+
+			World::WeaponRayCastResult res =
+			  world->WeaponRayCast(p.GetEye(), p.GetFront(), p.GetId());
+			if (!res.hit || res.startSolid)
+				return false;
+
+			out = res.hitPos;
+			return true;
+		}
+
+		bool Client::SendTeamplayPing(const Vector3& position, const std::string& reason) {
+			SPADES_MARK_FUNCTION();
+
+			if (!teamplay->CanSendPing())
+				return false;
+
+			// A dead player does not ping: waiting to respawn is not a vantage point,
+			// and a corpse pointing at things the living cannot see is a way of
+			// spectating the enemy. The server drops such a ping anyway.
+			if (!world)
+				return false;
+			auto maybePlayer = world->GetLocalPlayer();
+			if (!maybePlayer || !maybePlayer.value().IsAlive())
+				return false;
+
+			// No client-side rate limit: throttling is the server's job.
+			activeNet->SendTeamplayPing(position, reason);
+			return true;
+		}
+
+		void Client::SendTeamplayPingAtCrosshair() {
+			SPADES_MARK_FUNCTION();
+
+			// The extension gates pinging on the server's policy, and a server that
+			// never negotiated the extension leaves every bit clear. Say so instead of
+			// swallowing the key, so the binding never looks broken.
+			if (!teamplay->CanSendPing()) {
+				ShowAlert(_Tr("Client", "This server does not allow team pings."),
+						  AlertType::Notice);
+				return;
+			}
+
+			Vector3 pos;
+			if (!ResolveCrosshairWorldPos(pos))
+				return;
+
+			// The reason is deliberately left empty — a neutral "look here" marker.
+			// Deriving it from what the crosshair is on would turn the ping key into a
+			// confirmation that an enemy is under the crosshair with line of sight. The
+			// pie menu is where a player says what they mean, deliberately.
+			SendTeamplayPing(pos, std::string());
 		}
 
 		void Client::ServerSentMessage(bool system, const std::string& msg) {

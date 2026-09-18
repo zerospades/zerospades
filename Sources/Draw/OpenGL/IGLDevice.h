@@ -48,6 +48,7 @@ namespace spades {
 				UnsignedShort5551,
 				UnsignedShort1555Rev,
 				UnsignedInt2101010Rev,
+				UnsignedInt248,
 
 				// Front face
 				CW,
@@ -183,7 +184,8 @@ namespace spades {
 				BGRA,
 				DepthComponent,
 				DepthComponent24,
-				StencilIndex,
+				Depth24Stencil8,
+				DepthStencil,
 				RGB10A2,
 				RGB16F,
 				RGBA16F,
@@ -245,7 +247,7 @@ namespace spades {
 				ColorAttachment6,
 				ColorAttachment7,
 				DepthAttachment,
-				StencilAttachment,
+				DepthStencilAttachment,
 
 				// framebuffer status
 				FramebufferComplete,

@@ -38,6 +38,7 @@
 #include "ChatWindow.h"
 #include "ClientUI.h"
 #include "LimboView.h"
+#include "Teamplay.h"
 
 #include "GameMap.h"
 #include "World.h"
@@ -349,6 +350,10 @@ namespace spades {
 		void Client::PlayerLeaving(Player& p) {
 			int playerId = p.GetId();
 
+			// A mark or a ping outlives its owner otherwise, and the slot can be reused
+			// by whoever connects next.
+			teamplay->PlayerLeft(playerId);
+
 			// Choose the next player if a follow cam is active on this player
 			if (FollowsNonLocalPlayer(GetCameraMode()) && GetCameraTargetPlayerId() == playerId) {
 				FollowNextPlayer(false);
@@ -422,6 +427,12 @@ namespace spades {
 		}
 
 		void Client::PlayerSpawned(Player& p) {
+			// An ESP Mark with CLEAR_ON_RESPAWN ends here rather than at the death, so
+			// any Create Player for the id ends it and a mark on a player who stays dead
+			// lasts until they come back. Without the flag it survives death and respawn,
+			// so a punishment mark need not be re-sent on every kill.
+			TeamplayPlayerSpawned(p.GetId());
+
 			bool isArena = activeNet && activeNet->GetStatus() == NetClientStatusConnected &&
 			               activeNet->GetGameProperties()->isGameModeArena;
 			if (isArena || cg_corpseClearOnRespawn)

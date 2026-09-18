@@ -63,6 +63,17 @@ namespace spades {
 			void DrawText(IFont& font, std::string s, const Vector2&, const Vector4&);
 			void DrawMapCircle(const Vector2&, const Vector4&, float radius, float thickness = 1.0F);
 
+			/** The screen position of a world-space map point, or nothing when it falls
+			 * outside the visible part of the map for the current map mode. */
+			stmp::optional<Vector2> ProjectVisible(const Vector2& pos) const;
+
+			/** Relayed *Teamplay* pings whose packet names the minimap surface.
+			 * `mapAlpha` is the large map's fade-in factor. */
+			void DrawTeamplayPings(float mapAlpha);
+
+			/** Players the server marked, when the mark names the minimap surface. */
+			void DrawTeamplayMarks(float mapAlpha);
+
 		public:
 			MapView(Client*, bool largeMap);
 			~MapView();
