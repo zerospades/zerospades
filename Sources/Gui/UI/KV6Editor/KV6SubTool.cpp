@@ -45,19 +45,16 @@ namespace spades {
 			const Vector4 kAxisCol[3] = {MakeVector4(1.0F, 0.35F, 0.35F, 1.0F),
 			                             MakeVector4(0.4F, 1.0F, 0.4F, 1.0F),
 			                             MakeVector4(0.45F, 0.6F, 1.0F, 1.0F)};
-			const float kGizLen = 12.0F;   // gizmo handle length (voxels)
-			const float kCube = 0.8F;      // handle cube half-size
-			const float kCubeHi = 1.05F;   // handle cube half-size when active
+			// Gizmo snap steps for turning and scaling, for the tools that enable
+			// those handles.
+			const float kRotationStep = 15.0F * M_PI_F / 180.0F;
+			const float kScaleStep = 0.1F;
 
-			// Distance from point p to the segment [a, b] in screen space.
-			float DistToSeg(const Vector2& p, const Vector2& a, const Vector2& b) {
-				Vector2 ab = b - a;
-				float l2 = Vector2::Dot(ab, ab);
-				float t = (l2 < 1.0e-6F) ? 0.0F : Vector2::Dot(p - a, ab) / l2;
-				t = std::max(0.0F, std::min(1.0F, t));
-				return (p - (a + ab * t)).GetLength();
+			// A gizmo translation snapped to whole voxels, as integers.
+			IntVector3 WholeVoxels(const Vector3& v) {
+				return IntVector3::Make(int(std::lround(v.x)), int(std::lround(v.y)),
+				                        int(std::lround(v.z)));
 			}
-
 		} // namespace
 
 		// --- BlockSubTool (Draw single) --------------------------------------
@@ -310,10 +307,80 @@ namespace spades {
 				ed.DrawBoxOutline(lo, hi, kHover);
 		}
 
-		// --- MoveSubTool (drag a 3-axis gizmo) -------------------------------
+		// --- GizmoSubTool (shared gizmo plumbing) ----------------------------
+
+		GizmoSubTool::GizmoSubTool(float translationStep) {
+			GizmoSnap snap;
+			snap.translation = translationStep;
+			snap.rotation = kRotationStep;
+			snap.scale = kScaleStep;
+			gizmo.SetSnap(snap);
+		}
+
+		bool GizmoSubTool::SyncPose(IEditorContext& ed) {
+			GizmoPose pose;
+			if (!CurrentPose(ed, pose))
+				return false;
+			gizmo.SetPose(pose);
+			return true;
+		}
+
+		void GizmoSubTool::CancelDrag(IEditorContext& ed) {
+			if (gizmo.IsDragging())
+				OnGizmoCancel(ed, gizmo.Cancel());
+		}
+
+		// Whatever happened while the tool was away, a drag never outlives it.
+		void GizmoSubTool::OnActivate(IEditorContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDeactivate(IEditorContext& ed) { CancelDrag(ed); }
+
+		void GizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			if (e.IsRight() && e.IsDown()) {
+				CancelDrag(ed); // as in Blender: a right click abandons the drag
+				return;
+			}
+			if (!e.IsLeft())
+				return;
+			if (e.IsDown()) {
+				if (!gizmo.IsDragging() && SyncPose(ed) && gizmo.Begin(ed.GetGizmoView(), e.pos))
+					OnGizmoBegin(ed);
+			} else if (e.IsDrag()) {
+				if (!gizmo.IsDragging())
+					return;
+				if (!SyncPose(ed)) {
+					CancelDrag(ed); // what was being handled is gone
+					return;
+				}
+				if (gizmo.Drag(ed.GetGizmoView(), e.pos))
+					OnGizmoDrag(ed);
+			} else if (e.IsUp()) {
+				if (gizmo.IsDragging())
+					OnGizmoEnd(ed, gizmo.End());
+			}
+		}
+
+		bool GizmoSubTool::OnEscape(IEditorContext& ed) {
+			if (!gizmo.IsDragging())
+				return false;
+			CancelDrag(ed);
+			return true;
+		}
+
+		void GizmoSubTool::CancelInteraction(IEditorContext& ed) { CancelDrag(ed); }
+
+		void GizmoSubTool::DrawOverlay(IEditorContext& ed) {
+			if (!SyncPose(ed))
+				return;
+			gizmo.Hover(ed.GetGizmoView(), ed.CursorPos());
+			ed.DrawGizmo(gizmo);
+		}
+
+		// --- MoveSubTool (position the pending placement) --------------------
+
+		MoveSubTool::MoveSubTool() : GizmoSubTool(1.0F) {}
 
 		void MoveSubTool::OnActivate(IEditorContext& ed) {
-			grabAxis = -1;
+			GizmoSubTool::OnActivate(ed);
 			if (ed.HasPlacement())
 				return; // a paste or import is already waiting to be positioned
 			if (ed.BeginPlacementFromSelection())
@@ -323,66 +390,25 @@ namespace spades {
 		}
 
 		void MoveSubTool::OnDeactivate(IEditorContext& ed) {
-			grabAxis = -1;
+			GizmoSubTool::OnDeactivate(ed);
 			// Leaving the tool is what writes the voxels into the document.
 			ed.ApplyPlacement();
 		}
 
-		int MoveSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const {
-			bool ok1, ok2;
-			Vector2 s0 = ed.WorldToScreen(c, ok1);
-			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
-			if (!ok1 || !ok2)
-				return 0;
-			Vector2 da = sa - s0;
-			float dl = da.GetLength();
-			if (dl < 0.5F)
-				return 0; // axis ~parallel to the view
-			Vector2 m = ed.CursorPos() - grabCursor;
-			return int(std::lround(Vector2::Dot(m, da) / (dl * dl)));
+		bool MoveSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+			Vector3 centroid;
+			if (!ed.PlacementCentroid(centroid))
+				return false;
+			// The placement itself stays put until release; the gizmo rides the
+			// previewed offset.
+			pose.position = centroid + gizmo.Total().translation;
+			return true;
 		}
 
-		int MoveSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
-			bool ok0;
-			Vector2 s0 = ed.WorldToScreen(c, ok0);
-			if (!ok0)
-				return -1;
-			Vector2 cur = ed.CursorPos();
-			int best = -1;
-			float bestDist = 14.0F; // pixels
-			for (int a = 0; a < 3; a++) {
-				bool ok1;
-				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
-				if (!ok1)
-					continue;
-				// Along the axis line, or near the tip cube (a bigger, easier target).
-				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
-				if (d < bestDist) { bestDist = d; best = a; }
-			}
-			return best;
-		}
-
-		void MoveSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
-			if (!e.IsLeft())
-				return;
-			if (e.IsDown()) {
-				Vector3 c;
-				if (!ed.PlacementCentroid(c))
-					return;
-				int best = HitAxis(ed, c);
-				if (best >= 0) { grabAxis = best; grabCursor = ed.CursorPos(); curOffset = 0; }
-			} else if (e.IsUp()) {
-				if (grabAxis < 0)
-					return;
-				Vector3 c;
-				int off = ed.PlacementCentroid(c) ? OffsetAlong(ed, c, grabAxis) : 0;
-				if (off != 0) {
-					int d[3] = {0, 0, 0};
-					d[grabAxis] = off;
-					ed.MovePlacement(d[0], d[1], d[2]); // still only a pending move
-				}
-				grabAxis = -1;
-			}
+		void MoveSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+			IntVector3 d = WholeVoxels(total.translation);
+			if (d.x != 0 || d.y != 0 || d.z != 0)
+				ed.MovePlacement(d.x, d.y, d.z); // still only a pending move
 		}
 
 		void MoveSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
@@ -400,10 +426,8 @@ namespace spades {
 		}
 
 		bool MoveSubTool::OnEscape(IEditorContext& ed) {
-			if (grabAxis >= 0) {
-				grabAxis = -1; // cancel the drag, keep the placement where it was
-				return true;
-			}
+			if (GizmoSubTool::OnEscape(ed))
+				return true; // cancelled the drag, the placement stays where it was
 			if (ed.HasPlacement()) {
 				ed.CancelPlacement(); // nothing was written, so nothing to undo
 				return true;
@@ -412,235 +436,64 @@ namespace spades {
 		}
 
 		void MoveSubTool::DrawScene(IEditorContext& ed) {
-			Vector3 c;
-			if (!ed.PlacementCentroid(c))
-				return;
-			curOffset = (grabAxis >= 0) ? OffsetAlong(ed, c, grabAxis) : 0;
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col); // shaft (handle cube in overlay)
-			}
-			if (grabAxis >= 0 && curOffset != 0) {
-				int d[3] = {0, 0, 0};
-				d[grabAxis] = curOffset;
-				ed.DrawPlacementOffset(d[0], d[1], d[2], MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
-			}
-		}
-
-		void MoveSubTool::DrawOverlay(IEditorContext& ed) {
-			Vector3 c;
-			if (!ed.PlacementCentroid(c))
-				return;
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
-			}
+			IntVector3 d = WholeVoxels(gizmo.Total().translation);
+			if (d.x != 0 || d.y != 0 || d.z != 0)
+				ed.DrawPlacementOffset(d.x, d.y, d.z, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
 		}
 
 		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
 
+		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(0.1F) {}
+
 		void PivotGizmoSubTool::OnActivate(IEditorContext& ed) {
-			grabAxis = -1;
+			GizmoSubTool::OnActivate(ed);
 			ed.SetStatus("Pivot: drag a handle to move the pivot (0.1 steps)");
 		}
 
-		int PivotGizmoSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
-			bool ok0;
-			Vector2 s0 = ed.WorldToScreen(c, ok0);
-			if (!ok0)
-				return -1;
-			Vector2 cur = ed.CursorPos();
-			int best = -1;
-			float bestDist = 14.0F; // pixels
-			for (int a = 0; a < 3; a++) {
-				bool ok1;
-				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
-				if (!ok1)
-					continue;
-				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
-				if (d < bestDist) { bestDist = d; best = a; }
-			}
-			return best;
-		}
-
-		float PivotGizmoSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c, int axis) const {
-			bool ok1, ok2;
-			Vector2 s0 = ed.WorldToScreen(c, ok1);
-			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
-			if (!ok1 || !ok2)
-				return 0.0F;
-			Vector2 da = sa - s0;
-			float dl = da.GetLength();
-			if (dl < 0.5F)
-				return 0.0F; // axis ~parallel to the view
-			Vector2 m = ed.CursorPos() - grabCursor;
-			float raw = Vector2::Dot(m, da) / (dl * dl);
-			return std::round(raw * 10.0F) / 10.0F; // snap to 0.1
-		}
-
-		void PivotGizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
-			if (!e.IsLeft())
-				return;
-			if (e.IsDown()) {
-				Vector3 c = ed.GetPivot();
-				int best = HitAxis(ed, c);
-				if (best >= 0) {
-					grabAxis = best;
-					grabCursor = ed.CursorPos();
-					grabPivot = c;
-				}
-			} else if (e.IsDrag()) {
-				if (grabAxis < 0)
-					return;
-				// Move the pivot for real (marker and toolbar readout follow) but
-				// without journaling it.
-				float off = OffsetAlong(ed, grabPivot, grabAxis);
-				ed.PreviewPivot(grabPivot + AxisUnit(grabAxis) * off);
-			} else if (e.IsUp()) {
-				if (grabAxis < 0)
-					return;
-				float off = OffsetAlong(ed, grabPivot, grabAxis);
-				ed.PreviewPivot(grabPivot); // rewind the preview...
-				if (off != 0.0F)
-					ed.SetPivot(grabPivot + AxisUnit(grabAxis) * off); // ...then apply as one step
-				grabAxis = -1;
-			}
-		}
-
-		bool PivotGizmoSubTool::OnEscape(IEditorContext& ed) {
-			if (grabAxis < 0)
-				return false;
-			ed.PreviewPivot(grabPivot); // restore the original pivot, commit nothing
-			grabAxis = -1;
+		bool PivotGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+			pose.position = ed.GetPivot(); // live during a drag (the preview moved it)
 			return true;
 		}
 
-		void PivotGizmoSubTool::DrawScene(IEditorContext& ed) {
-			Vector3 c = ed.GetPivot(); // live during a drag (the preview moved the pivot)
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
-			}
+		void PivotGizmoSubTool::OnGizmoBegin(IEditorContext& ed) { startPivot = ed.GetPivot(); }
+
+		void PivotGizmoSubTool::OnGizmoDrag(IEditorContext& ed) {
+			// Move the pivot for real (marker and toolbar readout follow) but
+			// without journaling it.
+			ed.PreviewPivot(startPivot + gizmo.Total().translation);
 		}
 
-		void PivotGizmoSubTool::DrawOverlay(IEditorContext& ed) {
-			Vector3 c = ed.GetPivot();
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
-			}
+		void PivotGizmoSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+			ed.PreviewPivot(startPivot); // rewind the preview...
+			if (!total.IsIdentity())
+				ed.SetPivot(startPivot + total.translation); // ...then apply as one step
+		}
+
+		void PivotGizmoSubTool::OnGizmoCancel(IEditorContext& ed, const GizmoTransform&) {
+			ed.PreviewPivot(startPivot); // restore the original pivot, commit nothing
 		}
 
 		// --- MirrorGizmoSubTool (drag the mirror planes) ---------------------
 
+		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(0.5F) {}
+
 		void MirrorGizmoSubTool::OnActivate(IEditorContext& ed) {
-			grabAxis = -1;
+			GizmoSubTool::OnActivate(ed);
 			ed.SetStatus("Mirror: drag a handle to move the planes (0.5 steps)");
 		}
 
-		int MirrorGizmoSubTool::HitAxis(IEditorContext& ed, const Vector3& c) const {
-			bool ok0;
-			Vector2 s0 = ed.WorldToScreen(c, ok0);
-			if (!ok0)
-				return -1;
-			Vector2 cur = ed.CursorPos();
-			int best = -1;
-			float bestDist = 14.0F; // pixels
-			for (int a = 0; a < 3; a++) {
-				bool ok1;
-				Vector2 tip = ed.WorldToScreen(c + AxisUnit(a) * kGizLen, ok1);
-				if (!ok1)
-					continue;
-				float d = std::min(DistToSeg(cur, s0, tip), (cur - tip).GetLength());
-				if (d < bestDist) { bestDist = d; best = a; }
-			}
-			return best;
-		}
-
-		float MirrorGizmoSubTool::OffsetAlong(IEditorContext& ed, const Vector3& c,
-		                                      int axis) const {
-			bool ok1, ok2;
-			Vector2 s0 = ed.WorldToScreen(c, ok1);
-			Vector2 sa = ed.WorldToScreen(c + AxisUnit(axis), ok2); // 1 voxel along axis
-			if (!ok1 || !ok2)
-				return 0.0F;
-			Vector2 da = sa - s0;
-			float dl = da.GetLength();
-			if (dl < 0.5F)
-				return 0.0F; // axis ~parallel to the view
-			Vector2 m = ed.CursorPos() - grabCursor;
-			float raw = Vector2::Dot(m, da) / (dl * dl);
-			return std::round(raw * 2.0F) * 0.5F; // snap to 0.5
-		}
-
-		void MirrorGizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
-			if (!e.IsLeft())
-				return;
-			if (e.IsDown()) {
-				Vector3 c = ed.MirrorPlane();
-				int best = HitAxis(ed, c);
-				if (best >= 0) {
-					grabAxis = best;
-					grabCursor = ed.CursorPos();
-					grabAnchor = c;
-					appliedOffset = 0.0F;
-				}
-			} else if (e.IsDrag()) {
-				if (grabAxis < 0)
-					return;
-				// The planes are editor state, not document state, so the drag moves
-				// them directly, with nothing to journal.
-				ApplyOffset(ed, OffsetAlong(ed, grabAnchor, grabAxis));
-			} else if (e.IsUp()) {
-				grabAxis = -1;
-			}
-		}
-
-		void MirrorGizmoSubTool::ApplyOffset(IEditorContext& ed, float offset) {
-			// Only the change since the last step is added onto the live plane, never
-			// an absolute position rebuilt from the grab: an undo or redo mid-drag
-			// can resize the volume and shift the plane, and that shift must stand.
-			float delta = offset - appliedOffset;
-			if (delta == 0.0F)
-				return;
-			ed.SetMirrorPlane(ed.MirrorPlane() + AxisUnit(grabAxis) * delta);
-			appliedOffset = offset;
-		}
-
-		bool MirrorGizmoSubTool::OnEscape(IEditorContext& ed) {
-			if (grabAxis < 0)
-				return false;
-			ApplyOffset(ed, 0.0F); // take back what this drag moved, nothing more
-			grabAxis = -1;
+		bool MirrorGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+			pose.position = ed.MirrorPlane();
 			return true;
 		}
 
-		void MirrorGizmoSubTool::DrawScene(IEditorContext& ed) {
-			Vector3 c = ed.MirrorPlane();
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawLine3D(c, c + AxisUnit(a) * kGizLen, col);
-			}
+		void MirrorGizmoSubTool::OnGizmoDrag(IEditorContext& ed) {
+			// The planes are editor state, not document state: nothing to journal.
+			ed.SetMirrorPlane(ed.MirrorPlane() + gizmo.Step().translation);
 		}
 
-		void MirrorGizmoSubTool::DrawOverlay(IEditorContext& ed) {
-			Vector3 c = ed.MirrorPlane();
-			int hover = (grabAxis < 0) ? HitAxis(ed, c) : -1;
-			for (int a = 0; a < 3; a++) {
-				bool active = (grabAxis == a) || (hover == a);
-				Vector4 col = active ? MakeVector4(1, 1, 1, 1) : kAxisCol[a];
-				ed.DrawSolidCube(c + AxisUnit(a) * kGizLen, active ? kCubeHi : kCube, col);
-			}
+		void MirrorGizmoSubTool::OnGizmoCancel(IEditorContext& ed, const GizmoTransform& undo) {
+			ed.SetMirrorPlane(ed.MirrorPlane() + undo.translation);
 		}
 
 		// --- PivotValuesSubTool (type the pivot) -----------------------------
