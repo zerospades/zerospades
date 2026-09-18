@@ -22,6 +22,7 @@
 #include "KV6EditorView.h"
 #include "KV6EditorTool.h"
 #include "KV6ScreenHelper.h"
+#include "KV6SubTool.h"
 #include "KV6ToolRegistry.h"
 #include <Gui/UI/Components/ColorPicker.h>
 #include <Gui/UI/Components/OptionBar.h>
@@ -44,6 +45,7 @@
 #include <Core/VoxelModel.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserDialog.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
+#include <Gui/UI/Widgets/MessageBox.h>
 
 SPADES_SETTING(cg_keyMoveForward);
 SPADES_SETTING(cg_keyMoveBackward);
@@ -70,6 +72,8 @@ namespace spades {
 
 			// Keys that form an editor shortcut together with Ctrl.
 			bool IsCtrlShortcut(const std::string& key) {
+				// Ctrl is also the descend key, so a chord here costs the movement
+				// key bound to the same letter: keep this set clear of them.
 				for (const char* k : {"s", "c", "x", "v", "z", "y"}) {
 					if (EqualsIgnoringCase(key, k))
 						return true;
@@ -79,8 +83,39 @@ namespace spades {
 
 			float Clampf(float v, float lo, float hi) { return std::max(lo, std::min(hi, v)); }
 
+			// `v` in whole half-voxel steps, to the nearest step with ties going up.
+			// A mirror plane `k` half steps from the origin maps voxel i to k - i,
+			// and the plane snaps to the same count, so snapping never changes
+			// which voxels a plane pairs up.
+			int HalfSteps(float v) { return int(std::floor(v * 2.0F + 0.5F)); }
+
 			// Camera speed factor while the sprint key (cg_keySprint) is held.
 			constexpr float kSprintMultiplier = 3.0F;
+
+			// How long a descend key that doubles as a chord modifier (Ctrl, the
+			// default cg_keyCrouch) must be held alone before it moves the camera.
+			// Long enough that even an unhurried Ctrl+Z never nudges the view, while
+			// a deliberate hold still starts descending without feeling stuck.
+			constexpr float kDescendGracePeriod = 0.4F;
+
+			// The editor's ground grid. It never moves: a KV6 column is a 64-bit
+			// mask, so no model can be deeper than 64 voxels, and a plane at that
+			// depth therefore always sits below whatever is being edited (voxel z
+			// spans [z-0.5, z+0.5], so the deepest possible voxel ends at 63.5).
+			constexpr float kGroundPlaneZ = 64.0F;
+			constexpr int kGroundReach = 256; // voxels from the origin, each way
+			constexpr int kGroundStep = 4;    // voxels between lines
+			constexpr int kGroundMajorEvery = 4; // every Nth line is brighter
+
+			// The far plane (and the fog that fades into it) has to sit beyond the
+			// camera, or zooming out puts the whole model behind it.
+			constexpr float kViewDistanceFactor = 4.0F;
+			constexpr float kMinViewDistance = 1000.0F;
+
+			// Option id of the brush swatch, which mirrors the editor's current
+			// colour rather than holding a value of its own.
+			const char* const kBrushColorOption = "color";
+
 
 			// Top UI bands (full width): a title ribbon above the toolbar. The 3D
 			// viewport is inset below them by kBarsH.
@@ -267,6 +302,16 @@ namespace spades {
 				const ToolOption& opt = opts->At(idx);
 				if (opt.type != ToolOption::Type::Bool) return;
 				opts->At(idx).bvalue = !opts->At(idx).bvalue;
+				tool->OnOptionToggled(*this, opt.id, opt.bvalue);
+			};
+			ui->GetOptionBar()->OnActionClicked = [this](int idx) {
+				EditorTool* tool = ActiveTool();
+				if (!tool) return;
+				ToolOptions* opts = tool->Options();
+				if (!opts || idx < 0 || idx >= opts->Count()) return;
+				const ToolOption& opt = opts->At(idx);
+				if (opt.type != ToolOption::Type::Action) return;
+				tool->OnAction(*this, opt.id);
 			};
 			ui->GetOptionBar()->OnColorClicked = [this](int idx) {
 				EditorTool* tool = ActiveTool();
@@ -275,21 +320,23 @@ namespace spades {
 				if (!opts || idx < 0 || idx >= opts->Count()) return;
 				const ToolOption& opt = opts->At(idx);
 				if (opt.type != ToolOption::Type::Color) return;
-				colorOptionIdx = idx;
-				ui->GetColorPicker()->SetColor(opt.color);
+				// The brush swatch edits the shared colour; any other swatch (a
+				// future second colour) edits its own value, in its own tool.
+				bool brush = opt.id == kBrushColorOption;
+				colorTargetTool = brush ? nullptr : tool;
+				colorTargetOption = brush ? std::string() : opt.id;
+				ui->GetColorPicker()->SetColor(brush ? currentColor : opt.color);
 				ui->GetColorPicker()->Open();
 			};
 
 			// Wire up color picker callbacks
 			ui->GetColorPicker()->OnColorChanged = [this](uint32_t c) {
-				if (colorOptionIdx >= 0) {
-					EditorTool* tool = ActiveTool();
-					if (tool) {
-						ToolOptions* opts = tool->Options();
-						if (opts && colorOptionIdx < opts->Count()) {
-							opts->At(colorOptionIdx).color = c;
-						}
-					}
+				// The picker stays open across tool switches, so the edit goes to the
+				// swatch it was opened on, whichever tool is active now.
+				if (colorTargetTool) {
+					if (ToolOptions* opts = colorTargetTool->Options())
+						opts->SetColor(colorTargetOption, c);
+					return;
 				}
 				currentColor = c;
 			};
@@ -332,11 +379,12 @@ namespace spades {
 			cubeSize = n;
 			model = Handle<VoxelModel>::New(n, n, n);
 			model->SetSolid(n / 2, n / 2, n / 2, currentColor);
-			// Anchor the pivot on the seed voxel so mirroring (which reflects across
-			// the pivot) is symmetric about it from the start.
+			// Anchor the pivot on the seed voxel so mirroring (whose planes start
+			// there) is symmetric about it from the start.
 			float c = float(n / 2);
 			model->SetOrigin(MakeVector3(-c, -c, -c));
 			voxelCount = 1;
+			ResetMirrorPlane();
 			RebuildRenderModel();
 			filePath = path;
 			FrameCamera();
@@ -355,6 +403,7 @@ namespace spades {
 			model = Handle<VoxelModel>(loaded, false); // adopt (Load returns a ref)
 			cubeSize = std::max(model->GetWidth(), std::max(model->GetHeight(), model->GetDepth()));
 			voxelCount = CountSolids();
+			ResetMirrorPlane();
 			RebuildRenderModel();
 			filePath = path;
 			FrameCamera();
@@ -385,20 +434,21 @@ namespace spades {
 			statusTimer = 2.5F;
 		}
 
-		void KV6EditorView::Save() {
+		bool KV6EditorView::Save() {
 			// Saving writes the document, so anything still pending belongs in it.
 			if (placementActive)
 				ApplyPlacement();
 			if (filePath.empty()) {
 				SetStatus("No file to save to");
-				return;
+				return false;
 			}
-			if (io->Save(&*model, filePath)) {
-				savedGeomId = undo.GeometryStateId(); // this geometry state is now clean
-				SetStatus("Saved " + filePath);
-			} else {
+			if (!io->Save(&*model, filePath)) {
 				SetStatus("Save failed");
+				return false;
 			}
+			savedGeomId = undo.GeometryStateId(); // this geometry state is now clean
+			SetStatus("Saved " + filePath);
+			return true;
 		}
 
 		std::vector<EditorMenuItem> KV6EditorView::GetMenuItems() {
@@ -406,11 +456,69 @@ namespace spades {
 			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, !filePath.empty()});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
 			items.push_back(EditorMenuItem{"Import Model...", [this] { OpenImportDialog(); }, true});
-			items.push_back(EditorMenuItem{"Exit to Menu", [this] { wantsClose = true; }, true});
+			items.push_back(EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true});
+			items.push_back(EditorMenuItem{
+			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }, true});
 			return items;
 		}
 
-		void KV6EditorView::OpenSaveAsDialog() {
+		void KV6EditorView::ConfirmDiscardChanges(std::function<void()> proceed) {
+			if (!proceed)
+				return;
+			// Voxels still waiting to be placed are unsaved work too, even though
+			// the document itself may be clean.
+			if (!IsDirty() && !placementActive) {
+				proceed();
+				return;
+			}
+
+			UIOverlayHost* overlay = ui->GetOverlay();
+			Handle<MessageBoxScreen> box = Handle<MessageBoxScreen>::New(
+			  &overlay->GetUIManager().GetRootElement(),
+			  "This model has unsaved changes.",
+			  std::vector<std::string>{"Save", "Discard", "Cancel"}, 160.0F);
+			box->closed = [this, proceed](ui::UIElement& sender) {
+				MessageBoxScreen* answer = dynamic_cast<MessageBoxScreen*>(&sender);
+				if (!answer)
+					return;
+				if (answer->resultIndex == 1) { // Discard
+					proceed();
+				} else if (answer->resultIndex == 0) { // Save
+					// A document that was never saved needs somewhere to go first;
+					// `proceed` then runs only if that save succeeds.
+					if (filePath.empty())
+						OpenSaveAsDialog(proceed);
+					else if (Save())
+						proceed();
+				}
+			};
+			ReleaseHeldInput();
+			overlay->Show(box.GetPointerOrNull());
+		}
+
+		void KV6EditorView::OpenDocument() {
+			ConfirmDiscardChanges([this] {
+				FileBrowserOptions options;
+				options.purpose = FileBrowserPurpose::Open;
+				options.target = FileBrowserTarget::Files;
+				options.homeDir = io->DefaultDir();
+				options.initialDir =
+				  filePath.empty() ? io->DefaultDir() : LocalFileSystem::ParentDir(filePath);
+				options.filters.push_back(FileFilter{"KV6 models", {GetDocumentExtension()}});
+
+				UIOverlayHost* overlay = ui->GetOverlay();
+				Handle<FileBrowserDialog> dialog = Handle<FileBrowserDialog>::New(
+				  &overlay->GetUIManager().GetRootElement(), "Open Model", std::move(options));
+				dialog->closed = [this](const FileBrowserResult& result) {
+					if (result.accepted && !result.paths.empty())
+						LoadModel(result.paths.front());
+				};
+				ReleaseHeldInput();
+				overlay->Show(dialog.GetPointerOrNull());
+			});
+		}
+
+		void KV6EditorView::OpenSaveAsDialog(std::function<void()> after) {
 			FileBrowserOptions options;
 			options.purpose = FileBrowserPurpose::Save;
 			options.target = FileBrowserTarget::Files;
@@ -425,9 +533,11 @@ namespace spades {
 			UIOverlayHost* overlay = ui->GetOverlay();
 			Handle<FileBrowserDialog> dialog = Handle<FileBrowserDialog>::New(
 			  &overlay->GetUIManager().GetRootElement(), "Save As", std::move(options));
-			dialog->closed = [this](const FileBrowserResult& result) {
-				if (result.accepted && !result.paths.empty())
-					SaveDocument(result.paths.front());
+			dialog->closed = [this, after](const FileBrowserResult& result) {
+				if (!result.accepted || result.paths.empty())
+					return;
+				if (SaveDocument(result.paths.front()) && after)
+					after();
 			};
 			// A dialog takes over input: nothing should stay held while it is up.
 			ReleaseHeldInput();
@@ -454,9 +564,9 @@ namespace spades {
 			overlay->Show(dialog.GetPointerOrNull());
 		}
 
-		void KV6EditorView::SaveDocument(const std::string& path) {
+		bool KV6EditorView::SaveDocument(const std::string& path) {
 			filePath = path;
-			Save();
+			return Save();
 		}
 
 		bool KV6EditorView::OnMenuEscape() {
@@ -483,6 +593,12 @@ namespace spades {
 
 		Vector3 KV6EditorView::CameraEye() const { return orbitTarget - Forward() * orbitDist; }
 
+		float KV6EditorView::ViewDistance() const {
+			// Far enough to keep the model visible at any zoom, and never nearer than
+			// the fixed distance the editor used before.
+			return std::max(kMinViewDistance, orbitDist * kViewDistanceFactor);
+		}
+
 		void KV6EditorView::UpdateMovement(float dt) {
 			Vector3 fwd = Forward();
 			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
@@ -492,6 +608,7 @@ namespace spades {
 			Vector3 right = MakeVector3(-sinf(yaw), cosf(yaw), 0.0F);
 
 			float step = float(cubeSize) * 0.7F * (keySprint ? kSprintMultiplier : 1.0F) * dt;
+			bool descending = keyDown && DescendKeyIsActive();
 			auto displacement = [&](bool withDescend) {
 				Vector3 move = MakeVector3(0, 0, 0);
 				if (keyFwd) move += fwd;
@@ -499,7 +616,7 @@ namespace spades {
 				if (keyRight) move += right;
 				if (keyLeft) move -= right;
 				if (keyUp) move += up;
-				if (withDescend && keyDown) move -= up;
+				if (withDescend && descending) move -= up;
 				if (move.x == 0.0F && move.y == 0.0F && move.z == 0.0F)
 					return MakeVector3(0, 0, 0);
 				return move.Normalize() * step;
@@ -511,8 +628,18 @@ namespace spades {
 
 			// While Ctrl is both the descend key and held, remember how far the
 			// descend part alone moved us, so a Ctrl shortcut can take it back.
-			if (keyDown && ctrlHeld && KV6CheckKey(cg_keyCrouch, "Control"))
+			if (descending && ctrlHeld && KV6CheckKey(cg_keyCrouch, "Control"))
 				ctrlDescent += delta - displacement(false);
+		}
+
+		bool KV6EditorView::DescendKeyIsActive() const {
+			// A descend key that cannot start a shortcut moves the camera at once.
+			if (!KV6CheckKey(cg_keyCrouch, "Control"))
+				return true;
+			// Ctrl also opens Ctrl+S/C/X/V/Z/Y, so wait out the moment in which the
+			// letter of a chord would arrive: the view then never moves for a
+			// shortcut, and a deliberate hold still descends.
+			return globalTime - descendPressTime >= kDescendGracePeriod;
 		}
 
 		void KV6EditorView::PanView(float dx, float dy) {
@@ -557,12 +684,22 @@ namespace spades {
 			sceneDef.fovY = 60.0F * M_PI_F / 180.0F;
 			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (vpW / vpH));
 			sceneDef.zNear = 0.1F;
-			sceneDef.zFar = 1000.0F;
+			sceneDef.zFar = ViewDistance();
 			sceneDef.viewportLeft = int(vpX);
 			sceneDef.viewportTop = int(vpY);
 			sceneDef.viewportWidth = int(vpW);
 			sceneDef.viewportHeight = int(vpH);
+			// The editor draws its own ground: the game world brings chunk culling
+			// and terrain that crowds the model, and water is a plane following the
+			// camera at sea level with a mirrored scene rendered into it.
 			sceneDef.skipWorld = true;
+			sceneDef.skipWater = true;
+			// A voxel has six face normals, so sunlight splits one palette colour
+			// into several on-screen shades and the model stops reading as the
+			// colour it was painted. Light it evenly instead, and outline it so the
+			// shape survives the loss of shading.
+			sceneDef.flatModelLighting = true;
+			sceneDef.forceOutlines = true;
 			sceneDef.denyCameraBlur = true;
 			sceneDef.time = (unsigned int)(globalTime * 1000.0F);
 			return sceneDef;
@@ -688,24 +825,21 @@ namespace spades {
 			}
 		}
 
-		int KV6EditorView::MirrorIdx(int i, float pivot) const {
-			return int(std::floor(2.0F * pivot + 0.5F)) - i;
-		}
+		int KV6EditorView::MirrorIdx(int i, float plane) const { return HalfSteps(plane) - i; }
 
 		void KV6EditorView::ExpandMirrors(std::vector<IntVector3>& cells) const {
 			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
 			if (!mx && !my && !mz)
 				return;
-			Vector3 org = model->GetOrigin();
 			std::vector<IntVector3> out;
 			out.reserve(cells.size() * 8);
 			for (const IntVector3& c : cells) {
 				int xs[2] = {c.x, c.x}, nx = 1;
 				int ys[2] = {c.y, c.y}, ny = 1;
 				int zs[2] = {c.z, c.z}, nz = 1;
-				if (mx) { int m = MirrorIdx(c.x, -org.x); if (m != c.x) { xs[1] = m; nx = 2; } }
-				if (my) { int m = MirrorIdx(c.y, -org.y); if (m != c.y) { ys[1] = m; ny = 2; } }
-				if (mz) { int m = MirrorIdx(c.z, -org.z); if (m != c.z) { zs[1] = m; nz = 2; } }
+				if (mx) { int m = MirrorIdx(c.x, mirrorPlane.x); if (m != c.x) { xs[1] = m; nx = 2; } }
+				if (my) { int m = MirrorIdx(c.y, mirrorPlane.y); if (m != c.y) { ys[1] = m; ny = 2; } }
+				if (mz) { int m = MirrorIdx(c.z, mirrorPlane.z); if (m != c.z) { zs[1] = m; nz = 2; } }
 				for (int a = 0; a < nx; a++)
 				for (int b = 0; b < ny; b++)
 				for (int d = 0; d < nz; d++)
@@ -732,8 +866,23 @@ namespace spades {
 			dst->SetOrigin(model->GetOrigin() - shift);
 			model = dst;
 			orbitTarget += shift;
+			// The mirror planes are in voxel coordinates too. The shift is whole
+			// voxels, so they stay on the half-step grid.
+			mirrorPlane += shift;
 			cubeSize = std::max(nw, std::max(nh, nd));
 			ShiftSelection(ox, oy, oz); // keep selected voxel coords aligned
+			// A pending placement stores document coordinates too, so it has to
+			// follow the relabelling or it would apply in the wrong place.
+			if (placementActive) {
+				placement.anchor.x += ox;
+				placement.anchor.y += oy;
+				placement.anchor.z += oz;
+				for (IntVector3& v : placement.lifted) {
+					v.x += ox;
+					v.y += oy;
+					v.z += oz;
+				}
+			}
 		}
 
 		void KV6EditorView::TrimVolume() {
@@ -761,13 +910,12 @@ namespace spades {
 				return;
 			int tx = pickPX, ty = pickPY, tz = pickPZ;
 
-			// Target plus its mirror images across the pivot plane. The mirror — or
-			// a placement past an edge — may land outside, so grow to fit them all.
-			Vector3 org = model->GetOrigin();
+			// Target plus its mirror images across the mirror planes. The mirror —
+			// or a placement past an edge — may land outside, so grow to fit them all.
 			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
-			int xb = mx ? MirrorIdx(tx, -org.x) : tx; int nx = (mx && xb != tx) ? 2 : 1;
-			int yb = my ? MirrorIdx(ty, -org.y) : ty; int ny = (my && yb != ty) ? 2 : 1;
-			int zb = mz ? MirrorIdx(tz, -org.z) : tz; int nz = (mz && zb != tz) ? 2 : 1;
+			int xb = mx ? MirrorIdx(tx, mirrorPlane.x) : tx; int nx = (mx && xb != tx) ? 2 : 1;
+			int yb = my ? MirrorIdx(ty, mirrorPlane.y) : ty; int ny = (my && yb != ty) ? 2 : 1;
+			int zb = mz ? MirrorIdx(tz, mirrorPlane.z) : tz; int nz = (mz && zb != tz) ? 2 : 1;
 
 			int loX = std::min(0, tx); int hiX = std::max(model->GetWidth(), tx + 1);
 			if (nx == 2) { loX = std::min(loX, xb); hiX = std::max(hiX, xb + 1); }
@@ -807,11 +955,10 @@ namespace spades {
 			if (!pickHit)
 				return;
 			int hx = pickHX, hy = pickHY, hz = pickHZ;
-			Vector3 org = model->GetOrigin();
 			bool mx = MirrorOn(0), my = MirrorOn(1), mz = MirrorOn(2);
-			int xb = mx ? MirrorIdx(hx, -org.x) : hx; int nx = (mx && xb != hx) ? 2 : 1;
-			int yb = my ? MirrorIdx(hy, -org.y) : hy; int ny = (my && yb != hy) ? 2 : 1;
-			int zb = mz ? MirrorIdx(hz, -org.z) : hz; int nz = (mz && zb != hz) ? 2 : 1;
+			int xb = mx ? MirrorIdx(hx, mirrorPlane.x) : hx; int nx = (mx && xb != hx) ? 2 : 1;
+			int yb = my ? MirrorIdx(hy, mirrorPlane.y) : hy; int ny = (my && yb != hy) ? 2 : 1;
+			int zb = mz ? MirrorIdx(hz, mirrorPlane.z) : hz; int nz = (mz && zb != hz) ? 2 : 1;
 
 			int n = 0;
 			for (int ia = 0; ia < nx; ia++) { int X = (ia == 0) ? hx : xb;
@@ -1029,6 +1176,7 @@ void KV6EditorView::StartPaste() {
 			placement.anchor = anchor;
 			placement.label = label;
 			placementActive = true;
+			RebuildPlacementModel();
 
 			// Positioning a placement is what the Move tool is for, so go there.
 			if (!ActivateMoveTool()) {
@@ -1040,9 +1188,11 @@ void KV6EditorView::StartPaste() {
 		}
 
 		bool KV6EditorView::ActivateMoveTool() {
+			// Matched by type: other sub-tools share the "Move" label (the mirror
+			// gizmo does), so a label search would depend on the toolbar order.
 			for (size_t i = 0; i < tools.size(); i++) {
 				for (int sub = 0; sub < tools[i]->SubToolCount(); sub++) {
-					if (std::string(tools[i]->SubToolLabel(sub)) != "Move")
+					if (!dynamic_cast<MoveSubTool*>(tools[i]->SubTool(sub)))
 						continue;
 					SetMode(EditorMode::Edit);
 					SetActiveTool(int(i));
@@ -1127,7 +1277,52 @@ void KV6EditorView::StartPaste() {
 			placement.anchor = MakeIntVector3(minX, minY, minZ);
 			placement.label = "Move";
 			placementActive = true;
+
+			// The voxels leave the document right away, so the gap they came from is
+			// visible while they are being positioned. The edit is not journaled:
+			// applying (or cancelling) decides what the undo history sees.
+			LiftPlacementVoxels();
+			selection.clear(); // those cells are empty now
+			RebuildPlacementModel();
 			return true;
+		}
+
+		void KV6EditorView::LiftPlacementVoxels() {
+			if (placement.lifted.empty())
+				return;
+			for (const IntVector3& v : placement.lifted) {
+				if (InBounds(v.x, v.y, v.z))
+					WriteVoxelRaw(v.x, v.y, v.z, false, 0);
+			}
+			RebuildRenderModel();
+		}
+
+		void KV6EditorView::RestorePlacementVoxels() {
+			if (placement.lifted.empty())
+				return;
+			// `lifted` and `voxels` are parallel: same order, same voxel.
+			for (size_t i = 0; i < placement.lifted.size(); i++) {
+				const IntVector3& v = placement.lifted[i];
+				if (InBounds(v.x, v.y, v.z))
+					WriteVoxelRaw(v.x, v.y, v.z, true, placement.voxels[i].color);
+			}
+			RebuildRenderModel();
+		}
+
+		void KV6EditorView::RebuildPlacementModel() {
+			placementModel = Handle<client::IModel>();
+			if (!placementActive || placement.voxels.empty())
+				return;
+			int w = 1, h = 1, d = 1;
+			for (const ClipVoxel& v : placement.voxels) {
+				w = std::max(w, v.rel.x + 1);
+				h = std::max(h, v.rel.y + 1);
+				d = std::max(d, v.rel.z + 1);
+			}
+			Handle<VoxelModel> preview = Handle<VoxelModel>::New(w, h, d);
+			for (const ClipVoxel& v : placement.voxels)
+				preview->SetSolid(v.rel.x, v.rel.y, v.rel.z, v.color);
+			placementModel = renderer->CreateModel(*preview);
 		}
 
 		void KV6EditorView::MovePlacement(int dx, int dy, int dz) {
@@ -1154,9 +1349,13 @@ void KV6EditorView::StartPaste() {
 		void KV6EditorView::ApplyPlacement() {
 			if (!placementActive)
 				return;
+			// Put the lifted voxels back first: the journaled edit below is what the
+			// undo history should contain, as a single step.
+			RestorePlacementVoxels();
 			Placement pending = std::move(placement);
 			placement = Placement();
 			placementActive = false;
+			placementModel = Handle<client::IModel>();
 
 			// Voxels that end up exactly where they started change nothing.
 			bool moved = true;
@@ -1170,8 +1369,10 @@ void KV6EditorView::StartPaste() {
 				moved = from.x != pending.anchor.x || from.y != pending.anchor.y ||
 				        from.z != pending.anchor.z;
 			}
-			if (!moved)
+			if (!moved) {
+				RebuildRenderModel(); // the lift was undone above
 				return;
+			}
 
 			// Volume that must hold the document plus the placed voxels, checked
 			// before anything is written.
@@ -1186,6 +1387,12 @@ void KV6EditorView::StartPaste() {
 			}
 			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
 			if (nw > 4096 || nh > 4096 || nd > 64) {
+				// Refuse the placement rather than lose it: it stays pending where it
+				// was so the user can move it somewhere that fits.
+				placement = std::move(pending);
+				placementActive = true;
+				LiftPlacementVoxels();
+				RebuildPlacementModel();
 				SetStatus("Reached the maximum model size");
 				return;
 			}
@@ -1222,12 +1429,32 @@ void KV6EditorView::StartPaste() {
 			if (!placementActive)
 				return;
 			std::string label = placement.label;
+			// Nothing was journaled, so putting the voxels back is the whole undo.
+			RestorePlacementVoxels();
+			for (const IntVector3& v : placement.lifted)
+				AddSelect(v.x, v.y, v.z); // they are selected again, as before the lift
 			placement = Placement();
 			placementActive = false;
+			placementModel = Handle<client::IModel>();
 			SetStatus(label + " cancelled");
 		}
 
-		void KV6EditorView::DrawPlacementPreview() { DrawPlacementOffset(0, 0, 0, MakeVector4(0, 0, 0, 0)); }
+		void KV6EditorView::DrawPlacementPreview() {
+			// The voxels themselves are rendered solid (see RunFrame); outline the
+			// volume so it reads as pending rather than part of the document.
+			if (!placementActive || placement.voxels.empty())
+				return;
+			IntVector3 lo = placement.anchor, hi = placement.anchor;
+			for (const ClipVoxel& v : placement.voxels) {
+				lo.x = std::min(lo.x, placement.anchor.x + v.rel.x);
+				lo.y = std::min(lo.y, placement.anchor.y + v.rel.y);
+				lo.z = std::min(lo.z, placement.anchor.z + v.rel.z);
+				hi.x = std::max(hi.x, placement.anchor.x + v.rel.x);
+				hi.y = std::max(hi.y, placement.anchor.y + v.rel.y);
+				hi.z = std::max(hi.z, placement.anchor.z + v.rel.z);
+			}
+			DrawBoxOutline(lo, hi, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+		}
 
 		void KV6EditorView::DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) {
 			if (!placementActive)
@@ -1243,78 +1470,6 @@ void KV6EditorView::StartPaste() {
 		}
 
 				// --- Selection move (gizmo) ------------------------------------------
-
-		bool KV6EditorView::SelectionCentroid(Vector3& out) const {
-			if (selection.empty())
-				return false;
-			int minX = 1 << 30, minY = 1 << 30, minZ = 1 << 30;
-			int maxX = -(1 << 30), maxY = -(1 << 30), maxZ = -(1 << 30);
-			for (int64_t k : selection) {
-				int x, y, z;
-				SelDecode(k, x, y, z);
-				minX = std::min(minX, x); minY = std::min(minY, y); minZ = std::min(minZ, z);
-				maxX = std::max(maxX, x); maxY = std::max(maxY, y); maxZ = std::max(maxZ, z);
-			}
-			out = MakeVector3((minX + maxX) * 0.5F, (minY + maxY) * 0.5F, (minZ + maxZ) * 0.5F);
-			return true;
-		}
-
-		void KV6EditorView::DrawSelectionOffset(int dx, int dy, int dz, const Vector4& color) {
-			for (int64_t k : selection) {
-				int x, y, z;
-				SelDecode(k, x, y, z);
-				DrawCellOutline(x + dx, y + dy, z + dz, color);
-			}
-		}
-
-		void KV6EditorView::MoveSelection(int dx, int dy, int dz) {
-			if (selection.empty() || (dx == 0 && dy == 0 && dz == 0))
-				return;
-			// Gather the selected voxels (with their colours).
-			std::vector<ClipVoxel> moved;
-			for (int64_t k : selection) {
-				int x, y, z;
-				SelDecode(k, x, y, z);
-				if (InBounds(x, y, z) && model->IsSolid(x, y, z))
-					moved.push_back({MakeIntVector3(x, y, z), model->GetColor(x, y, z) & 0xFFFFFF});
-			}
-			if (moved.empty())
-				return;
-			// Volume that must hold both the current model and the moved voxels at
-			// their destination — checked up front so we can bail before editing.
-			int loX = 0, loY = 0, loZ = 0;
-			int hiX = model->GetWidth(), hiY = model->GetHeight(), hiZ = model->GetDepth();
-			for (const ClipVoxel& v : moved) {
-				int x = v.rel.x + dx, y = v.rel.y + dy, z = v.rel.z + dz;
-				loX = std::min(loX, x); hiX = std::max(hiX, x + 1);
-				loY = std::min(loY, y); hiY = std::max(hiY, y + 1);
-				loZ = std::min(loZ, z); hiZ = std::max(hiZ, z + 1);
-			}
-			int nw = hiX - loX, nh = hiY - loY, nd = hiZ - loZ;
-			if (nw > 4096 || nh > 4096 || nd > 64) {
-				SetStatus("Reached the maximum model size");
-				return;
-			}
-			undo.Begin("Move");
-			// Lift the selected voxels off the model, then re-stamp them shifted.
-			for (const ClipVoxel& v : moved)
-				WriteVoxel(v.rel.x, v.rel.y, v.rel.z, false, 0);
-			selection.clear();
-			int ox = -loX, oy = -loY, oz = -loZ;
-			if (ox != 0 || oy != 0 || oz != 0 || nw != model->GetWidth() ||
-			    nh != model->GetHeight() || nd != model->GetDepth())
-				RebuildVolume(nw, nh, nd, ox, oy, oz);
-			for (const ClipVoxel& v : moved) {
-				int x = v.rel.x + dx + ox, y = v.rel.y + dy + oy, z = v.rel.z + dz + oz;
-				if (!InBounds(x, y, z))
-					continue;
-				WriteVoxel(x, y, z, true, v.color);
-				AddSelect(x, y, z);
-			}
-			TrimVolume();
-			undo.End();
-			RebuildRenderModel();
-		}
 
 		// --- Layout / hit testing --------------------------------------------
 
@@ -1366,16 +1521,15 @@ void KV6EditorView::StartPaste() {
 
 		void KV6EditorView::DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 		                                           const Vector4& color) {
-			Vector3 org = model->GetOrigin();
 			for (int mx = 0; mx <= (MirrorOn(0) ? 1 : 0); mx++)
 			for (int my = 0; my <= (MirrorOn(1) ? 1 : 0); my++)
 			for (int mz = 0; mz <= (MirrorOn(2) ? 1 : 0); mz++) {
 				IntVector3 a = lo, b = hi;
-				if (mx) { int p = MirrorIdx(lo.x, -org.x), q = MirrorIdx(hi.x, -org.x);
+				if (mx) { int p = MirrorIdx(lo.x, mirrorPlane.x), q = MirrorIdx(hi.x, mirrorPlane.x);
 				          a.x = std::min(p, q); b.x = std::max(p, q); }
-				if (my) { int p = MirrorIdx(lo.y, -org.y), q = MirrorIdx(hi.y, -org.y);
+				if (my) { int p = MirrorIdx(lo.y, mirrorPlane.y), q = MirrorIdx(hi.y, mirrorPlane.y);
 				          a.y = std::min(p, q); b.y = std::max(p, q); }
-				if (mz) { int p = MirrorIdx(lo.z, -org.z), q = MirrorIdx(hi.z, -org.z);
+				if (mz) { int p = MirrorIdx(lo.z, mirrorPlane.z), q = MirrorIdx(hi.z, mirrorPlane.z);
 				          a.z = std::min(p, q); b.z = std::max(p, q); }
 				DrawBoxOutline(a, b, color);
 			}
@@ -1624,22 +1778,33 @@ void KV6EditorView::StartPaste() {
 		float KV6EditorView::BarsH() { return kBarsH; }
 
 		void KV6EditorView::DrawHelpers() {
-			Vector4 grid = MakeVector4(1.0F, 1.0F, 1.0F, 0.06F);
+			// Opaque (alpha 1.0, so the lines cover what is behind them) but kept
+			// close to the background tone: the floor should be legible without
+			// competing with the model. Contrast comes from the minor/major
+			// difference rather than from brightness.
+			Vector4 grid = MakeVector4(0.19F, 0.20F, 0.23F, 1.0F);
+			Vector4 gridMajor = MakeVector4(0.30F, 0.32F, 0.37F, 1.0F);
 			Vector4 box = MakeVector4(0.4F, 0.7F, 1.0F, 0.5F);
+
+			// A fixed grid in world space: it does not follow the model, the volume
+			// or the camera, so it reads as the ground rather than something moving
+			// with the subject.
+			float z = kGroundPlaneZ;
+			float from = float(-kGroundReach) - 0.5F; // voxel edges, not centres
+			float to = float(kGroundReach) - 0.5F;
+			for (int i = -kGroundReach; i <= kGroundReach; i += kGroundStep) {
+				float at = float(i) - 0.5F;
+				bool major = (i % (kGroundStep * kGroundMajorEvery)) == 0;
+				const Vector4& color = major ? gridMajor : grid;
+				renderer->AddDebugLine(MakeVector3(at, from, z), MakeVector3(at, to, z), color);
+				renderer->AddDebugLine(MakeVector3(from, at, z), MakeVector3(to, at, z), color);
+			}
+
 			float lo = -0.5F;
-			float hiX = float(model->GetWidth()) - 0.5F;
-			float hiY = float(model->GetHeight()) - 0.5F;
-			float hiZ = float(model->GetDepth()) - 0.5F;
-
-			for (int i = 0; i <= model->GetWidth(); i += 4)
-				renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, lo, hiZ),
-				                       MakeVector3(float(i) - 0.5F, hiY, hiZ), grid);
-			for (int i = 0; i <= model->GetHeight(); i += 4)
-				renderer->AddDebugLine(MakeVector3(lo, float(i) - 0.5F, hiZ),
-				                       MakeVector3(hiX, float(i) - 0.5F, hiZ), grid);
-
 			Vector3 a = MakeVector3(lo, lo, lo);
-			Vector3 b = MakeVector3(hiX, hiY, hiZ);
+			Vector3 b = MakeVector3(float(model->GetWidth()) - 0.5F,
+			                        float(model->GetHeight()) - 0.5F,
+			                        float(model->GetDepth()) - 0.5F);
 			BoxEdges(a, b, [&](const Vector3& p, const Vector3& q) {
 				renderer->AddDebugLine(p, q, box);
 			});
@@ -1648,7 +1813,6 @@ void KV6EditorView::StartPaste() {
 		// Semi-transparent quad at each enabled mirror plane (drawn as a fan of
 		// debug lines, since the editor only has line primitives in 3D).
 		void KV6EditorView::DrawMirrorPlanes() {
-			Vector3 org = model->GetOrigin();
 			int w = model->GetWidth(), h = model->GetHeight(), d = model->GetDepth();
 
 			// Grid lines are spaced one tile (2 voxels) apart. Extend one tile past
@@ -1662,7 +1826,7 @@ void KV6EditorView::StartPaste() {
 			float hiZ = float(stop(d)) - 0.5F;
 
 			if (MirrorOn(0)) {
-				float px = -org.x;
+				float px = mirrorPlane.x;
 				Vector4 col = MakeVector4(1.0F, 0.35F, 0.35F, 0.25F);
 				for (int i = -2; i <= stop(h); i += 2)
 					renderer->AddDebugLine(MakeVector3(px, float(i) - 0.5F, lo),
@@ -1672,7 +1836,7 @@ void KV6EditorView::StartPaste() {
 					                       MakeVector3(px, hiY, float(i) - 0.5F), col);
 			}
 			if (MirrorOn(1)) {
-				float py = -org.y;
+				float py = mirrorPlane.y;
 				Vector4 col = MakeVector4(0.4F, 1.0F, 0.4F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
 					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, py, lo),
@@ -1682,7 +1846,7 @@ void KV6EditorView::StartPaste() {
 					                       MakeVector3(hiX, py, float(i) - 0.5F), col);
 			}
 			if (MirrorOn(2)) {
-				float pz = -org.z;
+				float pz = mirrorPlane.z;
 				Vector4 col = MakeVector4(0.45F, 0.6F, 1.0F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
 					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, lo, pz),
@@ -1939,18 +2103,32 @@ void KV6EditorView::StartPaste() {
 					ui->GetEditorMenu()->IsActive(), sw);
 		}
 
-		bool KV6EditorView::MirrorOn(int axis) const {
+		bool KV6EditorView::MirrorOn(int axis) const { return MirrorEnabled(axis); }
+
+		bool KV6EditorView::MirrorEnabled(int axis) const {
 			if (axis < 0 || axis > 2)
 				return false;
-			if (currentMode != EditorMode::Edit || activeTool < 0 ||
-			    activeTool >= int(tools.size()))
+			// Mirroring is a modelling aid for Edit mode; it must not silently
+			// reshape anything while another mode is driving the document.
+			if (currentMode != EditorMode::Edit)
 				return false;
-			ToolOptions* o = tools[activeTool]->Options();
-			if (!o)
-				return false;
-			static const char* ids[3] = {"mirror.x", "mirror.y", "mirror.z"};
-			return o->GetBool(ids[axis]);
+			return mirrorEnabled[axis];
 		}
+
+		void KV6EditorView::SetMirrorEnabled(int axis, bool on) {
+			if (axis < 0 || axis > 2)
+				return;
+			mirrorEnabled[axis] = on;
+		}
+
+		void KV6EditorView::SetMirrorPlane(const Vector3& plane) {
+			// MirrorIdx only sees whole half steps, so anything finer would move the
+			// handle without moving the reflection.
+			auto snap = [](float v) { return float(HalfSteps(v)) * 0.5F; };
+			mirrorPlane = MakeVector3(snap(plane.x), snap(plane.y), snap(plane.z));
+		}
+
+		void KV6EditorView::ResetMirrorPlane() { SetMirrorPlane(GetPivot()); }
 
 		void KV6EditorView::DrawSubToolbar(float sw) {
 			(void)sw;
@@ -1971,13 +2149,21 @@ void KV6EditorView::StartPaste() {
 			std::vector<OptionBar::Option> options;
 			ToolOptions* opts = t->Options();
 			if (opts) {
+				// The brush swatch is a view of the editor's single current colour,
+				// not a per-tool value: the picker, the eyedropper and every tool's
+				// swatch must always agree.
+				for (int i = 0; i < opts->Count(); i++) {
+					if (opts->At(i).id == kBrushColorOption)
+						opts->At(i).color = currentColor;
+				}
 				for (int i = 0; i < opts->Count(); i++) {
 					const ToolOption& op = opts->At(i);
 					OptionBar::Option opt;
 					opt.group = op.group;
 					opt.label = op.label;
-					opt.type = (op.type == ToolOption::Type::Color) ? OptionBar::OptionType::Color
-							 : (op.type == ToolOption::Type::Label) ? OptionBar::OptionType::Label
+					opt.type = (op.type == ToolOption::Type::Color)  ? OptionBar::OptionType::Color
+							 : (op.type == ToolOption::Type::Label)  ? OptionBar::OptionType::Label
+							 : (op.type == ToolOption::Type::Action) ? OptionBar::OptionType::Action
 							 : OptionBar::OptionType::Bool;
 					opt.bvalue = op.bvalue;
 					opt.color = op.color;
@@ -2166,6 +2352,10 @@ void KV6EditorView::StartPaste() {
 										if (ui->GetOptionBar()->OnColorClicked)
 											ui->GetOptionBar()->OnColorClicked(idx);
 										ui->GetOptionBar()->PlayButtonActivateSound();
+									} else if (opt.type == ToolOption::Type::Action) {
+										if (ui->GetOptionBar()->OnActionClicked)
+											ui->GetOptionBar()->OnActionClicked(idx);
+										ui->GetOptionBar()->PlayButtonActivateSound();
 									}
 								}
 							}
@@ -2211,6 +2401,8 @@ void KV6EditorView::StartPaste() {
 			if (KV6CheckKey(jp, key)) { keyUp = down; return; }
 			if (KV6CheckKey(cr, key)) {
 				keyDown = down;
+				if (down)
+					descendPressTime = globalTime; // starts the grace period
 				ctrlDescent = MakeVector3(0, 0, 0); // a new press, or a finished one
 				return;
 			}
@@ -2273,7 +2465,9 @@ void KV6EditorView::StartPaste() {
 				statusTimer -= dt;
 
 			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
-			renderer->SetFogDistance(1000.0F);
+			// Matches the far plane: fog that ended closer would swallow the model
+			// at the far end of the zoom range.
+			renderer->SetFogDistance(ViewDistance());
 
 			// The scene is rendered full-screen (sub-viewport rendering isn't
 			// guaranteed across renderers — keep this renderer-agnostic), and the
@@ -2297,6 +2491,16 @@ void KV6EditorView::StartPaste() {
 				// Cancel the KV6 pivot so the model sits in the editor's grid space.
 				param.matrix = Matrix4::Translate(model->GetOrigin() * -1.0F);
 				renderer->RenderModel(*renderModel, param);
+			}
+			// Pending voxels (a paste, an import, or a selection being moved) render
+			// solid at their temporary position, in a document that no longer holds
+			// them.
+			if (placementActive && placementModel) {
+				client::ModelRenderParam param;
+				param.matrix = Matrix4::Translate(MakeVector3(float(placement.anchor.x),
+				                                             float(placement.anchor.y),
+				                                             float(placement.anchor.z)));
+				renderer->RenderModel(*placementModel, param);
 			}
 			DrawHelpers();
 			DrawOriginAxes();

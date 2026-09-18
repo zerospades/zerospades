@@ -735,7 +735,7 @@ namespace spades {
 				device->Enable(IGLDevice::Blend, false);
 			}
 
-			if (settings.r_outlines && !mirror) {
+			if ((settings.r_outlines || sceneDef.forceOutlines) && !mirror) {
 				GLProfiler::Context p(*profiler, "Outline Pass");
 
 				device->DepthFunc(IGLDevice::Less);
@@ -882,7 +882,7 @@ namespace spades {
 			device->ClearDepth(1.0F);
 			device->DepthRange(0.0F, 1.0F);
 
-			if ((int)settings.r_water >= 2) {
+			if ((int)settings.r_water >= 2 && !sceneDef.skipWater) {
 				// for Water 2 (r_water >= 2), we need to render reflection
 				try {
 					// render mirrored scene
@@ -981,7 +981,7 @@ namespace spades {
 			}
 
 			device->Enable(IGLDevice::CullFace, false);
-			if (settings.r_water && waterRenderer) {
+			if (settings.r_water && waterRenderer && !sceneDef.skipWater) {
 				GLProfiler::Context p(*profiler, "Water");
 				waterRenderer->Update(dt);
 				waterRenderer->Render();

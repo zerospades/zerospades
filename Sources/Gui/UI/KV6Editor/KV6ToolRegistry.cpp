@@ -21,6 +21,7 @@
 #include "KV6ToolRegistry.h"
 
 #include "KV6DrawTool.h"
+#include "KV6MirrorTool.h"
 #include "KV6PaintTool.h"
 #include "KV6PivotTool.h"
 #include "KV6SelectTool.h"
@@ -38,6 +39,7 @@ namespace spades {
 				registry.Register([] { return std::unique_ptr<EditorTool>(new DrawTool()); });
 				registry.Register([] { return std::unique_ptr<EditorTool>(new PaintTool()); });
 				registry.Register([] { return std::unique_ptr<EditorTool>(new SelectTool()); });
+				registry.Register([] { return std::unique_ptr<EditorTool>(new MirrorTool()); });
 			}
 			return registry;
 		}

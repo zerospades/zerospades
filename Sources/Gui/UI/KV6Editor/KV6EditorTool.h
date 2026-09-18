@@ -60,15 +60,28 @@ namespace spades {
 			virtual bool OnEscape(IEditorContext&) { return false; }
 
 			// Declarative options shown in the secondary toolbar next to this tool's
-			// sub-tools (e.g. Draw's mirror toggles and colour swatch). Returning
+			// sub-tools (e.g. Mirror's axis toggles, Draw's colour swatch). Returning
 			// null means the tool has no options. The editor renders and hit-tests
 			// whatever is listed, so tools never touch the toolbar code directly.
 			virtual ToolOptions* Options() { return nullptr; }
+
+			// A ToolOption of type Bool was clicked; it has already been flipped to
+			// `value`. Tools that mirror a toggle into other state react here.
+			virtual void OnOptionToggled(IEditorContext&, const std::string& id, bool value) {
+				(void)id;
+				(void)value;
+			}
+
+			// A ToolOption of type Action was clicked; `id` is that option's id.
+			virtual void OnAction(IEditorContext&, const std::string& id) { (void)id; }
 
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
 			virtual int SubToolCount() const { return 0; }
 			virtual const char* SubToolLabel(int) const { return ""; }
+			// The sub-tool itself, for callers that must find one by what it is
+			// rather than by its label; null when out of range.
+			virtual EditorTool* SubTool(int) { return nullptr; }
 			virtual int ActiveSubTool() const { return 0; }
 			virtual void SetSubTool(IEditorContext&, int) {}
 

@@ -35,7 +35,7 @@ namespace spades {
 			ToolOptions* Options() override { return &options; }
 
 		private:
-			ToolOptions options; // mirror X/Y/Z toggles + the colour swatch
+			ToolOptions options; // the brush colour swatch
 		};
 	} // namespace gui
 } // namespace spades
