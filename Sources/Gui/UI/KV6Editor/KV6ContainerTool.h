@@ -46,6 +46,7 @@ namespace spades {
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
 			bool OnEscape(IEditorContext&) override;
+			void CancelInteraction(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
 			void DrawOverlay(IEditorContext&) override;
 

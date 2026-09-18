@@ -57,6 +57,10 @@ namespace spades {
 			EditorTool* s = Cur();
 			return s ? s->OnEscape(ed) : false;
 		}
+		void ContainerTool::CancelInteraction(IEditorContext& ed) {
+			if (EditorTool* s = Cur())
+				s->CancelInteraction(ed);
+		}
 		void ContainerTool::DrawScene(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->DrawScene(ed);

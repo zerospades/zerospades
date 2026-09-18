@@ -59,6 +59,11 @@ namespace spades {
 			// key (so the editor doesn't also open the pause menu).
 			virtual bool OnEscape(IEditorContext&) { return false; }
 
+			// Abandon a gesture in progress (a drag) without applying it. The editor
+			// calls this before it acts behind the tool's back (a shortcut, a dialog
+			// taking the input), so no gesture outlives the state it started from.
+			virtual void CancelInteraction(IEditorContext&) {}
+
 			// Declarative options shown in the secondary toolbar next to this tool's
 			// sub-tools (e.g. Mirror's axis toggles, Draw's colour swatch). Returning
 			// null means the tool has no options. The editor renders and hit-tests

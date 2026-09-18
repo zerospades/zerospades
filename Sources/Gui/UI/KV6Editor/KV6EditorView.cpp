@@ -25,6 +25,8 @@
 #include "KV6SubTool.h"
 #include "KV6ToolRegistry.h"
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
+#include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/Toolbar.h>
 #include <Gui/UIWidgetPainter.h>
@@ -643,18 +645,21 @@ namespace spades {
 		}
 
 		void KV6EditorView::PanView(float dx, float dy) {
-			if (camSH <= 0.0F)
+			if (!camera.IsValid())
 				return;
-			// World units per screen pixel at the orbit distance, so the point under
+			// World units per screen pixel at the orbited point, so the point under
 			// the cursor follows the drag at any zoom level.
-			float unitsPerPixel = 2.0F * orbitDist * tanf(camFovY * 0.5F) / camSH;
-			orbitTarget += camRight * (-dx * unitsPerPixel) + camUp * (dy * unitsPerPixel);
+			float unitsPerPixel = camera.WorldPerPixel(orbitTarget);
+			orbitTarget +=
+			  camera.right * (-dx * unitsPerPixel) + camera.up * (dy * unitsPerPixel);
 		}
 
 		void KV6EditorView::ReleaseHeldInput() {
 			keyFwd = keyBack = keyLeft = keyRight = keyUp = keyDown = false;
 			ctrlDescent = MakeVector3(0, 0, 0);
 			lookActive = false;
+			// The button release that would end a drag may be swallowed too.
+			CancelToolInteraction();
 		}
 
 		client::SceneDefinition KV6EditorView::SetupScene(float vpX, float vpY, float vpW, float vpH) {
@@ -709,38 +714,26 @@ namespace spades {
 
 		bool KV6EditorView::RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
 		                                 IntVector3& out) {
-			if (camSW <= 0.0F || camSH <= 0.0F)
+			if (!camera.IsValid())
 				return false;
-			const Vector2& cursorPos = softwareCursor->GetPosition();
-			float sx = ((cursorPos.x - camVpX) / camSW) * 2.0F - 1.0F;
-			float sy = ((cursorPos.y - camVpY) / camSH) * 2.0F - 1.0F;
-			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
-			              camUp * (sy * tanf(camFovY * 0.5F));
-			dir = dir.Normalize();
+			Vector3 origin, dir;
+			camera.Ray(softwareCursor->GetPosition(), origin, dir);
 			float denom = Vector3::Dot(dir, normal);
 			if (std::fabs(denom) < 1.0e-5F)
 				return false;
-			float t = Vector3::Dot(planePoint - camEye, normal) / denom;
+			float t = Vector3::Dot(planePoint - origin, normal) / denom;
 			if (t <= 0.0F)
 				return false;
-			Vector3 hit = camEye + dir * t;
+			Vector3 hit = origin + dir * t;
 			out = MakeIntVector3(int(std::floor(hit.x + 0.5F)), int(std::floor(hit.y + 0.5F)),
 			                     int(std::floor(hit.z + 0.5F)));
 			return true;
 		}
 
 		Vector2 KV6EditorView::WorldToScreen(const Vector3& w, bool& ok) const {
-			Vector3 rel = w - camEye;
-			float fz = Vector3::Dot(rel, camFwd);
-			ok = fz > 0.001F;
-			if (!ok)
-				fz = 0.001F;
-			float fx = Vector3::Dot(rel, camRight);
-			float fy = Vector3::Dot(rel, camUp);
-			float sx = (fx / fz) / tanf(camFovX * 0.5F);
-			float sy = -(fy / fz) / tanf(camFovY * 0.5F);
-			return MakeVector2(camVpX + (sx + 1.0F) * 0.5F * camSW,
-			                   camVpY + (sy + 1.0F) * 0.5F * camSH);
+			Vector2 screen = MakeVector2(0.0F, 0.0F);
+			ok = camera.Project(w, screen);
+			return screen;
 		}
 
 		// A bright depth-tested 3D line, also collected for the dim see-through pass.
@@ -771,19 +764,15 @@ namespace spades {
 
 		void KV6EditorView::DoPick() {
 			pickHit = false;
-			if (camSW <= 0.0F || camSH <= 0.0F)
+			if (!camera.IsValid())
 				return;
 
-			const Vector2& cursorPos = softwareCursor->GetPosition();
-			float sx = ((cursorPos.x - camVpX) / camSW) * 2.0F - 1.0F;
-			float sy = ((cursorPos.y - camVpY) / camSH) * 2.0F - 1.0F;
-			Vector3 dir = camFwd + camRight * (sx * tanf(camFovX * 0.5F)) -
-			              camUp * (sy * tanf(camFovY * 0.5F));
-			dir = dir.Normalize();
+			Vector3 eye, dir;
+			camera.Ray(softwareCursor->GetPosition(), eye, dir);
 
 			// The renderer centres voxel (x,y,z) at world (x,y,z), so traverse in a
 			// +0.5-shifted space where each integer cell maps to a voxel index.
-			Vector3 o = camEye + MakeVector3(0.5F, 0.5F, 0.5F);
+			Vector3 o = eye + MakeVector3(0.5F, 0.5F, 0.5F);
 
 			int cx = int(std::floor(o.x));
 			int cy = int(std::floor(o.y));
@@ -1489,13 +1478,7 @@ void KV6EditorView::StartPaste() {
 		}
 		void KV6EditorView::DrawLine2D(const Vector2& a, const Vector2& b, float w,
 		                               const Vector4& col) {
-			Vector2 d = b - a;
-			float len = d.GetLength();
-			if (len < 0.001F)
-				return;
-			Vector2 n = MakeVector2(-d.y, d.x) * (w * 0.5F / len);
-			ColorNP(col);
-			renderer->DrawImage((client::IImage*)NULL, a + n, b + n, a - n, AABB2(0, 0, 1, 1));
+			OverlayStrokeLine(*renderer, a, b, w, col);
 		}
 
 		void KV6EditorView::DrawCellOutline(int x, int y, int z, const Vector4& color) {
@@ -1861,35 +1844,22 @@ void KV6EditorView::StartPaste() {
 
 		void KV6EditorView::FillTri(const Vector2& A, const Vector2& B, const Vector2& C,
 		                            const Vector4& col) {
-			Vector2 p[3] = {A, B, C};
-			auto sw = [](Vector2& a, Vector2& b) { Vector2 t = a; a = b; b = t; };
-			if (p[0].y > p[1].y) sw(p[0], p[1]);
-			if (p[1].y > p[2].y) sw(p[1], p[2]);
-			if (p[0].y > p[1].y) sw(p[0], p[1]);
-			float y0 = p[0].y, y2 = p[2].y;
-			if (y2 - y0 < 0.5F)
-				return;
-			auto xAt = [](const Vector2& a, const Vector2& b, float y) {
-				float dy = b.y - a.y;
-				return a.x + (b.x - a.x) * ((std::fabs(dy) < 1.0e-5F) ? 0.0F : (y - a.y) / dy);
-			};
+			// Hard-edged on purpose: triangles tiling a larger shape would show
+			// seams where two anti-aliased edges meet. Use OverlayFillConvexPolygon
+			// for a standalone shape.
 			ColorNP(col);
-			const int N = 10; // horizontal strips approximate the triangle
-			for (int i = 0; i < N; i++) {
-				float ya = y0 + (y2 - y0) * float(i) / N;
-				float yb = y0 + (y2 - y0) * float(i + 1) / N;
-				float la = xAt(p[0], p[2], ya), lb = xAt(p[0], p[2], yb);
-				// The strip's lower-right corner is implied by DrawImage's affine
-				// parallelogram (top-left, top-right, bottom-left), so only `ra` is
-				// needed here.
-				float ra = (ya < p[1].y) ? xAt(p[0], p[1], ya) : xAt(p[1], p[2], ya);
-				renderer->DrawImage((client::IImage*)NULL, MakeVector2(la, ya), MakeVector2(ra, ya),
-				                    MakeVector2(lb, yb), AABB2(0, 0, 1, 1));
-			}
+			renderer->DrawFilledTriangle(A, B, C);
+		}
+
+		GizmoView KV6EditorView::GetGizmoView() const { return camera; }
+
+		void KV6EditorView::DrawGizmo(const TransformGizmo& gizmo) {
+			GizmoCanvas canvas(*renderer);
+			gizmo.Draw(canvas, GetGizmoView());
 		}
 
 		// A solid, shaded cube drawn as a 2D overlay: project the camera-facing faces
-		// and fill them (used for the move gizmo's draggable handles).
+		// and fill them (offered to tool scripts for solid markers).
 		void KV6EditorView::DrawSolidCube(const Vector3& center, float half,
 		                                  const Vector4& color) {
 			Vector3 corner[8];
@@ -1902,7 +1872,7 @@ void KV6EditorView::StartPaste() {
 			                                  {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
 			for (int f = 0; f < 6; f++) {
 				Vector3 n = MakeVector3(faceN[f][0], faceN[f][1], faceN[f][2]);
-				Vector3 toCam = camEye - (center + n * half);
+				Vector3 toCam = camera.eye - (center + n * half);
 				float facing = Vector3::Dot(n, toCam);
 				if (facing <= 0.0F)
 					continue; // back-facing
@@ -1924,12 +1894,12 @@ void KV6EditorView::StartPaste() {
 		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
 			const std::vector<NaviFacet>& facets = NaviFacets();
 			for (const NaviFacet& f : facets) {
-				if (-Vector3::Dot(f.dir, camFwd) <= 0.02F)
+				if (-Vector3::Dot(f.dir, camera.forward) <= 0.02F)
 					continue; // back-facing
 				Vector2 q[4];
 				for (int i = 0; i < f.n; i++)
-					q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
-					                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+					q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
+					                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
 				if (PointInPoly(p, q, f.n)) { dir = f.dir; return true; }
 			}
 			return false;
@@ -1948,24 +1918,22 @@ void KV6EditorView::StartPaste() {
 					bool isEdge = !isFace && !isCorner;
 					if ((pass == 0 && !isCorner) || (pass == 1 && !isEdge) || (pass == 2 && !isFace))
 						continue;
-					float facing = -Vector3::Dot(f.dir, camFwd);
+					float facing = -Vector3::Dot(f.dir, camera.forward);
 					if (facing <= 0.02F)
 						continue;
 					Vector2 q[4];
 					for (int i = 0; i < f.n; i++)
-						q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
-						                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+						q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
+						                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
 					float sh = 0.45F + 0.55F * facing;
 					Vector4 base = isFace ? AxisTint(f.tint) : MakeVector4(0.5F, 0.52F, 0.56F, 1.0F);
 					bool hl = hov && Vector3::Dot(hdir, f.dir) > 0.999F;
 					Vector4 col = hl ? MakeVector4(0.4F, 0.7F, 1.0F, 0.97F)
 					                 : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.97F);
-					if (f.n == 3) {
-						FillTri(q[0], q[1], q[2], col);
-					} else {
-						ColorNP(col);
-						renderer->DrawImage((client::IImage*)NULL, q[0], q[1], q[3], AABB2(0, 0, 1, 1));
-					}
+					// Each facet is one convex polygon so its whole outline is
+					// anti-aliased; the seams it leaves against its neighbours are
+					// covered by the edge lines drawn next.
+					OverlayFillConvexPolygon(*renderer, q, std::size_t(f.n), col);
 					Vector4 ec = MakeVector4(0.08F, 0.08F, 0.1F, 0.85F);
 					for (int e = 0; e < f.n; e++)
 						DrawLine2D(q[e], q[(e + 1) % f.n], 1.0F, ec);
@@ -1973,12 +1941,12 @@ void KV6EditorView::StartPaste() {
 			}
 			// Face labels last, so they sit on top of the cube.
 			for (const NaviFacet& f : facets) {
-				if (!f.label || -Vector3::Dot(f.dir, camFwd) <= 0.02F)
+				if (!f.label || -Vector3::Dot(f.dir, camera.forward) <= 0.02F)
 					continue;
 				Vector2 ctr = MakeVector2(0.0F, 0.0F);
 				for (int i = 0; i < 4; i++)
-					ctr += MakeVector2(gizCx + Vector3::Dot(f.v[i], camRight) * gizR,
-					                   gizCy - Vector3::Dot(f.v[i], camUp) * gizR);
+					ctr += MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
+					                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
 				ctr = ctr * 0.25F;
 				float ls = 0.85F;
 				Vector2 ts = font.Measure(f.label);
@@ -2066,6 +2034,11 @@ void KV6EditorView::StartPaste() {
 		void KV6EditorView::DispatchPointer(const PointerInput& e) {
 			if (EditorTool* t = ActiveTool())
 				t->OnPointer(*this, e);
+		}
+
+		void KV6EditorView::CancelToolInteraction() {
+			if (EditorTool* t = ActiveTool())
+				t->CancelInteraction(*this);
 		}
 
 		// --- Ribbon (title) + unified toolbar [modes] | [tools] -------------
@@ -2276,6 +2249,9 @@ void KV6EditorView::StartPaste() {
 					ctrlDescent = MakeVector3(0, 0, 0);
 					keyDown = false;
 				}
+				// A shortcut changes the document or the placement under a drag
+				// in progress (a paste replaces it), so that drag is abandoned.
+				CancelToolInteraction();
 				if (EqualsIgnoringCase(key, "s")) Save();
 				else if (EqualsIgnoringCase(key, "c")) CopySelection();
 				else if (EqualsIgnoringCase(key, "x")) CutSelection();
@@ -2474,16 +2450,16 @@ void KV6EditorView::StartPaste() {
 			// ribbon + toolbar bars are drawn opaque over the top. So the camera
 			// projection and the cursor->ray pick both use the full screen.
 			client::SceneDefinition sceneDef = SetupScene(0.0F, 0.0F, sw, sh);
-			camEye = sceneDef.viewOrigin;
-			camRight = sceneDef.viewAxis[0];
-			camUp = sceneDef.viewAxis[1];
-			camFwd = sceneDef.viewAxis[2];
-			camFovX = sceneDef.fovX;
-			camFovY = sceneDef.fovY;
-			camVpX = 0.0F;
-			camVpY = 0.0F;
-			camSW = sw;
-			camSH = sh;
+			camera.eye = sceneDef.viewOrigin;
+			camera.right = sceneDef.viewAxis[0];
+			camera.up = sceneDef.viewAxis[1];
+			camera.forward = sceneDef.viewAxis[2];
+			camera.tanHalfFovX = tanf(sceneDef.fovX * 0.5F);
+			camera.tanHalfFovY = tanf(sceneDef.fovY * 0.5F);
+			camera.viewportX = 0.0F;
+			camera.viewportY = 0.0F;
+			camera.viewportWidth = sw;
+			camera.viewportHeight = sh;
 
 			renderer->StartScene(sceneDef);
 			if (renderModel) {

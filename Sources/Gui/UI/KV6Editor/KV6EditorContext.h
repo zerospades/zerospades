@@ -25,10 +25,13 @@
 #include <vector>
 
 #include <Core/Math.h>
+#include <Gui/UI/Components/Gizmo/GizmoView.h>
 
 namespace spades {
 	class VoxelModel;
 	namespace gui {
+		class TransformGizmo;
+
 		/**
 		 * The editor seam tools operate through.
 		 *
@@ -132,10 +135,15 @@ namespace spades {
 			virtual void CancelPlacement() = 0;
 			/** Outlines the pending voxels as they would land `d` voxels further on. */
 			virtual void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) = 0;
-			// Opaque, shaded cube of half-size `half` centred at `center` (a solid
-			// gizmo handle). This is a 2D overlay fill, so call it from a tool's
-			// DrawOverlay (not DrawScene).
+			// Opaque, shaded cube of half-size `half` centred at `center`. This is a
+			// 2D overlay fill, so call it from a tool's DrawOverlay (not DrawScene).
 			virtual void DrawSolidCube(const Vector3& center, float half, const Vector4& color) = 0;
+
+			// --- Transform gizmo ----------------------------------------------
+			/** The live 3D view, for a gizmo to pick and drag against. */
+			virtual GizmoView GetGizmoView() const = 0;
+			/** Draws `gizmo` over the finished scene; call from a tool's DrawOverlay. */
+			virtual void DrawGizmo(const TransformGizmo& gizmo) = 0;
 
 			// --- Pivot --------------------------------------------------------
 			// The model's pivot point (in editor grid coordinates). Moving it keeps
