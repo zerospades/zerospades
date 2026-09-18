@@ -45,15 +45,53 @@ namespace spades {
 			const Vector4 kAxisCol[3] = {MakeVector4(1.0F, 0.35F, 0.35F, 1.0F),
 			                             MakeVector4(0.4F, 1.0F, 0.4F, 1.0F),
 			                             MakeVector4(0.45F, 0.6F, 1.0F, 1.0F)};
-			// Gizmo snap steps for turning and scaling, for the tools that enable
-			// those handles.
-			const float kRotationStep = 15.0F * M_PI_F / 180.0F;
-			const float kScaleStep = 0.1F;
+			constexpr float kQuarterTurn = 0.5F * M_PI_F;
+
+			// A gizmo that only moves, in steps of `step`.
+			GizmoSnap TranslationSnap(float step) {
+				GizmoSnap snap;
+				snap.translation = step;
+				return snap;
+			}
+
+			// Whole voxels, and quarter turns about the world axes: the only turns
+			// that keep every voxel on a voxel. The view ring and the trackball turn
+			// about any axis, so Transform leaves them out.
+			GizmoSnap TransformSnap() {
+				GizmoSnap snap = TranslationSnap(1.0F);
+				snap.rotation = kQuarterTurn;
+				return snap;
+			}
+			GizmoHandleSet TransformHandles() {
+				return GizmoHandleSet::Translation() | GizmoHandleSet::Of(GizmoHandle::RotateX) |
+				       GizmoHandleSet::Of(GizmoHandle::RotateY) |
+				       GizmoHandleSet::Of(GizmoHandle::RotateZ);
+			}
 
 			// A gizmo translation snapped to whole voxels, as integers.
 			IntVector3 WholeVoxels(const Vector3& v) {
 				return IntVector3::Make(int(std::lround(v.x)), int(std::lround(v.y)),
 				                        int(std::lround(v.z)));
+			}
+
+			// A gizmo change in whole voxels and quarter turns. The Transform gizmo
+			// snaps to both and turns only about world axes, so a rotation there is
+			// (axis * sin(a / 2), cos(a / 2)) for a multiple a of a quarter turn;
+			// its largest imaginary part names the axis.
+			PlacementTransform WholeStep(const GizmoTransform& change) {
+				PlacementTransform t;
+				t.shift = WholeVoxels(change.translation);
+				const Vector4& q = change.rotation.v;
+				const float parts[3] = {q.x, q.y, q.z};
+				int axis = 0;
+				for (int a = 1; a < 3; a++) {
+					if (std::fabs(parts[a]) > std::fabs(parts[axis]))
+						axis = a;
+				}
+				const float angle = 2.0F * std::atan2(parts[axis], q.w);
+				t.axis = axis;
+				t.quarterTurns = int(std::lround(angle / kQuarterTurn));
+				return t;
 			}
 		} // namespace
 
@@ -309,12 +347,10 @@ namespace spades {
 
 		// --- GizmoSubTool (shared gizmo plumbing) ----------------------------
 
-		GizmoSubTool::GizmoSubTool(float translationStep) {
-			GizmoSnap snap;
-			snap.translation = translationStep;
-			snap.rotation = kRotationStep;
-			snap.scale = kScaleStep;
+		GizmoSubTool::GizmoSubTool(const GizmoSnap& snap, const GizmoHandleSet& handles) {
 			gizmo.SetSnap(snap);
+			gizmo.SetVisibleHandles(handles);
+			gizmo.SetEnabledHandles(handles);
 		}
 
 		bool GizmoSubTool::SyncPose(IEditorContext& ed) {
@@ -367,6 +403,7 @@ namespace spades {
 		}
 
 		void GizmoSubTool::CancelInteraction(IEditorContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDocumentChanged(IEditorContext& ed) { CancelDrag(ed); }
 
 		void GizmoSubTool::DrawOverlay(IEditorContext& ed) {
 			if (!SyncPose(ed))
@@ -375,57 +412,67 @@ namespace spades {
 			ed.DrawGizmo(gizmo);
 		}
 
-		// --- MoveSubTool (position the pending placement) --------------------
+		// --- TransformSubTool (position the pending placement) ---------------
 
-		MoveSubTool::MoveSubTool() : GizmoSubTool(1.0F) {}
+		TransformSubTool::TransformSubTool() : GizmoSubTool(TransformSnap(), TransformHandles()) {}
 
-		void MoveSubTool::OnActivate(IEditorContext& ed) {
+		void TransformSubTool::OnActivate(IEditorContext& ed) {
 			GizmoSubTool::OnActivate(ed);
 			if (ed.HasPlacement())
 				return; // a paste or import is already waiting to be positioned
 			if (ed.BeginPlacementFromSelection())
-				ed.SetStatus("Move: drag a handle or use the arrows; leaving Move applies it");
+				ed.SetStatus("Transform: drag an arrow to move or a ring to turn (90 degrees), or use"
+				             " the arrow keys; leaving Transform applies it");
 			else
-				ed.SetStatus("Move: select some voxels first");
+				ed.SetStatus("Transform: select some voxels first");
 		}
 
-		void MoveSubTool::OnDeactivate(IEditorContext& ed) {
+		void TransformSubTool::OnDeactivate(IEditorContext& ed) {
 			GizmoSubTool::OnDeactivate(ed);
 			// Leaving the tool is what writes the voxels into the document.
 			ed.ApplyPlacement();
 		}
 
-		bool MoveSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
-			Vector3 centroid;
-			if (!ed.PlacementCentroid(centroid))
+		void TransformSubTool::OnDocumentChanged(IEditorContext& ed) {
+			GizmoSubTool::OnDocumentChanged(ed);
+			// The command landed the placement; carry on with what is selected now.
+			// Quietly, so the command's own status stays up.
+			if (!ed.HasPlacement())
+				ed.BeginPlacementFromSelection();
+		}
+
+		bool TransformSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+			IntVector3 pivot;
+			if (!ed.PlacementPivot(pivot))
 				return false;
 			// The placement itself stays put until release; the gizmo rides the
-			// previewed offset.
-			pose.position = centroid + gizmo.Total().translation;
+			// previewed change, turned axes included.
+			const GizmoTransform& total = gizmo.Total();
+			pose.position = VecOf(pivot) + total.translation;
+			for (int a = 0; a < 3; a++)
+				pose.axes[a] = total.rotation.Apply(AxisUnit(a));
 			return true;
 		}
 
-		void MoveSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
-			IntVector3 d = WholeVoxels(total.translation);
-			if (d.x != 0 || d.y != 0 || d.z != 0)
-				ed.MovePlacement(d.x, d.y, d.z); // still only a pending move
+		void TransformSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+			ed.TransformPlacement(WholeStep(total)); // still only pending
 		}
 
-		void MoveSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
+		void TransformSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
 			if (e.phase != KeyPhase::Down || !ed.HasPlacement())
 				return;
-			int d[3] = {0, 0, 0};
-			if (e.key == "Left") d[0] = -1;
-			else if (e.key == "Right") d[0] = 1;
-			else if (e.key == "Down") d[1] = -1;
-			else if (e.key == "Up") d[1] = 1;
-			else if (e.key == "PageDown") d[2] = -1;
-			else if (e.key == "PageUp") d[2] = 1;
+			PlacementTransform t;
+			if (e.key == "Left") t.shift.x = -1;
+			else if (e.key == "Right") t.shift.x = 1;
+			else if (e.key == "Down") t.shift.y = -1;
+			else if (e.key == "Up") t.shift.y = 1;
+			else if (e.key == "PageDown") t.shift.z = -1;
+			else if (e.key == "PageUp") t.shift.z = 1;
 			else return;
-			ed.MovePlacement(d[0], d[1], d[2]);
+			ed.TransformPlacement(t);
 		}
 
-		bool MoveSubTool::OnEscape(IEditorContext& ed) {
+		bool TransformSubTool::OnEscape(IEditorContext& ed) {
 			if (GizmoSubTool::OnEscape(ed))
 				return true; // cancelled the drag, the placement stays where it was
 			if (ed.HasPlacement()) {
@@ -435,15 +482,15 @@ namespace spades {
 			return false;
 		}
 
-		void MoveSubTool::DrawScene(IEditorContext& ed) {
-			IntVector3 d = WholeVoxels(gizmo.Total().translation);
-			if (d.x != 0 || d.y != 0 || d.z != 0)
-				ed.DrawPlacementOffset(d.x, d.y, d.z, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+		void TransformSubTool::DrawScene(IEditorContext& ed) {
+			const PlacementTransform t = WholeStep(gizmo.Total());
+			if (!t.IsIdentity())
+				ed.DrawPlacementTransformed(t, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
 		}
 
 		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
 
-		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(0.1F) {}
+		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(TranslationSnap(0.1F)) {}
 
 		void PivotGizmoSubTool::OnActivate(IEditorContext& ed) {
 			GizmoSubTool::OnActivate(ed);
@@ -475,7 +522,7 @@ namespace spades {
 
 		// --- MirrorGizmoSubTool (drag the mirror planes) ---------------------
 
-		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(0.5F) {}
+		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(TranslationSnap(0.5F)) {}
 
 		void MirrorGizmoSubTool::OnActivate(IEditorContext& ed) {
 			GizmoSubTool::OnActivate(ed);

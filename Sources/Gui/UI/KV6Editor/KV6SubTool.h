@@ -137,11 +137,14 @@ namespace spades {
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			bool OnEscape(IEditorContext&) override;
 			void CancelInteraction(IEditorContext&) override;
+			// What the gizmo handles moved under it, so a drag in progress is void.
+			void OnDocumentChanged(IEditorContext&) override;
 			void DrawOverlay(IEditorContext&) override;
 
 		protected:
-			/** `translationStep`: the snap increment of a move, in voxels. */
-			explicit GizmoSubTool(float translationStep);
+			/** The gizmo snaps by `snap` and shows (and responds to) `handles`. */
+			explicit GizmoSubTool(const GizmoSnap& snap,
+			                      const GizmoHandleSet& handles = GizmoHandleSet::Translation());
 
 			TransformGizmo gizmo;
 
@@ -165,20 +168,26 @@ namespace spades {
 		};
 
 		/**
-		 * Positions pending voxels with the gizmo (whole voxels), or with the arrow
-		 * keys (Page Up/Down for the third axis).
+		 * Positions pending voxels with the gizmo: its arrows and squares move
+		 * them by whole voxels, its axis rings turn them by quarter turns about
+		 * their pivot. The arrow keys move them too (Page Up/Down for the third
+		 * axis).
 		 *
 		 * Entering the tool lifts the selection into a placement, and a paste or an
 		 * import arrives with one already pending. Nothing is written to the
 		 * document until the tool is left, so voxels dragged over others never
-		 * destroy them; Escape drops the placement instead.
+		 * destroy them; Escape drops the placement instead. Any other command
+		 * (select all, copy, save, undo, ...) lands the placement first and then
+		 * the tool lifts the selection again: while it is active, what is selected
+		 * is what moves.
 		 */
-		class MoveSubTool : public GizmoSubTool {
+		class TransformSubTool : public GizmoSubTool {
 		public:
-			MoveSubTool();
-			const char* Label() const override { return "Move"; }
+			TransformSubTool();
+			const char* Label() const override { return "Transform"; }
 			void OnActivate(IEditorContext&) override;
 			void OnDeactivate(IEditorContext&) override;
+			void OnDocumentChanged(IEditorContext&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
 			bool OnEscape(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
