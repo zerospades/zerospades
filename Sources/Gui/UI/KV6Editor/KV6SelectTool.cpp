@@ -42,7 +42,7 @@ namespace spades {
 			subs.push_back(std::unique_ptr<EditorTool>(new PointSubTool()));
 			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", select, deselect)));
 			subs.push_back(std::unique_ptr<EditorTool>(new ByColourSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(new MoveSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new TransformSubTool()));
 
 			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
 			// the built-in ones.

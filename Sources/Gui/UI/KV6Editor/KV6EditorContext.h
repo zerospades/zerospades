@@ -33,6 +33,24 @@ namespace spades {
 		class TransformGizmo;
 
 		/**
+		 * A whole-voxel change to pending voxels: `quarterTurns` right-handed
+		 * quarter turns about the world axis `axis` (0 = x, 1 = y, 2 = z) through
+		 * their pivot, then a shift by `shift`. Right angles and whole voxels
+		 * only, so every voxel still lands on a voxel and four turns are exactly
+		 * none.
+		 */
+		struct PlacementTransform {
+			IntVector3 shift = IntVector3::Make(0, 0, 0);
+			int axis = 2;
+			int quarterTurns = 0;
+
+			bool Turns() const { return quarterTurns % 4 != 0; }
+			// A turn needs an axis that exists; a plain shift has none to check.
+			bool IsValid() const { return !Turns() || (axis >= 0 && axis < 3); }
+			bool IsIdentity() const { return !Turns() && shift == IntVector3::Make(0, 0, 0); }
+		};
+
+		/**
 		 * The editor seam tools operate through.
 		 *
 		 * Tools never touch `KV6EditorView` directly; they query and mutate the
@@ -119,22 +137,29 @@ namespace spades {
 			                                    const Vector4& color) = 0;
 
 			// --- Pending placement (floating voxels) --------------------------
-			// Paste, import and move park their voxels here first: nothing reaches
+			// Paste, import and Transform park their voxels here first: nothing reaches
 			// the document until the placement is applied, so dragging voxels over
-			// others never destroys what they pass across. Leaving the Move tool
-			// applies the placement; Escape drops it.
+			// others never destroys what they pass across. Leaving the Transform
+			// tool applies the placement; Escape drops it. Every edit of the voxels,
+			// the selection or the pivot (and the editor's copy, cut, save and
+			// undo) applies it first, so it acts on the document as it stands.
 			virtual bool HasPlacement() const = 0;
 			/** Lifts the selection into a placement; false if nothing solid is selected. */
 			virtual bool BeginPlacementFromSelection() = 0;
-			virtual void MovePlacement(int dx, int dy, int dz) = 0;
-			/** Centre of the pending voxels, for a gizmo; false if none pending. */
-			virtual bool PlacementCentroid(Vector3& out) const = 0;
+			/**
+			 * Turns and shifts the pending voxels; a shift stops at the model size
+			 * limit. Turns are about the pivot, which moves only with a shift.
+			 */
+			virtual void TransformPlacement(const PlacementTransform& t) = 0;
+			/** The voxel the pending voxels turn about; false if none pending. */
+			virtual bool PlacementPivot(IntVector3& out) const = 0;
 			/** Writes the pending voxels into the document as one undo step. */
 			virtual void ApplyPlacement() = 0;
 			/** Drops the pending voxels, changing nothing. */
 			virtual void CancelPlacement() = 0;
-			/** Outlines the pending voxels as they would land `d` voxels further on. */
-			virtual void DrawPlacementOffset(int dx, int dy, int dz, const Vector4& color) = 0;
+			/** Outlines the pending voxels as they would land after `t`. */
+			virtual void DrawPlacementTransformed(const PlacementTransform& t,
+			                                      const Vector4& color) = 0;
 			// Opaque, shaded cube of half-size `half` centred at `center`. This is a
 			// 2D overlay fill, so call it from a tool's DrawOverlay (not DrawScene).
 			virtual void DrawSolidCube(const Vector3& center, float half, const Vector4& color) = 0;
