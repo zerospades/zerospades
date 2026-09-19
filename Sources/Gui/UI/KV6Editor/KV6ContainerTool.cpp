@@ -53,9 +53,13 @@ namespace spades {
 			if (EditorTool* s = Cur())
 				s->OnKey(ed, e);
 		}
-		bool ContainerTool::OnEscape(IEditorContext& ed) {
+		std::string ContainerTool::EscapeLabel(IEditorContext& ed) {
 			EditorTool* s = Cur();
-			return s ? s->OnEscape(ed) : false;
+			return s ? s->EscapeLabel(ed) : std::string();
+		}
+		void ContainerTool::OnEscape(IEditorContext& ed) {
+			if (EditorTool* s = Cur())
+				s->OnEscape(ed);
 		}
 		void ContainerTool::CancelInteraction(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
@@ -64,6 +68,10 @@ namespace spades {
 		void ContainerTool::OnDocumentChanged(IEditorContext& ed) {
 			if (EditorTool* s = Cur())
 				s->OnDocumentChanged(ed);
+		}
+		std::string ContainerTool::Hint(IEditorContext& ed) {
+			EditorTool* s = Cur();
+			return s ? s->Hint(ed) : std::string();
 		}
 		void ContainerTool::DrawScene(IEditorContext& ed) {
 			if (EditorTool* s = Cur())

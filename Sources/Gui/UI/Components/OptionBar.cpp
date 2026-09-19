@@ -20,10 +20,11 @@
 
 #include "OptionBar.h"
 
+#include <algorithm>
+#include <utility>
+
 #include <Gui/OverlayPaint.h>
 #include <Gui/UIWidgetPainter.h>
-#include <Client/IAudioChunk.h>
-#include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Client/Fonts.h>
 #include <Core/Math.h>
@@ -38,202 +39,163 @@ namespace spades {
 		static const float kTbGap = 2.0F;
 		static const float kTbSep = 14.0F;
 		static const float kTbX0 = 12.0F;
+		static const float kBandY = kRibbonH + kToolbarH;
+		static const float kBtnY = kBandY + (kSubBarH - kTbH) * 0.5F;
 		static const float kSubBtn = 88.0F;
-		static const float kMirW = 24.0F;
-		static const float kMirLabelW = 50.0F;
-		static const float kColorW = 46.0F;
+		// A readout is at least this wide, so the options after it hold still
+		// while its text changes.
 		static const float kLabelW = 190.0F;
-		// An action carries a phrase, not an axis letter, and is deliberately wider
-		// than the kSubBtn sub-tool buttons it sits beside: near-identical widths
-		// would read as one more mode button that just failed to latch.
-		static const float kActionW = 104.0F;
+		static const float kGroupLabelGap = 6.0F;
+		// A button's text sits inside PaintButton's 8-unit inset on each side.
+		static const float kButtonTextInset = 16.0F;
+		static const float kToggleMinW = 24.0F;
+		// An action carries a phrase, not an axis letter, so it gets more room
+		// than a toggle; with the separators, that keeps it from reading as one
+		// more sub-tool button that just failed to latch.
+		static const float kActionPad = 24.0F;
+		static const float kActionMinW = 56.0F;
 
-		OptionBar::OptionBar(client::IAudioDevice* audioDevice) : audioDevice(audioDevice) {}
+		OptionBar::OptionBar(client::IAudioDevice* audioDevice) : sounds(audioDevice) {}
 
-		void OptionBar::PlayHoverSound() const {
-			if (!audioDevice)
-				return;
-			Handle<client::IAudioChunk> chunk(audioDevice->RegisterSound("Sounds/Feedback/Limbo/Hover.opus"));
-			audioDevice->PlayLocal(chunk.GetPointerOrNull(), client::AudioParam());
+		void OptionBar::SetContent(const void* newOwner, std::vector<SubToolButton> buttons,
+		                           std::vector<Option> newOptions) {
+			owner = newOwner;
+			subToolButtons = std::move(buttons);
+			options = std::move(newOptions);
 		}
 
-		void OptionBar::PlayClickSound() const {
-			if (!audioDevice)
-				return;
-			Handle<client::IAudioChunk> chunk(audioDevice->RegisterSound("Sounds/Feedback/Limbo/Select.opus"));
-			audioDevice->PlayLocal(chunk.GetPointerOrNull(), client::AudioParam());
-		}
-
-		void OptionBar::SetSubToolButtons(const std::vector<SubToolButton>& buttons) {
-			subToolButtons = buttons;
-		}
-
-		void OptionBar::SetOptions(const std::vector<Option>& options) { this->options = options; }
-
-		bool OptionBar::InRect(const Vector2& p, float x, float y, float w, float h) const {
-			return OverlayInRect(p, x, y, w, h);
-		}
-
-		float OptionBar::OptionWidth(OptionType type) {
-			switch (type) {
-				case OptionType::Color: return kColorW;
-				case OptionType::Label: return kLabelW;
-				case OptionType::Action: return kActionW;
-				case OptionType::Bool: break;
+		bool OptionBar::Click(const Vector2& p) {
+			if (CurrentOwner && CurrentOwner() != drawnOwner)
+				return false; // what is on screen belongs to an owner no longer current
+			for (size_t i = 0; i < subToolSpans.size() && i < subToolButtons.size(); i++) {
+				const Span& span = subToolSpans[i];
+				if (!OverlayInRect(p, span.x, kBtnY, span.width, kTbH))
+					continue;
+				if (OnSubToolClicked)
+					OnSubToolClicked(int(i));
+				sounds.Activate();
+				return true;
 			}
-			return kMirW;
-		}
-
-		float OptionBar::OptionX(int i, float& outW) const {
-			outW = 0.0F;
-			if (i < 0 || i >= int(options.size()))
-				return 0.0F;
-
-			float x = kTbX0 + float(subToolButtons.size()) * (kSubBtn + kTbGap);
-			std::string prevGroup;
-			bool first = true;
-
-			for (int k = 0; k <= i; k++) {
-				const Option& op = options[k];
-				bool newGroup = first || op.group != prevGroup;
-
-				if (newGroup) {
-					x += kTbSep; // separator before a new group
-					if (!op.group.empty())
-						x += kMirLabelW; // room for the group label
-				} else {
-					x += kTbGap; // gap between items in the same group
+			for (size_t i = 0; i < optionSpans.size() && i < options.size(); i++) {
+				const Span& span = optionSpans[i];
+				if (!OverlayInRect(p, span.x, kBtnY, span.width, kTbH))
+					continue;
+				const Option& op = options[i];
+				const std::function<void(const std::string&)>* handler = nullptr;
+				switch (op.type) {
+					case OptionType::Bool: handler = &OnBoolToggled; break;
+					case OptionType::Action: handler = &OnActionClicked; break;
+					case OptionType::Label: break;
 				}
-
-				float w = OptionWidth(op.type);
-				if (k == i) {
-					outW = w;
-					return x;
-				}
-
-				x += w;
-				prevGroup = op.group;
-				first = false;
-			}
-			return x;
-		}
-
-		float OptionBar::HitTest(const Vector2& p) {
-			float bandY = kRibbonH + kToolbarH;
-			float by = bandY + (kSubBarH - kTbH) * 0.5F;
-
-			for (int i = 0; i < int(options.size()); i++) {
-				float w;
-				float x = OptionX(i, w);
-				if (InRect(p, x, by, w, kTbH))
-					return float(i);
-			}
-			return -1.0F;
-		}
-
-		bool OptionBar::IsSubToolButtonHit(const Vector2& p, int& outIndex) const {
-			float bandY = kRibbonH + kToolbarH;
-			float by = bandY + (kSubBarH - kTbH) * 0.5F;
-
-			for (int i = 0; i < int(subToolButtons.size()); i++) {
-				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
-				if (InRect(p, x, by, kSubBtn, kTbH)) {
-					outIndex = i;
-					return true;
-				}
+				if (!handler || !op.enabled)
+					return false; // a readout, or greyed out
+				const std::string id = op.id; // the handler may change the options
+				if (*handler)
+					(*handler)(id);
+				sounds.Activate();
+				return true;
 			}
 			return false;
-		}
-
-		bool OptionBar::IsOptionHovered(const Vector2& p, int index) const {
-			if (index < 0 || index >= int(options.size()))
-				return false;
-			float bandY = kRibbonH + kToolbarH;
-			float by = bandY + (kSubBarH - kTbH) * 0.5F;
-			float w;
-			float x = OptionX(index, w);
-			return InRect(p, x, by, w, kTbH);
 		}
 
 		void OptionBar::Draw(client::IRenderer& renderer, client::FontManager& fontManager,
 		                     const Vector2& cursorPos, bool menuActive, float screenWidth) {
 			client::IFont& font = fontManager.GetSmallGuiFont();
-			float s = 1.0F;
-			float bandY = kRibbonH + kToolbarH;
-			float by = bandY + (kSubBarH - kTbH) * 0.5F;
+			const Vector4 textColor = MakeVector4(0.85F, 0.85F, 0.9F, 1.0F);
+			const Vector4 groupColor = MakeVector4(0.75F, 0.75F, 0.75F, 1.0F);
 
-			// Ensure hover tracking arrays are sized correctly
-			if (previousSubToolHoverState.size() != subToolButtons.size())
-				previousSubToolHoverState.resize(subToolButtons.size(), false);
-			if (previousOptionHoverState.size() != options.size())
-				previousOptionHoverState.resize(options.size(), false);
+			previousSubToolHoverState.resize(subToolButtons.size(), false);
+			previousOptionHoverState.resize(options.size(), false);
+			drawnOwner = owner;
+			subToolSpans.clear();
+			optionSpans.clear();
 
 			// Full-width sub-toolbar band background (always present)
 			OverlayColorNP(renderer, MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
-			OverlayFillRect(renderer, 0.0F, bandY, screenWidth, kSubBarH);
+			OverlayFillRect(renderer, 0.0F, kBandY, screenWidth, kSubBarH);
 
-			// Draw sub-tool buttons
-			for (int i = 0; i < int(subToolButtons.size()); i++) {
-				float x = kTbX0 + float(i) * (kSubBtn + kTbGap);
-				bool on = subToolButtons[i].active;
-				bool hover = !menuActive && InRect(cursorPos, x, by, kSubBtn, kTbH);
-				// Play sound on hover transition (false → true)
-				if (hover && !previousSubToolHoverState[i])
-					PlayHoverSound();
-				previousSubToolHoverState[i] = hover;
-				widgets::PaintButton(renderer, font, MakeVector2(x, by), MakeVector2(kSubBtn, kTbH),
-				                     subToolButtons[i].label.c_str(), MakeVector2(0.5F, 0.5F), "",
-				                     MakeVector2(1.0F, 0.5F), true, hover, false, on, s);
+			// Items are placed left to right, `x` being where the last one ended:
+			// a gap parts items of one group, a separator line one group from the
+			// next. Nothing precedes the first item.
+			float x = kTbX0;
+			bool placedAny = false;
+			auto advance = [&](bool newGroup) {
+				if (!placedAny) {
+					placedAny = true;
+					return;
+				}
+				if (!newGroup) {
+					x += kTbGap;
+					return;
+				}
+				OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
+				OverlayFillRect(renderer, x + kTbSep * 0.5F, kBtnY + 2.0F, 1.0F, kTbH - 4.0F);
+				x += kTbSep;
+			};
+			// Hover of an item this frame, sounding once as it starts.
+			auto hovered = [&](const Span& span, bool enabled, std::vector<bool>& previous,
+			                   size_t i) {
+				bool hover = !menuActive && enabled &&
+				             OverlayInRect(cursorPos, span.x, kBtnY, span.width, kTbH);
+				previous[i] = sounds.HoverEdge(hover, previous[i]);
+				return hover;
+			};
+
+			for (size_t i = 0; i < subToolButtons.size(); i++) {
+				const SubToolButton& button = subToolButtons[i];
+				advance(false);
+				const Span span{x, kSubBtn};
+				subToolSpans.push_back(span);
+				bool hover = hovered(span, true, previousSubToolHoverState, i);
+				Vector2 labelAlign =
+				  button.hotKey.empty() ? MakeVector2(0.5F, 0.5F) : MakeVector2(0.0F, 0.5F);
+				widgets::PaintButton(renderer, font, MakeVector2(span.x, kBtnY),
+				                     MakeVector2(span.width, kTbH), button.label, labelAlign,
+				                     button.hotKey, MakeVector2(1.0F, 0.5F), true, hover, false,
+				                     button.active, 1.0F);
+				x += span.width;
 			}
 
-			// Draw options (toggles, colours, labels)
-			std::string prevGroup;
-			bool first = true;
-			for (int i = 0; i < int(options.size()); i++) {
+			for (size_t i = 0; i < options.size(); i++) {
 				const Option& op = options[i];
-				float w;
-				float x = OptionX(i, w);
-				bool newGroup = first || op.group != prevGroup;
-
-				if (newGroup) {
-					// Separator before the group; named groups also get a label
-					float labelW = op.group.empty() ? 0.0F : kMirLabelW;
-					OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-					OverlayFillRect(renderer, x - labelW - kTbSep * 0.5F, by + 2.0F, 1.0F,
-					               kTbH - 4.0F);
-					if (!op.group.empty()) {
-						font.Draw(op.group, MakeVector2(x - kMirLabelW + 2.0F, by + (kTbH - 9.0F * s) * 0.5F),
-						         s, MakeVector4(0.75F, 0.75F, 0.75F, 1.0F));
-					}
+				const bool startsGroup = i == 0 || op.group != options[i - 1].group;
+				advance(startsGroup);
+				if (startsGroup && !op.group.empty()) {
+					Vector2 ts = font.Measure(op.group);
+					font.Draw(op.group, MakeVector2(x, kBtnY + (kTbH - ts.y) * 0.5F), 1.0F,
+					          groupColor);
+					x += ts.x + kGroupLabelGap;
 				}
+
+				const Vector2 textSize = font.Measure(op.label);
+				float width = 0.0F;
+				switch (op.type) {
+					case OptionType::Label:
+						width = std::max(kLabelW, textSize.x);
+						break;
+					case OptionType::Bool:
+						width = std::max(kToggleMinW, textSize.x + kButtonTextInset);
+						break;
+					case OptionType::Action:
+						width = std::max(kActionMinW, textSize.x + kActionPad);
+						break;
+				}
+				const Span span{x, width};
+				optionSpans.push_back(span);
 
 				if (op.type == OptionType::Label) {
-					Vector2 ts = font.Measure(op.label);
-					font.Draw(op.label, MakeVector2(x, by + (kTbH - ts.y * s) * 0.5F), s,
-					         MakeVector4(0.85F, 0.85F, 0.9F, 1.0F));
-				} else if (op.type == OptionType::Color) {
-					Vector4 color = MakeVector4(float(op.color & 0xFF) / 255.0F,
-					                            float((op.color >> 8) & 0xFF) / 255.0F,
-					                            float((op.color >> 16) & 0xFF) / 255.0F, 1.0F);
-					OverlayColorNP(renderer, color);
-					OverlayFillRect(renderer, x, by, w, kTbH);
-					OverlayStrokeRect(renderer, x, by, w, kTbH, 1.0F,
-					                 MakeVector4(0.8F, 0.8F, 0.8F, 0.7F));
+					font.Draw(op.label, MakeVector2(x, kBtnY + (kTbH - textSize.y) * 0.5F), 1.0F,
+					          textColor);
 				} else { // Bool toggle or Action button
-					bool hover = !menuActive && InRect(cursorPos, x, by, w, kTbH);
-					// Play sound on hover transition (false → true)
-					if (hover && !previousOptionHoverState[i])
-						PlayHoverSound();
-					previousOptionHoverState[i] = hover;
+					bool hover = hovered(span, op.enabled, previousOptionHoverState, i);
 					// An action holds no state, so it never draws as toggled.
 					bool toggled = (op.type == OptionType::Bool) && op.bvalue;
-					widgets::PaintButton(renderer, font, MakeVector2(x, by), MakeVector2(w, kTbH),
-					                     op.label.c_str(), MakeVector2(0.5F, 0.5F), "",
-					                     MakeVector2(1.0F, 0.5F), true, hover, false, toggled, s);
+					widgets::PaintButton(renderer, font, MakeVector2(x, kBtnY),
+					                     MakeVector2(width, kTbH), op.label,
+					                     MakeVector2(0.5F, 0.5F), "", MakeVector2(1.0F, 0.5F),
+					                     op.enabled, hover, false, toggled, 1.0F);
 				}
-
-				prevGroup = op.group;
-				first = false;
+				x += width;
 			}
 		}
 	} // namespace gui

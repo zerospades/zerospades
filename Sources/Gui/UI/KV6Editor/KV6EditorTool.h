@@ -31,6 +31,8 @@ namespace spades {
 
 		// What a top-level tool does with cells, so sub-tools (incl. scripted ones)
 		// can apply through IEditorContext::ApplyCells without knowing their host.
+		// The right button does the inverse of the left (erase, deselect); Paint
+		// has no inverse, so the editor keeps the right button from its sub-tools.
 		enum class EditorRole { Edit, Select, Paint };
 
 		/**
@@ -55,25 +57,39 @@ namespace spades {
 			virtual void OnActivate(IEditorContext&) {}
 			virtual void OnDeactivate(IEditorContext&) {}
 
-			// Abort an in-progress operation (Esc). Returns true if it consumed the
-			// key (so the editor doesn't also open the pause menu).
-			virtual bool OnEscape(IEditorContext&) { return false; }
+			// What Escape would back out of in this tool now, as a short phrase
+			// for the hint line ("cancel the box"); empty when nothing is in
+			// progress. The editor shows it and, when Escape reaches the tool,
+			// calls OnEscape: one answer drives both, so they always agree.
+			virtual std::string EscapeLabel(IEditorContext&) { return std::string(); }
+			// Back out of what EscapeLabel named.
+			virtual void OnEscape(IEditorContext&) {}
 
 			// Abandon a gesture in progress (a drag) without applying it. The editor
 			// calls this before it acts behind the tool's back (a shortcut, a dialog
 			// taking the input), so no gesture outlives the state it started from.
 			virtual void CancelInteraction(IEditorContext&) {}
 
-			// A command changed the document or the selection (an edit, a shortcut,
-			// an option, undo). A tool holding state derived from them refreshes it
-			// here; the Transform tool, for one, picks the selection up again.
+			// A command changed the document or the edit state (an edit, a shortcut,
+			// an option, undo, redo). A tool holding anything derived from them
+			// refreshes it here: a gizmo drops its drag, the Mirror tool its toggles.
 			virtual void OnDocumentChanged(IEditorContext&) {}
+
+			// What the mouse and keys do in this tool right now, in "  |  "
+			// separated parts ("[LMB] place  |  [RMB] delete"). The editor shows
+			// it under the viewport after the tool's name; empty shows the name only.
+			virtual std::string Hint(IEditorContext&) { return std::string(); }
 
 			// Declarative options shown in the secondary toolbar next to this tool's
 			// sub-tools (e.g. Mirror's axis toggles, Draw's colour swatch). Returning
 			// null means the tool has no options. The editor renders and hit-tests
 			// whatever is listed, so tools never touch the toolbar code directly.
 			virtual ToolOptions* Options() { return nullptr; }
+
+			// Called just before the options are drawn: bring any option that
+			// shows editor state (a readout, the mirror toggles, a command that
+			// needs a selection) up to date with it.
+			virtual void UpdateOptions(IEditorContext&) {}
 
 			// A ToolOption of type Bool was clicked; it has already been flipped to
 			// `value`. Tools that mirror a toggle into other state react here.
@@ -86,7 +102,7 @@ namespace spades {
 			virtual void OnAction(IEditorContext&, const std::string& id) { (void)id; }
 
 			// Optional sub-tools, shown in a secondary toolbar under the main one
-			// while this tool is active (e.g. Select's Point / Rect / By-Colour).
+			// while this tool is active (e.g. Select's Voxel / Box / By Colour).
 			virtual int SubToolCount() const { return 0; }
 			virtual const char* SubToolLabel(int) const { return ""; }
 			// The sub-tool itself, for callers that must find one by what it is
