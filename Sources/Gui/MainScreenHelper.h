@@ -32,6 +32,7 @@ namespace spades {
 	class PingTester;
 	namespace gui {
 		class MainScreen;
+		class SoftwareCursor;
 
 		class MainScreenServerItem : public RefCountedObject {
 			friend class MainScreenHelper;
@@ -111,6 +112,8 @@ namespace spades {
 
 			std::vector<std::string> GetDemoList();
 			std::string PlayDemo(const std::string& filename);
+			std::string OpenKV6Editor(const std::string& path, bool isNew, SoftwareCursor* cursor = nullptr);
+			std::string OpenMapEditor(const std::string& path, SoftwareCursor* cursor = nullptr);
 			int64_t GetDemoFileSize(const std::string& filename);
 			bool DeleteDemo(const std::string& filename);
 			bool RenameDemo(const std::string& oldName, const std::string& newName);

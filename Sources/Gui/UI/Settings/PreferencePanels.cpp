@@ -408,6 +408,9 @@ namespace spades {
 			l.AddControl(_Tr("Preferences", "Navigate right"), "cg_keyPaletteRight");
 			l.AddControl(_Tr("Preferences", "Toggle extended palette"), "cg_keyExtendedPalette");
 
+			l.AddHeading(_Tr("Preferences", "Model Editor"));
+			l.AddControl(_Tr("Preferences", "Delete"), "cg_keyDelete");
+
 			l.AddHeading(_Tr("Preferences", "Misc"));
 			l.AddControl(_Tr("Preferences", "Scoreboard"), "cg_keyScoreboard");
 			l.AddToggleField(_Tr("Preferences", "Hold Large Map"), "cg_holdMapZoom");

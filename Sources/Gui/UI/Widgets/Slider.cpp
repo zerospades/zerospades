@@ -19,6 +19,7 @@
  */
 
 #include "DrawUtils.h"
+#include <Gui/UI/Framework/FeedbackSounds.h>
 #include "Slider.h"
 #include <Client/IRenderer.h>
 #include <Gui/UI/Framework/UIManager.h>
@@ -32,10 +33,10 @@ namespace spades {
 			}
 
 			void SliderKnob::PlayMouseEnterSound() {
-				GetManager().PlaySound("Sounds/Feedback/Limbo/Hover.opus");
+				GetManager().PlaySound(kHoverSound);
 			}
 			void SliderKnob::PlayActivateSound() {
-				GetManager().PlaySound("Sounds/Feedback/Limbo/Select.opus");
+				GetManager().PlaySound(kActivateSound);
 			}
 
 			void SliderKnob::MouseDown(MouseButton button, Vector2 clientPosition) {

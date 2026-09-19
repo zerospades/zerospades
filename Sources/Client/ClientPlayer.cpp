@@ -192,6 +192,14 @@ namespace spades {
 					OnProhibitedAction();
 			}
 
+			void DrawShadedTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2,
+			                        const Vector4& c0, const Vector4& c1, const Vector4& c2) {
+				if (allowDepthHack)
+					base->DrawShadedTriangle(v0, v1, v2, c0, c1, c2);
+				else
+					OnProhibitedAction();
+			}
+
 			void DrawFilledRectFade(float x0, float y0, float x1, float y1, Vector4 colorTop, Vector4 colorBottom, bool horizontal) {
 				if (allowDepthHack)
 					base->DrawFilledRectFade(x0, y0, x1, y1, colorTop, colorBottom, horizontal);
@@ -252,6 +260,7 @@ namespace spades {
 
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
+			float ScreenPixelRatio() { return base->ScreenPixelRatio(); }
 		};
 
 		ClientPlayer::ClientPlayer(Player& p, Client& c)

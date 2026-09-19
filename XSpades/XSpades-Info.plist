@@ -26,6 +26,8 @@
 	<string>public.app-category.action-games</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.13</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2017 yvt. All rights reserved.</string>
 	<key>NSMainNibFile</key>

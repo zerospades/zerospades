@@ -30,6 +30,7 @@
 
 #include "ClientCameraMode.h"
 #include "DemoNetClient.h"
+#include "EditorNetClient.h"
 #include "INetClient.h"
 #include "NetClient.h"
 #include "ILocalEntity.h"
@@ -112,7 +113,9 @@ namespace spades {
 
 			std::unique_ptr<NetClient> net;
 			std::unique_ptr<DemoNetClient> demoNet;
-			INetClient* activeNet; // points to net.get() or demoNet.get(), never null after DoInit
+			std::unique_ptr<EditorNetClient> editorNet;
+			std::string editorMapPath;
+			INetClient* activeNet; // points to net.get() or demoNet.get() or editorNet.get(), never null after DoInit
 			std::string demoFilePath;
 
 			// Seek-key hold state.
@@ -592,7 +595,11 @@ namespace spades {
 
 			bool HasLocalPlayer();
 			bool IsDemoMode() const { return demoNet != nullptr; }
+			bool IsEditorMode() const { return editorNet != nullptr; }
 			DemoNetClient* GetDemoNetClient() { return demoNet.get(); }
+			EditorNetClient* GetEditorNetClient() { return editorNet.get(); }
+			void EnableEditorMode(std::unique_ptr<EditorNetClient> net);
+			void SetEditorMapPath(const std::string& path) { editorMapPath = path; }
 			void ReloadDemo();
 
 			/**

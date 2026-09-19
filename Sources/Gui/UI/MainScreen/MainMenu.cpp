@@ -35,6 +35,7 @@
 #include <Gui/UI/Widgets/DrawUtils.h>
 #include <Gui/UI/Widgets/Label.h>
 #include <Gui/UI/Widgets/MessageBox.h>
+#include <Gui/UI/Widgets/TextPromptScreen.h>
 
 DEFINE_SPADES_SETTING(cg_protocolVersion, "3");
 DEFINE_SPADES_SETTING(cg_lastQuickConnectHost, "127.0.0.1");
@@ -72,103 +73,6 @@ namespace spades {
 			Vector2 sz = size;
 			Handle<client::IImage> img = r.RegisterImage("Gfx/UI/Refresh.png");
 			r.DrawImage(img, pos + (sz - MakeVector2(16.0F, 16.0F)) * 0.5F);
-		}
-
-		// -- RenameScreen --
-
-		RenameScreen::RenameScreen(UIElement* owner, const std::string& currentName)
-		    : UIElement(&owner->GetManager()), owner(owner) {
-			SetFont(GetManager().GetRootElement().GetFont());
-			SetBounds(owner->GetBounds());
-
-			UIManager* manager = &GetManager();
-			float sw = manager->screenWidth;
-			float sh = manager->screenHeight;
-			float w = std::min(sw - 16.0F, 500.0F);
-			float h = 160.0F;
-			float x = (sw - w) * 0.5F;
-			float y = (sh - h) * 0.5F;
-
-			// draw full background
-			{
-				Handle<Label> overlay = Handle<Label>::New(manager);
-				overlay->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
-				overlay->SetBounds(AABB2(0.0F, 0.0F, sw, sh));
-				AddChild(overlay.GetPointerOrNull());
-			}
-
-			// Background
-			{
-				Handle<Label> bg = Handle<Label>::New(manager);
-				bg->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.9F);
-				bg->SetBounds(AABB2(0.0F, y - 13.0F, size.x, h + 27.0F));
-				AddChild(bg.GetPointerOrNull());
-			}
-			{
-				Handle<Label> label = Handle<Label>::New(manager);
-				label->text = _Tr("MainScreen", "Rename Demo");
-				label->SetBounds(AABB2(x, y, w, 30.0F));
-				label->alignment = MakeVector2(0.0F, 0.5F);
-				AddChild(label.GetPointerOrNull());
-			}
-			{
-				Handle<Field> field = Handle<Field>::New(manager);
-				nameField = field.GetPointerOrNull();
-				nameField->SetBounds(AABB2(x, y + 40.0F, w, 30.0F));
-				nameField->SetText(currentName);
-				nameField->SelectAll();
-				AddChild(nameField);
-			}
-			{
-				Handle<Button> btn = Handle<Button>::New(manager);
-				btn->caption = _Tr("MainScreen", "Rename");
-				btn->SetBounds(AABB2(x + w - 310.0F, y + 130.0F, 150.0F, 30.0F));
-				btn->activated = [this](UIElement& s) { OnConfirm(s); };
-				AddChild(btn.GetPointerOrNull());
-			}
-			{
-				Handle<Button> btn = Handle<Button>::New(manager);
-				btn->caption = _Tr("MainScreen", "Cancel");
-				btn->SetBounds(AABB2(x + w - 150.0F, y + 130.0F, 150.0F, 30.0F));
-				btn->activated = [this](UIElement& s) { OnCancel(s); };
-				AddChild(btn.GetPointerOrNull());
-			}
-		}
-
-		void RenameScreen::OnConfirm(UIElement&) {
-			newName = nameField->GetText();
-			result = true;
-			Close();
-		}
-
-		void RenameScreen::OnCancel(UIElement&) {
-			result = false;
-			Close();
-		}
-
-		void RenameScreen::Close() {
-			// keep ourselves alive while handlers observing the close run
-			Handle<RenameScreen> keepAlive(this);
-			owner->enable = true;
-			GetParent()->RemoveChild(this);
-			if (closed)
-				closed(*this);
-		}
-
-		void RenameScreen::Run() {
-			owner->enable = false;
-			owner->GetParent()->AddChild(this);
-			GetManager().SetActiveElement(nameField);
-		}
-
-		void RenameScreen::HotKey(const std::string& key) {
-			if (IsEnabled() && key == "Enter") {
-				OnConfirm(*this);
-			} else if (IsEnabled() && key == "Escape") {
-				OnCancel(*this);
-			} else {
-				UIElement::HotKey(key);
-			}
 		}
 
 		// -- MainScreenMainMenu --
@@ -598,6 +502,15 @@ namespace spades {
 					modsPanel->AddChild(modsList);
 				}
 
+				{
+					Handle<KV6BrowserPanel> panel = Handle<KV6BrowserPanel>::New(
+					    manager, helper, this, contentsLeft, contentsWidth, headerPos,
+					    headerHeight, listPos, footerPos);
+					editorPanel = panel.GetPointerOrNull();
+					editorPanel->visible = false;
+					AddChild(editorPanel);
+				}
+
 				AddChild(serverPanel);
 				AddChild(demoPanel);
 				AddChild(modsPanel);
@@ -613,6 +526,7 @@ namespace spades {
 					// the mod manager is irrelevant and its enabled set is bypassed.
 					if (!helper->IsTryingMod())
 						tabStrip->AddItem(_Tr("MainScreen", "Mods"), modsPanel);
+					tabStrip->AddItem(_Tr("MainScreen", "Editor"), editorPanel);
 					tabStrip->changed = [this](UIElement& s) { OnTabChanged(s); };
 				}
 
@@ -684,13 +598,19 @@ namespace spades {
 			currentDemoListModel = model;
 		}
 
-		void MainScreenMainMenu::OnTabChanged(UIElement&) {
-			// Refresh demo list when switching to demos tab
+		void MainScreenMainMenu::RefreshVisibleTab() {
+			// The listings are snapshots: re-read whichever one is on screen, both
+			// when its tab is selected and when a subview (game, demo, editor) hands
+			// control back, since it may have added or removed files.
 			if (demoPanel->visible)
 				LoadDemoList();
 			if (modsPanel->visible)
 				LoadModList();
+			if (editorPanel->visible)
+				editorPanel->Refresh();
 		}
+
+		void MainScreenMainMenu::OnTabChanged(UIElement&) { RefreshVisibleTab(); }
 
 		MainScreenMainMenuState MainScreenMainMenu::GetState() {
 			MainScreenMainMenuState state;
@@ -939,17 +859,20 @@ namespace spades {
 		void MainScreenMainMenu::OnRenameDemoPressed(UIElement&) {
 			if (selectedDemoPath.empty())
 				return;
-			Handle<RenameScreen> rename =
-			    Handle<RenameScreen>::New(this, StripDemoPath(selectedDemoPath));
+			TextPromptScreen::Options options;
+			options.title = _Tr("MainScreen", "Rename Demo");
+			options.initialText = StripDemoPath(selectedDemoPath);
+			options.confirmCaption = _Tr("MainScreen", "Rename");
+			Handle<TextPromptScreen> rename = Handle<TextPromptScreen>::New(this, std::move(options));
 			rename->closed = [this](UIElement& s) { OnRenameScreenClosed(s); };
 			rename->Run();
 		}
 
 		void MainScreenMainMenu::OnRenameScreenClosed(UIElement& sender) {
-			RenameScreen* rename = dynamic_cast<RenameScreen*>(&sender);
-			if (!rename || !rename->result)
+			TextPromptScreen* rename = dynamic_cast<TextPromptScreen*>(&sender);
+			if (!rename || !rename->GetResult())
 				return;
-			std::string newName = rename->newName;
+			std::string newName = rename->GetText();
 			if (newName.size() >= 4 && newName.substr(newName.size() - 4) == ".dem")
 				newName = newName.substr(0, newName.size() - 4);
 			if (newName.empty())
@@ -1142,6 +1065,8 @@ namespace spades {
 			if (IsEnabled() && key == "Enter") {
 				if (demoPanel->visible) {
 					PlaySelectedDemo();
+				} else if (editorPanel->visible) {
+					editorPanel->SubmitDefault();
 				} else {
 					Connect();
 				}

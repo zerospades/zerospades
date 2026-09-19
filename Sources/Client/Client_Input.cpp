@@ -913,16 +913,28 @@ namespace spades {
 						}
 					}
 				} else if (CheckKey(cg_keyGlobalChat, name) && down) {
-					scriptedUI->EnterGlobalChatWindow();
-					scriptedUI->SetIgnored(name);
+					// Disable chat in editor mode
+					if (!GetEditorNetClient()) {
+						scriptedUI->EnterGlobalChatWindow();
+						scriptedUI->SetIgnored(name);
+					}
 				} else if (CheckKey(cg_keyTeamChat, name) && down) {
-					scriptedUI->EnterTeamChatWindow();
-					scriptedUI->SetIgnored(name);
+					// Disable chat in editor mode
+					if (!GetEditorNetClient()) {
+						scriptedUI->EnterTeamChatWindow();
+						scriptedUI->SetIgnored(name);
+					}
 				} else if (CheckKey(cg_keyChatLog, name) && down) {
-					scriptedUI->EnterChatLogWindow();
-					scriptedUI->SetIgnored(name);
+					// Disable chat log in editor mode
+					if (!GetEditorNetClient()) {
+						scriptedUI->EnterChatLogWindow();
+						scriptedUI->SetIgnored(name);
+					}
 				} else if (CheckKey(cg_keyZoomChatLog, name)) {
-					chatWindow->SetExpanded(down);
+					// Disable chat zoom in editor mode
+					if (!GetEditorNetClient()) {
+						chatWindow->SetExpanded(down);
+					}
 				} else if (CheckKey(cg_keyCaptureColor, name) && down) {
 					if (!localPlayerIsSpectator && localPlayerIsAlive && p.IsToolBlock())
 						CaptureColor();

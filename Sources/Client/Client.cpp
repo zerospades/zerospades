@@ -309,6 +309,12 @@ namespace spades {
 			activeNet = demoNet.get();
 		}
 
+		void Client::EnableEditorMode(std::unique_ptr<EditorNetClient> net) {
+			SPADES_MARK_FUNCTION();
+			editorNet = std::move(net);
+			activeNet = editorNet.get();
+		}
+
 		Client::~Client() {
 			SPADES_MARK_FUNCTION();
 
@@ -328,6 +334,11 @@ namespace spades {
 			if (demoNet) {
 				SPLog("Closing demo playback");
 				demoNet.reset();
+			}
+
+			if (editorNet) {
+				SPLog("Closing map editor");
+				editorNet.reset();
 			}
 
 			SPLog("Disconnected");
@@ -640,7 +651,16 @@ namespace spades {
 			mumbleLink.SetContext(hostname.ToString(false));
 			mumbleLink.SetIdentity(playerName);
 
-			if (!demoFilePath.empty()) {
+			if (editorNet) {
+				SPLog("Starting map editor mode");
+				activeNet = editorNet.get();
+			} else if (!editorMapPath.empty()) {
+				SPLog("Starting map editor with: %s", editorMapPath.c_str());
+				editorNet = stmp::make_unique<EditorNetClient>(this);
+				if (!editorNet->LoadMap(editorMapPath))
+					SPRaise("Failed to load map: %s", editorNet->GetStatusString().c_str());
+				activeNet = editorNet.get();
+			} else if (!demoFilePath.empty()) {
 				SPLog("Starting demo playback: '%s'", demoFilePath.c_str());
 				demoNet = stmp::make_unique<DemoNetClient>(this);
 				if (!demoNet->OpenDemo(demoFilePath))
@@ -714,6 +734,12 @@ namespace spades {
 				} else {
 					SPLog("Exception while processing network packets (ignored):\n%s", ex.what());
 				}
+			}
+
+			// Update editor mode with current spectator position and player state
+			if (editorNet) {
+				editorNet->SetSpectatorPosition(freeCameraState.position);
+				editorNet->UpdatePlayerState();
 			}
 
 			// Repeated seek preview while a seek key is held.
