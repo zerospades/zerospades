@@ -25,18 +25,31 @@
 
 namespace spades {
 	namespace gui {
-		PivotTool::PivotTool() {
-			subs.push_back(std::unique_ptr<EditorTool>(new PivotGizmoSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(new PivotValuesSubTool()));
-			options.AddLabel("pivot.readout");
+		namespace {
+			const char* const kSetOption = "pivot.set";
+			const char* const kReadoutOption = "pivot.readout";
+		} // namespace
+
+		// The pivot is a point anywhere, on no grid: it takes every step, finest first.
+		PivotTool::PivotTool()
+		    : GizmoTool(std::unique_ptr<GizmoSubTool>(new PivotGizmoSubTool()), {0.1F, 0.5F, 1.0F},
+		                0.0F) {
+			options.AddAction(kSetOption, "Set...");
+			AddSnapOptions();
+			options.AddLabel(kReadoutOption);
 		}
 
-		void PivotTool::DrawScene(IEditorContext& ed) {
+		void PivotTool::UpdateOptions(IEditorContext& ed) {
+			GizmoTool::UpdateOptions(ed);
 			Vector3 p = ed.GetPivot();
 			char buf[80];
 			std::snprintf(buf, sizeof(buf), "Pivot  %.1f, %.1f, %.1f", p.x, p.y, p.z);
-			options.SetLabel("pivot.readout", buf);
-			ContainerTool::DrawScene(ed);
+			options.SetLabel(kReadoutOption, buf);
+		}
+
+		void PivotTool::OnAction(IEditorContext& ed, const std::string& id) {
+			if (id == kSetOption)
+				ed.BeginPivotEntry();
 		}
 	} // namespace gui
 } // namespace spades

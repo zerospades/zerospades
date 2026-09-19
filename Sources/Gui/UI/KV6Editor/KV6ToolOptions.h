@@ -33,17 +33,16 @@ namespace spades {
 		struct ToolOption {
 			enum class Type {
 				Bool,  // a toggle button; value lives in `bvalue`
-				Color, // colour swatch; opens picker on click; value lives in `color`
 				Label, // a read-only text readout; the tool updates `label` each frame
 				Action // a one-shot button; clicking calls EditorTool::OnAction(id)
 			};
 
 			std::string id;    // stable key, e.g. "mirror.x"
-			std::string label; // short button text ("X"); empty for icon/swatch only
+			std::string label; // button text ("X"), or a readout's current text
 			std::string group; // shared group label ("Mirror"); empty = ungrouped
 			Type type = Type::Bool;
 			bool bvalue = false;     // Bool value
-			uint32_t color = 0xFFFFFFFF; // Color value (ARGB)
+			bool enabled = true;     // false greys a Bool or Action out (nothing to act on)
 		};
 
 		// An ordered list of a tool's options.
@@ -57,15 +56,6 @@ namespace spades {
 				o.group = group;
 				o.type = ToolOption::Type::Bool;
 				o.bvalue = initial;
-				items.push_back(o);
-			}
-			void AddColor(const std::string& id, const std::string& group = "",
-			             uint32_t initial = 0xFFFFFFFF) {
-				ToolOption o;
-				o.id = id;
-				o.group = group;
-				o.type = ToolOption::Type::Color;
-				o.color = initial;
 				items.push_back(o);
 			}
 			// A one-shot button: it holds no state, and a click is reported to the
@@ -88,36 +78,29 @@ namespace spades {
 				items.push_back(o);
 			}
 			void SetLabel(const std::string& id, const std::string& text) {
-				for (ToolOption& o : items)
-					if (o.id == id) {
-						o.label = text;
-						return;
-					}
+				if (ToolOption* o = Find(id))
+					o->label = text;
 			}
-			void SetColor(const std::string& id, uint32_t color) {
+			void SetEnabled(const std::string& id, bool enabled) {
+				if (ToolOption* o = Find(id))
+					o->enabled = enabled;
+			}
+
+			/** The option with `id`, or null if there is none. */
+			ToolOption* Find(const std::string& id) {
 				for (ToolOption& o : items)
-					if (o.id == id) {
-						o.color = color;
-						return;
-					}
+					if (o.id == id)
+						return &o;
+				return nullptr;
 			}
 
 			int Count() const { return int(items.size()); }
 			ToolOption& At(int i) { return items[i]; }
 			const ToolOption& At(int i) const { return items[i]; }
 
-			bool GetBool(const std::string& id) const {
-				for (const ToolOption& o : items)
-					if (o.id == id)
-						return o.bvalue;
-				return false;
-			}
 			void SetBool(const std::string& id, bool value) {
-				for (ToolOption& o : items)
-					if (o.id == id) {
-						o.bvalue = value;
-						return;
-					}
+				if (ToolOption* o = Find(id))
+					o->bvalue = value;
 			}
 
 		private:
