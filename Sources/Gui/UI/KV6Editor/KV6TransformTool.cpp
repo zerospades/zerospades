@@ -33,16 +33,20 @@ namespace spades {
 			const char* const kReadoutOption = "transform.readout";
 		} // namespace
 
-		TransformTool::TransformTool() {
-			subs.push_back(std::unique_ptr<EditorTool>(new TransformSubTool()));
+		// Voxels only ever land on voxels: they move by whole ones, and always
+		// sit on the grid, so neither a finer step nor Snap to Grid applies.
+		TransformTool::TransformTool()
+		    : GizmoTool(std::unique_ptr<GizmoSubTool>(new TransformSubTool()), {1.0F}, false) {
 			options.AddAction(kPlaceOption, "Place");
 			options.AddAction(kCancelOption, "Cancel");
 			options.AddBool(kAboutSelectionOption, "Selection", "Turn about");
 			options.AddBool(kAboutPivotOption, "Pivot", "Turn about");
+			AddSnapOptions();
 			options.AddLabel(kReadoutOption);
 		}
 
 		void TransformTool::UpdateOptions(IEditorContext& ed) {
+			GizmoTool::UpdateOptions(ed);
 			// Place and Cancel act on pending voxels; a selection that has not
 			// moved yet is not pending, so there is nothing for them to do.
 			const bool pending = ed.HasPlacement();
@@ -65,7 +69,8 @@ namespace spades {
 			}
 		}
 
-		void TransformTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool) {
+		void TransformTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) {
+			GizmoTool::OnOptionToggled(ed, id, value);
 			// The pair acts as radio buttons: a click picks its choice, whatever
 			// the toggle it landed on was showing.
 			if (id == kAboutSelectionOption)

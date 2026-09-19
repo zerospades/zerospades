@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6GizmoTool.h"
 
 namespace spades {
 	namespace gui {
@@ -33,17 +33,13 @@ namespace spades {
 		 * the middle of the voxels or the model's pivot; the readout names the
 		 * voxel they turn about.
 		 */
-		class TransformTool : public ContainerTool {
+		class TransformTool : public GizmoTool {
 		public:
 			TransformTool();
 			const char* Label() const override { return "Transform"; }
-			ToolOptions* Options() override { return &options; }
 			void UpdateOptions(IEditorContext& ed) override;
 			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
-
-		private:
-			ToolOptions options; // Place, Cancel, the turn centre, and its readout
 		};
 	} // namespace gui
 } // namespace spades

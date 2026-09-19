@@ -108,6 +108,10 @@ namespace spades {
 			float translation = 0.0F; // world units, per pose axis
 			float rotation = 0.0F;    // radians
 			float scale = 0.0F;       // added to a factor of 1 (0.1 gives 1.0, 1.1, ...)
+			// Translation lands the position the drag started from on multiples
+			// of `translation` along each pose axis (an absolute grid), instead of
+			// moving it by multiples of it.
+			bool translationToGrid = false;
 		};
 
 		/** A change made by a drag, about the gizmo's position. */
@@ -209,6 +213,7 @@ namespace spades {
 			// What a drag needs to remember from the moment of the grab.
 			struct DragState {
 				Vector3 axes[3];            // pose axes at the grab
+				Vector3 grabPosition;       // pose position at the grab
 				Vector2 grabCursor;         // cursor at the grab
 				Vector2 lastCursor;         // cursor at the previous Drag
 				Vector3 planeNormal;        // plane the cursor ray is cast against

@@ -148,6 +148,12 @@ namespace spades {
 			void OnDocumentChanged(IEditorContext&) override;
 			void DrawOverlay(IEditorContext&) override;
 
+			/**
+			 * Moves snap to multiples of `step`: moving by them, or with `toGrid`
+			 * landing on them. Turns keep their own snap.
+			 */
+			void SetTranslationSnap(float step, bool toGrid);
+
 		protected:
 			/** The gizmo snaps by `snap` and shows (and responds to) `handles`. */
 			explicit GizmoSubTool(const GizmoSnap& snap,
@@ -211,8 +217,9 @@ namespace spades {
 			void OnClickAway(IEditorContext& ed) override;
 		};
 
-		// Moves the model pivot with the gizmo, in 0.1 steps. Voxels stay put. The
-		// pivot follows the drag live and is committed as one undo step on release.
+		// Moves the model pivot with the gizmo, snapped as the Pivot tool sets it.
+		// Voxels stay put. The pivot follows the drag live and is committed as one
+		// undo step on release.
 		class PivotGizmoSubTool : public GizmoSubTool {
 		public:
 			PivotGizmoSubTool();
@@ -230,9 +237,10 @@ namespace spades {
 			Vector3 startPivot; // pivot at the grab
 		};
 
-		// Moves the mirror planes with the gizmo, in 0.5 steps — the step at which
-		// a reflection actually shifts. The planes follow the drag live and the
-		// move is committed as one undo step on release, as the pivot's is.
+		// Moves the mirror planes with the gizmo, snapped as the Mirror tool sets it
+		// (never finer than 0.5, the step at which a reflection actually shifts).
+		// The planes follow the drag live and the move is committed as one undo
+		// step on release, as the pivot's is.
 		class MirrorGizmoSubTool : public GizmoSubTool {
 		public:
 			MirrorGizmoSubTool();

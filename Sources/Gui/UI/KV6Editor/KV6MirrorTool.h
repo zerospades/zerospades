@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6GizmoTool.h"
 
 namespace spades {
 	namespace gui {
@@ -45,18 +45,14 @@ namespace spades {
 		 * planes. Its one sub-tool, Move, is the plane gizmo; Reset to Pivot is a
 		 * one-shot action beside the X/Y/Z toggles.
 		 */
-		class MirrorTool : public ContainerTool {
+		class MirrorTool : public GizmoTool {
 		public:
 			MirrorTool();
 			const char* Label() const override { return "Mirror"; }
 
-			ToolOptions* Options() override { return &options; }
 			void UpdateOptions(IEditorContext& ed) override;
 			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
-
-		private:
-			ToolOptions options; // X/Y/Z toggles, Reset to Pivot, the plane readout
 		};
 	} // namespace gui
 } // namespace spades

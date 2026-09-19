@@ -399,6 +399,13 @@ namespace spades {
 			return true;
 		}
 
+		void GizmoSubTool::SetTranslationSnap(float step, bool toGrid) {
+			GizmoSnap snap = gizmo.Snap();
+			snap.translation = step;
+			snap.translationToGrid = toGrid;
+			gizmo.SetSnap(snap);
+		}
+
 		void GizmoSubTool::CancelInteraction(IEditorContext& ed) { CancelDrag(ed); }
 		void GizmoSubTool::OnDocumentChanged(IEditorContext& ed) { CancelDrag(ed); }
 
@@ -485,10 +492,11 @@ namespace spades {
 
 		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
 
-		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(TranslationSnap(0.1F)) {}
+		// The Pivot tool sets the snap (GizmoTool).
+		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
 
 		std::string PivotGizmoSubTool::Hint(IEditorContext&) {
-			return std::string("drag a handle to move the pivot (0.1 steps)") + kGizmoDragHint;
+			return std::string("drag a handle to move the pivot") + kGizmoDragHint;
 		}
 
 		bool PivotGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
@@ -517,10 +525,11 @@ namespace spades {
 
 		// --- MirrorGizmoSubTool (drag the mirror planes) ---------------------
 
-		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(TranslationSnap(0.5F)) {}
+		// The Mirror tool sets the snap (GizmoTool).
+		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
 
 		std::string MirrorGizmoSubTool::Hint(IEditorContext&) {
-			return std::string("drag a handle to move the planes (0.5 steps)") + kGizmoDragHint;
+			return std::string("drag a handle to move the planes") + kGizmoDragHint;
 		}
 
 		bool MirrorGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {

@@ -587,6 +587,7 @@ namespace spades {
 			drag = DragState();
 			for (int i = 0; i < 3; i++)
 				drag.axes[i] = f.axes[i];
+			drag.grabPosition = pose.position;
 			drag.grabCursor = cursor;
 			drag.lastCursor = cursor;
 
@@ -678,12 +679,26 @@ namespace spades {
 				move = axis * Vector3::Dot(move, axis);
 			}
 
-			// Snap the running total, per pose axis, not each step.
+			// Snap the running total, per pose axis, not each step. On a grid the
+			// position reached is snapped, and the total is what gets it there,
+			// but only along the axes this handle moves: an arrow must never pull
+			// what it moves onto the grid sideways.
+			auto moves = [&](int i) {
+				if (info.shape == Shape::Axis)
+					return i == info.axis;
+				if (info.shape == Shape::Plane)
+					return i != info.axis;
+				return true; // the screen-plane handle moves along all three
+			};
 			Vector3 wanted = total.translation + move;
 			Vector3 snapped = MakeVector3(0.0F, 0.0F, 0.0F);
-			for (int i = 0; i < 3; i++)
-				snapped += drag.axes[i] *
-				           SnapTo(Vector3::Dot(wanted, drag.axes[i]), snap.translation);
+			for (int i = 0; i < 3; i++) {
+				const float along = Vector3::Dot(wanted, drag.axes[i]);
+				const float from = (snap.translationToGrid && moves(i))
+				                     ? Vector3::Dot(drag.grabPosition, drag.axes[i])
+				                     : 0.0F;
+				snapped += drag.axes[i] * (SnapTo(from + along, snap.translation) - from);
+			}
 			Vector3 delta = snapped - total.translation;
 			if (delta == MakeVector3(0.0F, 0.0F, 0.0F))
 				return false;

@@ -20,23 +20,19 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6GizmoTool.h"
 
 namespace spades {
 	namespace gui {
-		// Set the model pivot: a draggable gizmo (0.1 steps), and Set... to type
-		// exact values. The sub-toolbar shows the live pivot position.
-		class PivotTool : public ContainerTool {
+		// Set the model pivot: a draggable gizmo (steps down to 0.1), and Set... to
+		// type exact values. The sub-toolbar shows the live pivot position.
+		class PivotTool : public GizmoTool {
 		public:
 			PivotTool();
 			const char* Label() const override { return "Pivot"; }
-			ToolOptions* Options() override { return &options; }
 			// Refresh the readout from the live pivot.
 			void UpdateOptions(IEditorContext&) override;
 			void OnAction(IEditorContext&, const std::string& id) override;
-
-		private:
-			ToolOptions options; // Set..., and a read-only pivot-position readout
 		};
 	} // namespace gui
 } // namespace spades

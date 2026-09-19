@@ -53,15 +53,19 @@ namespace spades {
 			return false;
 		}
 
-		MirrorTool::MirrorTool() {
-			subs.push_back(std::unique_ptr<EditorTool>(new MirrorGizmoSubTool()));
-
+		// A reflection only shifts at half a voxel, the finest step the planes
+		// take (PlaceMirrorPlane holds them to it), so 0.1 is not offered.
+		MirrorTool::MirrorTool()
+		    : GizmoTool(std::unique_ptr<GizmoSubTool>(new MirrorGizmoSubTool()), {0.5F, 1.0F},
+		                true) {
 			AddMirrorToggles(options);
 			options.AddAction(kResetOption, "Reset to Pivot");
+			AddSnapOptions();
 			options.AddLabel(kReadoutOption);
 		}
 
 		void MirrorTool::UpdateOptions(IEditorContext& ed) {
+			GizmoTool::UpdateOptions(ed);
 			SyncMirrorToggles(options, ed);
 			Vector3 p = ed.MirrorPlane();
 			char buf[80];
@@ -70,6 +74,7 @@ namespace spades {
 		}
 
 		void MirrorTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) {
+			GizmoTool::OnOptionToggled(ed, id, value);
 			ApplyMirrorToggle(ed, id, value);
 		}
 
