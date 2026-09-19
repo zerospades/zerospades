@@ -24,7 +24,8 @@
 
 namespace spades {
 	namespace gui {
-		// Select voxels: Point (single), Rect (box region), By Colour.
+		// Select voxels: Voxel (single), Box (box region), By Colour. Its bar holds
+		// the commands that act on the selection, clipboard included.
 		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
@@ -32,9 +33,9 @@ namespace spades {
 			EditorRole Role() const override { return EditorRole::Select; }
 
 			ToolOptions* Options() override;
+			// Commands with nothing to act on are greyed out.
+			void UpdateOptions(IEditorContext& ed) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
-			// Escape drops the selection once whatever is in progress has had it.
-			bool OnEscape(IEditorContext& ed) override;
 
 			static void SelectAll(IEditorContext& ed);
 

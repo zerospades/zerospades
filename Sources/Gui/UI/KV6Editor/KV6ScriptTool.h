@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -27,6 +28,7 @@
 
 class asIScriptObject;
 class asIScriptFunction;
+class asIScriptContext;
 
 namespace spades {
 	namespace gui {
@@ -47,18 +49,30 @@ namespace spades {
 			void OnDeactivate(IEditorContext&) override;
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
-			bool OnEscape(IEditorContext&) override;
+			std::string EscapeLabel(IEditorContext&) override;
+			void OnEscape(IEditorContext&) override;
+			std::string Hint(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
 
 		private:
 			asIScriptObject* obj;
+			// Runs `fn` on the tool with the editor as its first argument;
+			// `setArgs` sets the others and `read` takes the result. A method the
+			// tool does not have is skipped, leaving its default.
+			void Call(asIScriptFunction* fn, IEditorContext& ed,
+			          const std::function<void(asIScriptContext&)>& setArgs = nullptr,
+			          const std::function<void(asIScriptContext&)>& read = nullptr);
+			// Call for a method returning a string; empty when skipped.
+			std::string CallForString(asIScriptFunction* fn, IEditorContext& ed);
 			// Concrete tool methods, resolved once from the object's type (null if the
 			// tool doesn't provide one).
 			asIScriptFunction* fnActivate = nullptr;
 			asIScriptFunction* fnDeactivate = nullptr;
 			asIScriptFunction* fnPointer = nullptr;
 			asIScriptFunction* fnKey = nullptr;
+			asIScriptFunction* fnEscapeLabel = nullptr;
 			asIScriptFunction* fnEscape = nullptr;
+			asIScriptFunction* fnHint = nullptr;
 			asIScriptFunction* fnDraw = nullptr;
 			std::string label;
 		};

@@ -23,14 +23,17 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
+#include "KV6ToolRegistry.h"
 #include "KV6UndoStack.h"
 #include <Gui/UI/Components/EditorMenu.h>
+#include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/View.h>
 #include <Client/IAudioDevice.h>
@@ -94,10 +97,11 @@ namespace spades {
 			Vector2 WorldToScreen(const Vector3& w, bool& ok) const override;
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			// Pending placement (positioned by the Transform tool).
-			bool HasPlacement() const override { return placementActive; }
-			bool BeginPlacementFromSelection() override;
+			bool HasPlacement() const override { return edit.placing; }
 			void TransformPlacement(const PlacementTransform& t) override;
-			bool PlacementPivot(IntVector3& out) const override;
+			bool TransformPivot(IntVector3& out) const override;
+			bool TurnsAboutModelPivot() const override { return turnsAboutModelPivot; }
+			void SetTurnsAboutModelPivot(bool on) override { turnsAboutModelPivot = on; }
 			void ApplyPlacement() override;
 			void CancelPlacement() override;
 			void DrawPlacementTransformed(const PlacementTransform& t,
@@ -110,19 +114,22 @@ namespace spades {
 			uint32_t CurrentColor() const override { return currentColor; }
 
 			// Selection (a set of solid-voxel coords, shared across tools).
-			void ToggleSelect(int x, int y, int z) override;
-			void AddSelect(int x, int y, int z) override;
 			bool IsSelected(int x, int y, int z) const override;
 			void ClearSelection() override;
-			// Voxels lifted by Transform are still what is selected; they only float.
+			void DeleteSelection() override;
+			// While voxels are pending (lifted, pasted, imported) they are what is
+			// selected; the selection itself is empty then.
 			int SelectionCount() const override {
-				return int(selection.size() + (placementActive ? placement.lifted.size() : 0));
+				return edit.placing ? int(edit.placement.voxels->size()) : edit.selection.Size();
 			}
-			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
-			void SelectLinkedColor(int x, int y, int z) override;
+			// Flood-fill over the 6-connected voxels sharing (x,y,z)'s colour.
+			std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const override;
 
-			bool PickModeActive() const override { return pickMode; }
-			void ClearPickMode() override { pickMode = false; }
+			// Clipboard (also driven by Ctrl+C/X/V).
+			void CopySelection() override;
+			bool CutSelection() override;
+			void Paste() override;
+			bool CanPaste() const override { return !clipboard.empty(); }
 
 			// Pivot (= -origin); moving it keeps the voxels fixed. Undoable.
 			Vector3 GetPivot() const override;
@@ -131,18 +138,12 @@ namespace spades {
 			void BeginPivotEntry() override;
 
 			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---
-			// Tools and scripts bracket a multi-step edit so it undoes as one step;
-			// nested brackets coalesce. Edits made between Begin/End (incl. plain
-			// FillCells/PaintCells/SelectCells calls) are captured automatically.
-			void BeginUndoGroup(const std::string& label) override { undo.Begin(label); }
-			void EndUndoGroup() override { undo.End(); }
 			void Undo() override;
 			void Redo() override;
 			bool CanUndo() const override { return undo.CanUndo(); }
 			bool CanRedo() const override { return undo.CanRedo(); }
 			void PlaceCube() override;
 			void DeleteCube() override;
-			void Eyedropper() override;
 			void SetStatus(const std::string&) override;
 			void DrawCellOutline(int x, int y, int z, const Vector4& color) override;
 			// 3D wireframe over the inclusive voxel range [lo, hi].
@@ -150,8 +151,9 @@ namespace spades {
 			                    const Vector4& color) override;
 			bool MirrorEnabled(int axis) const override;
 			void SetMirrorEnabled(int axis, bool on) override;
-			Vector3 MirrorPlane() const override { return mirrorPlane; }
+			Vector3 MirrorPlane() const override { return edit.mirror.plane; }
 			void SetMirrorPlane(const Vector3& plane) override;
+			void PreviewMirrorPlane(const Vector3& plane) override;
 			void ResetMirrorPlane() override;
 			// As above, but also drawing the mirror images for the enabled axes.
 			void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) override;
@@ -185,7 +187,8 @@ namespace spades {
 
 			// --- Document -----------------------------------------------------
 			Handle<VoxelModel> model;
-			Handle<client::IModel> renderModel; // rebuilt on edit
+			// Rebuilt from the model once per frame, when invalidated (see RefreshRenderModels).
+			Handle<client::IModel> renderModel;
 			int cubeSize = 32;
 			std::string filePath;
 			int voxelCount = 0;
@@ -201,124 +204,137 @@ namespace spades {
 			long savedGeomId = -1;
 			bool IsDirty() const { return undo.GeometryStateId() != savedGeomId; }
 			// What saving would change: the journaled edits, plus voxels still
-			// waiting to be placed somewhere new.
-			bool HasUnsavedChanges() const { return IsDirty() || PlacementChangesDocument(); }
+			// waiting to be placed (a paste leaves the document itself untouched).
+			bool HasUnsavedChanges() const { return IsDirty() || edit.placing; }
 
 			// KV6UndoStack::Sink — apply primitives the stack replays on undo/redo.
 			void UndoApplyVoxel(int x, int y, int z, bool solid, uint32_t color) override;
 			void UndoApplyReframe(int w, int h, int d, int ox, int oy, int oz) override;
 			void UndoApplyOrigin(const Vector3& origin) override;
-			std::set<int64_t> UndoSnapshotSelection() const override { return selection; }
-			void UndoRestoreSelection(const std::set<int64_t>& sel) override { selection = sel; }
-			void UndoReplayed() override { RebuildRenderModel(); }
+			EditState UndoSnapshotState() const override;
+			void UndoRestoreState(const EditState& state) override;
+			void UndoReplayed() override { InvalidateRenderModel(); }
 
 			// The single voxel-write choke point. `WriteVoxel` journals the change for
 			// undo; `WriteVoxelRaw` only applies it (used by the stack's replay). Both
-			// keep `voxelCount` correct, so no mutator touches it directly.
+			// keep `voxelCount` correct, so no mutator touches it directly, and
+			// `WriteVoxel` drops a removed voxel from the selection, so the selection
+			// only ever holds solid voxels (a replay restores a selection that did).
 			void WriteVoxel(int x, int y, int z, bool solid, uint32_t color);
 			void WriteVoxelRaw(int x, int y, int z, bool solid, uint32_t color);
 
 			// --- Mode (Blender-style) -----------------------------------------
-			// KV6 documents only support Edit mode for now; Object/Animation are
-			// shown but disabled.
+			// A .kv6 holds one model, so it is only edited in Edit mode. Object and
+			// Animation are shown greyed out: they arrive with .2kv6 scenes.
 			enum class EditorMode { Object, Edit, Animation };
 			EditorMode currentMode = EditorMode::Edit;
+			static bool ModeSupported(EditorMode mode) { return mode == EditorMode::Edit; }
+			// Each mode's toolbar button: its id and label.
+			struct ModeInfo {
+				EditorMode mode;
+				const char* id;
+				const char* label;
+			};
+			static const std::vector<ModeInfo>& Modes();
 
 			// --- Tools (available in Edit mode) -------------------------------
-			std::vector<std::unique_ptr<EditorTool>> tools;
+			std::vector<ToolSlot> tools;
 			int activeTool = 0;
 			EditorTool* ActiveTool(); // active tool in Edit mode, else null
+			// The index of the tool with `id` (as the toolbar reports it), or -1.
+			int ToolIndex(const std::string& id) const;
+			// The active tool's option `id` if it is of `type`, else null: where a
+			// click on the option bar lands.
+			ToolOption* ActiveOption(const std::string& id, ToolOption::Type type);
 			// Switching tools or modes deactivates the outgoing tool, which is where
 			// a pending placement is applied.
 			void SetActiveTool(int index);
 			void SetMode(EditorMode mode);
+			// Makes tool `toolIndex` in `mode` the active one, deactivating the
+			// outgoing tool and activating the incoming one.
+			void Activate(int toolIndex, EditorMode mode);
+			// Keys 1-9 pick the active tool's sub-tools, in bar order.
+			static std::string SubToolHotKey(int index);
+			// Switches tool or sub-tool when `key` is one's hot key; false if not.
+			bool SwitchByHotKey(const std::string& key);
+			// Whether the editor already handles `key` itself (movement, sprint,
+			// delete, screenshot), so it cannot serve as a tool's hot key.
+			bool KeyIsTaken(const std::string& key) const;
 
-			// --- Selection ----------------------------------------------------
-			std::set<int64_t> selection; // packed voxel keys
+			// --- Edit state -----------------------------------------------------
+			// Everything besides the voxels that undo restores: the selection, the
+			// mirror setup and the pending voxels. Held as one EditState, so a
+			// snapshot is a copy of it and new state added there is journaled.
+			EditState edit;
 			void DrawSelection();
-			void ShiftSelection(int ox, int oy, int oz); // keep keys valid on resize
+			// Adds `v` to the selection if it holds a voxel, within the step open.
+			void SelectIfSolid(const IntVector3& v);
 
 			// --- Clipboard / placement ----------------------------------------
-			// Placing voxels (paste, import) is one mechanism: a buffer of voxels
-			// follows the cursor until it is dropped. The clipboard is just one
-			// source for that buffer, so an import never disturbs a copy.
-			struct ClipVoxel {
-				IntVector3 rel; // position relative to the buffer's min corner
-				uint32_t color;
-			};
+			// Placing voxels (paste, import, Transform) is one mechanism: a group of
+			// voxels waits, drawn where it would land, until it is placed. The
+			// clipboard is just one source for that group, so an import never
+			// disturbs a copy.
 			std::vector<ClipVoxel> clipboard; // Ctrl+C / Ctrl+X store
 
-			/**
-			 * Voxels waiting to be placed (a paste, an import, or a lifted
-			 * selection being moved).
-			 *
-			 * Nothing here has touched the document yet: the voxels are drawn as a
-			 * preview and written only when the placement is applied, which is what
-			 * keeps a move from destroying whatever it is dragged across. `lifted`
-			 * holds the document voxels to clear at that point (empty for a paste or
-			 * an import, which take nothing away). A placement only ever sits
-			 * where it fits the model size limit, so applying it never fails.
-			 */
-			struct Placement {
-				// Relative to `anchor`. Parallel to `lifted` when that is not empty:
-				// voxel i was taken from lifted[i], whatever turns it made since.
-				std::vector<ClipVoxel> voxels;
-				IntVector3 anchor = IntVector3::Make(0, 0, 0); // min corner, document coords
-				// The voxel turns go round, in document coords. It starts at the
-				// middle of the voxels and moves only with a shift, so turning back
-				// always returns them exactly where they were.
-				IntVector3 pivot = IntVector3::Make(0, 0, 0);
-				std::vector<IntVector3> lifted;
-				// Whether some voxel would land elsewhere than where it was lifted.
-				bool displaced = false;
-				std::string label = "Transform"; // undo step name
-			};
-			bool placementActive = false;
-			Placement placement;
-			// Whether applying the placement would change the document: always for
-			// a paste or an import, and for a lifted selection once it is displaced.
-			bool PlacementChangesDocument() const {
-				return placementActive && (placement.lifted.empty() || placement.displaced);
-			}
-			// Starts `placement` as `voxels` (relative to `anchor`), pivoting about
-			// their middle; `lifted` names where each came from, if anywhere.
-			void BeginPlacement(std::vector<ClipVoxel> voxels, const IntVector3& anchor,
-			                    std::vector<IntVector3> lifted, const std::string& label);
-			// The placement `t` would make of the current one, kept within the model
-			// size limit (`clamped` says whether that held it back); false if it
-			// fits nowhere.
-			bool TransformedPlacement(const PlacementTransform& t, Placement& out,
-			                          bool& clamped) const;
+			// The pending voxels live in `edit` (see PendingPlacement), so lifting,
+			// moving, turning, placing and cancelling them are undo steps like any
+			// edit. Turns go round the model's pivot rather than the voxels' middle.
+			bool turnsAboutModelPivot = false;
+			// The voxel a group with that middle turns about, per the setting above.
+			IntVector3 TurnCentre(const IntVector3& groupMiddle) const;
 			// Voxels in the document, counting those lifted by Transform (they only float).
 			int DocumentVoxelCount() const {
-				return voxelCount + (placementActive ? int(placement.lifted.size()) : 0);
+				return voxelCount + (edit.placing ? int(edit.placement.lifted->size()) : 0);
 			}
+			// A group of `voxels` (relative to `anchor`) turning about their middle;
+			// `lifted` names where each came from, if anywhere.
+			static PendingPlacement MakePlacement(std::vector<ClipVoxel> voxels,
+			                                      const IntVector3& anchor,
+			                                      std::vector<IntVector3> lifted,
+			                                      const std::string& label);
+			// What lifting the selection would take: false when nothing is
+			// selected. Changes nothing.
+			bool PlacementFromSelection(PendingPlacement& out) const;
+			// Takes the voxels of `taken` (see PlacementFromSelection) out of the
+			// document into the placement, as part of the undo step in progress.
+			void LiftIntoPlacement(PendingPlacement taken);
+			// Writes a pending voxel back into the document at `at`, selected;
+			// false when `at` lies outside the volume.
+			bool LandVoxel(const IntVector3& at, uint32_t color);
+			// The group `t` makes of `from`, kept within the model size limit
+			// (`clamped` says whether that held it back); false if it fits nowhere.
+			bool TransformedPlacement(const PendingPlacement& from, const PlacementTransform& t,
+			                          PendingPlacement& out, bool& clamped) const;
+			// Forgets the pending voxels without touching the document or history:
+			// for a document being replaced, or once they are placed or put back.
+			void DropPlacement();
 			// The pending voxels as a renderable model, so they are drawn solid at
 			// their temporary position while the document shows the gap they left.
+			// Rebuilt before a frame when the voxels changed (see RefreshRenderModels).
 			Handle<client::IModel> placementModel;
-			void RebuildPlacementModel();
-			// Size of the box holding `voxels` (at least one voxel each way).
-			static IntVector3 ExtentOf(const std::vector<ClipVoxel>& voxels);
-			// Moves `anchor` to the nearest spot where `voxels` land without the
-			// document outgrowing the model size limit; false if none exists.
-			bool ClampPlacementAnchor(const std::vector<ClipVoxel>& voxels,
-			                          IntVector3& anchor) const;
-			// Take the lifted voxels, and their selection, out of / back into the
-			// document without journaling: applying does the journaled edit in one
-			// step, starting from the document exactly as it was before the lift.
-			void LiftPlacementVoxels();
-			void RestorePlacementVoxels();
+			// The grid placementModel was made from, kept for the overlay lines to
+			// test what the pending voxels hide.
+			Handle<VoxelModel> placementVoxels;
+			std::uint64_t placementModelVersion = ~std::uint64_t(0); // voxels it shows
+			// Moves `anchor` to the nearest spot where voxels filling a box of
+			// `extent` land without the document outgrowing the model size limit;
+			// false if none exists.
+			bool ClampPlacementAnchor(const IntVector3& extent, IntVector3& anchor) const;
 
 			/**
 			 * Scope of a command that edits the document or the selection, or reads
-			 * them as a whole (copy, save). The outermost one applies a pending
-			 * placement first, so the command acts on the document as it stands,
-			 * and tells the active tool once it is done, so Transform can lift what is
-			 * selected then. Nested commands (Cut copies) act as one.
+			 * them as a whole (copy, save). The outermost one ends previews and
+			 * applies pending voxels first, so the command acts on the document as
+			 * it stands, unless it acts on the pending voxels themselves (`Keep`).
+			 * Once done it tells the active tool, so the tool can catch up. Nested
+			 * commands (Cut copies) act as one.
 			 */
 			class DocumentCommand {
 			public:
-				explicit DocumentCommand(KV6EditorView& editor);
+				enum class Pending { Apply, Keep };
+				explicit DocumentCommand(KV6EditorView& editor, Pending pending = Pending::Apply);
+				// Never throws: a tool failing to catch up is logged, not rethrown.
 				~DocumentCommand();
 				DocumentCommand(const DocumentCommand&) = delete;
 				DocumentCommand& operator=(const DocumentCommand&) = delete;
@@ -329,10 +345,16 @@ namespace spades {
 			int documentCommandDepth = 0;
 			// The document or the selection changed: let the active tool catch up.
 			void NotifyDocumentChanged();
+			// After undo or redo: pending voxels it brought back are positioned in
+			// the Transform tool, and the active tool catches up.
+			void HistoryReplayed();
 
-			void CopySelection();
-			bool CutSelection(); // returns false if it would empty the document
-			void StartPaste();
+			// Cut and Delete share these: whether removing the selection is
+			// allowed (saying why not on the status line), and the removal itself
+			// as one undo step, returning how many voxels went. While voxels are
+			// pending they are the selection, so both act on them instead.
+			bool CanEraseSelection();
+			int EraseSelection(const std::string& label);
 			// Starts a placement of `voxels` with its min corner at `anchor`, and
 			// switches to the Transform tool so it can be positioned.
 			void StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
@@ -346,25 +368,30 @@ namespace spades {
 			void OpenImportDialog();
 
 			// --- Colour picker (managed by ColorPicker component) ----------------
+			// The brush colour, shared by every tool and edited by the picker. A
+			// setting of the editor, not of the document: it is no part of the
+			// edit state, so choosing a colour is never an undo step and undo
+			// never changes it. The picker's recent colours are the same.
 			uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
-			// What the open picker edits: the shared brush colour when null, else
-			// swatch `colorTargetOption` of that tool. Held by identity rather than
-			// by option index, since an index shifts as a tool's options change
-			// and names a different option in whichever tool is active when the
-			// picker reports.
-			EditorTool* colorTargetTool = nullptr;
-			std::string colorTargetOption;
-			bool pickMode = false; // for eyedropper tool (not color picker UI)
+			// `color` was just written into the model by an edit: it leads the
+			// picker's recent colours.
+			void NoteColorUsed(uint32_t color);
+			// Sampling a colour is the editor's, not a tool's: Alt+click, or a
+			// click while the picker's eyedropper is armed, samples in any tool.
+			bool SamplingArmed() const;
+			// Takes the colour of the voxel under the cursor as the brush colour,
+			// disarming the eyedropper; false (and still armed) over empty space.
+			bool SampleColor();
 
 			// --- Mirror modelling (reflect each edit across the mirror planes) ---
 			// Owned here rather than by a tool, so an edit mirrors whichever tool
 			// made it and the planes survive switching tools. The Mirror tool is
 			// the UI over this state.
-			bool mirrorEnabled[3] = {false, false, false};
-			// Plane position per axis, in voxel coordinates. Starts on the pivot.
-			// MirrorIdx only sees whole half steps, so SetMirrorPlane keeps it on
-			// that grid, and ReframeRaw shifts it along with the voxels.
-			Vector3 mirrorPlane = MakeVector3(0.0F, 0.0F, 0.0F);
+			// The planes start on the pivot. MirrorIdx only sees whole half steps,
+			// so PlaceMirrorPlane keeps them on that grid, and ReframeRaw shifts
+			// them along with the voxels. The setup lives in `edit`.
+			// Moves the planes without journaling (the setters journal).
+			void PlaceMirrorPlane(const Vector3& plane);
 			bool MirrorOn(int axis) const; // shorthand for MirrorEnabled
 
 			// Orientation gizmo.
@@ -407,6 +434,47 @@ namespace spades {
 			// Drop the active tool's gesture in progress before acting behind its back.
 			void CancelToolInteraction();
 
+			// --- User actions -------------------------------------------------
+			// A user action is a press to its release, or a key press: its undo
+			// steps merge into one, and a preview it shows lasts no longer.
+			// Ends the current one: steps stop merging, previews go back. It only
+			// restores values, so it cannot fail, even while unwinding.
+			void EndUserAction() noexcept;
+			// Ends the user action on leaving the scope when `ends` says the scope
+			// completes it (the last release, a key press), even if the tool
+			// handling it throws.
+			class UserActionEnd {
+			public:
+				UserActionEnd(KV6EditorView& editor, bool ends) : editor(editor), ends(ends) {}
+				~UserActionEnd() {
+					if (ends)
+						editor.EndUserAction();
+				}
+				UserActionEnd(const UserActionEnd&) = delete;
+				UserActionEnd& operator=(const UserActionEnd&) = delete;
+
+			private:
+				KV6EditorView& editor;
+				bool ends;
+			};
+			// Live previews (pivot, mirror planes) remember the value they cover,
+			// so committing records from it and ending a preview puts it back.
+			std::optional<Vector3> previewedOrigin;
+			std::optional<Vector3> previewedMirrorPlane;
+			void EndPreviews() noexcept;
+
+			// --- Escape ---------------------------------------------------------
+			// What Escape backs out of, top-most first: the eyedropper, the active
+			// tool's gesture, pending voxels, the selection. With none of them, it
+			// opens the menu. Escape does it and the hint line names it, both from
+			// here, so the line says what the key does. The colour picker is a
+			// panel kept open while in use, not a step to back out of: its swatch
+			// and its close button close it.
+			enum class EscapeLayer { None, Eyedropper, Tool, Placement, Selection };
+			EscapeLayer NextEscape();
+			std::string EscapeLabel(EscapeLayer layer);
+			void Escape(EscapeLayer layer);
+
 			// --- Cursor / status ----------------------------------------------
 			SoftwareCursor* softwareCursor = nullptr;
 			std::unique_ptr<SoftwareCursor> ownedCursor; // if no cursor was provided
@@ -420,8 +488,21 @@ namespace spades {
 			// Document
 			void NewModel(int n, const std::string& path);
 			void LoadModel(const std::string& path);
+			// State of the document being replaced that must not carry over.
+			void ResetDocumentState();
 			int CountSolids();
-			void RebuildRenderModel();
+			// The render models are derived from the document: edits only mark
+			// them stale, which cannot fail, and RefreshRenderModels rebuilds
+			// them once, before the frame is drawn.
+			bool renderModelDirty = true;
+			// Advances with every change to the document's voxels, as every change
+			// stales the render model; keys what else is derived from them.
+			std::uint64_t voxelsVersion = 0;
+			void InvalidateRenderModel() noexcept {
+				renderModelDirty = true;
+				voxelsVersion++;
+			}
+			void RefreshRenderModels();
 			void FrameCamera();
 			/** Writes the document to its path; false if there is none, or on error. */
 			bool Save();
@@ -446,28 +527,61 @@ namespace spades {
 			// Append each cell's mirror images for the enabled axes (Draw and Paint
 			// edits).
 			void ExpandMirrors(std::vector<IntVector3>& cells) const;
+			// Every edit of cells goes through these two: the cells and their
+			// mirror images are filled with `color` (the volume growing to hold
+			// them) or erased (never the last voxel), as one undo step `label`.
+			void Fill(std::vector<IntVector3> cells, uint32_t color, const std::string& label);
+			void Erase(std::vector<IntVector3> cells, const std::string& label);
+			// A volume to reframe to: its size, and the shift that moves today's
+			// voxels into it.
+			struct VolumeFrame {
+				IntVector3 size;
+				IntVector3 shift;
+				bool Fits() const; // within the model size limit
+			};
+			// The smallest volume holding the model and the box [lo, hi], which
+			// may reach past it.
+			VolumeFrame FrameHolding(const IntVector3& lo, const IntVector3& hi) const;
+			// Moves the volume to `frame`, journaled, unless it is already there.
+			void Reframe(const VolumeFrame& frame);
 			// Resize/relabel the volume. `ReframeRaw` does the work; `RebuildVolume`
 			// also journals it for undo (used by the live mutators).
 			void RebuildVolume(int nw, int nh, int nd, int ox, int oy, int oz);
 			void ReframeRaw(int nw, int nh, int nd, int ox, int oy, int oz);
-			// Set the model origin and rebuild the render model (no journaling).
-			void ApplyOriginRaw(const Vector3& origin);
+			// Set the model origin, which the render model bakes in (no journaling).
+			void ApplyOriginRaw(const Vector3& origin) noexcept;
 			void TrimVolume();
-
-			// Colour (used by the eyedropper tool)
-			uint32_t PackRGB(float r, float g, float b) const;
-			uint32_t HSV(float h, float s, float v) const;
 
 			// UI layout + hit testing
 			bool InRect(const Vector2& p, float x, float y, float w, float h) const;
 
-			// Editor overlay lines (cell/box outlines, gizmo) are drawn both as
-			// depth-tested 3D lines (bright where visible) and collected here to be
-			// re-drawn as dim 2D lines on top, so occluded parts still show through.
+			// Editor overlay lines (cell/box outlines, tool wires) are collected here
+			// and drawn over the finished scene as 2D strokes: a dark casing under a
+			// coloured core where in view, a dim core where voxels hide them.
 			struct OverlayLine { Vector3 a, b; Vector4 color; };
 			std::vector<OverlayLine> overlayLines;
 			void EmitLine(const Vector3& a, const Vector3& b, const Vector4& color);
 			void DrawOverlayLines2D();
+			// A piece of an overlay line on screen, in view or hidden throughout.
+			struct OverlayStroke {
+				Vector2 a, b;
+				float widthScale;
+				Vector4 color;
+			};
+			// What DrawOverlayLines2D worked out, reused while what it depends on
+			// holds still: the lines, the view, and the voxels that hide them.
+			struct OverlayCache {
+				std::vector<OverlayLine> emitted; // as emitted, to spot a change
+				std::vector<OverlayLine> lines;   // the same, each once
+				GizmoView view;
+				std::uint64_t voxelsVersion = 0;
+				bool placing = false;
+				std::uint64_t pendingVersion = 0;
+				IntVector3 pendingAnchor = IntVector3::Make(0, 0, 0);
+				bool valid = false; // strokes match everything above
+				std::vector<OverlayStroke> hidden, shown;
+			} overlayCache;
+			void UpdateOverlayLines(); // lines -> cached strokes
 
 			// Drawing
 			void ColorNP(const Vector4& c);
@@ -486,6 +600,11 @@ namespace spades {
 			// corner -> ortho / 45deg / isometric). Returns false if not over the cube.
 			bool NaviCubeDir(const Vector2& p, Vector3& dir);
 			void SnapCameraDir(const Vector3& dir); // animate to look from `dir`
+			// "Tool › Sub-tool:  hint" for the active tool, or what a click does
+			// while sampling a colour.
+			std::string ToolHintLine();
+			// Under the viewport, bottom up: the editor's keys, the tool hint and
+			// the transient status message, each wrapped to the free width.
 			void DrawOverlay(float sw, float sh);
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			void DrawCursor();
@@ -511,6 +630,13 @@ namespace spades {
 			void OpenSaveAsDialog(std::function<void()> after = std::function<void()>());
 			/** Opens another model in place of this one, guarding unsaved changes. */
 			void OpenDocument();
+			/**
+			 * Shows the shared file browser over the editor for .kv6 models,
+			 * starting in the document's folder; `picked` gets the chosen path.
+			 */
+			void ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
+			                         const std::string& initialName,
+			                         std::function<void(const std::string&)> picked);
 			/**
 			 * Runs `proceed` once it is safe to lose the current document: right
 			 * away when it is clean, otherwise after the user picks Save or Discard.

@@ -33,9 +33,27 @@ namespace spades {
 			presetColumns = std::max(1, cols);
 		}
 
-		void ColorPicker::SetColor(uint32_t rgb) {
-			RGBToHSV(rgb);
-			SyncColor();
+		void ColorPicker::SetColor(uint32_t rgb) { RGBToHSV(rgb); }
+
+		void ColorPicker::AddRecentColor(uint32_t rgb) {
+			rgb &= 0xFFFFFF;
+			recent.erase(std::remove(recent.begin(), recent.end(), rgb), recent.end());
+			recent.insert(recent.begin(), rgb);
+			if (int(recent.size()) > kRecentSlots)
+				recent.resize(size_t(kRecentSlots));
+		}
+
+		Vector2 ColorPicker::SwatchGrid::Cell(int i) const {
+			return MakeVector2(x + float(i % columns) * size, y + float(i / columns) * size);
+		}
+
+		int ColorPicker::SwatchGrid::At(const Vector2& p, int count) const {
+			for (int i = 0; i < count; i++) {
+				const Vector2 c = Cell(i);
+				if (OverlayInRect(p, c.x, c.y, size, size))
+					return i;
+			}
+			return -1;
 		}
 
 		void ColorPicker::Open() {
@@ -50,13 +68,21 @@ namespace spades {
 		}
 
 		void ColorPicker::UpdateLayout(float screenWidth, float screenHeight, float topClearance) {
-			float bottomClear = 44.0F;
-			presSwatch = (svSize + 6.0F + hueW) / float(presetColumns);
-			float contentW = svSize + 6.0F + hueW;
+			const float bottomClear = 44.0F;
+			const float gap = 6.0F;
+			const float headerH = 18.0F;
+			const float labelH = 14.0F; // the "Recent" caption
+			const float contentW = svSize + gap + hueW;
+			const float presetSwatch = contentW / float(presetColumns);
+			const float recentSwatch = contentW / float(kRecentSlots);
 			prevH = 22.0F;
-			float headerH = 18.0F;
+			// Only swatch rows that exist take room: the presets when there are
+			// any, and the recent row, which always has its slots.
+			const int presetRows = (int(presets.size()) + presetColumns - 1) / presetColumns;
+			const float presetsH = presets.empty() ? 0.0F : float(presetRows) * presetSwatch + gap;
+			const float recentH = labelH + recentSwatch;
 			pkW = 8.0F * 2.0F + contentW;
-			pkH = 8.0F * 2.0F + headerH + svSize + 6.0F + prevH + 6.0F + 2.0F * presSwatch;
+			pkH = 8.0F * 2.0F + headerH + svSize + gap + prevH + gap + presetsH + recentH;
 			pkX = screenWidth - 16.0F - pkW;
 			pkY = screenHeight - bottomClear - pkH;
 			closeS = 13.0F;
@@ -72,8 +98,11 @@ namespace spades {
 			prevW = contentW - eyeS - 6.0F;
 			eyeX = prevX + prevW + 6.0F;
 			eyeY = prevY;
-			presX = svX;
-			presY = prevY + prevH + 6.0F;
+			float y = prevY + prevH + gap;
+			presetGrid = {svX, y, presetSwatch, presetColumns};
+			y += presetsH;
+			recentLabelY = y;
+			recentGrid = {svX, y + labelH, recentSwatch, kRecentSlots};
 		}
 
 		uint32_t ColorPicker::PackRGB(float r, float g, float b) const {
@@ -100,14 +129,12 @@ namespace spades {
 		}
 
 		Vector4 ColorPicker::ColorToVec(uint32_t c) const {
-			return MakeVector4(float(c & 0xFF) / 255.0F, float((c >> 8) & 0xFF) / 255.0F,
-			                   float((c >> 16) & 0xFF) / 255.0F, 1.0F);
+			return ConvertColorRGBA(IntVectorFromColor(c));
 		}
 
 		void ColorPicker::RGBToHSV(uint32_t c) {
-			float r = float(c & 0xFF) / 255.0F;
-			float g = float((c >> 8) & 0xFF) / 255.0F;
-			float b = float((c >> 16) & 0xFF) / 255.0F;
+			const Vector3 rgb = ConvertColorRGB(IntVectorFromColor(c));
+			const float r = rgb.x, g = rgb.y, b = rgb.z;
 			float mx = std::max(r, std::max(g, b));
 			float mn = std::min(r, std::min(g, b));
 			float d = mx - mn;
@@ -157,13 +184,12 @@ namespace spades {
 			if (InRect(p, eyeX, eyeY, eyeS, eyeS))
 				return {ClickType::Eyedropper, -1};
 
-			// Check preset swatches
-			for (size_t i = 0; i < presets.size(); i++) {
-				float x = presX + float(int(i) % presetColumns) * presSwatch;
-				float y = presY + float(int(i) / presetColumns) * presSwatch;
-				if (InRect(p, x, y, presSwatch, presSwatch))
-					return {ClickType::Preset, int(i)};
-			}
+			const int preset = presetGrid.At(p, int(presets.size()));
+			if (preset >= 0)
+				return {ClickType::Preset, preset};
+			const int used = recentGrid.At(p, int(recent.size()));
+			if (used >= 0)
+				return {ClickType::Recent, used};
 
 			return {ClickType::None, -1};
 		}
@@ -180,21 +206,22 @@ namespace spades {
 					dragMode = 2;
 					UpdateHue(p);
 					break;
+				case ClickType::Close: Close(); break;
 				case ClickType::Eyedropper:
 					eyedropperMode = !eyedropperMode;
-					if (OnEyedropperToggled)
-						OnEyedropperToggled(eyedropperMode);
 					break;
-				case ClickType::Preset:
-					if (result.presetIndex >= 0 && result.presetIndex < int(presets.size())) {
-						SetColor(presets[result.presetIndex]);
-						if (OnColorPicked)
-							OnColorPicked(GetColor());
-					}
-					break;
+				case ClickType::Preset: ChooseColor(presets[size_t(result.index)]); break;
+				case ClickType::Recent: ChooseColor(recent[size_t(result.index)]); break;
 				default:
 					break;
 			}
+		}
+
+		void ColorPicker::ChooseColor(uint32_t rgb) {
+			RGBToHSV(rgb);
+			SyncColor();
+			if (OnColorPicked)
+				OnColorPicked(GetColor());
 		}
 
 		void ColorPicker::MouseMove(const Vector2& p) {
@@ -232,20 +259,12 @@ namespace spades {
 			                 MakeVector4(0.7F, 0.5F, 0.5F, 0.9F));
 
 			// Close button X icon
-			auto DrawLine2D = [&](const Vector2& a, const Vector2& b, float w, const Vector4& col) {
-				Vector2 d = b - a;
-				float len = d.GetLength();
-				if (len < 0.001F) return;
-				Vector2 n = MakeVector2(-d.y, d.x) * (w * 0.5F / len);
-				OverlayColorNP(renderer, col);
-				renderer.DrawImage((client::IImage*)NULL, a + n, b + n, a - n, AABB2(0, 0, 1, 1));
-			};
-			DrawLine2D(MakeVector2(closeX + 3.0F, closeY + 3.0F),
-			          MakeVector2(closeX + closeS - 3.0F, closeY + closeS - 3.0F), 1.5F,
-			          MakeVector4(1, 1, 1, 0.9F));
-			DrawLine2D(MakeVector2(closeX + closeS - 3.0F, closeY + 3.0F),
-			          MakeVector2(closeX + 3.0F, closeY + closeS - 3.0F), 1.5F,
-			          MakeVector4(1, 1, 1, 0.9F));
+			OverlayStrokeLine(renderer, MakeVector2(closeX + 3.0F, closeY + 3.0F),
+			                  MakeVector2(closeX + closeS - 3.0F, closeY + closeS - 3.0F), 1.5F,
+			                  MakeVector4(1, 1, 1, 0.9F));
+			OverlayStrokeLine(renderer, MakeVector2(closeX + closeS - 3.0F, closeY + 3.0F),
+			                  MakeVector2(closeX + 3.0F, closeY + closeS - 3.0F), 1.5F,
+			                  MakeVector4(1, 1, 1, 0.9F));
 
 			// SV square (24x24 grid)
 			int cells = 24;
@@ -288,9 +307,9 @@ namespace spades {
 			OverlayColorNP(renderer, eyedropperMode ? MakeVector4(0.18F, 0.45F, 0.24F, 1.0F)
 			                                        : MakeVector4(0.18F, 0.18F, 0.20F, 1.0F));
 			OverlayFillRect(renderer, eyeX, eyeY, eyeS, eyeS);
-			DrawLine2D(MakeVector2(eyeX + 5.0F, eyeY + eyeS - 5.0F),
-			          MakeVector2(eyeX + eyeS - 5.0F, eyeY + 5.0F), 2.5F,
-			          MakeVector4(1.0F, 1.0F, 1.0F, 0.9F));
+			OverlayStrokeLine(renderer, MakeVector2(eyeX + 5.0F, eyeY + eyeS - 5.0F),
+			                  MakeVector2(eyeX + eyeS - 5.0F, eyeY + 5.0F), 2.5F,
+			                  MakeVector4(1.0F, 1.0F, 1.0F, 0.9F));
 			OverlayColorNP(renderer, ColorToVec(GetColor()));
 			OverlayFillRect(renderer, eyeX + 4.0F, eyeY + eyeS - 8.0F, 4.0F, 4.0F);
 			OverlayStrokeRect(renderer, eyeX, eyeY, eyeS, eyeS,
@@ -298,13 +317,25 @@ namespace spades {
 			                 eyedropperMode ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
 			                                : MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
 
-			// Preset swatches
-			float pad = 2.0F;
-			for (size_t i = 0; i < presets.size(); i++) {
-				float x = presX + float(int(i) % presetColumns) * presSwatch;
-				float y = presY + float(int(i) / presetColumns) * presSwatch;
-				OverlayColorNP(renderer, ColorToVec(presets[i]));
-				OverlayFillRect(renderer, x, y, presSwatch - pad, presSwatch - pad);
+			DrawSwatches(renderer, presetGrid, presets, 0);
+			hf.Draw("Recent", MakeVector2(svX, recentLabelY), 0.75F,
+			        MakeVector4(0.7F, 0.7F, 0.7F, 1.0F));
+			DrawSwatches(renderer, recentGrid, recent, kRecentSlots);
+		}
+
+		void ColorPicker::DrawSwatches(client::IRenderer& renderer, const SwatchGrid& grid,
+		                               const std::vector<uint32_t>& colors, int slots) const {
+			const float inner = grid.size - 2.0F; // a gap between swatches
+			const int cells = std::max(int(colors.size()), slots);
+			for (int i = 0; i < cells; i++) {
+				const Vector2 c = grid.Cell(i);
+				if (i < int(colors.size())) {
+					OverlayColorNP(renderer, ColorToVec(colors[size_t(i)]));
+					OverlayFillRect(renderer, c.x, c.y, inner, inner);
+				} else {
+					OverlayStrokeRect(renderer, c.x, c.y, inner, inner, 1.0F,
+					                  MakeVector4(0.5F, 0.5F, 0.5F, 0.35F));
+				}
 			}
 		}
 	} // namespace gui

@@ -25,8 +25,6 @@
 #include <Gui/UIWidgetPainter.h>
 
 #include <Client/Fonts.h>
-#include <Client/IAudioChunk.h>
-#include <Client/IAudioDevice.h>
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Core/Math.h>
@@ -42,7 +40,7 @@ namespace spades {
 
         EditorMenu::EditorMenu(IEditorMenuHost& h, client::IRenderer& r, client::FontManager& fm,
                                SoftwareCursor& c, client::IAudioDevice* ad)
-            : host(h), renderer(&r), fontManager(&fm), cursor(c), audioDevice(ad) {}
+            : host(h), renderer(&r), fontManager(&fm), cursor(c), sounds(ad) {}
 
         void EditorMenu::Open() {
             RebuildItems();
@@ -107,10 +105,8 @@ namespace spades {
             if (hover >= 0)
                 selectedItem = hover;   // mouse hover and keyboard nav share one selection
 
-            if (selectedItem != prevSelectedItem && selectedItem >= 0 && audioDevice) {
-                Handle<client::IAudioChunk> chunk(
-                    audioDevice->RegisterSound("Sounds/Feedback/Limbo/Hover.opus"));
-                audioDevice->PlayLocal(chunk.GetPointerOrNull(), client::AudioParam());
+            if (selectedItem != prevSelectedItem && selectedItem >= 0) {
+                sounds.Hover();
                 prevSelectedItem = selectedItem;
             }
 
@@ -179,11 +175,8 @@ namespace spades {
                 if (key == "Down") { selectedItem = (selectedItem + 1) % count; return true; }
                 if (key == "Enter" || key == "LeftMouseButton") {
                     int b = (key == "LeftMouseButton") ? MenuButtonAt(cursor.GetPosition()) : selectedItem;
-                    if (b >= 0 && items[b].enabled && audioDevice) {
-                        Handle<client::IAudioChunk> chunk(
-                            audioDevice->RegisterSound("Sounds/Feedback/Limbo/Select.opus"));
-                        audioDevice->PlayLocal(chunk.GetPointerOrNull(), client::AudioParam());
-                    }
+                    if (b >= 0 && items[b].enabled)
+                        sounds.Activate();
                     Activate(b);
                     return true;
                 }

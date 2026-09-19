@@ -20,10 +20,22 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6GizmoTool.h"
 
 namespace spades {
 	namespace gui {
+		/**
+		 * The X/Y/Z mirror toggles, grouped under "Mirror".
+		 *
+		 * Every tool whose edits reflect shows them, so which axes are on stays
+		 * in sight (and at hand) while drawing. They only show the editor's
+		 * mirror state: sync them in UpdateOptions and route their clicks here.
+		 */
+		void AddMirrorToggles(ToolOptions& options);
+		void SyncMirrorToggles(ToolOptions& options, IEditorContext& ed);
+		/** Applies a clicked toggle to the editor; false if `id` is not one of them. */
+		bool ApplyMirrorToggle(IEditorContext& ed, const std::string& id, bool value);
+
 		/**
 		 * The UI over the editor's mirror state: which axes reflect, and where the
 		 * planes sit.
@@ -33,19 +45,14 @@ namespace spades {
 		 * planes. Its one sub-tool, Move, is the plane gizmo; Reset to Pivot is a
 		 * one-shot action beside the X/Y/Z toggles.
 		 */
-		class MirrorTool : public ContainerTool {
+		class MirrorTool : public GizmoTool {
 		public:
 			MirrorTool();
 			const char* Label() const override { return "Mirror"; }
 
-			void OnActivate(IEditorContext& ed) override;
-			ToolOptions* Options() override { return &options; }
+			void UpdateOptions(IEditorContext& ed) override;
 			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
-			void DrawScene(IEditorContext& ed) override;
-
-		private:
-			ToolOptions options; // X/Y/Z toggles, Reset to Pivot, the plane readout
 		};
 	} // namespace gui
 } // namespace spades

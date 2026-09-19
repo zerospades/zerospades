@@ -27,6 +27,7 @@
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 #include "IModalMenu.h"
+#include <Gui/UI/Framework/FeedbackSounds.h>
 
 namespace spades {
     namespace client {
@@ -83,7 +84,7 @@ namespace spades {
             Handle<client::IRenderer> renderer;
             Handle<client::FontManager> fontManager;
             SoftwareCursor& cursor;
-            Handle<client::IAudioDevice> audioDevice;
+            ui::FeedbackSounds sounds;
 
             bool menuOpen = false;
             int selectedItem = 0;

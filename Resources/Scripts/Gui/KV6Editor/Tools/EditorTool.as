@@ -33,9 +33,13 @@ namespace spades {
 	 * A scriptable editor tool.
 	 *
 	 * The C++ editor drives these callbacks while the tool is active; the tool
-	 * queries and edits the model through the bound `EditorContext`. Register a
-	 * tool by providing a factory the C++ SubToolRegistry can call (see
-	 * CylinderTool.as).
+	 * queries and edits the model through the bound `EditorContext`. Every class
+	 * implementing this interface with a no-argument constructor is found and
+	 * registered on its own (see CylinderTool.as).
+	 *
+	 * Derive tools from EditorToolBase rather than implementing this directly:
+	 * it gives every method a default, so a tool overrides only what it needs
+	 * and keeps compiling as methods are added here.
 	 */
 	interface EditorTool {
 		// Toolbar label (read once when the tool is created).
@@ -53,11 +57,40 @@ namespace spades {
 		void OnPointer(EditorContext@ ctx, int button, int phase, bool alt, bool ctrl, bool shift);
 		void OnKey(EditorContext@ ctx, string key, bool down);
 
-		// Abort an in-progress operation (Esc); return true if it was consumed.
-		bool OnEscape(EditorContext@ ctx);
+		// What Escape would back out of now, as a short phrase for the hint line
+		// ("cancel the cylinder"); empty when nothing is in progress. When Escape
+		// reaches the tool, the editor calls OnEscape to do it.
+		string EscapeLabel(EditorContext@ ctx);
+		void OnEscape(EditorContext@ ctx);
+
+		// What the mouse and keys do right now, in "  |  " separated parts; the
+		// editor shows it under the viewport after the tool's name. Queried each
+		// frame, so it can follow the tool's progress. Empty for no hint.
+		string Hint(EditorContext@ ctx);
 
 		// 3D preview, drawn each frame while active.
 		void DrawScene(EditorContext@ ctx);
+	}
+
+	/**
+	 * EditorTool with a default for every method: no label of its own, every
+	 * container, and nothing done on any event. Being abstract, it is never
+	 * registered as a tool itself.
+	 */
+	abstract class EditorToolBase : EditorTool {
+		string Label() { return "Script"; }
+		int Targets() {
+			return int(EditorTarget::TargetDraw) | int(EditorTarget::TargetSelect) |
+			       int(EditorTarget::TargetPaint);
+		}
+		void OnActivate(EditorContext@ ctx) {}
+		void OnDeactivate(EditorContext@ ctx) {}
+		void OnPointer(EditorContext@ ctx, int button, int phase, bool alt, bool ctrl, bool shift) {}
+		void OnKey(EditorContext@ ctx, string key, bool down) {}
+		string EscapeLabel(EditorContext@ ctx) { return ""; }
+		void OnEscape(EditorContext@ ctx) {}
+		string Hint(EditorContext@ ctx) { return ""; }
+		void DrawScene(EditorContext@ ctx) {}
 	}
 
 }

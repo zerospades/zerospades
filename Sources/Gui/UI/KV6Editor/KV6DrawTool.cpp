@@ -25,19 +25,16 @@
 namespace spades {
 	namespace gui {
 		DrawTool::DrawTool() {
-			// Rect fills its cells with the current colour (LMB) or erases them (RMB).
+			// Box fills its cells with the current colour (LMB) or erases them (RMB).
 			auto fill = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.FillCells(cells, ed.CurrentColor());
 			};
 			auto erase = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.EraseCells(cells);
 			};
-			subs.push_back(std::unique_ptr<EditorTool>(new BlockSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", fill, erase, true)));
-
-			// The brush colour swatch (opens the picker). Mirroring is the Mirror
-			// tool's business now; edits made here reflect whenever it is armed.
-			options.AddColor("color");
+			subs.push_back(std::unique_ptr<EditorTool>(new DrawVoxelSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(
+			  new BoxSubTool({fill, "fill"}, {erase, "erase"}, true)));
 
 			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
 			// the built-in ones.

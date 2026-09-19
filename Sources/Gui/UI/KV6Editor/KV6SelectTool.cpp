@@ -27,33 +27,51 @@
 namespace spades {
 	namespace gui {
 		namespace {
-			const char* kSelectAllOption = "select.all";
-			const char* kClearSelectionOption = "select.clear";
+			const char* const kSelectAllOption = "select.all";
+			const char* const kClearSelectionOption = "select.clear";
+			const char* const kDeleteSelectionOption = "select.delete";
+			const char* const kCopyOption = "clipboard.copy";
+			const char* const kCutOption = "clipboard.cut";
+			const char* const kPasteOption = "clipboard.paste";
 		} // namespace
 
 		SelectTool::SelectTool() {
-			// Rect adds its solid cells to the selection (LMB) or removes them (RMB).
+			// Box adds its solid cells to the selection (LMB) or removes them (RMB).
 			auto select = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.SelectCells(cells);
 			};
 			auto deselect = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.DeselectCells(cells);
 			};
-			subs.push_back(std::unique_ptr<EditorTool>(new PointSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(new RectSubTool("Rect", select, deselect)));
+			subs.push_back(std::unique_ptr<EditorTool>(new SelectVoxelSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(
+			  new BoxSubTool({select, "select"}, {deselect, "deselect"}, false)));
 			subs.push_back(std::unique_ptr<EditorTool>(new ByColourSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(new TransformSubTool()));
 
 			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
 			// the built-in ones.
 			SubToolRegistry::Instance().BuildFor(SubToolTarget::Select, subs);
 
 			// Whole-selection commands, available whichever sub-tool is active.
+			// Their keys work in every tool; these buttons are their one home.
 			options.AddAction(kSelectAllOption, "Select All");
 			options.AddAction(kClearSelectionOption, "Select None");
+			options.AddAction(kDeleteSelectionOption, "Delete");
+			options.AddAction(kCopyOption, "Copy", "Clipboard");
+			options.AddAction(kCutOption, "Cut", "Clipboard");
+			options.AddAction(kPasteOption, "Paste", "Clipboard");
 		}
 
 		ToolOptions* SelectTool::Options() { return &options; }
+
+		void SelectTool::UpdateOptions(IEditorContext& ed) {
+			const bool selected = ed.SelectionCount() > 0;
+			options.SetEnabled(kClearSelectionOption, selected);
+			options.SetEnabled(kDeleteSelectionOption, selected);
+			options.SetEnabled(kCopyOption, selected);
+			options.SetEnabled(kCutOption, selected);
+			options.SetEnabled(kPasteOption, ed.CanPaste());
+		}
 
 		void SelectTool::SelectAll(IEditorContext& ed) {
 			VoxelModel& model = ed.Model();
@@ -63,31 +81,26 @@ namespace spades {
 		}
 
 		void SelectTool::OnAction(IEditorContext& ed, const std::string& id) {
-			// Both report a count: selecting is invisible on a model that was
+			// Each reports a count: selecting is invisible on a model that was
 			// already fully selected, and a button that seems to do nothing reads
-			// as broken. Matches SelectLinkedColor / Copy / Cut.
+			// as broken. Matches By Colour / Copy / Cut.
 			if (id == kSelectAllOption) {
 				SelectAll(ed);
 				ed.SetStatus("Selected " + std::to_string(ed.SelectionCount()) + " voxels");
+			} else if (id == kDeleteSelectionOption) {
+				ed.DeleteSelection(); // reports what it removed, or why not
 			} else if (id == kClearSelectionOption) {
 				int count = ed.SelectionCount();
 				ed.ClearSelection();
 				ed.SetStatus(count ? "Deselected " + std::to_string(count) + " voxels"
 				                   : "Nothing was selected");
+			} else if (id == kCopyOption) {
+				ed.CopySelection();
+			} else if (id == kCutOption) {
+				ed.CutSelection();
+			} else if (id == kPasteOption) {
+				ed.Paste();
 			}
-		}
-
-		bool SelectTool::OnEscape(IEditorContext& ed) {
-			// A pending rect or move owns Escape first; only once nothing is in
-			// progress does it fall through to dropping the selection. With no
-			// selection either, it belongs to the pause menu.
-			if (ContainerTool::OnEscape(ed))
-				return true;
-			if (ed.SelectionCount() == 0)
-				return false;
-			ed.ClearSelection();
-			ed.SetStatus("Selection cleared");
-			return true;
 		}
 	} // namespace gui
 } // namespace spades

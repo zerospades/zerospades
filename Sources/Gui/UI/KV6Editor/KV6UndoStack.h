@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <set>
@@ -27,6 +28,8 @@
 #include <vector>
 
 #include <Core/Math.h>
+
+#include "KV6EditState.h"
 
 namespace spades {
 	namespace gui {
@@ -40,10 +43,18 @@ namespace spades {
 		 * replay, frame restoration, selection timing) in one place and lets the host
 		 * stay a thin adapter.
 		 *
-		 * Edits are grouped into single undo steps by Begin()/End(); nested brackets
-		 * coalesce (e.g. a paint-drag stroke, or a scripted multi-step op, become one
-		 * step). A group is committed only if it actually changed the voxels or the
-		 * selection. The history is capped at `kMaxGroups`, evicting the oldest.
+		 * Each edit records into a `Step`, a scope that lives no longer than the
+		 * call making the edit; nested steps coalesce, and a step is committed only
+		 * if it actually changed the voxels or the rest of the edit state.
+		 * Steps committed during one user action (a press-drag-release, a key
+		 * press) then merge into a single undo step, so a paint stroke or a
+		 * scripted multi-step edit undoes at once. Nothing stays open between
+		 * events, so undo and redo work at any moment. The history is capped at
+		 * `kMaxGroups` steps and `kMaxBytes` of memory, evicting the oldest.
+		 *
+		 * Recording never fails a command half way: a step that cannot be kept
+		 * (out of memory) would leave the history unable to replay back to the
+		 * document, so the history is cleared instead of left inconsistent.
 		 */
 		class KV6UndoStack {
 		public:
@@ -63,9 +74,9 @@ namespace spades {
 				// Set the model's origin (pivot = -origin) and rebuild what depends
 				// on it. Used to replay a pivot change.
 				virtual void UndoApplyOrigin(const Vector3& origin) = 0;
-				// Read / replace the current selection (packed voxel keys).
-				virtual std::set<int64_t> UndoSnapshotSelection() const = 0;
-				virtual void UndoRestoreSelection(const std::set<int64_t>& sel) = 0;
+				// Read / replace everything besides the voxels that a step restores.
+				virtual EditState UndoSnapshotState() const = 0;
+				virtual void UndoRestoreState(const EditState& state) = 0;
 				// Called once after a group has been applied, to refresh derived state
 				// (the render model, etc.).
 				virtual void UndoReplayed() = 0;
@@ -74,10 +85,32 @@ namespace spades {
 			explicit KV6UndoStack(Sink& sink) : sink(sink) {}
 
 			// --- recording ----------------------------------------------------
-			// Open / close an undo group. Nested calls coalesce; only the outermost
-			// pair forms a step, committed only if the voxels or selection changed.
-			void Begin(const std::string& label);
-			void End();
+			/**
+			 * One journaled edit, recorded for the lifetime of the scope. Nested
+			 * steps coalesce into the outermost, which commits on leaving its scope
+			 * (also when an exception unwinds it) if anything changed.
+			 */
+			class Step {
+			public:
+				Step(KV6UndoStack& stack, const std::string& label) : stack(stack) {
+					stack.Begin(label);
+				}
+				~Step() { stack.End(); } // never throws, so it is safe while unwinding
+				Step(const Step&) = delete;
+				Step& operator=(const Step&) = delete;
+
+			private:
+				KV6UndoStack& stack;
+			};
+
+			/**
+			 * Starts a user action: every step committed until EndAction (or the
+			 * next BeginAction, Undo, Redo or Clear) merges into one undo step.
+			 * Actions hold nothing open, so ending one is never required for
+			 * the history to work; it only stops the merging.
+			 */
+			void BeginAction();
+			void EndAction() { action = 0; }
 
 			// Append a reversible voxel change to the open group (old -> new state).
 			void RecordVoxel(int x, int y, int z, bool oldSolid, uint32_t oldColor,
@@ -95,11 +128,12 @@ namespace spades {
 			std::string RedoLabel() const { return redoGroups.empty() ? "" : redoGroups.back().label; }
 			bool Undo(); // false if there was nothing to undo
 			bool Redo();
-			void Clear();
+			void Clear() noexcept;
 
-			// Monotonic id of the current *geometry* state, for the document's
-			// dirty/clean flag. Selection-only steps leave it unchanged, so merely
-			// selecting voxels never marks the document modified.
+			// Id of the current *geometry* state, for the document's dirty/clean
+			// flag. Selection-only steps leave it unchanged, so merely selecting
+			// voxels never marks the document modified. A new state never takes an
+			// id used before, Clear included, so a stale saved id never matches it.
 			long GeometryStateId() const { return geomId; }
 
 		private:
@@ -142,12 +176,22 @@ namespace spades {
 			struct Group {
 				std::string label;
 				std::vector<Record> records;
-				std::set<int64_t> selBefore, selAfter;
+				EditState before, after;
+				std::size_t bytes = 0; // what keeping it costs; see BytesOf
 				bool hasGeometry = false;
 				long geomBefore = 0, geomAfter = 0;
+				unsigned action = 0; // the user action it was recorded in, 0 for none
 			};
 
+			// Open / close the pending group; only through Step, so they pair up.
+			void Begin(const std::string& label);
+			void End() noexcept;
 			void Commit();
+			// Approximate memory a group adds: its records, plus whatever of its
+			// after state it does not share with its before state. The before state
+			// is the after state of the step below it, which counts it already;
+			// only the oldest step's before state goes uncounted.
+			static std::size_t BytesOf(const Group& g);
 			void ApplyForward(const Group& g); // redo direction
 			void ApplyInverse(const Group& g); // undo direction
 
@@ -156,14 +200,15 @@ namespace spades {
 			std::deque<Group> redoGroups;
 			Group pending;
 			int depth = 0;
+			unsigned action = 0, nextAction = 0;
 			long geomId = 0, nextGeomId = 0;
-			size_t totalRecords = 0; // deltas held across undo + redo (for the byte cap)
+			std::size_t totalBytes = 0; // BytesOf every group held, undo + redo
 
-			static const size_t kMaxGroups = 256;
-			// Cap the total deltas too, so one or many big edits can't grow the
-			// history without bound (~240 MB at ~40 bytes/record). The most recent
-			// step is always kept, even if it alone exceeds this.
-			static const size_t kMaxRecords = 6000000;
+			static const std::size_t kMaxGroups = 256;
+			// Cap the memory too, so neither big edits nor the selections and
+			// pending voxels kept per step grow the history without bound. The
+			// most recent step is always kept, even if it alone exceeds this.
+			static const std::size_t kMaxBytes = std::size_t(256) << 20;
 		};
 	} // namespace gui
 } // namespace spades

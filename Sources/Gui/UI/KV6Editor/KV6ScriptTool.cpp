@@ -76,7 +76,9 @@ namespace spades {
 			fnDeactivate = ti->GetMethodByDecl("void OnDeactivate(EditorContext@)");
 			fnPointer = ti->GetMethodByDecl("void OnPointer(EditorContext@, int, int, bool, bool, bool)");
 			fnKey = ti->GetMethodByDecl("void OnKey(EditorContext@, string, bool)");
-			fnEscape = ti->GetMethodByDecl("bool OnEscape(EditorContext@)");
+			fnEscapeLabel = ti->GetMethodByDecl("string EscapeLabel(EditorContext@)");
+			fnEscape = ti->GetMethodByDecl("void OnEscape(EditorContext@)");
+			fnHint = ti->GetMethodByDecl("string Hint(EditorContext@)");
 			fnDraw = ti->GetMethodByDecl("void DrawScene(EditorContext@)");
 
 			// Fetch the toolbar label once; it doesn't change at runtime.
@@ -98,61 +100,58 @@ namespace spades {
 				obj->Release();
 		}
 
-		void ScriptEditorTool::OnActivate(IEditorContext& ed) {
-			if (fnActivate == nullptr)
-				return;
-			ScriptContextHandle c = PrepareCall(fnActivate, obj);
-			c->SetArgObject(0, &ed);
-			c.ExecuteChecked();
-		}
+		void ScriptEditorTool::OnActivate(IEditorContext& ed) { Call(fnActivate, ed); }
 
-		void ScriptEditorTool::OnDeactivate(IEditorContext& ed) {
-			if (fnDeactivate == nullptr)
-				return;
-			ScriptContextHandle c = PrepareCall(fnDeactivate, obj);
-			c->SetArgObject(0, &ed);
-			c.ExecuteChecked();
-		}
+		void ScriptEditorTool::OnDeactivate(IEditorContext& ed) { Call(fnDeactivate, ed); }
 
 		void ScriptEditorTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
-			if (fnPointer == nullptr)
-				return;
-			ScriptContextHandle c = PrepareCall(fnPointer, obj);
-			c->SetArgObject(0, &ed);
-			c->SetArgDWord(1, static_cast<asDWORD>(e.button));
-			c->SetArgDWord(2, static_cast<asDWORD>(e.phase));
-			c->SetArgByte(3, e.alt ? 1 : 0);
-			c->SetArgByte(4, e.ctrl ? 1 : 0);
-			c->SetArgByte(5, e.shift ? 1 : 0);
-			c.ExecuteChecked();
+			Call(fnPointer, ed, [&](asIScriptContext& c) {
+				c.SetArgDWord(1, static_cast<asDWORD>(e.button));
+				c.SetArgDWord(2, static_cast<asDWORD>(e.phase));
+				c.SetArgByte(3, e.alt ? 1 : 0);
+				c.SetArgByte(4, e.ctrl ? 1 : 0);
+				c.SetArgByte(5, e.shift ? 1 : 0);
+			});
 		}
 
 		void ScriptEditorTool::OnKey(IEditorContext& ed, const KeyInput& e) {
-			if (fnKey == nullptr)
-				return;
 			std::string key = e.key; // must outlive the call (copied into the arg)
-			ScriptContextHandle c = PrepareCall(fnKey, obj);
-			c->SetArgObject(0, &ed);
-			c->SetArgObject(1, &key);
-			c->SetArgByte(2, e.IsDown() ? 1 : 0);
-			c.ExecuteChecked();
+			Call(fnKey, ed, [&](asIScriptContext& c) {
+				c.SetArgObject(1, &key);
+				c.SetArgByte(2, e.IsDown() ? 1 : 0);
+			});
 		}
 
-		bool ScriptEditorTool::OnEscape(IEditorContext& ed) {
-			if (fnEscape == nullptr)
-				return false;
-			ScriptContextHandle c = PrepareCall(fnEscape, obj);
-			c->SetArgObject(0, &ed);
-			c.ExecuteChecked();
-			return c->GetReturnByte() != 0;
+		std::string ScriptEditorTool::EscapeLabel(IEditorContext& ed) {
+			return CallForString(fnEscapeLabel, ed);
 		}
 
-		void ScriptEditorTool::DrawScene(IEditorContext& ed) {
-			if (fnDraw == nullptr)
-				return;
-			ScriptContextHandle c = PrepareCall(fnDraw, obj);
+		void ScriptEditorTool::OnEscape(IEditorContext& ed) { Call(fnEscape, ed); }
+
+		std::string ScriptEditorTool::Hint(IEditorContext& ed) { return CallForString(fnHint, ed); }
+
+		void ScriptEditorTool::DrawScene(IEditorContext& ed) { Call(fnDraw, ed); }
+
+		void ScriptEditorTool::Call(asIScriptFunction* fn, IEditorContext& ed,
+		                            const std::function<void(asIScriptContext&)>& setArgs,
+		                            const std::function<void(asIScriptContext&)>& read) {
+			if (fn == nullptr)
+				return; // the tool leaves this one to its default
+			ScriptContextHandle c = PrepareCall(fn, obj);
 			c->SetArgObject(0, &ed);
+			if (setArgs)
+				setArgs(*c.GetContext());
 			c.ExecuteChecked();
+			if (read)
+				read(*c.GetContext());
+		}
+
+		std::string ScriptEditorTool::CallForString(asIScriptFunction* fn, IEditorContext& ed) {
+			std::string result;
+			Call(fn, ed, nullptr, [&](asIScriptContext& c) {
+				result = *reinterpret_cast<std::string*>(c.GetReturnObject());
+			});
+			return result;
 		}
 
 		void RegisterScriptTools(SubToolRegistry& reg) {
@@ -172,6 +171,8 @@ namespace spades {
 				asITypeInfo* ti = mod->GetObjectTypeByIndex(i);
 				if (ti == nullptr || ti == iface || !ti->Implements(iface))
 					continue;
+				if ((ti->GetFlags() & asOBJ_ABSTRACT) != 0)
+					continue; // a base for tools (EditorToolBase), not a tool
 
 				std::string cn = ti->GetName();
 				asIScriptFunction* factory = ti->GetFactoryByDecl((cn + "@ " + cn + "()").c_str());

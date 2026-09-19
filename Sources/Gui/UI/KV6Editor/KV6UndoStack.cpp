@@ -20,7 +20,11 @@
 
 #include "KV6UndoStack.h"
 
+#include <exception>
+#include <iterator>
 #include <utility>
+
+#include <Core/Debug.h>
 
 namespace spades {
 	namespace gui {
@@ -29,22 +33,35 @@ namespace spades {
 			if (depth == 0) {
 				pending = Group();
 				pending.label = label;
-				pending.selBefore = sink.UndoSnapshotSelection();
+				pending.before = sink.UndoSnapshotState();
 			}
 			depth++;
 		}
 
-		void KV6UndoStack::End() {
+		void KV6UndoStack::End() noexcept {
 			if (depth == 0)
 				return; // unbalanced End; ignore defensively
 			if (--depth > 0)
 				return; // still inside an outer group
-			pending.selAfter = sink.UndoSnapshotSelection();
-			bool changed = !pending.records.empty() || pending.selBefore != pending.selAfter;
-			if (changed)
-				Commit();
-			else
-				pending = Group();
+			// Runs from a destructor, possibly while an exception unwinds, so
+			// nothing may escape. The edit itself has happened either way: a step
+			// that cannot be kept would leave undo replaying into the wrong
+			// document, so the history starts afresh instead.
+			try {
+				pending.after = sink.UndoSnapshotState();
+				bool changed = !pending.records.empty() || pending.before != pending.after;
+				if (changed)
+					Commit();
+				else
+					pending = Group();
+			} catch (const std::exception& ex) {
+				SPLog("Undo history cleared: could not record '%s': %s", pending.label.c_str(),
+				      ex.what());
+				Clear();
+			} catch (...) {
+				SPLog("Undo history cleared: could not record '%s'", pending.label.c_str());
+				Clear();
+			}
 		}
 
 		void KV6UndoStack::RecordVoxel(int x, int y, int z, bool oldSolid, uint32_t oldColor,
@@ -76,27 +93,61 @@ namespace spades {
 			pending.hasGeometry = true; // the pivot is saved to the file -> dirties it
 		}
 
+		void KV6UndoStack::BeginAction() {
+			action = ++nextAction;
+			if (action == 0)
+				action = ++nextAction; // 0 means "no action"; skip it on wrap-around
+		}
+
 		void KV6UndoStack::Commit() {
 			pending.geomBefore = geomId;
 			// Only geometry edits advance the geometry id (drives the dirty flag);
-			// selection-only steps share the surrounding geometry state.
+			// steps that change only the rest of the edit state share the
+			// surrounding geometry state.
 			pending.geomAfter = pending.hasGeometry ? ++nextGeomId : geomId;
 			geomId = pending.geomAfter;
+			pending.action = action;
 
 			for (const Group& g : redoGroups)
-				totalRecords -= g.records.size();
+				totalBytes -= g.bytes;
 			redoGroups.clear(); // a fresh edit invalidates the redo branch
 
-			totalRecords += pending.records.size();
-			undoGroups.push_back(std::move(pending));
+			if (action != 0 && !undoGroups.empty() && undoGroups.back().action == action) {
+				// Later in the same user action: extend its step, which keeps the
+				// label and the "before" state of the action's first edit.
+				Group& step = undoGroups.back();
+				totalBytes -= step.bytes;
+				step.records.insert(step.records.end(),
+				                    std::make_move_iterator(pending.records.begin()),
+				                    std::make_move_iterator(pending.records.end()));
+				step.after = std::move(pending.after);
+				step.hasGeometry = step.hasGeometry || pending.hasGeometry;
+				step.geomAfter = pending.geomAfter;
+				// An action that put everything back (select, then deselect) leaves
+				// nothing to undo, so it leaves no step either.
+				if (step.records.empty() && step.before == step.after) {
+					undoGroups.pop_back();
+				} else {
+					step.bytes = BytesOf(step);
+					totalBytes += step.bytes;
+				}
+			} else {
+				pending.bytes = BytesOf(pending);
+				totalBytes += pending.bytes;
+				undoGroups.push_back(std::move(pending));
+			}
 			pending = Group();
 
 			// Evict the oldest history past either cap, but never the last step.
-			while ((undoGroups.size() > kMaxGroups || totalRecords > kMaxRecords) &&
+			while ((undoGroups.size() > kMaxGroups || totalBytes > kMaxBytes) &&
 			       undoGroups.size() > 1) {
-				totalRecords -= undoGroups.front().records.size();
+				totalBytes -= undoGroups.front().bytes;
 				undoGroups.pop_front();
 			}
+		}
+
+		std::size_t KV6UndoStack::BytesOf(const Group& g) {
+			return g.records.size() * sizeof(Record) + g.after.UnsharedBytes(g.before);
 		}
 
 		// Replay a group's records forward (redo): frames then their dependent voxels,
@@ -110,7 +161,7 @@ namespace spades {
 				else
 					sink.UndoApplyOrigin(MakeVector3(r.o.ax, r.o.ay, r.o.az));
 			}
-			sink.UndoRestoreSelection(g.selAfter);
+			sink.UndoRestoreState(g.after);
 			sink.UndoReplayed();
 		}
 
@@ -127,13 +178,14 @@ namespace spades {
 				else
 					sink.UndoApplyOrigin(MakeVector3(r.o.bx, r.o.by, r.o.bz));
 			}
-			sink.UndoRestoreSelection(g.selBefore);
+			sink.UndoRestoreState(g.before);
 			sink.UndoReplayed();
 		}
 
 		bool KV6UndoStack::Undo() {
 			if (depth != 0 || undoGroups.empty())
 				return false;
+			action = 0; // nothing done after this merges into what came before
 			Group g = std::move(undoGroups.back());
 			undoGroups.pop_back();
 			ApplyInverse(g);
@@ -145,6 +197,7 @@ namespace spades {
 		bool KV6UndoStack::Redo() {
 			if (depth != 0 || redoGroups.empty())
 				return false;
+			action = 0;
 			Group g = std::move(redoGroups.back());
 			redoGroups.pop_back();
 			ApplyForward(g);
@@ -153,14 +206,16 @@ namespace spades {
 			return true;
 		}
 
-		void KV6UndoStack::Clear() {
+		void KV6UndoStack::Clear() noexcept {
 			undoGroups.clear();
 			redoGroups.clear();
 			pending = Group();
 			depth = 0;
-			geomId = 0;
-			nextGeomId = 0;
-			totalRecords = 0;
+			action = 0;
+			// Ids are never reused: the geometry kept its unrecorded changes (when a
+			// step could not be recorded), so it must not match an id it was saved at.
+			geomId = ++nextGeomId;
+			totalBytes = 0;
 		}
 
 	} // namespace gui

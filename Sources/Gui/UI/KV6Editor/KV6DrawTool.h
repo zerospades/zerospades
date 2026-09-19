@@ -20,19 +20,15 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6BrushTool.h"
 
 namespace spades {
 	namespace gui {
-		// Draw voxels: Block (single) and Rect (filled box).
-		class DrawTool : public ContainerTool {
+		// Draw voxels: Voxel (single) and Box (filled box); RMB erases.
+		class DrawTool : public BrushTool {
 		public:
 			DrawTool();
 			const char* Label() const override { return "Draw"; }
-			ToolOptions* Options() override { return &options; }
-
-		private:
-			ToolOptions options; // the brush colour swatch
 		};
 	} // namespace gui
 } // namespace spades

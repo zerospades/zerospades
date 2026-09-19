@@ -20,22 +20,18 @@
 
 #pragma once
 
-#include "KV6ContainerTool.h"
+#include "KV6BrushTool.h"
 
 namespace spades {
 	namespace gui {
-		// Recolour existing voxels: Block (single, drag to keep painting) and Rect
+		// Recolour existing voxels: Voxel (single, drag to keep painting) and Box
 		// (recolour a box). The geometry is never changed, only the colours.
-		class PaintTool : public ContainerTool {
+		class PaintTool : public BrushTool {
 		public:
 			PaintTool();
 			const char* Label() const override { return "Paint"; }
 			// Cells from sub-tools (incl. scripted ones) recolour rather than fill.
 			EditorRole Role() const override { return EditorRole::Paint; }
-			ToolOptions* Options() override { return &options; }
-
-		private:
-			ToolOptions options; // the brush colour swatch
 		};
 	} // namespace gui
 } // namespace spades

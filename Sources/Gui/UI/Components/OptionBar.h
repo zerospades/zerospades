@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <Core/Math.h>
+#include <Gui/UI/Framework/FeedbackSounds.h>
 
 namespace spades {
 	namespace client {
@@ -36,58 +37,75 @@ namespace spades {
 	namespace gui {
 		/**
 		 * Secondary toolbar showing the active tool's sub-tools and options
-		 * (toggles, colour swatch, labels). Sits below the main toolbar.
+		 * (toggles, actions, labels). Sits below the main toolbar.
+		 *
+		 * Buttons are as wide as their text, so the layout is made while
+		 * drawing, where the font is at hand, and clicks are tested against the
+		 * frame last drawn: always what the user sees.
+		 *
+		 * The content belongs to an owner (whose options they are: the active
+		 * tool). A click only counts while that owner is still the host's
+		 * current one, so a click landing just after the host switched owners
+		 * never acts on the new owner through the old one's buttons. Options
+		 * are reported by id, sub-tool buttons by position within their owner.
 		 */
 		class OptionBar {
 		public:
-			enum class OptionType { Bool, Color, Label, Action };
+			enum class OptionType { Bool, Label, Action };
 
 			struct Option {
-				std::string group;
+				std::string id;    // reported when clicked
+				std::string group; // consecutive options of one group sit together
 				std::string label;
 				OptionType type = OptionType::Label;
 				bool bvalue = false;
-				uint32_t color = 0xC8C8C8;
+				bool enabled = true; // false greys a toggle or action out and ignores clicks
 			};
 
 			struct SubToolButton {
 				std::string label;
+				std::string hotKey; // drawn on the button's right; empty for none
 				bool active = false;
 			};
 
 			OptionBar(client::IAudioDevice* audioDevice = nullptr);
 
-			void SetSubToolButtons(const std::vector<SubToolButton>& buttons);
-			void SetOptions(const std::vector<Option>& options);
+			/** Fills the bar with `owner`'s sub-tool buttons and options. */
+			void SetContent(const void* owner, std::vector<SubToolButton> subToolButtons,
+			                std::vector<Option> options);
 
-			/** On-screen width of an option of this type. */
-			static float OptionWidth(OptionType type);
-
-			float OptionX(int index, float& outWidth) const;
-			float HitTest(const Vector2& p); // returns option index or -1.0
-			bool IsSubToolButtonHit(const Vector2& p, int& outIndex) const;
-			bool IsOptionHovered(const Vector2& p, int index) const;
-
+			/**
+			 * Runs the callback of the enabled sub-tool button or option under
+			 * `p`; false if there is none.
+			 */
+			bool Click(const Vector2& p);
 			void Draw(client::IRenderer& renderer, client::FontManager& fontManager,
 			         const Vector2& cursorPos, bool menuActive, float screenWidth);
-			void PlayButtonActivateSound() { PlayClickSound(); }
 
-			// Callbacks (optional)
-			std::function<void(int)> OnSubToolClicked;
-			std::function<void(int)> OnBoolToggled;
-			std::function<void(int)> OnColorClicked;
-			std::function<void(int)> OnActionClicked;
+			/** The host's current owner, asked on each click; unset, every click counts. */
+			std::function<const void*()> CurrentOwner;
+
+			// Called with the clicked sub-tool's index, or the clicked option's id.
+			std::function<void(int index)> OnSubToolClicked;
+			std::function<void(const std::string& id)> OnBoolToggled;
+			std::function<void(const std::string& id)> OnActionClicked;
 
 		private:
-			client::IAudioDevice* audioDevice = nullptr;
+			// Horizontal extent of something drawn on the bar.
+			struct Span {
+				float x, width;
+			};
+
+			ui::FeedbackSounds sounds;
+			const void* owner = nullptr;
 			std::vector<SubToolButton> subToolButtons;
 			std::vector<Option> options;
+			// What was last drawn: whose content, and where each item went.
+			const void* drawnOwner = nullptr;
+			std::vector<Span> subToolSpans;
+			std::vector<Span> optionSpans;
 			std::vector<bool> previousSubToolHoverState;
 			std::vector<bool> previousOptionHoverState;
-
-			void PlayHoverSound() const;
-			void PlayClickSound() const;
-			bool InRect(const Vector2& p, float x, float y, float w, float h) const;
 		};
 	} // namespace gui
 } // namespace spades

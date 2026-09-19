@@ -129,15 +129,6 @@ namespace spades {
 					manager->CheckError(r);
 
 					// --- undo / redo ---
-					r = eng->RegisterObjectMethod("EditorContext",
-					                              "void BeginUndoGroup(const string&in)",
-					                              asMETHOD(gui::IEditorContext, BeginUndoGroup),
-					                              asCALL_THISCALL);
-					manager->CheckError(r);
-					r = eng->RegisterObjectMethod("EditorContext", "void EndUndoGroup()",
-					                              asMETHOD(gui::IEditorContext, EndUndoGroup),
-					                              asCALL_THISCALL);
-					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "void Undo()",
 					                              asMETHOD(gui::IEditorContext, Undo),
 					                              asCALL_THISCALL);

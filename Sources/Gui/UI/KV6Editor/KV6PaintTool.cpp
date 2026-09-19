@@ -25,18 +25,14 @@
 namespace spades {
 	namespace gui {
 		PaintTool::PaintTool() {
-			// Rect recolours every existing voxel it spans with the current colour.
-			// Recolouring has no inverse, so both mouse buttons do the same thing.
+			// Box recolours every existing voxel it spans with the current colour.
+			// Recolouring has no inverse, so the right button does nothing.
 			auto paint = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
 				ed.PaintCells(cells, ed.CurrentColor());
 			};
-			subs.push_back(std::unique_ptr<EditorTool>(new PaintBlockSubTool()));
+			subs.push_back(std::unique_ptr<EditorTool>(new PaintVoxelSubTool()));
 			subs.push_back(std::unique_ptr<EditorTool>(
-			  new RectSubTool("Rect", paint, paint, true, "Painted", "Painted")));
-
-			// The brush swatch. Mirroring is the Mirror tool's business now;
-			// recolours made here reflect whenever it is armed.
-			options.AddColor("color");
+			  new BoxSubTool({paint, "paint"}, BoxSubTool::Action(), true)));
 
 			// Sub-tools contributed by scripts (targeting Paint), appended after the
 			// built-in ones.

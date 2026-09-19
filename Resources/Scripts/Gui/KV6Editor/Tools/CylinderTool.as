@@ -23,9 +23,11 @@ namespace spades {
 	// A 3-click circular cylinder, authored in AngelScript as a demo of editor tool
 	// scripting. Click the centre on a voxel face, click again to set the radius
 	// (the clicked cell lies on the rim), then click the depth along the clicked
-	// face's normal. The same class serves both containers: it fills under Draw and
-	// selects under Select, via ctx.ApplyCells (which routes by the active tool).
-	class CylinderTool : EditorTool {
+	// face's normal. The same class serves every container: it fills under Draw,
+	// recolours under Paint and selects under Select, via ctx.ApplyCells (which
+	// routes by the active tool). The right button on the last click applies the
+	// inverse (erase, deselect); Paint has none, so the editor keeps it from us.
+	class CylinderTool : EditorToolBase {
 		private int stage = 0; // 0 none, 1 centre set, 2 radius set
 		private int normalAxis = 2;
 		private IntVector3 p0; // centre
@@ -33,21 +35,20 @@ namespace spades {
 		private IntVector3 cur; // point under the cursor for the current stage
 
 		string Label() { return "Cylinder"; }
-		int Targets() { return int(EditorTarget::TargetDraw) | int(EditorTarget::TargetSelect); }
+		// Every container, as EditorToolBase offers by default.
 
-		void OnActivate(EditorContext@ ctx) {
-			stage = 0;
-			ctx.SetStatus("Cylinder: click the centre on a voxel face");
-		}
+		void OnActivate(EditorContext@ ctx) { stage = 0; }
 		void OnDeactivate(EditorContext@ ctx) { stage = 0; }
-		void OnKey(EditorContext@ ctx, string key, bool down) {}
 
-		bool OnEscape(EditorContext@ ctx) {
+		string EscapeLabel(EditorContext@ ctx) { return stage == 0 ? "" : "cancel the cylinder"; }
+		void OnEscape(EditorContext@ ctx) { stage = 0; }
+
+		string Hint(EditorContext@ ctx) {
 			if (stage == 0)
-				return false;
-			stage = 0;
-			ctx.SetStatus("Cylinder cancelled");
-			return true;
+				return "click the centre on a voxel face";
+			if (stage == 1)
+				return "click a point on the rim";
+			return "click the depth";
 		}
 
 		void OnPointer(EditorContext@ ctx, int button, int phase, bool alt, bool ctrl, bool shift) {
@@ -69,7 +70,6 @@ namespace spades {
 				int dy = place.y - p0.y;
 				normalAxis = (dx != 0) ? 0 : ((dy != 0) ? 1 : 2);
 				stage = 1;
-				ctx.SetStatus("Cylinder: click to set the radius");
 				return;
 			}
 
@@ -78,15 +78,14 @@ namespace spades {
 			if (stage == 1) { // fix the radius, then pick the depth
 				p1 = cur;
 				stage = 2;
-				ctx.SetStatus("Cylinder: pick the depth  (RMB to cut)");
 				return;
 			}
 
-			// Final click: build the cylinder and apply (button decides fill vs cut).
+			// Final click: build the cylinder and apply (the button decides between
+			// the tool's action and its inverse).
 			array<IntVector3>@ cells = BuildCylinder(cur);
-			ctx.ApplyCells(cells, rmb); // fill/erase under Draw, select/deselect under Select
 			stage = 0;
-			ctx.SetStatus(rmb ? "Cylinder cut" : "Cylinder applied");
+			ctx.ApplyCells(cells, rmb);
 		}
 
 		void DrawScene(EditorContext@ ctx) {

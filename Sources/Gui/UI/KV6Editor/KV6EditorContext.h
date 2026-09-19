@@ -91,28 +91,46 @@ namespace spades {
 			// Recolour the solid voxels among `cells` to `color`, without changing the
 			// geometry (skips empty cells; never grows the volume).
 			virtual void PaintCells(const std::vector<IntVector3>& cells, uint32_t color) = 0;
-			// Place / delete / sample at the current pick (Draw's single-voxel ops).
+			// Place / delete at the current pick (Draw's single-voxel ops). Sampling
+			// a colour is the editor's own business (Alt+click, the eyedropper), so
+			// no tool has to handle it.
 			virtual void PlaceCube() = 0;
 			virtual void DeleteCube() = 0;
-			virtual void Eyedropper() = 0;
 
 			// --- Selection (a set of solid-voxel coords, shared across tools) ---
-			virtual void ToggleSelect(int x, int y, int z) = 0;
-			virtual void AddSelect(int x, int y, int z) = 0;
 			virtual bool IsSelected(int x, int y, int z) const = 0;
 			virtual void ClearSelection() = 0;
+			// Removes the selected voxels from the model, or drops the pending
+			// ones while there are some (never the last voxel).
+			virtual void DeleteSelection() = 0;
+			// How many voxels the selection commands act on: the pending ones
+			// while there are some (lifted, pasted or imported), else the selected.
 			virtual int SelectionCount() const = 0;
-			// Flood-fill: add all 6-connected voxels sharing (x,y,z)'s colour.
-			virtual void SelectLinkedColor(int x, int y, int z) = 0;
+			// The solid voxels 6-connected to (x,y,z) through its colour, itself
+			// included; empty if (x,y,z) holds no voxel. Changes nothing.
+			virtual std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const = 0;
+
 			// Add every solid voxel in [lo, hi] to the selection.
 			virtual void SelectBox(const IntVector3& lo, const IntVector3& hi) = 0;
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
 			// Apply `cells` with the active tool's action: fill (or erase, if
-			// `secondary`) under Draw, select (or deselect) under Select. Lets a
-			// sub-tool act correctly in whichever container hosts it.
+			// `secondary`) under Draw, select (or deselect) under Select, recolour
+			// under Paint (which has no inverse). Lets a sub-tool act correctly in
+			// whichever container hosts it.
 			virtual void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) = 0;
+
+			// --- Clipboard ----------------------------------------------------
+			// Copy and Cut take the selection, or the pending voxels while there
+			// are some, which they leave where they are rather than place. Each
+			// reports what it did, or why not, on the status line.
+			virtual void CopySelection() = 0;
+			// False when refused (nothing selected, or it would empty the model).
+			virtual bool CutSelection() = 0;
+			// Starts placing the clipboard's voxels in the Transform tool.
+			virtual void Paste() = 0;
+			virtual bool CanPaste() const = 0;
 
 			// --- Overlay drawing (3D wireframe previews) ----------------------
 			virtual void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) = 0;
@@ -126,8 +144,15 @@ namespace spades {
 			virtual bool MirrorEnabled(int axis) const = 0;
 			virtual void SetMirrorEnabled(int axis, bool on) = 0;
 			virtual Vector3 MirrorPlane() const = 0;
+			// The axes and planes are journaled: each change below is an undo step.
 			/** Moves the planes; each coordinate is quantised to 0.5. */
 			virtual void SetMirrorPlane(const Vector3& plane) = 0;
+			/**
+			 * Shows the planes at `plane` for a drag in progress, without an undo
+			 * step. A preview lasts until the user action ends or a command runs:
+			 * commit it with SetMirrorPlane before then, or the planes go back.
+			 */
+			virtual void PreviewMirrorPlane(const Vector3& plane) = 0;
 			/** Puts the planes back on the pivot, where they start. */
 			virtual void ResetMirrorPlane() = 0;
 
@@ -137,27 +162,41 @@ namespace spades {
 			                                    const Vector4& color) = 0;
 
 			// --- Pending placement (floating voxels) --------------------------
-			// Paste, import and Transform park their voxels here first: nothing reaches
-			// the document until the placement is applied, so dragging voxels over
-			// others never destroys what they pass across. Leaving the Transform
-			// tool applies the placement; Escape drops it. Every edit of the voxels,
-			// the selection or the pivot (and the editor's copy, cut, save and
-			// undo) applies it first, so it acts on the document as it stands.
+			// Paste, import and Transform park their voxels here first: nothing
+			// reaches the document until the placement is applied, so dragging
+			// voxels over others never destroys what they pass across. A click
+			// away from the gizmo, Place, or leaving the Transform tool applies
+			// the placement; Cancel or Escape puts it back. Every edit of the
+			// voxels, the selection or the pivot (and the editor's copy, cut and
+			// save) applies it first, so it acts on the document as it stands.
+			// Lifting, moving, turning, applying and cancelling are undo steps.
 			virtual bool HasPlacement() const = 0;
-			/** Lifts the selection into a placement; false if nothing solid is selected. */
-			virtual bool BeginPlacementFromSelection() = 0;
 			/**
-			 * Turns and shifts the pending voxels; a shift stops at the model size
-			 * limit. Turns are about the pivot, which moves only with a shift.
+			 * Turns and shifts the pending voxels, lifting the selected voxels out
+			 * of the document first when none are pending; one undo step. A shift
+			 * stops at the model size limit. Turns are about the pivot, which
+			 * moves only with a shift.
 			 */
 			virtual void TransformPlacement(const PlacementTransform& t) = 0;
-			/** The voxel the pending voxels turn about; false if none pending. */
-			virtual bool PlacementPivot(IntVector3& out) const = 0;
+			/**
+			 * The voxel a transform turns about: the middle of the pending voxels
+			 * (or of the selection), or the model's pivot (see
+			 * TurnsAboutModelPivot); false when there is nothing to move.
+			 */
+			virtual bool TransformPivot(IntVector3& out) const = 0;
+			/**
+			 * Whether turns go round the model's pivot rather than the middle of
+			 * the voxels being turned. Turns keep voxels on voxels only about a
+			 * whole voxel, so they go round the one nearest the pivot. An editor
+			 * setting: not saved, and not an undo step.
+			 */
+			virtual bool TurnsAboutModelPivot() const = 0;
+			virtual void SetTurnsAboutModelPivot(bool on) = 0;
 			/** Writes the pending voxels into the document as one undo step. */
 			virtual void ApplyPlacement() = 0;
-			/** Drops the pending voxels, changing nothing. */
+			/** Puts lifted voxels back where they came from, or drops a paste. */
 			virtual void CancelPlacement() = 0;
-			/** Outlines the pending voxels as they would land after `t`. */
+			/** Outlines the pending voxels (or the selection) as they would land after `t`. */
 			virtual void DrawPlacementTransformed(const PlacementTransform& t,
 			                                      const Vector4& color) = 0;
 			// Opaque, shaded cube of half-size `half` centred at `center`. This is a
@@ -177,23 +216,23 @@ namespace spades {
 			// ResetMirrorPlane). Float-valued.
 			virtual Vector3 GetPivot() const = 0;
 			virtual void SetPivot(const Vector3& pivot) = 0;
-			// Move the pivot live without recording undo — for a drag in progress.
-			// Commit the result with a single SetPivot on release.
+			// Shows the pivot at `pivot` for a drag in progress, without an undo
+			// step. A preview lasts until the user action ends or a command runs:
+			// commit it with SetPivot before then, or the pivot goes back.
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
 			// Open the modal prompt to type a new pivot (x y z).
 			virtual void BeginPivotEntry() = 0;
 
-			// --- Misc editor state / feedback ---------------------------------
-			virtual bool PickModeActive() const = 0;
-			virtual void ClearPickMode() = 0;
+			// --- Feedback -----------------------------------------------------
+			// A transient message: what an action did, or why it did nothing.
+			// What a tool's buttons and keys do belongs in EditorTool::Hint.
 			virtual void SetStatus(const std::string&) = 0;
 
 			// --- Undo / redo --------------------------------------------------
-			// Edits made through this context are journaled automatically. Wrap a
-			// multi-step operation in BeginUndoGroup/EndUndoGroup so it undoes as a
-			// single step; nested brackets coalesce.
-			virtual void BeginUndoGroup(const std::string& label) = 0;
-			virtual void EndUndoGroup() = 0;
+			// Edits made through this context are journaled automatically. The
+			// editor merges everything done during one user action (a press to its
+			// release, a key press) into a single undo step, so a stroke or a
+			// multi-step scripted edit undoes at once without the tool grouping it.
 			virtual void Undo() = 0;
 			virtual void Redo() = 0;
 			virtual bool CanUndo() const = 0;
