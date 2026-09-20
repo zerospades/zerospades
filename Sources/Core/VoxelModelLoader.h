@@ -37,6 +37,10 @@ namespace spades {
 		/**
 		 * Load a `VoxelModel` from the specified `FileManager`-style path.
 		 *
+		 * Supports both .kv6 (single model) and .2kv6 (scene) formats.
+		 * For .2kv6 files, all objects in the scene are composited into a single model
+		 * with proper transforms applied. This ensures seamless rendering as game assets.
+		 *
 		 * In addition to loading the file at `path`, this method also loads
 		 * metadata from `BASENAME.meta.json` (where `BASENAME` is a portion of
 		 * `path` without a file extension).

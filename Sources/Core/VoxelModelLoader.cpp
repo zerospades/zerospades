@@ -22,16 +22,126 @@
 
 #include <json/json.h>
 
+#include <algorithm>
+#include <functional>
+#include <tuple>
+
 #include <Core/Debug.h>
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/LocalFileSystem.h>
 #include <Core/Math.h>
 #include <Core/TMPUtils.h>
 #include <Core/VoxelModel.h>
+#include <Core/VoxelModel2KV6.h>
 
 namespace spades {
 	namespace {
+		// Merge all objects in a scene hierarchy into a single composite VoxelModel
+		// with transforms applied (positions, rotations, scales).
+		Handle<VoxelModel> MergeSceneObjects(const std::vector<VoxelObject>& scene) {
+			if (scene.empty())
+				SPRaise(".2kv6 scene is empty");
+
+			// Find bounds of all objects
+			int minX = 0, minY = 0, minZ = 0;
+			int maxX = 0, maxY = 0, maxZ = 0;
+			bool hasAny = false;
+
+			// First pass: collect all voxel positions with transforms
+			std::vector<std::tuple<int, int, int, uint32_t>> voxels; // x, y, z, color
+
+			std::function<void(const VoxelObject&, const Matrix4&)> collectVoxels =
+			    [&](const VoxelObject& obj, const Matrix4& parentTransform) {
+				    // Build local transform: translate * rotate * scale
+				    Matrix4 scale = Matrix4::Scale(obj.scale);
+				    Matrix4 rotate = Quaternion(obj.rotation).ToRotationMatrix();
+				    Matrix4 translate = Matrix4::Translate(obj.position);
+				    Matrix4 localTransform = translate * rotate * scale;
+
+				    // Combine with parent transform
+				    Matrix4 worldTransform = parentTransform * localTransform;
+
+				    // Collect voxels from this object's model
+				    if (obj.model) {
+					    for (int x = 0; x < obj.model->GetWidth(); x++) {
+						    for (int y = 0; y < obj.model->GetHeight(); y++) {
+							    for (int z = 0; z < obj.model->GetDepth(); z++) {
+								    if (!obj.model->IsSolid(x, y, z))
+									    continue;
+
+								    // Transform voxel position
+								    Vector3 pos = MakeVector3(float(x), float(y), float(z));
+								    Vector4 transformed4 = worldTransform * MakeVector4(pos.x, pos.y, pos.z, 1.0F);
+								    Vector3 transformed = MakeVector3(transformed4.x, transformed4.y, transformed4.z);
+
+								    int tx = int(std::round(transformed.x));
+								    int ty = int(std::round(transformed.y));
+								    int tz = int(std::round(transformed.z));
+
+								    uint32_t color = obj.model->GetColor(x, y, z);
+								    voxels.push_back(std::make_tuple(tx, ty, tz, color));
+
+								    if (!hasAny) {
+									    minX = maxX = tx;
+									    minY = maxY = ty;
+									    minZ = maxZ = tz;
+									    hasAny = true;
+								    } else {
+									    minX = std::min(minX, tx);
+									    maxX = std::max(maxX, tx);
+									    minY = std::min(minY, ty);
+									    maxY = std::max(maxY, ty);
+									    minZ = std::min(minZ, tz);
+									    maxZ = std::max(maxZ, tz);
+								    }
+							    }
+						    }
+					    }
+				    }
+
+				    // Recursively process children
+				    for (const VoxelObject& child : obj.children) {
+					    collectVoxels(child, worldTransform);
+				    }
+			    };
+
+			// Collect voxels from all root objects
+			Matrix4 identity;
+			for (const VoxelObject& root : scene) {
+				collectVoxels(root, identity);
+			}
+
+			if (!hasAny)
+				SPRaise(".2kv6 scene has no voxel data");
+
+			// Create composite model with proper dimensions
+			int width = maxX - minX + 1;
+			int height = maxY - minY + 1;
+			int depth = maxZ - minZ + 1;
+
+			Handle<VoxelModel> result = Handle<VoxelModel>::New(width, height, depth);
+
+			// Place all voxels in the composite model
+			for (const auto& voxel : voxels) {
+				int x = std::get<0>(voxel);
+				int y = std::get<1>(voxel);
+				int z = std::get<2>(voxel);
+				uint32_t color = std::get<3>(voxel);
+
+				int dx = x - minX;
+				int dy = y - minY;
+				int dz = z - minZ;
+
+				if (dx >= 0 && dx < width && dy >= 0 && dy < height && dz >= 0 && dz < depth) {
+					result->SetSolid(dx, dy, dz, color);
+				}
+			}
+
+			return result;
+		}
+
 		// Copied from `ngspades`, a cancelled branch of OpenSpades
 		Vector3 ReadVector3(const Json::Value& json, const char* name) {
 			if (json.isArray() && json.size() == 3) {
@@ -77,8 +187,13 @@ namespace spades {
 	} // namespace
 
 	Handle<VoxelModel> VoxelModelLoader::Load(const char* path) {
+		std::string pathStr(path);
+
+		// Detect format from extension
+		bool is2KV6 = LocalFileSystem::HasExtension(pathStr, ".2kv6");
+
 		// Load the metadata file
-		std::string metadataPath = path;
+		std::string metadataPath = pathStr;
 		{
 			auto i = metadataPath.rfind('.');
 			if (i != std::string::npos)
@@ -103,9 +218,16 @@ namespace spades {
 			}
 		}
 
-		// Load the base KV6 model
+		// Load the model (either .kv6 or .2kv6)
 		Handle<VoxelModel> voxelModel;
-		{
+		if (is2KV6) {
+			// Load .2kv6 scene and merge all objects into a single composite model
+			SPLog("Loading '%s' as a .2kv6 scene file.", path);
+			std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
+			std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
+			voxelModel = MergeSceneObjects(scene);
+		} else {
+			// Load .kv6 file (regular single-model)
 			SPLog("Loading '%s' as a KV6 voxel model.", path);
 			std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
 			voxelModel = VoxelModel::LoadKV6(*stream);
