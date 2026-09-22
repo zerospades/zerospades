@@ -50,6 +50,8 @@ namespace spades {
 			alive = true;
 			airborne = false;
 			wade = false;
+			flashlightOn = false;
+			flashlightOnTime = -100.0F;
 			position = MakeVector3(0, 0, 0);
 			eye = position;
 			velocity = MakeVector3(0, 0, 0);
@@ -94,6 +96,16 @@ namespace spades {
 		Player::~Player() { SPADES_MARK_FUNCTION(); }
 
 		bool Player::IsLocalPlayer() { return world.GetLocalPlayer() == this; }
+
+		void Player::SetFlashlightOn(bool on) {
+			SPADES_MARK_FUNCTION();
+
+			if (flashlightOn == on)
+				return;
+
+			flashlightOn = on;
+			flashlightOnTime = world.GetTime();
+		}
 
 		void Player::SetInput(PlayerInput newInput) {
 			SPADES_MARK_FUNCTION();
