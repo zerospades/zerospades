@@ -20,6 +20,7 @@
 
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
+#include "VulkanSceneStencil.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -91,18 +92,34 @@ namespace spades {
 				}
 			}
 
-			// Prefer D24_UNORM_S8_UINT, fall back to depth-only D32_SFLOAT
-			// (stencil is unused by this renderer).
-			VkFormatProperties formatProps;
-			vkGetPhysicalDeviceFormatProperties(device->GetPhysicalDevice(),
-			                                     VK_FORMAT_D24_UNORM_S8_UINT, &formatProps);
+			// The scene depth buffer must carry stencil: the x-ray pass reads a bit
+			// the world stamps while the scene is drawn (see VulkanSceneStencil.h).
+			//
+			// D32_SFLOAT_S8_UINT comes first because its depth aspect is a plain
+			// 32-bit float, which is what CopyDepthToSampleImage's DEPTH -> R32_SFLOAT
+			// copy reinterprets. D24_UNORM_S8_UINT is the same 4 bytes per texel but a
+			// 24-bit unorm, so that copy would hand every depth-reading filter a
+			// garbage float; it is kept only as the fallback for hardware that has no
+			// float depth-stencil format. Vulkan guarantees at least one of the two.
+			{
+				auto supportsDepthStencil = [&](VkFormat fmt) {
+					VkFormatProperties props;
+					vkGetPhysicalDeviceFormatProperties(device->GetPhysicalDevice(), fmt, &props);
+					return (props.optimalTilingFeatures &
+					        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0;
+				};
 
-			if (formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-				fbDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-				SPLog("Using D24_UNORM_S8_UINT depth format");
-			} else {
-				fbDepthFormat = VK_FORMAT_D32_SFLOAT;
-				SPLog("D24_UNORM_S8_UINT not supported, using depth-only D32_SFLOAT depth format");
+				if (supportsDepthStencil(VK_FORMAT_D32_SFLOAT_S8_UINT)) {
+					fbDepthFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
+					SPLog("Using D32_SFLOAT_S8_UINT depth format");
+				} else if (supportsDepthStencil(VK_FORMAT_D24_UNORM_S8_UINT)) {
+					fbDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+					SPLog("D32_SFLOAT_S8_UINT not supported, using D24_UNORM_S8_UINT depth format");
+					SPLog("Warning: the depth -> R32_SFLOAT copy reinterprets bits, so on this "
+					      "format every depth-reading filter gets garbage without MSAA");
+				} else {
+					SPRaise("No depth+stencil attachment format is supported by this device");
+				}
 			}
 
 			CreateRenderPass();
@@ -134,6 +151,9 @@ namespace spades {
 				    VK_IMAGE_TILING_OPTIMAL, depthUsage,
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sampleCount);
 				renderDepthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
+				// The framebuffer needs the stencil aspect too, and a sampled view
+				// may carry only one aspect, so the attachment gets its own view.
+				renderDepthImage->CreateAttachmentImageView();
 				renderDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
 			}
@@ -207,7 +227,7 @@ namespace spades {
 
 			VkImageView attachments[] = {
 			    renderColorImage->GetImageView(),
-			    renderDepthImage->GetImageView()
+			    renderDepthImage->GetAttachmentImageView()
 			};
 
 			VkFramebufferCreateInfo fbInfo = {};
@@ -274,12 +294,13 @@ namespace spades {
 				        VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sampleCount);
 				mirrorDepthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
+				mirrorDepthImage->CreateAttachmentImageView();
 				mirrorDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
 
 				VkImageView mirrorAttachments[] = {
 				    mirrorColorImage->GetImageView(),
-				    mirrorDepthImage->GetImageView()
+				    mirrorDepthImage->GetAttachmentImageView()
 				};
 
 				VkFramebufferCreateInfo mirrorFbInfo = {};
@@ -388,8 +409,11 @@ namespace spades {
 			depthAttachment.samples = sampleCount;
 			depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-			depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			// Stencil is the x-ray pass's "the world is the nearest surface here" mark
+			// (VulkanSceneStencil.h). It is cleared to 0 with the rest of the scene and
+			// has to survive to whichever later pass draws the reveal.
+			depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 			depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
@@ -458,6 +482,9 @@ namespace spades {
 
 			VkAttachmentDescription waterDepthAttachment = depthAttachment;
 			waterDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			// Keep the world marks the scene pass stamped: the x-ray pass runs at the
+			// end of this pass whenever water is enabled.
+			waterDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			waterDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 			VkAttachmentDescription waterAttachments[] = {waterColorAttachment, waterDepthAttachment};
@@ -778,7 +805,7 @@ namespace spades {
 			srcBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			srcBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			srcBarriers[1].image = srcDepthImage->GetImage();
-			srcBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			srcBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			srcBarriers[1].srcAccessMask = useMSAA ? VK_ACCESS_SHADER_READ_BIT
 			                                       : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			srcBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -801,7 +828,7 @@ namespace spades {
 			dstBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			dstBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			dstBarriers[1].image = mirrorDepthImage->GetImage();
-			dstBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			dstBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			dstBarriers[1].srcAccessMask = 0;
 			dstBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
@@ -857,7 +884,7 @@ namespace spades {
 			postBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[1].image = mirrorDepthImage->GetImage();
-			postBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			postBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			postBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			postBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -952,7 +979,7 @@ namespace spades {
 			srcBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			srcBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			srcBarriers[1].image = renderDepthImage->GetImage();
-			srcBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			srcBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			srcBarriers[1].srcAccessMask = useMSAA ? VK_ACCESS_SHADER_READ_BIT
 			                                       : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			srcBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -975,7 +1002,7 @@ namespace spades {
 			dstBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			dstBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			dstBarriers[1].image = screenCopyDepthImage->GetImage();
-			dstBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			dstBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			dstBarriers[1].srcAccessMask = 0;
 			dstBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
@@ -1023,7 +1050,7 @@ namespace spades {
 			postBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[1].image = renderDepthImage->GetImage();
-			postBarriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			postBarriers[1].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			postBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 			postBarriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
@@ -1043,7 +1070,7 @@ namespace spades {
 			postBarriers[3].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[3].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			postBarriers[3].image = screenCopyDepthImage->GetImage();
-			postBarriers[3].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			postBarriers[3].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			postBarriers[3].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			postBarriers[3].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -1066,7 +1093,7 @@ namespace spades {
 			pre[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[0].image = renderDepthImage->GetImage();
-			pre[0].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+			pre[0].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			pre[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			pre[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
@@ -1190,10 +1217,11 @@ namespace spades {
 			    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			depthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
+			depthImage->CreateAttachmentImageView();
 
 			VkImageView attachments[] = {
 			    colorImage->GetImageView(),
-			    depthImage->GetImageView()
+			    depthImage->GetAttachmentImageView()
 			};
 
 			VkFramebufferCreateInfo fbInfo = {};
