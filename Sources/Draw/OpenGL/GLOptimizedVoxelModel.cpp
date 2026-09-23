@@ -748,7 +748,7 @@ namespace spades {
 
 				bool isMirrored = Vector3::Dot(Vector3::Cross(axisX, axisY), axisZ) < 0.0F;
 				if (isMirrored)
-					device.FrontFace(IGLDevice::CCW);
+					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
 					device.DepthRange(0.0F, 0.1F);
@@ -757,7 +757,7 @@ namespace spades {
 					numIndices, IGLDevice::UnsignedInt, (void*)0);
 
 				if (isMirrored)
-					device.FrontFace(IGLDevice::CW);
+					device.FrontFace(mirror ? IGLDevice::CCW : IGLDevice::CW);
 
 				if (param.depthHack)
 					device.DepthRange(0.0F, 1.0F);
@@ -882,7 +882,7 @@ namespace spades {
 
 				bool isMirrored = Vector3::Dot(Vector3::Cross(axisX, axisY), axisZ) < 0.0F;
 				if (isMirrored)
-					device.FrontFace(IGLDevice::CCW);
+					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
 					device.DepthRange(0.0F, 0.1F);
@@ -897,7 +897,7 @@ namespace spades {
 				}
 
 				if (isMirrored)
-					device.FrontFace(IGLDevice::CW);
+					device.FrontFace(mirror ? IGLDevice::CCW : IGLDevice::CW);
 
 				if (param.depthHack)
 					device.DepthRange(0.0F, 1.0F);
