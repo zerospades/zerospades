@@ -66,8 +66,6 @@ namespace spades {
 			std::vector<uint32_t> updateBitmap;
 			std::vector<uint32_t> bitmap;
 
-			bool needsFullUpload;
-
 			uint32_t GeneratePixel(int x, int y);
 			void MarkUpdate(int x, int y);
 			void RegenerateCoarseCell(int cx, int cy);
