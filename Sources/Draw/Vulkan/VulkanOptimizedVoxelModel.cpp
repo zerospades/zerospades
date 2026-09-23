@@ -22,6 +22,7 @@
 #include "VulkanSpirvCache.h"
 #include "VulkanRenderer.h"
 #include "VulkanMapRenderer.h"
+#include "VulkanSceneStencil.h"
 #include "VulkanShadowMapRenderer.h"
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
@@ -62,7 +63,9 @@ namespace spades {
 			SpirvCache::Preload({"Shaders/Vulkan/ModelDynamicLit.vert.spv",
 			                     "Shaders/Vulkan/ModelDynamicLit.frag.spv",
 			                     "Shaders/Vulkan/ModelShadowMap.vert.spv",
-			                     "Shaders/Vulkan/ShadowMap.frag.spv"});
+			                     "Shaders/Vulkan/ShadowMap.frag.spv",
+			                     "Shaders/Vulkan/ModelXRay.vert.spv",
+			                     "Shaders/Vulkan/ModelXRay.frag.spv"});
 		}
 
 		void VulkanOptimizedVoxelModel::InvalidateSharedPipeline(gui::SDLVulkanDevice* device) {
@@ -114,6 +117,18 @@ namespace spades {
 			if (sharedPipeline.mirroredGhostColorPipeline != VK_NULL_HANDLE) {
 				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredGhostColorPipeline, nullptr);
 				sharedPipeline.mirroredGhostColorPipeline = VK_NULL_HANDLE;
+			}
+			if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
+				vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
+				sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
+			}
+			if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
+				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
+				sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
+			}
+			if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
+				vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
+				sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
 			}
 			if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
 				vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
@@ -228,6 +243,18 @@ namespace spades {
 				if (sharedPipeline.ghostColorPipeline != VK_NULL_HANDLE) {
 					vkDestroyPipeline(vkDevice, sharedPipeline.ghostColorPipeline, nullptr);
 					sharedPipeline.ghostColorPipeline = VK_NULL_HANDLE;
+				}
+				if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
+					vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
+					sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
+				}
+				if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
+					vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
+					sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
+				}
+				if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
+					vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
+					sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
 				}
 				if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
 					vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
@@ -1080,6 +1107,112 @@ namespace spades {
 			}
 		}
 
+		void VulkanOptimizedVoxelModel::RenderXRayPass(VkCommandBuffer commandBuffer,
+		                                              std::vector<client::ModelRenderParam> params) {
+			SPADES_MARK_FUNCTION();
+
+			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
+				return;
+
+			// The pass runs for every model type in the scene, but only a handful of
+			// them are ever revealed, so leave before touching any state when none of
+			// this type's instances asked for it.
+			bool anyXRay = false;
+			for (const auto& param : params) {
+				if (param.xray) {
+					anyXRay = true;
+					break;
+				}
+			}
+			if (!anyXRay)
+				return;
+
+			// The scene pass has already run by the time this is called, so the shared
+			// pipeline exists; the x-ray variant is created alongside it.
+			if (sharedPipeline.xrayPipeline == VK_NULL_HANDLE)
+				return;
+
+			VkPipeline boundPipeline = VK_NULL_HANDLE;
+			auto bindPipeline = [&](VkPipeline p) {
+				if (p != boundPipeline) {
+					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, p);
+					boundPipeline = p;
+				}
+			};
+			bindPipeline(sharedPipeline.xrayPipeline);
+
+			// Binding VK_NULL_HANDLE is undefined behaviour, so a mirrored variant that
+			// failed to build degrades to the straight one: a negative-determinant
+			// model is then culled the wrong way round, costing the reveal its near
+			// faces, which beats an invalid command buffer.
+			VkPipeline mirroredXRayPipeline = sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE
+			                                      ? sharedPipeline.mirroredXRayPipeline
+			                                      : sharedPipeline.xrayPipeline;
+
+			VkBuffer vb = vertexBuffer->GetBuffer();
+			VkDeviceSize offsets[] = {0};
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
+			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+			const Matrix4& projectionViewMatrix = renderer.GetProjectionViewMatrix();
+			const Matrix4& viewMatrix = renderer.GetViewMatrix();
+
+			// Same fixed light vector GL's x-ray shader uses, carried into view space
+			// here rather than per-fragment. Left unnormalized at length sqrt(2), as GL
+			// has it: CookTorrance takes the light vector's magnitude into its dot
+			// products, so normalizing would shift the specular term and the alpha
+			// derived from it away from GL's.
+			Vector3 viewSpaceLight = (viewMatrix * MakeVector4(0, -1, -1, 0)).GetXYZ();
+
+			int rw = renderer.GetRenderWidth();
+			int rh = renderer.GetRenderHeight();
+
+			for (const auto& param : params) {
+				if (!param.xray)
+					continue;
+
+				const auto& modelMatrix = param.matrix;
+				const auto& ax = modelMatrix.GetAxis(0);
+				const auto& ay = modelMatrix.GetAxis(1);
+				const auto& az = modelMatrix.GetAxis(2);
+
+				{
+					float rad = radius * ax.GetLength();
+					if (!renderer.SphereFrustrumCull(modelMatrix.GetOrigin(), rad))
+						continue;
+				}
+
+				// This pass never runs in the mirror (a reflection of a revealed player
+				// means nothing), so only the model's own winding can flip it.
+				bool isMirrored = Vector3::Dot(Vector3::Cross(ax, ay), az) < 0.0F;
+				bindPipeline(isMirrored ? mirroredXRayPipeline : sharedPipeline.xrayPipeline);
+
+				ModelXRayPushConstants pushConstants;
+				pushConstants.projectionViewModelMatrix = projectionViewMatrix * modelMatrix;
+				pushConstants.viewModelMatrix = viewMatrix * modelMatrix;
+				pushConstants.modelOrigin = origin;
+				pushConstants.xrayColor = param.xrayColor;
+				pushConstants.customColor = param.customColor;
+				pushConstants.viewSpaceLight = viewSpaceLight;
+
+				vkCmdPushConstants(commandBuffer, sharedPipeline.xrayPipelineLayout,
+				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				                   0, sizeof(pushConstants), &pushConstants);
+
+				if (param.depthHack) {
+					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, VulkanRenderer::kFirstPersonDepthEnd};
+					vkCmdSetViewport(commandBuffer, 0, 1, &vp);
+				}
+
+				vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+
+				if (param.depthHack) {
+					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, 1.0f};
+					vkCmdSetViewport(commandBuffer, 0, 1, &vp);
+				}
+			}
+		}
+
 		void VulkanOptimizedVoxelModel::CreatePipeline(VkRenderPass renderPass) {
 			SPADES_MARK_FUNCTION();
 
@@ -1093,6 +1226,20 @@ namespace spades {
 				if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
 					vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
 					sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
+				}
+				// The x-ray objects are rebuilt unconditionally below, so they have to
+				// go here or the handles are overwritten and lost.
+				if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
+					vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
+					sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
+				}
+				if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
+					vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
+					sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
+				}
+				if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
+					vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
+					sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
 				}
 			}
 
@@ -1253,14 +1400,19 @@ namespace spades {
 			// dither blended edges) is used.
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
-			// Depth stencil
+			// Depth stencil. Clearing the world bit wherever a model lands in front is
+			// the other half of the x-ray mark the map pipeline sets; see
+			// VulkanSceneStencil.h. The ghost and dynamic-light pipelines below leave
+			// the stencil test off, so they never touch it.
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
 			depthStencil.depthWriteEnable = VK_TRUE;
 			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
-			depthStencil.stencilTestEnable = VK_FALSE;
+			depthStencil.stencilTestEnable = VK_TRUE;
+			depthStencil.front = MakeWorldStampStencilOp(0);
+			depthStencil.back = depthStencil.front;
 
 			// Color blending
 			VkPipelineColorBlendAttachmentState colorBlendAttachment{};
@@ -1724,6 +1876,149 @@ namespace spades {
 							sharedPipeline.ghostColorPipeline = VK_NULL_HANDLE;
 						} else {
 							SPLog("Created shared model ghost color pipeline");
+						}
+					}
+				}
+			}
+
+			// --- Create x-ray pipeline (reveals a model where the world hides it) ---
+			//
+			// `Greater` keeps exactly the fragments something else is already in front
+			// of, and the stencil narrows that to the fragments the world itself hides,
+			// so a player is not revealed through another player. Depth writes stay
+			// off: this is a second look at models the scene has already drawn, and it
+			// must not push the depth buffer around.
+			{
+				std::vector<uint32_t> xrVertCode = LoadSPIRVFile("Shaders/Vulkan/ModelXRay.vert.spv");
+				std::vector<uint32_t> xrFragCode = LoadSPIRVFile("Shaders/Vulkan/ModelXRay.frag.spv");
+
+				VkShaderModuleCreateInfo xrVertInfo{};
+				xrVertInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+				xrVertInfo.codeSize = xrVertCode.size() * sizeof(uint32_t);
+				xrVertInfo.pCode = xrVertCode.data();
+				VkShaderModule xrVertModule;
+				result = vkCreateShaderModule(vkDevice, &xrVertInfo, nullptr, &xrVertModule);
+				if (result != VK_SUCCESS) {
+					SPLog("Warning: Failed to create x-ray vertex shader module");
+				} else {
+					VkShaderModuleCreateInfo xrFragInfo{};
+					xrFragInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+					xrFragInfo.codeSize = xrFragCode.size() * sizeof(uint32_t);
+					xrFragInfo.pCode = xrFragCode.data();
+					VkShaderModule xrFragModule;
+					result = vkCreateShaderModule(vkDevice, &xrFragInfo, nullptr, &xrFragModule);
+					if (result != VK_SUCCESS) {
+						vkDestroyShaderModule(vkDevice, xrVertModule, nullptr);
+						SPLog("Warning: Failed to create x-ray fragment shader module");
+					} else {
+						VkPipelineShaderStageCreateInfo xrStages[2]{};
+						xrStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+						xrStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+						xrStages[0].module = xrVertModule;
+						xrStages[0].pName = "main";
+						xrStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+						xrStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+						xrStages[1].module = xrFragModule;
+						xrStages[1].pName = "main";
+
+						// Own layout: the x-ray shaders read no textures at all (the
+						// albedo is a vertex attribute), and their push block does not
+						// fit the solid pass's range in the non-physical build.
+						VkPushConstantRange xrPushRange{};
+						xrPushRange.offset = 0;
+						xrPushRange.size = sizeof(ModelXRayPushConstants);
+						xrPushRange.stageFlags =
+						    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+						VkPipelineLayoutCreateInfo xrLayoutInfo{};
+						xrLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+						xrLayoutInfo.setLayoutCount = 0;
+						xrLayoutInfo.pushConstantRangeCount = 1;
+						xrLayoutInfo.pPushConstantRanges = &xrPushRange;
+
+						result = vkCreatePipelineLayout(vkDevice, &xrLayoutInfo, nullptr,
+						                                &sharedPipeline.xrayPipelineLayout);
+						if (result != VK_SUCCESS) {
+							vkDestroyShaderModule(vkDevice, xrVertModule, nullptr);
+							vkDestroyShaderModule(vkDevice, xrFragModule, nullptr);
+							SPLog("Warning: Failed to create x-ray pipeline layout (error code: %d)",
+							      result);
+						} else {
+							VkPipelineDepthStencilStateCreateInfo xrDepth{};
+							xrDepth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+							xrDepth.depthTestEnable = VK_TRUE;
+							xrDepth.depthWriteEnable = VK_FALSE;
+							xrDepth.depthCompareOp = VK_COMPARE_OP_GREATER;
+							xrDepth.depthBoundsTestEnable = VK_FALSE;
+							xrDepth.stencilTestEnable = VK_TRUE;
+							xrDepth.front = MakeWorldTestStencilOp();
+							xrDepth.back = xrDepth.front;
+
+							VkPipelineColorBlendAttachmentState xrBlend{};
+							xrBlend.colorWriteMask =
+							    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+							    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+							xrBlend.blendEnable = VK_TRUE;
+							xrBlend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+							xrBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+							xrBlend.colorBlendOp = VK_BLEND_OP_ADD;
+							xrBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+							xrBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+							xrBlend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+							VkPipelineColorBlendStateCreateInfo xrColorBlending{};
+							xrColorBlending.sType =
+							    VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+							xrColorBlending.logicOpEnable = VK_FALSE;
+							xrColorBlending.attachmentCount = 1;
+							xrColorBlending.pAttachments = &xrBlend;
+
+							VkGraphicsPipelineCreateInfo xrPipelineInfo{};
+							xrPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+							xrPipelineInfo.stageCount = 2;
+							xrPipelineInfo.pStages = xrStages;
+							xrPipelineInfo.pVertexInputState = &vertexInputInfo;
+							xrPipelineInfo.pInputAssemblyState = &inputAssembly;
+							xrPipelineInfo.pViewportState = &viewportState;
+							xrPipelineInfo.pRasterizationState = &rasterizer;
+							xrPipelineInfo.pMultisampleState = &multisampling;
+							xrPipelineInfo.pDepthStencilState = &xrDepth;
+							xrPipelineInfo.pColorBlendState = &xrColorBlending;
+							xrPipelineInfo.pDynamicState = &dynamicState;
+							xrPipelineInfo.layout = sharedPipeline.xrayPipelineLayout;
+							xrPipelineInfo.renderPass = renderPass;
+							xrPipelineInfo.subpass = 0;
+
+							result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(),
+							                                   1, &xrPipelineInfo, nullptr,
+							                                   &sharedPipeline.xrayPipeline);
+
+							if (result == VK_SUCCESS) {
+								VkPipelineRasterizationStateCreateInfo xrMirroredRasterizer = rasterizer;
+								xrMirroredRasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
+								xrPipelineInfo.pRasterizationState = &xrMirroredRasterizer;
+								if (vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+								                              &xrPipelineInfo, nullptr,
+								                              &sharedPipeline.mirroredXRayPipeline) !=
+								    VK_SUCCESS) {
+									// Left null on purpose rather than aliased to the straight
+									// variant, which teardown would then destroy twice; the
+									// draw loop falls back at bind time.
+									SPLog("Warning: Failed to create mirrored x-ray pipeline");
+									sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
+								}
+							}
+
+							vkDestroyShaderModule(vkDevice, xrVertModule, nullptr);
+							vkDestroyShaderModule(vkDevice, xrFragModule, nullptr);
+
+							if (result != VK_SUCCESS) {
+								SPLog("Warning: Failed to create x-ray pipeline (error code: %d)",
+								      result);
+								sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
+							} else {
+								SPLog("Created shared model x-ray pipeline");
+							}
 						}
 					}
 				}
