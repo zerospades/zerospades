@@ -2239,7 +2239,12 @@ namespace spades {
 			const float range = 120.0F;
 
 			// draw labels and ticks
-			static const char* cardinalLabels[] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+			std::array<std::string, 8> cardinalLabels = {
+				_Tr("Client", "N"),  _Tr("Client", "NE"),
+				_Tr("Client", "E"),  _Tr("Client", "SE"),
+				_Tr("Client", "S"),  _Tr("Client", "SW"),
+				_Tr("Client", "W"),  _Tr("Client", "NW"),
+			};
 			auto drawLabel = [&](const char* label, float px, float alpha) {
 				Vector2 size = font.Measure(label);
 				float tx = floorf(px - size.x * 0.5F);
@@ -2276,7 +2281,7 @@ namespace spades {
 				// draw cardinal labels
 				if (isCardinal) {
 					const auto& label = cardinalLabels[deg / cardinalStep];
-					drawLabel(label, px, edgeFade);
+					drawLabel(label.c_str(), px, edgeFade);
 					continue;
 				}
 
