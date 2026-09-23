@@ -148,5 +148,26 @@ namespace spades {
 		void ClientMenu::TextInputEvent(const std::string& text) { KeyPress(text); }
 		bool ClientMenu::AcceptsTextInput() const { return IsEnabled(); }
 		void ClientMenu::Draw() { Render(); }
+
+		void ClientMenu::Render() {
+			UIElement::Render();
+
+			int now = static_cast<int>(helper->GetClientTime());
+			int hrs = now / 3600;
+			int mins = (now % 3600) / 60;
+			int secs = now % 60;
+
+			char buf[16];
+			if (hrs > 0)
+				snprintf(buf, sizeof(buf), "%d:%02d:%02d", hrs, mins, secs);
+			else
+				snprintf(buf, sizeof(buf), "%d:%02d", mins, secs);
+
+			std::string str = _Tr("Client", "Time played: {0}", std::string(buf));
+			IFont& font = ui->GetFontManager().GetHeadingFont();
+			Vector2 pos = MakeVector2(8.0F, 8.0F);
+			font.Draw(str, pos + MakeVector2(1, 1), 1.0F, MakeVector4(0, 0, 0, 0.5F));
+			font.Draw(str, pos, 1.0F, MakeVector4(1, 1, 1, 1));
+		}
 	} // namespace client
 } // namespace spades

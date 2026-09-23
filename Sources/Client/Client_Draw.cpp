@@ -390,37 +390,6 @@ namespace spades {
 			font.DrawShadow(timeBuf, MakeVector2(textX + recSize.x + labelGap, textY), 1.0F, red, shadow);
 		}
 
-		void Client::DrawPlayingTime() {
-			float sw = renderer->ScreenWidth();
-
-			float y = 8.0F;
-
-			bool isDemoMode = IsDemoMode();
-
-			const int statsMode = cg_stats;
-			if (statsMode == 2
-				|| (statsMode >= 3 && scoreboardVisible)
-				|| (statsMode == 1 && isDemoMode)) // force on screen top for demo playback hud
-				y += cg_statsSmallFont ? 10.0F : 20.0F;
-
-			int now = (int)time;
-			int hrs = now / 3600;
-			int mins = (now % 3600) / 60;
-			int secs = now % 60;
-
-			char buf[16];
-			if (hrs > 0)
-				snprintf(buf, sizeof(buf), "%d:%02d:%02d", hrs, mins, secs);
-			else
-				snprintf(buf, sizeof(buf), "%d:%02d", mins, secs);
-
-			IFont& font = fontManager->GetHeadingFont();
-			Vector2 size = font.Measure(buf);
-			Vector2 pos = MakeVector2((sw - size.x) * 0.5F, y);
-			font.Draw(buf, pos + MakeVector2(1, 1), 1.0F, MakeVector4(0, 0, 0, 0.5));
-			font.Draw(buf, pos, 1.0F, MakeVector4(1, 1, 1, 1));
-		}
-
 		void Client::DrawAlivePlayersCount() {
 			const int playerCountMode = cg_hudPlayerCount;
 			if (playerCountMode >= 3)
@@ -444,10 +413,6 @@ namespace spades {
 			bool playerCountOnTop = playerCountMode > 0
 				&& playerCountMode < 2
 				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
-
-			// account for playing time height
-			if (playerCountOnTop && scoreboardVisible)
-				y += 30.0F;
 
 			// account for client stats height
 			if ((statsOnTop && playerCountOnTop)
@@ -2230,10 +2195,6 @@ namespace spades {
 				&& playerCountMode < 2
 				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
 
-			// account for playing time height
-			if (scoreboardVisible)
-				barY += 30.0F;
-
 			// account for client stats height
 			if (statsOnTop)
 				barY += cg_statsSmallFont ? 10.0F : 20.0F;
@@ -2627,10 +2588,8 @@ namespace spades {
 
 				DrawAlert();
 				centerMessageView->Draw();
-				if (scoreboardVisible) {
+				if (scoreboardVisible)
 					scoreboard->Draw();
-					DrawPlayingTime();
-				}
 
 				// --- end "player is there" render
 			} else {
@@ -2668,10 +2627,8 @@ namespace spades {
 				}
 
 				// In demo mode, only show scoreboard when toggled
-				if (!isDemoMode || scoreboardVisible) {
+				if (!isDemoMode || scoreboardVisible)
 					scoreboard->Draw();
-					DrawPlayingTime();
-				}
 
 				centerMessageView->Draw();
 				DrawAlert();

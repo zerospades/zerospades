@@ -552,7 +552,6 @@ namespace spades {
 
 			void DrawBlockPaletteHUD(float y);
 			void DrawAlivePlayersCount();
-			void DrawPlayingTime();
 			void DrawRecordingIndicator();
 			void DrawDemoPlaybackHUD();
 			void DrawHurtSprites();

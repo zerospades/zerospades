@@ -37,7 +37,7 @@ namespace spades {
 			ClientUIHelper* helper; // weak
 			// Lives for the session so reopening Setup lands on the same tab/row.
 			Handle<gui::PreferenceViewPersistedState> preferenceState;
-			
+
 			gui::ui::Label* escHint = nullptr; // weak
 
 			void OnBackToGame(gui::ui::UIElement& sender);
@@ -57,6 +57,7 @@ namespace spades {
 			void TextInputEvent(const std::string& text) override;
 			bool AcceptsTextInput() const override;
 			void Draw() override;
+			void Render() override;
 		};
 	} // namespace client
 } // namespace spades

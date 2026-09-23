@@ -61,5 +61,9 @@ namespace spades {
 		bool ClientUIHelper::IsDemoMode() const {
 			return ui && ui->client && ui->client->IsDemoMode();
 		}
+
+		float ClientUIHelper::GetClientTime() const {
+			return (ui && ui->client) ? ui->client->GetTime() : 0.0F;
+		}
 	} // namespace client
 } // namespace spades

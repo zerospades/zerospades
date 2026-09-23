@@ -45,6 +45,8 @@ namespace spades {
 
 			bool HasLocalPlayer() const;
 			bool IsDemoMode() const;
+
+			float GetClientTime() const;
 		};
 	} // namespace client
 } // namespace spades
