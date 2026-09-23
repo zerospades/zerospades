@@ -36,6 +36,41 @@ namespace spades {
             const float kItemW = 260.0F;
             const float kItemH = 36.0F;
             const float kItemPitch = 44.0F;
+
+            /** The start of the codepoint `i` is inside, so that nothing removed
+             *  from a string ever leaves half a character behind. */
+            size_t CodepointStart(const std::string& s, size_t i) {
+                while (i > 0 && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80)
+                    i--;
+                return i;
+            }
+
+            /**
+             * `text` shortened to fit `width`, losing characters from the middle to
+             * an ellipsis. The middle goes rather than the end because both ends of
+             * a document name carry something: what it is called, and what type it
+             * is and whether it has been saved.
+             */
+            std::string ElideToWidth(client::IFont& font, std::string text, float width) {
+                if (font.Measure(text).x <= width)
+                    return text;
+
+                const std::string ellipsis = "...";
+                auto elided = [&ellipsis](const std::string& t) {
+                    size_t middle = CodepointStart(t, t.size() / 2);
+                    return t.substr(0, middle) + ellipsis + t.substr(middle);
+                };
+
+                while (text.size() > 1 && font.Measure(elided(text)).x > width) {
+                    size_t cut = CodepointStart(text, text.size() / 2);
+                    size_t end = cut + 1;
+                    while (end < text.size() &&
+                           (static_cast<unsigned char>(text[end]) & 0xC0) == 0x80)
+                        end++;
+                    text.erase(cut, end - cut);
+                }
+                return elided(text);
+            }
         } // namespace
 
         EditorMenu::EditorMenu(IEditorMenuHost& h, client::IRenderer& r, client::FontManager& fm,
@@ -66,14 +101,6 @@ namespace spades {
         }
         void EditorMenu::Close() { menuOpen = false; }
 
-        void EditorMenu::OpenTextPrompt(const std::string& title, const std::string& initial,
-                                        std::function<void(const std::string&)> onSubmit) {
-            promptTitle = title;
-            promptText = initial;
-            promptSubmit = std::move(onSubmit);
-            promptOpen = true;
-        }
-
         int EditorMenu::MenuButtonAt(const Vector2& p) const {
             float sw = renderer->ScreenWidth();
             float sh = renderer->ScreenHeight();
@@ -95,7 +122,8 @@ namespace spades {
             float x = (sw - kItemW) * 0.5F;
             float y = sh * 0.5F - 110.0F;
 
-            std::string title = host.GetMenuTitle();
+            // The title names the document, so it is as long as a file name can be.
+            std::string title = ElideToWidth(font, host.GetMenuTitle(), kItemW);
             Vector2 sz = font.Measure(title);
             font.Draw(title, MakeVector2(x + (kItemW - sz.x) * 0.5F, y), 1.0F,
                       MakeVector4(1, 1, 1, 1));
@@ -119,53 +147,7 @@ namespace spades {
             }
         }
 
-        void EditorMenu::DrawPrompt(float sw, float sh) {
-            client::IFont& font = fontManager->GetSmallGuiFont();
-            OverlayColorNP(*renderer, MakeVector4(0.0F, 0.0F, 0.0F, 0.7F));
-            OverlayFillRect(*renderer, 0, 0, sw, sh);
-
-            float w = 460.0F, h = 116.0F;
-            float x = (sw - w) * 0.5F, y = (sh - h) * 0.5F;
-            OverlayColorNP(*renderer, MakeVector4(0.16F, 0.16F, 0.18F, 1.0F));
-            OverlayFillRect(*renderer, x, y, w, h);
-            OverlayStrokeRect(*renderer, x, y, w, h, 1.0F, MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
-
-            font.Draw(promptTitle, MakeVector2(x + 16.0F, y + 12.0F), 1.0F,
-                      MakeVector4(0.8F, 0.8F, 0.8F, 1.0F));
-
-            float fx = x + 16.0F, fy = y + 44.0F, fw = w - 32.0F, fh = 28.0F;
-            widgets::PaintField(*renderer, MakeVector2(fx, fy), MakeVector2(fw, fh), true, false);
-            std::string shown = promptText + "_";
-            font.Draw(shown, MakeVector2(fx + 6.0F, fy + 6.0F), 1.0F, MakeVector4(1, 1, 1, 1));
-
-            font.Draw("[Enter] OK    [Esc] cancel", MakeVector2(x + 16.0F, y + h - 24.0F), 0.9F,
-                      MakeVector4(0.7F, 0.7F, 0.7F, 1.0F));
-        }
-
-        void EditorMenu::SubmitPrompt() {
-            auto submit = std::move(promptSubmit);
-            std::string text = promptText;
-            promptOpen = false;
-            menuOpen = false;   // no-op if this prompt wasn't menu-sourced (menuOpen already false)
-            if (submit)
-                submit(text);
-        }
-
         bool EditorMenu::KeyEvent(const std::string& key, bool down) {
-            if (promptOpen) {
-                if (!down)
-                    return true;
-                if (key == "Escape") {
-                    promptOpen = false;   // cancel: does NOT touch menuOpen (see plan notes)
-                } else if (key == "Enter") {
-                    SubmitPrompt();
-                } else if (key == "BackSpace") {
-                    if (!promptText.empty())
-                        promptText.pop_back();
-                }
-                return true;
-            }
-
             if (menuOpen) {
                 if (!down)
                     return true;
@@ -193,25 +175,11 @@ namespace spades {
             return false;
         }
 
-        void EditorMenu::TextInputEvent(const std::string& text) {
-            if (promptOpen)
-                promptText += text;
-        }
-
-        AABB2 EditorMenu::GetTextInputRect() const {
-            float sw = renderer->ScreenWidth(), sh = renderer->ScreenHeight();
-            float w = 460.0F, h = 116.0F;
-            float x = (sw - w) * 0.5F, y = (sh - h) * 0.5F;
-            return AABB2(x + 16.0F, y + 44.0F, w - 32.0F, 28.0F);
-        }
-
         void EditorMenu::Draw() {
             float sw = renderer->ScreenWidth();
             float sh = renderer->ScreenHeight();
             if (menuOpen)
                 DrawMenu(sw, sh);
-            if (promptOpen)
-                DrawPrompt(sw, sh);
         }
     } // namespace gui
 } // namespace spades

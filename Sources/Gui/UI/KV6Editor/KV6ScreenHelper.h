@@ -29,11 +29,6 @@
 namespace spades {
 	class VoxelModel;
 	namespace gui {
-		/** Extensions of the voxel model files the editor lists. */
-		const std::vector<std::string>& KV6ModelExtensions();
-		/** True if `name` is a directly editable model file (currently `.kv6`). */
-		bool KV6IsEditable(const std::string& name);
-
 		/**
 		 * Loads and saves KV6 models by absolute path, and names the folder the
 		 * editor opens in.
