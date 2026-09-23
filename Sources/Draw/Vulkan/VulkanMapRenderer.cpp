@@ -558,10 +558,13 @@ namespace spades {
 			attributeDescriptions[1].format = VK_FORMAT_R16G16_UINT;
 			attributeDescriptions[1].offset = 4;
 
-			// Color (location 2) - colorRed, colorGreen, colorBlue are uint8_t at offset 8
+			// Color (location 2) - colorRed, colorGreen, colorBlue, shading are
+			// uint8_t at offset 8. The 4th component is the per-face sun
+			// shading byte BasicMap.vert reads as color.w (GL parity); shaders
+			// that only need the colour declare a uvec3 and ignore it.
 			attributeDescriptions[2].binding = 0;
 			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R8G8B8_UINT;
+			attributeDescriptions[2].format = VK_FORMAT_R8G8B8A8_UINT;
 			attributeDescriptions[2].offset = 8;
 
 			// Normal (location 3) - nx, ny, nz are int8_t at offset 12
