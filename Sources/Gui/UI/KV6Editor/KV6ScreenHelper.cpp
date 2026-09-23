@@ -31,14 +31,6 @@ namespace spades {
 	namespace gui {
 		namespace fs = LocalFileSystem;
 
-		const std::vector<std::string>& KV6ModelExtensions() {
-			// .kv6 is editable; .2kv6/.vxl are listed but not supported yet.
-			static const std::vector<std::string> extensions = {".kv6", ".2kv6", ".vxl"};
-			return extensions;
-		}
-
-		bool KV6IsEditable(const std::string& name) { return fs::HasExtension(name, ".kv6"); }
-
 		KV6ScreenHelper::KV6ScreenHelper() {
 			// Home is a dedicated `kv6/` folder inside the app-data dir (alongside
 			// Mods/, Demos/, ...), created on demand. The parent already exists (the

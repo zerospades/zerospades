@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include <Gui/ModelFileTypes.h>
 #include "KV6EditorContext.h"
 #include "KV6ToolEvent.h"
 #include "KV6ToolRegistry.h"
@@ -362,10 +363,13 @@ namespace spades {
 			void DrawPlacementPreview();
 			// Switch to the placement Transform sub-tool (where a placement is positioned).
 			bool ActivateTransformTool();
-			// Loads `path` and starts placing its voxels in the current document.
-			void ImportModel(const std::string& path);
-			/** Asks for a model with the shared file browser, then imports it. */
-			void OpenImportDialog();
+			// Loads `path` and starts placing its voxels in the current document,
+			// which is a paste from a file rather than a change of document.
+			void InsertModel(const std::string& path);
+			/** Asks for a model with the shared file browser, then inserts it. */
+			void OpenInsertDialog();
+			/** Starts an empty document, once it is safe to lose this one. */
+			void NewDocument();
 
 			// --- Colour picker (managed by ColorPicker component) ----------------
 			// The brush colour, shared by every tool and edited by the picker. A
@@ -487,7 +491,9 @@ namespace spades {
 
 			// Document
 			void NewModel(int n, const std::string& path);
-			void LoadModel(const std::string& path);
+			/** Replaces the document with the model at `path`. False leaves the
+			 *  document untouched: the file could not be read. */
+			bool LoadModel(const std::string& path);
 			// State of the document being replaced that must not carry over.
 			void ResetDocumentState();
 			int CountSolids();
@@ -617,13 +623,17 @@ namespace spades {
 			float BarsH();
 
 			// --- IEditorMenuHost (overrides) ---
-			std::string GetMenuTitle() override { return "KV6 Editor"; }
+			/** The document the menu is about: its file name, or that it has never
+			 *  been saved, with a marker while it has changes that have not been
+			 *  written. The menu is where saving is decided, so it is where the
+			 *  player has to be able to see what they are deciding about. */
+			std::string GetMenuTitle() override;
 			std::vector<EditorMenuItem> GetMenuItems() override;
 			bool OnMenuEscape() override;
 
 			// --- Document commands behind the menu items ---
 			std::string GetDocumentPath() const { return filePath; }
-			std::string GetDocumentExtension() const { return ".kv6"; }
+			std::string GetDocumentExtension() const { return KV6DocumentExtension(); }
 			bool SaveDocument(const std::string& path);
 			/** Asks for a path with the shared file browser, then saves to it.
 			 *  `after` runs only once the document has actually been written. */
@@ -631,12 +641,14 @@ namespace spades {
 			/** Opens another model in place of this one, guarding unsaved changes. */
 			void OpenDocument();
 			/**
-			 * Shows the shared file browser over the editor for .kv6 models,
-			 * starting in the document's folder; `picked` gets the chosen path.
+			 * Shows the shared model file browser over the editor, starting in the
+			 * document's folder; `picked` gets the chosen path.
 			 */
 			void ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
 			                         const std::string& initialName,
 			                         std::function<void(const std::string&)> picked);
+			/** A plain message over the editor with a single way out. */
+			void ShowMessage(const std::string& text);
 			/**
 			 * Runs `proceed` once it is safe to lose the current document: right
 			 * away when it is clean, otherwise after the user picks Save or Discard.

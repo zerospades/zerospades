@@ -38,8 +38,15 @@ namespace spades {
 	 * window and the enabled-mod set, and hides the Mods tab. */
 	extern bool g_tryMod;
 
+	/** A model file to open in the editor at startup, from the command line, from
+	 * a file manager's "Open with", or from a file dropped on the splash window.
+	 * Empty when the program was started without one. Cleared once opened. */
+	extern std::string g_openModelPath;
+
 	void StartClient(const ServerAddress&);
-	void StartMainScreen();
+	/** Runs the main screen. A model path opens it straight in the editor, which
+	 * is how a file given on the command line or by the desktop gets there. */
+	void StartMainScreen(const std::string& openModelPath = std::string());
 	void StartDemoReplay(const std::string& demoPath);
 
 	/** Play back a demo and auto-follow a player, skipping all menus. playerSpec

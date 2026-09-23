@@ -32,8 +32,6 @@
 #include <Gui/UI/Widgets/MessageBox.h>
 #include <Gui/UI/Widgets/TextPromptScreen.h>
 
-DEFINE_SPADES_SETTING(cl_kv6EditorFolder, ""); // remembered folder (absolute)
-
 namespace {
 	// The tab's own layout: the action row sits at y=200 and the list header at
 	// `headerPos`, with the browser's error line fitting under the list.
@@ -144,31 +142,18 @@ namespace spades {
 
 			SetBounds(AABB2(0.0F, 0.0F, manager->screenWidth, manager->screenHeight));
 
-			FileBrowserOptions options;
+			// The options every model dialog shares; this tab is the embedded one,
+			// so it drives the browser itself instead of showing a footer.
+			FileBrowserOptions options = KV6ModelBrowserOptions();
 			options.purpose = FileBrowserPurpose::Open;
-			options.target = FileBrowserTarget::Files;
 			// Restore the last-used folder; the browser falls back to Home if it is
 			// gone.
-			options.initialDir = static_cast<std::string>(cl_kv6EditorFolder);
+			options.initialDir = KV6RememberedFolder(fs->DefaultDir());
 			options.homeDir = fs->DefaultDir();
-			options.filters.push_back(
-			  FileFilter{_Tr("MainScreen", "Voxel models"), KV6ModelExtensions()});
-			options.allowCreateFolder = true;
-			options.allowRename = true;
-			options.allowDelete = true;
 			options.showFooter = false;    // the tab itself has no OK/Cancel row
 			options.showListHeader = true; // "Name", like the other tabs
 			// Line the rows up with the tab's own layout (action row, header, list).
 			options.listTopGap = headerPos - kActionRowY - kActionRowH;
-			// Only .kv6 can be edited so far; the rest are listed but greyed out.
-			options.describeEntry = [](const LocalFileSystem::DirEntry& entry) {
-				FileEntryInfo info;
-				if (!entry.isFolder && !KV6IsEditable(entry.name)) {
-					info.accepted = false;
-					info.hint = _Tr("MainScreen", "(not implemented)");
-				}
-				return info;
-			};
 			{
 				FileBrowserAction action;
 				action.caption = _Tr("MainScreen", "New");
@@ -187,7 +172,7 @@ namespace spades {
 					OpenModel(result.paths.front(), false);
 			};
 			browser->directoryChanged = [](const std::string& dir) {
-				cl_kv6EditorFolder = dir; // remember for next time
+				KV6RememberFolder(dir); // the editor's own dialogs open here too
 			};
 			browser->entryRejected = [this](const FileBrowserEntry& entry) {
 				OnEntryRejected(entry);
@@ -201,7 +186,7 @@ namespace spades {
 
 			// The browser may have fallen back to another folder (the remembered one
 			// could be gone), and it settles that before anyone can subscribe.
-			cl_kv6EditorFolder = browser->GetDirectory();
+			KV6RememberFolder(browser->GetDirectory());
 
 			(void)headerHeight;
 			(void)listPos;
@@ -219,10 +204,8 @@ namespace spades {
 		}
 
 		void KV6BrowserPanel::OnEntryRejected(const FileBrowserEntry&) {
-			Handle<AlertScreen> al = Handle<AlertScreen>::New(
-			  modalOwner,
-			  _Tr("MainScreen", "This file type is not supported yet. Only .kv6 files can be edited."),
-			  120.0F);
+			Handle<AlertScreen> al =
+			  Handle<AlertScreen>::New(modalOwner, KV6UnsupportedMessage(), 120.0F);
 			al->Run();
 		}
 
@@ -236,7 +219,7 @@ namespace spades {
 		}
 
 		std::string KV6BrowserPanel::ModelFileName(const std::string& name) {
-			return KV6IsEditable(name) ? name : name + ".kv6";
+			return KV6DocumentFileName(name);
 		}
 
 		void KV6BrowserPanel::OnNewModel() {
@@ -255,9 +238,9 @@ namespace spades {
 				options.title = _Tr("MainScreen", "New KV6 Model");
 				options.initialText = "untitled";
 				options.validate = [this](const std::string& name) {
-					// ".kv6" alone would silently become a hidden, nameless file.
+					// An extension on its own would silently become a hidden, nameless file.
 					std::string file = ModelFileName(name);
-					if (file.size() <= 4)
+					if (file.size() <= KV6DocumentExtension().size())
 						return _Tr("MainScreen", "The name is empty.");
 					return ValidateNewName(file);
 				};

@@ -22,6 +22,7 @@
 #include "KV6EditorView.h"
 #include "KV6DrawTool.h"
 #include "KV6EditorTool.h"
+#include "KV6FileDialog.h"
 #include "KV6ScreenHelper.h"
 #include "KV6SubTool.h"
 #include "KV6ToolRegistry.h"
@@ -54,6 +55,7 @@
 #include <Gui/UI/Components/FileBrowser/FileBrowserDialog.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Widgets/MessageBox.h>
+#include <Gui/UI/Widgets/TextPromptScreen.h>
 
 SPADES_SETTING(cg_keyMoveForward);
 SPADES_SETTING(cg_keyMoveBackward);
@@ -84,7 +86,7 @@ namespace spades {
 			bool IsCtrlShortcut(const std::string& key) {
 				// Ctrl is also the descend key, so a chord here costs the movement
 				// key bound to the same letter: keep this set clear of them.
-				for (const char* k : {"s", "c", "x", "v", "z", "y"}) {
+				for (const char* k : {"s", "c", "x", "v", "z", "y", "n", "o"}) {
 					if (EqualsIgnoringCase(key, k))
 						return true;
 				}
@@ -601,10 +603,15 @@ namespace spades {
 				}
 			}
 
+			// The editor always opens with a document. A file the player asked to
+			// create is started under its name; one that exists but cannot be read
+			// leaves an untitled document instead, because naming it after a file
+			// whose contents are still on disk is how Save comes to overwrite
+			// something this editor never managed to read.
 			if (isNew || path.empty())
 				NewModel(kNewModelSize, path);
-			else
-				LoadModel(path);
+			else if (!LoadModel(path))
+				NewModel(kNewModelSize, std::string());
 		}
 
 		KV6EditorView::~KV6EditorView() { SPADES_MARK_FUNCTION(); }
@@ -650,12 +657,13 @@ namespace spades {
 			NotifyDocumentChanged();
 		}
 
-		void KV6EditorView::LoadModel(const std::string& path) {
+		bool KV6EditorView::LoadModel(const std::string& path) {
 			VoxelModel* loaded = io->Load(path);
 			if (!loaded) {
-				NewModel(kNewModelSize, path);
+				// The document that is open is not the one that failed to load, so it
+				// stays exactly as it is; the caller says how to break the news.
 				SetStatus("Could not load " + path);
-				return;
+				return false;
 			}
 			ResetDocumentState();
 			model = Handle<VoxelModel>(loaded, false); // adopt (Load returns a ref)
@@ -666,6 +674,7 @@ namespace spades {
 			FrameCamera();
 			savedGeomId = undo.GeometryStateId(); // a freshly loaded document is clean
 			NotifyDocumentChanged();
+			return true;
 		}
 
 		int KV6EditorView::CountSolids() {
@@ -713,12 +722,16 @@ namespace spades {
 		}
 
 		bool KV6EditorView::Save() {
-			// Saving writes the document, so anything still pending belongs in it.
-			DocumentCommand command(*this);
+			// A document that has never been saved has nowhere to go yet, so "save"
+			// means asking where. Asked before anything is committed, so cancelling
+			// the dialog leaves the document exactly as it was.
 			if (filePath.empty()) {
-				SetStatus("No file to save to");
+				OpenSaveAsDialog();
 				return false;
 			}
+
+			// Saving writes the document, so anything still pending belongs in it.
+			DocumentCommand command(*this);
 			if (!io->Save(&*model, filePath)) {
 				SetStatus("Save failed");
 				return false;
@@ -728,22 +741,44 @@ namespace spades {
 			return true;
 		}
 
+		std::string KV6EditorView::GetMenuTitle() {
+			const std::string name = filePath.empty() ? std::string("Untitled model")
+			                                          : LocalFileSystem::GetFileName(filePath);
+			return HasUnsavedChanges() ? name + " *" : name;
+		}
+
+		void KV6EditorView::NewDocument() {
+			ConfirmDiscardChanges([this] {
+				NewModel(kNewModelSize, std::string());
+				SetStatus("New model");
+			});
+		}
+
 		std::vector<EditorMenuItem> KV6EditorView::GetMenuItems() {
-			auto newModel = [this] {
-				ConfirmDiscardChanges([this] {
-					NewModel(kNewModelSize, std::string());
-					SetStatus("New model");
-				});
-			};
 			std::vector<EditorMenuItem> items;
-			items.push_back(EditorMenuItem{"New Model", newModel, true});
+			// The file commands first, then the one command that edits the open
+			// document with a file: inserting a model is a paste that happens to come
+			// from disk, and it belongs beside Paste rather than beside Save.
+			items.push_back(EditorMenuItem{"New Model", [this] { NewDocument(); }, true});
 			items.push_back(EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true});
-			items.push_back(EditorMenuItem{"Import Model...", [this] { OpenImportDialog(); }, true});
-			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, !filePath.empty()});
+			// Always available: a document with nowhere to go yet is asked where.
+			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
+			items.push_back(EditorMenuItem{"Insert Model...", [this] { OpenInsertDialog(); }, true});
 			items.push_back(EditorMenuItem{
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }, true});
 			return items;
+		}
+
+		void KV6EditorView::ShowMessage(const std::string& text) {
+			// An alert rather than a message box with one button: it is the same
+			// thing to look at, and it answers to Enter and Escape as every other
+			// dismissable box in the game does.
+			UIOverlayHost* overlay = ui->GetOverlay();
+			Handle<AlertScreen> box =
+			  Handle<AlertScreen>::New(&overlay->GetUIManager().GetRootElement(), text, 120.0F);
+			ReleaseHeldInput();
+			overlay->Show(box.GetPointerOrNull());
 		}
 
 		void KV6EditorView::ConfirmDiscardChanges(std::function<void()> proceed) {
@@ -781,19 +816,35 @@ namespace spades {
 		void KV6EditorView::ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
 		                                        const std::string& initialName,
 		                                        std::function<void(const std::string&)> picked) {
-			FileBrowserOptions options;
+			// The same options the model tab on the main screen is built from, so a
+			// model file behaves the same way wherever it is picked.
+			FileBrowserOptions options = KV6ModelBrowserOptions();
 			options.purpose = purpose;
-			options.target = FileBrowserTarget::Files;
+
+			// Reading lists every type; writing offers only the one this editor
+			// produces. The browser takes a name that already ends in a listed type
+			// at its word, so a document named `model.vxl` would be written as a KV6
+			// under a name promising something else.
+			if (purpose != FileBrowserPurpose::Open) {
+				options.filters.clear();
+				options.filters.push_back(
+				  FileFilter{KV6ModelFilterLabel(), {KV6DocumentExtension()}});
+			}
 			options.homeDir = io->DefaultDir();
-			options.initialDir =
-			  filePath.empty() ? io->DefaultDir() : LocalFileSystem::ParentDir(filePath);
+			// The document's own folder is where this document's dialogs belong;
+			// anything else opens where the player last was, here or on the main
+			// screen.
+			options.initialDir = filePath.empty() ? KV6RememberedFolder(io->DefaultDir())
+			                                      : LocalFileSystem::ParentDir(filePath);
 			options.initialName = initialName;
-			options.filters.push_back(FileFilter{"KV6 models", {GetDocumentExtension()}});
 
 			UIOverlayHost* overlay = ui->GetOverlay();
 			Handle<FileBrowserDialog> dialog = Handle<FileBrowserDialog>::New(
 			  &overlay->GetUIManager().GetRootElement(), title, std::move(options));
 			dialog->closed = [picked](const FileBrowserResult& result) {
+				// Where the player ended up is where every model dialog opens next,
+				// whether or not they picked something here.
+				KV6RememberFolder(result.directory);
 				if (result.accepted && !result.paths.empty())
 					picked(result.paths.front());
 			};
@@ -805,13 +856,17 @@ namespace spades {
 		void KV6EditorView::OpenDocument() {
 			ConfirmDiscardChanges([this] {
 				ShowModelFileDialog("Open Model", FileBrowserPurpose::Open, std::string(),
-				                    [this](const std::string& path) { LoadModel(path); });
+				                    [this](const std::string& path) {
+					                    if (!LoadModel(path))
+						                    ShowMessage("Could not open " +
+						                                LocalFileSystem::GetFileName(path) + ".");
+				                    });
 			});
 		}
 
 		void KV6EditorView::OpenSaveAsDialog(std::function<void()> after) {
 			const std::string name =
-			  filePath.empty() ? "untitled.kv6" : LocalFileSystem::GetFileName(filePath);
+			  filePath.empty() ? KV6UntitledFileName() : LocalFileSystem::GetFileName(filePath);
 			ShowModelFileDialog("Save As", FileBrowserPurpose::Save, name,
 			                    [this, after](const std::string& path) {
 				                    if (SaveDocument(path) && after)
@@ -819,14 +874,22 @@ namespace spades {
 			                    });
 		}
 
-		void KV6EditorView::OpenImportDialog() {
-			ShowModelFileDialog("Import Model", FileBrowserPurpose::Open, std::string(),
-			                    [this](const std::string& path) { ImportModel(path); });
+		void KV6EditorView::OpenInsertDialog() {
+			ShowModelFileDialog("Insert Model", FileBrowserPurpose::Open, std::string(),
+			                    [this](const std::string& path) { InsertModel(path); });
 		}
 
 		bool KV6EditorView::SaveDocument(const std::string& path) {
+			// The document only moves to the new path once the write has succeeded:
+			// a failed Save As leaves it where it was, rather than pointing it at a
+			// file it could not produce and offering to "save" there again.
+			const std::string previousPath = filePath;
 			filePath = path;
-			return Save();
+			if (Save())
+				return true;
+
+			filePath = previousPath;
+			return false;
 		}
 
 		// --- Escape -----------------------------------------------------------
@@ -1609,7 +1672,7 @@ namespace spades {
 			return false;
 		}
 
-		void KV6EditorView::ImportModel(const std::string& path) {
+		void KV6EditorView::InsertModel(const std::string& path) {
 			Handle<VoxelModel> imported(io->Load(path), false); // adopt (Load returns a ref)
 			if (!imported) {
 				SetStatus("Could not load " + path);
@@ -1653,7 +1716,7 @@ namespace spades {
 			IntVector3 anchor = MakeIntVector3(int(std::floor(aligned.x + 0.5F)),
 			                                   int(std::floor(aligned.y + 0.5F)),
 			                                   int(std::floor(aligned.z + 0.5F)));
-			StartPlacement(std::move(voxels), "Import", anchor);
+			StartPlacement(std::move(voxels), "Insert", anchor);
 		}
 
 		bool KV6EditorView::PlacementFromSelection(PendingPlacement& out) const {
@@ -2167,23 +2230,55 @@ namespace spades {
 			ApplyOriginRaw(pivot * -1.0F);
 		}
 
-		void KV6EditorView::BeginPivotEntry() {
-			Vector3 p = GetPivot();
-			char buf[64];
-			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
-			ui->GetEditorMenu()->OpenTextPrompt("Set pivot (x y z)", buf, [this](const std::string& s) {
-				std::string str = s;
+		namespace {
+			/** Reads "x y z", with commas allowed for decimal-comma keyboards. False
+			 *  when it is not three numbers. */
+			bool ParsePivot(const std::string& text, Vector3& out) {
+				std::string str = text;
 				for (char& c : str)
 					if (c == ',')
 						c = ' ';
 				float x, y, z;
-				if (std::sscanf(str.c_str(), "%f %f %f", &x, &y, &z) == 3) {
-					SetPivot(MakeVector3(x, y, z));
-					SetStatus("Pivot set");
-				} else {
-					SetStatus("Enter three numbers: x y z");
-				}
-			});
+				if (std::sscanf(str.c_str(), "%f %f %f", &x, &y, &z) != 3)
+					return false;
+				out = MakeVector3(x, y, z);
+				return true;
+			}
+		} // namespace
+
+		void KV6EditorView::BeginPivotEntry() {
+			Vector3 p = GetPivot();
+			char buf[64];
+			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
+
+			// The same prompt the rest of the game asks with, so a value typed here
+			// looks and behaves like a value typed anywhere else — and a bad one is
+			// reported in the prompt rather than after it has closed.
+			TextPromptScreen::Options options;
+			options.title = "Set pivot (x y z)";
+			options.initialText = buf;
+			options.validate = [](const std::string& text) {
+				Vector3 parsed;
+				return ParsePivot(text, parsed) ? std::string()
+				                                : std::string("Enter three numbers: x y z");
+			};
+
+			UIOverlayHost* overlay = ui->GetOverlay();
+			Handle<TextPromptScreen> prompt = Handle<TextPromptScreen>::New(
+			  &overlay->GetUIManager().GetRootElement(), std::move(options));
+			prompt->closed = [this](ui::UIElement& sender) {
+				TextPromptScreen* p = dynamic_cast<TextPromptScreen*>(&sender);
+				Vector3 parsed;
+				if (!p || !p->GetResult() || !ParsePivot(p->GetText(), parsed))
+					return;
+				SetPivot(parsed);
+				SetStatus("Pivot set");
+			};
+			ReleaseHeldInput();
+			// `Run` attaches the prompt and puts the caret in its field; the overlay
+			// only has to know it is there.
+			prompt->Run();
+			overlay->Show(prompt.GetPointerOrNull());
 		}
 
 		// Long world axes through the model's origin (pivot), which renders at
@@ -2867,12 +2962,16 @@ namespace spades {
 				// A shortcut changes the document or the placement under a drag
 				// in progress (a paste replaces it), so that drag is abandoned.
 				CancelToolInteraction();
-				if (EqualsIgnoringCase(key, "s")) Save();
+				// The document commands the menu offers, reachable without it: the
+				// menu is where they are found, not where they have to be used.
+				if (EqualsIgnoringCase(key, "s")) { if (shiftHeld) OpenSaveAsDialog(); else Save(); }
+				else if (EqualsIgnoringCase(key, "n")) NewDocument();
+				else if (EqualsIgnoringCase(key, "o")) OpenDocument();
 				else if (EqualsIgnoringCase(key, "c")) CopySelection();
 				else if (EqualsIgnoringCase(key, "x")) CutSelection();
 				else if (EqualsIgnoringCase(key, "v")) Paste();
 				else if (EqualsIgnoringCase(key, "z")) { if (shiftHeld) Redo(); else Undo(); }
-				else Redo(); // "y"
+				else if (EqualsIgnoringCase(key, "y")) Redo();
 				return;
 			}
 
@@ -2985,26 +3084,18 @@ namespace spades {
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
-			if (ui->GetOverlay()->IsActive()) {
-				ui->GetOverlay()->TextInputEvent(text);
-				return;
-			}
-			ui->GetEditorMenu()->TextInputEvent(text);
+			// Everything that takes typing — a name, a pivot, a folder — is a widget
+			// in the overlay; the menu itself only offers commands.
+			ui->GetOverlay()->TextInputEvent(text);
 		}
 
 		void KV6EditorView::TextEditingEvent(const std::string& text, int start, int len) {
 			ui->GetOverlay()->TextEditingEvent(text, start, len);
 		}
 
-		bool KV6EditorView::AcceptsTextInput() {
-			return ui->GetOverlay()->AcceptsTextInput() || ui->GetEditorMenu()->AcceptsTextInput();
-		}
+		bool KV6EditorView::AcceptsTextInput() { return ui->GetOverlay()->AcceptsTextInput(); }
 
-		AABB2 KV6EditorView::GetTextInputRect() {
-			if (ui->GetOverlay()->IsActive())
-				return ui->GetOverlay()->GetTextInputRect();
-			return ui->GetEditorMenu()->GetTextInputRect();
-		}
+		AABB2 KV6EditorView::GetTextInputRect() { return ui->GetOverlay()->GetTextInputRect(); }
 
 		void KV6EditorView::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();

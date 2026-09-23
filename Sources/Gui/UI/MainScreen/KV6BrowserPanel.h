@@ -23,6 +23,8 @@
 #include <string>
 
 #include <Gui/UI/Components/FileBrowser/FileBrowserView.h>
+#include <Gui/ModelFileTypes.h>
+#include <Gui/UI/KV6Editor/KV6FileDialog.h>
 #include <Gui/UI/KV6Editor/KV6ScreenHelper.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/Label.h>
