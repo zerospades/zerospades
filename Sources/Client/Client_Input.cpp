@@ -100,7 +100,7 @@ DEFINE_SPADES_SETTING(cg_keySpawnCorpse, "p");
 DEFINE_SPADES_SETTING(cg_keyPieMenu, "MiddleMouseButton");
 
 // Teamplay protocol extension
-DEFINE_SPADES_SETTING(cg_keyTeamOverlay, "Alt");
+DEFINE_SPADES_SETTING(cg_keyTeamOverlay, "z");
 DEFINE_SPADES_SETTING(cg_keyTeamPing, "q");
 
 SPADES_SETTING(cg_manualFocus);
