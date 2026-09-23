@@ -33,6 +33,7 @@ namespace spades {
 		  image(VK_NULL_HANDLE),
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
+		  attachmentView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -87,6 +88,7 @@ namespace spades {
 		  image(VK_NULL_HANDLE),
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
+		  attachmentView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -136,6 +138,7 @@ namespace spades {
 		  image(existingImage),
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
+		  attachmentView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -163,6 +166,10 @@ namespace spades {
 
 			if (imageView != VK_NULL_HANDLE) {
 				vkDestroyImageView(vkDevice, imageView, nullptr);
+			}
+
+			if (attachmentView != VK_NULL_HANDLE) {
+				vkDestroyImageView(vkDevice, attachmentView, nullptr);
 			}
 
 			if (ownsImage && image != VK_NULL_HANDLE) {
@@ -216,6 +223,45 @@ namespace spades {
 			VkResult result = vkCreateImageView(device->GetDevice(), &viewInfo, nullptr, &imageView);
 			if (result != VK_SUCCESS) {
 				SPRaise("Failed to create image view (error code: %d)", result);
+			}
+		}
+
+		void VulkanImage::CreateAttachmentImageView() {
+			// Only a combined depth+stencil image has anything to add: everywhere
+			// else the sampled view already covers the whole format, and
+			// GetAttachmentImageView() falls back to it.
+			VkImageAspectFlags aspectFlags;
+			switch (format) {
+				case VK_FORMAT_D16_UNORM_S8_UINT:
+				case VK_FORMAT_D24_UNORM_S8_UINT:
+				case VK_FORMAT_D32_SFLOAT_S8_UINT:
+					aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+					break;
+				default:
+					return;
+			}
+
+			if (attachmentView != VK_NULL_HANDLE) {
+				vkDestroyImageView(device->GetDevice(), attachmentView, nullptr);
+				attachmentView = VK_NULL_HANDLE;
+			}
+
+			VkImageViewCreateInfo viewInfo{};
+			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			viewInfo.image = image;
+			viewInfo.viewType =
+			    (arrayLayers > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+			viewInfo.format = format;
+			viewInfo.subresourceRange.aspectMask = aspectFlags;
+			viewInfo.subresourceRange.baseMipLevel = 0;
+			viewInfo.subresourceRange.levelCount = mipLevels;
+			viewInfo.subresourceRange.baseArrayLayer = 0;
+			viewInfo.subresourceRange.layerCount = arrayLayers;
+
+			VkResult result =
+			    vkCreateImageView(device->GetDevice(), &viewInfo, nullptr, &attachmentView);
+			if (result != VK_SUCCESS) {
+				SPRaise("Failed to create depth+stencil attachment view (error code: %d)", result);
 			}
 		}
 
