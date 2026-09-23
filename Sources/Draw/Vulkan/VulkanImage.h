@@ -36,6 +36,7 @@ namespace spades {
 			VkImage image;
 			VmaAllocation allocation;
 			VkImageView imageView;
+			VkImageView attachmentView;
 			VkSampler sampler;
 
 			uint32_t width;
@@ -73,6 +74,16 @@ namespace spades {
 
 			VkImage GetImage() const { return image; }
 			VkImageView GetImageView() const { return imageView; }
+
+			/**
+			 * The view to hang on a framebuffer. It differs from GetImageView() only
+			 * for a combined depth+stencil image, where the attachment has to cover
+			 * both aspects for stencil ops to reach the buffer, while a sampled view
+			 * may cover only one. Anything else returns the single view.
+			 */
+			VkImageView GetAttachmentImageView() const {
+				return attachmentView != VK_NULL_HANDLE ? attachmentView : imageView;
+			}
 			VkSampler GetSampler() const { return sampler; }
 			uint32_t GetWidth() const { return width; }
 			uint32_t GetHeight() const { return height; }
@@ -103,6 +114,13 @@ namespace spades {
 
 			// Create image view (called automatically in constructor)
 			void CreateImageView(VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT);
+
+			/**
+			 * Creates the extra full-aspect view GetAttachmentImageView() hands out.
+			 * Only a combined depth+stencil image needs it, and only because its
+			 * sampled view is depth-only; it is a no-op for every other format.
+			 */
+			void CreateAttachmentImageView();
 
 			// Create sampler (optional, for texture sampling)
 			void CreateSampler(VkFilter magFilter = VK_FILTER_LINEAR,
