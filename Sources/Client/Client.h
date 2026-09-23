@@ -560,6 +560,7 @@ namespace spades {
 			void DrawAlert();
 			void DrawDebugAim(Player&);
 			void DrawCompassBar(Player&);
+			void DrawReloadIndicator(const Vector4&);
 			void DrawStats();
 			void DrawNetGraph();
 			void DrawHitTestDebugger();

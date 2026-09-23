@@ -96,6 +96,7 @@ DEFINE_SPADES_SETTING(cg_hudCompassBar, "1");
 DEFINE_SPADES_SETTING(cg_hudPlayerCount, "0");
 DEFINE_SPADES_SETTING(cg_hudHealthBar, "1");
 DEFINE_SPADES_SETTING(cg_hudHealthAnimation, "1");
+DEFINE_SPADES_SETTING(cg_hudReloadIndicator, "1");
 DEFINE_SPADES_SETTING(cg_playerNames, "2");
 DEFINE_SPADES_SETTING(cg_playerNameX, "0");
 DEFINE_SPADES_SETTING(cg_playerNameY, "0");
@@ -1914,7 +1915,15 @@ namespace spades {
 			if (isToolWeapon) {
 				std::string msg = "";
 				if (awaitingReload) {
-					msg = _Tr("Client", "Reloading");
+					int reloadIndicatorMode = cg_hudReloadIndicator;
+					if (reloadIndicatorMode == 1) {
+						msg = _Tr("Client", "Reloading");
+					} else if (reloadIndicatorMode == 2) {
+						float prg = weapon.GetReloadProgress();
+						const float fadeStart = 0.9F;
+						float alpha = 1.0F - Clamp((prg - fadeStart) / (1.0F - fadeStart), 0.0F, 1.0F);
+						DrawReloadIndicator(MakeVector4(color.x, color.y, color.z, alpha));
+					}
 				} else if (stockNum > 0 && clipNum < (clipSize / 4)) {
 					msg = _Tr("Client", "Press [{0}] to Reload", TrKey(cg_keyReloadWeapon));
 				}
@@ -2447,6 +2456,60 @@ namespace spades {
 
 				// The blink runs on every surface the mark names, this one included.
 				drawBearing(marked.GetPosition(), ResolveMarkColor(marked, mark.color), 1.0F);
+			}
+		}
+
+		void Client::DrawReloadIndicator(const Vector4& col) {
+			SPADES_MARK_FUNCTION();
+
+			if (col.w <= 0.0F)
+				return;
+
+			float sw = renderer->ScreenWidth();
+			float sh = renderer->ScreenHeight();
+
+			const Vector2 center = MakeVector2(sw * 0.5F, sh * 0.5F);
+
+			const float radius = 16.0F;
+			const float thickness = 2.0F;
+			const float spinSpeed = (M_PI_F * 2.0F) * 0.75F;
+			const float sweepAngle = DEG2RAD(225.0F);
+			const float startAngle = fmodf(time * spinSpeed, M_PI_F * 2.0F);
+			const float fadeAngle = DEG2RAD(45.0F);
+
+			// draw background
+			renderer->SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.4F * col.w));
+			renderer->DrawOutlinedCircle(center, radius, thickness * 2.0F);
+
+			// draw outlined arc
+			const float inner = radius - (thickness * 0.5F);
+			const float outer = radius + (thickness * 0.5F);
+			const float sweepAbs = fabsf(sweepAngle);
+			const float fadeLength = std::min(sweepAbs, fadeAngle);
+
+			Vector2 prevInner = center + MakeVector2(cosf(startAngle), sinf(startAngle)) * inner;
+			Vector2 prevOuter = center + MakeVector2(cosf(startAngle), sinf(startAngle)) * outer;
+
+			const int segments = Clamp((int)radius, 16, 64);
+			for (int i = 1; i <= segments; i++) {
+				float t = (float)i / (float)segments;
+				float angle = startAngle + sweepAngle * t;
+
+				Vector2 curInner = center + MakeVector2(cosf(angle), sinf(angle)) * inner;
+				Vector2 curOuter = center + MakeVector2(cosf(angle), sinf(angle)) * outer;
+
+				float distFromStart = sweepAbs * t;
+				float segAlpha = (fadeLength > 0.0F)
+					? Clamp(distFromStart / fadeLength, 0.0F, 1.0F) : 1.0F;
+				segAlpha *= col.w;
+
+				renderer->SetColorAlphaPremultiplied(MakeVector4(col.x * segAlpha, col.y * segAlpha,
+																col.z * segAlpha, segAlpha));
+				renderer->DrawFilledTriangle(prevInner, prevOuter, curInner);
+				renderer->DrawFilledTriangle(prevOuter, curOuter, curInner);
+
+				prevInner = curInner;
+				prevOuter = curOuter;
 			}
 		}
 
