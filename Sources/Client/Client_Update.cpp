@@ -1934,8 +1934,9 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			if (source.GetSquaredLength() < 0.01F) {
+				// should this be handled on the server side?
 				stmp::optional<Player&> p = world->GetLocalPlayer();
-				if (p && p->GetWade())
+				if (p && p->GetWade() && type != HurtTypeFall)
 					ShowAlert(_Tr("Client", "You are taking damage. Find solid ground!"), AlertType::Warning, 1.5F, true);
 				return;
 			}
