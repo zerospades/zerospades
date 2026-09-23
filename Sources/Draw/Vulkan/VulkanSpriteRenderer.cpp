@@ -37,6 +37,7 @@
 #include <fstream>
 
 SPADES_SETTING(r_softParticles);
+SPADES_SETTING(r_hdr);
 
 namespace {
 	// Push-constant block shared by Sprite.vert / .frag (non-soft particles).
@@ -517,7 +518,16 @@ namespace spades {
 
 			const Matrix4& projViewMatrix = renderer.GetProjectionViewMatrix();
 			Vector3 fogCol = renderer.GetFogColor();
-			fogCol *= fogCol; // linearize
+			// GL leaves the sprite fog colour un-linearized in both modes
+			// (GLSpriteRenderer has `//fogCol *= fogCol;` commented out, with a
+			// FIXME in Sprite.vs about not being able to gamma-correct an
+			// alpha-blended sprite). Its non-HDR framebuffer is gamma-space, so
+			// the raw value is right there; under HDR it mixes toward a fog
+			// colour that is too bright, and that is what the player sees.
+			// Vulkan's offscreen target is linear in both modes, so reproducing
+			// GL's output means linearizing only when GL's buffer was gamma.
+			if (!(int)r_hdr)
+				fogCol *= fogCol;
 			float fogDist = renderer.GetFogDistance();
 			const client::SceneDefinition& sceneDef = renderer.GetSceneDef();
 
