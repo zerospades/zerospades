@@ -866,8 +866,12 @@ namespace spades {
 				               1, &depthCopyRegion);
 
 			}
-			// Transition mirror images to SHADER_READ_ONLY for water shader sampling
-			VkImageMemoryBarrier postBarriers[2]{};
+			// Transition mirror images to SHADER_READ_ONLY for water shader sampling,
+			// and put the scene back where it was. Leaving the source in
+			// TRANSFER_SRC_OPTIMAL made the next copy's declared old layout a lie, so
+			// its contents were undefined from there on -- which at r_water == 1 threw
+			// away the scene depth and the x-ray world marks the water pass loads.
+			VkImageMemoryBarrier postBarriers[4]{};
 			postBarriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			postBarriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			postBarriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -888,10 +892,28 @@ namespace spades {
 			postBarriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 			postBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+			// Exactly the inverse of srcBarriers above.
+			postBarriers[2] = srcBarriers[0];
+			postBarriers[2].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			postBarriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			postBarriers[2].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			postBarriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			postBarriers[3] = srcBarriers[1];
+			postBarriers[3].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			postBarriers[3].newLayout = useMSAA
+			                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+			                                : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			postBarriers[3].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			postBarriers[3].dstAccessMask = useMSAA
+			                                    ? VK_ACCESS_SHADER_READ_BIT
+			                                    : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+			                                          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
 			vkCmdPipelineBarrier(commandBuffer,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			0, 0, nullptr, 0, nullptr, 2, postBarriers);
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+			0, 0, nullptr, 0, nullptr, 4, postBarriers);
 			}
 
 		void VulkanFramebufferManager::CopySceneForWaterSampling(VkCommandBuffer commandBuffer) {
