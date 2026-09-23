@@ -135,15 +135,27 @@ namespace spades {
 			// Removing ourselves drops the parent's reference, which may be the last
 			// one: stay alive while the `closed` handlers run.
 			Handle<TextPromptScreen> keepAlive(this);
-			owner->enable = true;
+			if (disabledOwner)
+				owner->enable = true;
 			GetParent()->RemoveChild(this);
 			if (closed)
 				closed(*this);
 		}
 
 		void TextPromptScreen::Run() {
-			owner->enable = false;
-			owner->GetParent()->AddChild(this);
+			// The prompt sits next to its owner, which it disables while it is up.
+			// An owner with no parent (a manager's root element) hosts the prompt
+			// directly and must stay enabled: a disabled root swallows the mouse,
+			// leaving the prompt unclickable.
+			if (UIElement* parent = owner->GetParent()) {
+				owner->enable = false;
+				disabledOwner = true;
+				parent->AddChild(this);
+			} else {
+				owner->AddChild(this);
+			}
+			// Typing is the whole point of a prompt, so it starts focused wherever
+			// it was hosted.
 			GetManager().SetActiveElement(field);
 		}
 

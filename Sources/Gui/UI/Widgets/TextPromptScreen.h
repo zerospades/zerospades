@@ -73,6 +73,7 @@ namespace spades {
 
 		private:
 			ui::UIElement* owner;            // weak
+			bool disabledOwner = false;      // false: the owner hosts the prompt itself
 			ui::Field* field = nullptr;      // weak; owned as a child
 			ui::Label* errorLabel = nullptr; // weak; owned as a child
 			Validator validate;

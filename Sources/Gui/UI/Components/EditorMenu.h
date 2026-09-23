@@ -66,18 +66,11 @@ namespace spades {
                       client::IAudioDevice* audioDevice);
 
             // IModalMenu implementation
-            bool IsActive() const override { return menuOpen || promptOpen; }
+            bool IsActive() const override { return menuOpen; }
             void Open() override;
             void Close() override;
             bool KeyEvent(const std::string& key, bool down) override;
-            void TextInputEvent(const std::string& text) override;
-            bool AcceptsTextInput() const override { return promptOpen; }
             void Draw() override;
-
-            // EditorMenu-specific
-            void OpenTextPrompt(const std::string& title, const std::string& initial,
-                                std::function<void(const std::string&)> onSubmit);
-            AABB2 GetTextInputRect() const;
 
         private:
             IEditorMenuHost& host;
@@ -91,16 +84,9 @@ namespace spades {
             int prevSelectedItem = -1;
             std::vector<EditorMenuItem> items; // "Resume" plus the host's commands
 
-            bool promptOpen = false;
-            std::string promptTitle;
-            std::string promptText;
-            std::function<void(const std::string&)> promptSubmit;
-
             void RebuildItems();
             void Activate(int index);
             void DrawMenu(float sw, float sh);
-            void DrawPrompt(float sw, float sh);
-            void SubmitPrompt();
             int MenuButtonAt(const Vector2& p) const;
         };
     } // namespace gui
