@@ -32,6 +32,7 @@
 #include "VulkanMapShadowRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanGlareRenderer.h"
+#include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanImageManager.h"
 #include "VulkanImage.h"
@@ -2030,7 +2031,7 @@ namespace spades {
 			mirrorBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			mirrorBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			mirrorBarriers[1].image = mirrorDepth->GetImage();
-			mirrorBarriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+			mirrorBarriers[1].subresourceRange.aspectMask = DepthStencilBarrierAspects(mirrorDepth->GetFormat());
 			mirrorBarriers[1].subresourceRange.baseMipLevel = 0;
 			mirrorBarriers[1].subresourceRange.levelCount = 1;
 			mirrorBarriers[1].subresourceRange.baseArrayLayer = 0;
@@ -2173,19 +2174,16 @@ namespace spades {
 			                             framebufferManager->GetMirrorColorImage();
 
 			if (!willRenderWater) {
+				// Ahead of the transparent overlays, as in GL, so smoke and tracers
+				// stay on top of a reveal rather than under it.
+				RenderXRayPass(commandBuffer);
+
 				if (!useSoftParticles && spriteRenderer)
 					spriteRenderer->Render(commandBuffer, imageIndex);
 				if (longSpriteRenderer)
 					longSpriteRenderer->Render(commandBuffer, imageIndex);
 				RenderDebugLines(commandBuffer);
 				debugLines.clear();
-			}
-
-			// Clear for next frame. lights survives until after the
-			// post-process chain: the lens flare filter reads it for
-			// r_lensFlareDynamic.
-			if (modelRenderer) {
-				modelRenderer->Clear();
 			}
 
 			// End offscreen render pass (scene without water is now complete)
@@ -2211,7 +2209,7 @@ namespace spades {
 				dRead.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				dRead.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				dRead.image = offscreenDepth->GetImage();
-				dRead.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+				dRead.subresourceRange = {DepthStencilBarrierAspects(offscreenDepth->GetFormat()), 0, 1, 0, 1};
 				dRead.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 				dRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 				vkCmdPipelineBarrier(commandBuffer,
@@ -2250,7 +2248,7 @@ namespace spades {
 				barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				barriers[1].image = offscreenDepth->GetImage();
-				barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				barriers[1].subresourceRange.aspectMask = DepthStencilBarrierAspects(offscreenDepth->GetFormat());
 				barriers[1].subresourceRange.baseMipLevel = 0;
 				barriers[1].subresourceRange.levelCount = 1;
 				barriers[1].subresourceRange.baseArrayLayer = 0;
@@ -2324,7 +2322,7 @@ namespace spades {
 				backToAttachment[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				backToAttachment[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				backToAttachment[1].image = offscreenDepth->GetImage();
-				backToAttachment[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				backToAttachment[1].subresourceRange.aspectMask = DepthStencilBarrierAspects(offscreenDepth->GetFormat());
 				backToAttachment[1].subresourceRange.baseMipLevel = 0;
 				backToAttachment[1].subresourceRange.levelCount = 1;
 				backToAttachment[1].subresourceRange.baseArrayLayer = 0;
@@ -2370,6 +2368,10 @@ namespace spades {
 					tsc.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
 					vkCmdSetScissor(commandBuffer, 0, 1, &tsc);
 
+					// Over the finished water and ahead of the transparent overlays,
+					// which is where GL runs its x-ray pass too.
+					RenderXRayPass(commandBuffer);
+
 					if (!useSoftParticles && spriteRenderer)
 						spriteRenderer->Render(commandBuffer, imageIndex);
 					if (longSpriteRenderer)
@@ -2408,7 +2410,7 @@ namespace spades {
 				waterPostBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				waterPostBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				waterPostBarriers[1].image = offscreenDepth->GetImage();
-				waterPostBarriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				waterPostBarriers[1].subresourceRange.aspectMask = DepthStencilBarrierAspects(offscreenDepth->GetFormat());
 				waterPostBarriers[1].subresourceRange.baseMipLevel = 0;
 				waterPostBarriers[1].subresourceRange.levelCount = 1;
 				waterPostBarriers[1].subresourceRange.baseArrayLayer = 0;
@@ -2420,6 +2422,15 @@ namespace spades {
 					VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 					0, 0, nullptr, 0, nullptr, msaaScene ? 2u : 1u, waterPostBarriers);
+			}
+
+			// Clear for next frame, now that both of RenderXRayPass's call sites are
+			// behind us — like the deferred transparent stage, the x-ray pass needs the
+			// model list to survive past the offscreen pass when water is enabled.
+			// `lights` survives further still: the lens flare filter reads it for
+			// r_lensFlareDynamic after the post-process chain.
+			if (modelRenderer) {
+				modelRenderer->Clear();
 			}
 
 			// Soft particles (smoke/blood) are drawn here, after water, so the water
@@ -3493,6 +3504,19 @@ namespace spades {
 				vkDestroyPipelineLayout(vkDevice, debugLinePipelineLayout, nullptr);
 				debugLinePipelineLayout = VK_NULL_HANDLE;
 			}
+		}
+
+		void VulkanRenderer::RenderXRayPass(VkCommandBuffer commandBuffer) {
+			SPADES_MARK_FUNCTION();
+
+			// Revealing a player has no meaning in a mirror's reflection of them, and
+			// the whole pass is skipped on frames where nothing asked to be revealed
+			// (sceneDef.allowPlayerXRay), so the stencil marks the scene leaves behind
+			// cost nothing when the feature is off.
+			if (!sceneDef.allowPlayerXRay || IsRenderingMirror() || !modelRenderer)
+				return;
+
+			modelRenderer->RenderXRayPass(commandBuffer);
 		}
 
 		void VulkanRenderer::RenderDebugLines(VkCommandBuffer commandBuffer) {
