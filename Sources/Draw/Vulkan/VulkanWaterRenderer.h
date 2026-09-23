@@ -107,7 +107,12 @@ namespace spades {
 			// Mesh
 			Handle<VulkanBuffer> vertexBuffer;
 			Handle<VulkanBuffer> indexBuffer;
-			unsigned int numIndices;
+			// Must be initialised here: the constructor returns early when the
+			// renderer is built before a map is loaded, and Realize() only
+			// builds the mesh while this is 0. A leftover non-zero value skips
+			// the build, then RenderSunlightPass gets past its own == 0 guard
+			// and dereferences the null vertexBuffer.
+			unsigned int numIndices = 0;
 
 			// Water color texture (map colors)
 			Handle<VulkanImage> textureImage;
