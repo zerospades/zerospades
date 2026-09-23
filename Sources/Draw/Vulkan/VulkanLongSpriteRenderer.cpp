@@ -24,6 +24,7 @@
 #include "VulkanImage.h"
 #include "VulkanBuffer.h"
 #include "VulkanShader.h"
+#include "../SW/SWFeatureLevel.h" // for fastRcp
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -315,6 +316,22 @@ namespace spades {
 			spr.start = p1;
 			spr.end = p2;
 			spr.radius = rad;
+
+			// Same linearization as GLLongSpriteRenderer::Add; see the note in
+			// VulkanSpriteRenderer::Add for why it is unconditional here.
+			if (color.x > color.w || color.y > color.w || color.z > color.w) {
+				// emissive material
+				color.x *= color.x;
+				color.y *= color.y;
+				color.z *= color.z;
+			} else {
+				// scattering/absorptive material
+				float rcp = fastRcp(color.w + 0.01F);
+				color.x *= color.x * rcp;
+				color.y *= color.y * rcp;
+				color.z *= color.z * rcp;
+			}
+
 			spr.color = color;
 			sprites.push_back(spr);
 		}
