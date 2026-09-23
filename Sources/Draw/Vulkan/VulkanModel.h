@@ -58,6 +58,12 @@ namespace spades {
 			                                    std::vector<client::ModelRenderParam> params,
 			                                    std::vector<void*> lights) = 0;
 
+			/** Renders the instances flagged `xray` again in their x-ray colour. The
+			 * pipeline keeps only the fragments the world hides; see
+			 * VulkanSceneStencil.h. */
+			virtual void RenderXRayPass(VkCommandBuffer commandBuffer,
+			                            std::vector<client::ModelRenderParam> params) = 0;
+
 		private:
 			// members used when rendering by VulkanModelRenderer
 			int renderId;

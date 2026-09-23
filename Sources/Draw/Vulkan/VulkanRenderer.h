@@ -254,6 +254,13 @@ namespace spades {
 			void DestroyDebugLinePipeline();
 			void RenderDebugLines(VkCommandBuffer commandBuffer);
 
+			/** Draws every model flagged `xray` again where the world hides it, in the
+			 * colour the model asked for. The world marks the stencil buffer as it is
+			 * drawn, which is what tells this pass where "behind the world" is. Must be
+			 * called inside a render pass that still has the scene's colour and
+			 * depth+stencil attached, and before the model list is cleared. */
+			void RenderXRayPass(VkCommandBuffer commandBuffer);
+
 			// Deferred deletion queue management
 			void ProcessDeferredDeletions();
 			void FlushPendingUploads();

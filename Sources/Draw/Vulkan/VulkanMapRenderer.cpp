@@ -22,6 +22,7 @@
 #include "VulkanSpirvCache.h"
 #include "VulkanMapChunk.h"
 #include "VulkanRenderer.h"
+#include "VulkanSceneStencil.h"
 #include "VulkanShadowMapRenderer.h"
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
@@ -616,14 +617,18 @@ namespace spades {
 			// opaque, so plain multisample coverage antialiases its silhouettes.
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
-			// Depth stencil
+			// Depth stencil. The world stamps its own bit as it is drawn so the x-ray
+			// pass can tell "behind the world" from "behind another model"; the model
+			// passes clear the same bit again where they land in front.
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
 			depthStencil.depthWriteEnable = VK_TRUE;
 			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
-			depthStencil.stencilTestEnable = VK_FALSE;
+			depthStencil.stencilTestEnable = VK_TRUE;
+			depthStencil.front = MakeWorldStampStencilOp(kStencilBitWorld);
+			depthStencil.back = depthStencil.front;
 
 			// Color blending
 			VkPipelineColorBlendAttachmentState colorBlendAttachment{};

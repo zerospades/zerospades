@@ -94,6 +94,15 @@ namespace spades {
 			}
 		}
 
+		void VulkanModelRenderer::RenderXRayPass(VkCommandBuffer commandBuffer) {
+			SPADES_MARK_FUNCTION();
+
+			for (const auto& m : models) {
+				VulkanModel* model = m.model;
+				model->RenderXRayPass(commandBuffer, m.params);
+			}
+		}
+
 		void VulkanModelRenderer::Clear() {
 			SPADES_MARK_FUNCTION();
 
