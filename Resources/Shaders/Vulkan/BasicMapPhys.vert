@@ -79,8 +79,10 @@ void main() {
 
 	// Shadow coordinates — sample at the face center ("fixed position",
 	// matches GL fixedPositionAttribute) so voxel-boundary vertices don't
-	// leak the neighboring column's shadow value (lit sliver on face edges).
-	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
+	// leak the neighboring column's shadow value (lit sliver on face edges),
+	// lifted off the face by normal * 0.1 as GL's PrepareShadowForMap does.
+	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin
+	            + normalFloat * 0.1;
 	shadowCoord = vec3(wPos.x / 512.0, (wPos.y - wPos.z) / 512.0, wPos.z / 255.0);
 
 	// Fog
