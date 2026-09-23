@@ -39,7 +39,7 @@ layout(set = 1, binding = 0) uniform ShadowSampling {
 
 layout(location = 0) in uvec3 positionAttribute;
 layout(location = 1) in uvec2 aoCoordAttribute;
-layout(location = 2) in uvec3 colorAttribute;  // colorRed, colorGreen, colorBlue
+layout(location = 2) in uvec4 colorAttribute;  // colorRed, colorGreen, colorBlue, shading
 layout(location = 3) in ivec3 normalAttribute;
 layout(location = 4) in ivec3 fixedPositionAttribute; // face-center * 2 (chunk-local)
 
@@ -70,13 +70,17 @@ void main() {
 	// Convert int8 normal to float and normalize
 	vec3 normalFloat = normalize(vec3(normalAttribute));
 
-	// Sun direction from the renderer (single source of truth; matches the
-	// shadow projection and lens flare).
-	vec3 sunDir = normalize(pushConstants.sunDirection);
-	float lambert = max(dot(normalFloat, sunDir), 0.0);
+	// Sun response is the per-face "shading" byte the chunk builder bakes into
+	// the vertex (0 for the +Z/+Y/±X faces, 220 for -Z, 255 for -Y), NOT a
+	// Lambert dot product: GL's BasicBlock.vs has its own lambert line
+	// commented out and passes colorAttribute.w straight through. Computing
+	// dot(normal, sunDirection) here gives every lit face a different
+	// response from GL. (BasicMapPhys.vert does use the dot product, because
+	// GL's BasicBlockPhys.vs does too.)
+	float lambert = float(colorAttribute.w) / 255.0;
 
 	// Convert color from uint8 [0,255] to float [0,1] and linearize
-	vec3 vertexColor = vec3(colorAttribute) / 255.0;
+	vec3 vertexColor = vec3(colorAttribute.xyz) / 255.0;
 	vertexColor *= vertexColor;
 
 	// Ambient color matching GL GLShadowShader: fog * 0.5 with a minimum
