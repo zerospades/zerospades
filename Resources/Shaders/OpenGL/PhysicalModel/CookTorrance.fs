@@ -21,7 +21,7 @@
 float GGXDistribution(float m, float dotNH) {
 	float m2 = m * m;
 	float t = dotNH * dotNH * (m2 - 1.0) + 1.0;
-	return m2 / max(3.141592653 * t * t, 0.00001);
+	return m2 / (3.141592653 * t * t);
 }
 
 // http://en.wikipedia.org/wiki/Specular_highlight#Cook.E2.80.93Torrance_model
@@ -32,7 +32,7 @@ float CookTorrance(vec3 eyeVec, vec3 lightVec, vec3 normal) {
 
 	float dotNL = max(dot(normal, lightVec), 0.0);
 	float dotNV = max(dot(normal, eyeVec), 0.0);
-	float dotNH = max(dot(normal, halfVec), 0.0);
+	float dotNH = max(dot(normal, halfVec), 0.00001);
 	float dotVH = max(dot(eyeVec, halfVec), 0.0);
 
 	// distribution term
