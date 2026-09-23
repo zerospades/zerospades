@@ -980,7 +980,12 @@ namespace spades {
 		}
 
 		Vector3 VulkanRenderer::GetFogColorForSolidPass() {
-			if (r_fogShadow && shadowMapRenderer)
+			// The fog post-process re-adds the in-scattered light, so the solid
+			// pass fades to black instead of the fog colour — but only when the
+			// heightmap shadow that pass samples exists. GL tests
+			// mapShadowRenderer here; testing shadowMapRenderer (the model
+			// cascades) is a different object and gates on the wrong thing.
+			if (r_fogShadow && mapShadowRenderer)
 				return MakeVector3(0, 0, 0);
 			else
 				return fogColor;
