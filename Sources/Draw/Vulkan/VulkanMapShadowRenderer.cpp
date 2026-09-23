@@ -47,8 +47,7 @@ namespace spades {
 
 		VulkanMapShadowRenderer::VulkanMapShadowRenderer(VulkanRenderer& renderer,
 		                                                 client::GameMap* map)
-		    : renderer(renderer), device(renderer.GetDevice()), map(map),
-		      needsFullUpload(true) {
+		    : renderer(renderer), device(renderer.GetDevice()), map(map) {
 			SPADES_MARK_FUNCTION();
 
 			w = map->Width();
@@ -166,8 +165,6 @@ namespace spades {
 			vkQueueWaitIdle(device->GetGraphicsQueue());
 
 			vkFreeCommandBuffers(device->GetDevice(), device->GetCommandPool(), 1, &commandBuffer);
-
-			needsFullUpload = false;
 
 			SPLog("Map shadow renderer created (%dx%d)", w, h);
 		}
