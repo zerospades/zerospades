@@ -30,8 +30,11 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/Settings.h>
 #include <algorithm>
 #include <cstring>
+
+SPADES_SETTING(r_hdr);
 
 namespace spades {
 	namespace draw {
@@ -430,7 +433,11 @@ namespace spades {
 
 			const Matrix4& projViewMatrix = renderer.GetProjectionViewMatrix();
 			Vector3 fogCol = renderer.GetFogColor();
-			fogCol *= fogCol; // linearize
+			// See the note in VulkanSpriteRenderer::Flush: GL never linearizes
+			// the sprite fog colour, so only the non-HDR (gamma buffer) case
+			// needs it here.
+			if (!(int)r_hdr)
+				fogCol *= fogCol;
 			float fogDist = renderer.GetFogDistance();
 			const client::SceneDefinition& sceneDef = renderer.GetSceneDef();
 
