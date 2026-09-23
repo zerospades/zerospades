@@ -101,7 +101,12 @@ void main() {
 	// boundaries; sampling the map-shadow texture there picks the neighboring
 	// column and leaks a lit sliver along face edges (e.g. top of north faces
 	// seen from the south). The face center is safely inside the voxel.
-	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
+	// GL's PrepareShadowForMap (Shadow/Common.vs) samples at
+	// `centerCoord + normal * 0.1`, lifting the sample just off the face so a
+	// surface never tests against its own column height. Omitting it biases
+	// every face toward shadowed.
+	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin
+	            + normalFloat * 0.1;
 	shadowCoord = vec3(wPos.x / 512.0, (wPos.y - wPos.z) / 512.0, wPos.z / 255.0);
 
 	// Fog density based on horizontal distance (matching SW/GL implementation)
