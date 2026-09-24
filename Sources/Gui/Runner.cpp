@@ -24,6 +24,7 @@
 #include <Core/Exception.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
+#include <cstdio>
 
 DEFINE_SPADES_SETTING(r_videoWidth, "800");
 DEFINE_SPADES_SETTING(r_videoHeight, "600");
@@ -61,8 +62,7 @@ namespace spades {
 				if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
 				                             _Tr("Main", "ZeroSpades Fatal Error").c_str(),
 				                             msg.c_str(), nullptr)) {
-					// showing dialog failed.
-					// TODO: do appropriate action
+					fprintf(stderr, "[Fatal] %s\n", err.c_str());
 				}
 			}
 		}

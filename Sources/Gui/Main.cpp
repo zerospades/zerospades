@@ -1060,8 +1060,7 @@ int main(int argc, char** argv) {
 		SDL_InitSubSystem(SDL_INIT_VIDEO);
 		if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
 			_Tr("Main", "ZeroSpades Fatal Error").c_str(), msg.c_str(), nullptr)) {
-			// showing dialog failed.
-			// TODO: do appropriate action
+			fprintf(stderr, "[Fatal] %s\n", ex.what());
 		}
 	}
 

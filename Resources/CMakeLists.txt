@@ -42,13 +42,82 @@ if(ZEROSPADES_RESOURCES)
 	file(GLOB_RECURSE SCRIPT_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Scripts/*.as)
 	file(GLOB_RECURSE SHADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.fs
 		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.program
-		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vs)
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vs
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vert
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.frag
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vk.vs
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vk.fs
+		${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.vk.program)
 	file(GLOB_RECURSE SOUND_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Sounds/*)
 	file(GLOB_RECURSE TEXTURE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Textures/*)
+
+	# Compile Vulkan GLSL shaders to SPIR-V at build time
+	if(USE_VULKAN AND GLSLANG_VALIDATOR)
+		# Collect all standalone Vulkan shader source files
+		file(GLOB_RECURSE VK_VERT_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.vert)
+		file(GLOB_RECURSE VK_FRAG_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.frag)
+		file(GLOB_RECURSE VK_VS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.vk.vs)
+		file(GLOB_RECURSE VK_FS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.vk.fs)
+
+		# Exclude non-standalone shader files (helper/include files without #version/main())
+		list(FILTER VK_VS_FILES EXCLUDE REGEX "Shadow/Common\\.vk\\.vs$")
+		list(FILTER VK_FS_FILES EXCLUDE REGEX "Shadow/Common\\.vk\\.fs$")
+
+		set(COMPILED_SPIRV_FILES "")
+
+		# Compile .vert files (stage auto-detected by glslangValidator)
+		foreach(SHADER_SRC ${VK_VERT_FILES})
+			set(SHADER_SPV "${SHADER_SRC}.spv")
+			add_custom_command(
+				OUTPUT ${SHADER_SPV}
+				COMMAND ${GLSLANG_VALIDATOR} -V -o ${SHADER_SPV} ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC}
+				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
+			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
+		endforeach()
+
+		# Compile .frag files (stage auto-detected by glslangValidator)
+		foreach(SHADER_SRC ${VK_FRAG_FILES})
+			set(SHADER_SPV "${SHADER_SRC}.spv")
+			add_custom_command(
+				OUTPUT ${SHADER_SPV}
+				COMMAND ${GLSLANG_VALIDATOR} -V -o ${SHADER_SPV} ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC}
+				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
+			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
+		endforeach()
+
+		# Compile .vk.vs files (need explicit -S vert for non-standard extension)
+		foreach(SHADER_SRC ${VK_VS_FILES})
+			set(SHADER_SPV "${SHADER_SRC}.spv")
+			add_custom_command(
+				OUTPUT ${SHADER_SPV}
+				COMMAND ${GLSLANG_VALIDATOR} -V -S vert -o ${SHADER_SPV} ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC}
+				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
+			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
+		endforeach()
+
+		# Compile .vk.fs files (need explicit -S frag for non-standard extension)
+		foreach(SHADER_SRC ${VK_FS_FILES})
+			set(SHADER_SPV "${SHADER_SRC}.spv")
+			add_custom_command(
+				OUTPUT ${SHADER_SPV}
+				COMMAND ${GLSLANG_VALIDATOR} -V -S frag -o ${SHADER_SPV} ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC}
+				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
+			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
+		endforeach()
+
+		add_custom_target(compile_vulkan_shaders ALL
+			DEPENDS ${COMPILED_SPIRV_FILES}
+			COMMENT "Compiling Vulkan shaders to SPIR-V")
+	endif()
+
 	set(PAK_IN_FILES
 		${GFX_FILES} ${LICENSE_FILES} ${LOCALE_FILES} ${MAP_FILES}
 		${MODEL_FILES} ${SCRIPT_FILES} ${SHADER_FILES} ${SOUND_FILES}
-		${TEXTURE_FILES})
+		${TEXTURE_FILES} ${COMPILED_SPIRV_FILES})
 
 	source_group("Gfx" FILES ${GFX_FILES})
 	source_group("License Texts" FILES ${LICENSE_FILES})
@@ -64,6 +133,11 @@ if(ZEROSPADES_RESOURCES)
 		COMMENT "Building assets"
 		SOURCES ${PAK_IN_FILES}
 		DEPENDS ${COMPILED_PAK_FILES})
+
+	# Ensure shaders are compiled before pak files are built
+	if(USE_VULKAN AND TARGET compile_vulkan_shaders)
+		add_dependencies(ZeroSpades_Resources compile_vulkan_shaders)
+	endif()
 
 	if(WIN32)
 		add_custom_command(
