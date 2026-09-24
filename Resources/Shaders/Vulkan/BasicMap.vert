@@ -108,9 +108,9 @@ void main() {
 	// GL's PrepareShadowForMap (Shadow/Common.vs) samples at
 	// `centerCoord + normal * 0.1`, lifting the sample just off the face so a
 	// surface never tests against its own column height. Omitting it biases
-	// every face toward shadowed. The lift applies to the SHADOW lookup only —
-	// GL hands PrepareForMapRadiosityForMap the unbiased centre — so keep it
-	// out of wPos, which the AO and radiosity coords below also use.
+	// every face toward shadowed. This 0.1 lift is the SHADOW lookup's own —
+	// keep it out of wPos, which the AO and radiosity coords below also use,
+	// because GL derives those from a different base entirely (see there).
 	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
 	vec3 shadowPos = wPos + normalFloat * 0.1;
 	shadowCoord = vec3(shadowPos.x / 512.0, (shadowPos.y - shadowPos.z) / 512.0,
@@ -125,6 +125,18 @@ void main() {
 	// AO 3D-texture coords. World position with z+1 (the 0-th slice is the
 	// "below ground" guard plane), divided by texture extent. Map dimensions
 	// are 512x512x64 in this game, so the texture is 512x512x65.
+	//
+	// KNOWN DIVERGENCE from GL's PrepareForMapRadiosityForMap
+	// (Shadow/MapRadiosity.vs): GL builds this from the raw VERTEX position
+	// and adds a `normal * 0.5` lift, so the fetch lands inside the air cell
+	// rather than on the face; it then runs a weightSum fallback over three
+	// neighbouring fetches to hide the leak at voxel corners. This samples the
+	// face centre with no lift and no fallback, so the ambient-shadow fetch
+	// straddles the boundary between the air cell and the solid behind it.
+	// The ambTexVal.x / max(ambTexVal.y, 0.25) ratio in BasicMap.frag hides
+	// most of that, but it stops self-normalising once the weight falls under
+	// the 0.25 clamp, which is where concave geometry sits. Only affects the
+	// radiosity branch. Unresolved — do not "fix" it without an A/B capture.
 	aoCoord = (wPos + vec3(0.0, 0.0, 1.0)) / vec3(512.0, 512.0, 65.0);
 
 	// 2D AO atlas coords (matches GL BasicBlock.vs). The atlas is 256x256 with
@@ -132,7 +144,8 @@ void main() {
 	// offset on each axis (range 0..255). +0.5 centres the sample.
 	ambientOcclusionCoord = (vec2(aoCoordAttribute) + 0.5) * (1.0 / 256.0);
 
-	// Radiosity 3D-texture coords (matches GL MapRadiosity.vs).
+	// Radiosity 3D-texture coords. GL uses the raw vertex position here, not
+	// the face centre — see the note on aoCoord above.
 	radiosityTextureCoord = wPos / vec3(512.0, 512.0, 64.0);
 	normalVarying = normalFloat;
 
