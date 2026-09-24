@@ -24,15 +24,24 @@
 
 namespace spades {
 	namespace gui {
-		// Set the model pivot: a draggable gizmo (steps down to 0.1), and Set... to
-		// type exact values. The sub-toolbar shows the live pivot position.
+		// Set the model pivot: a draggable gizmo (steps down to 0.1), and an X, Y
+		// and Z box on the sub-toolbar, which show where the pivot is and are
+		// typed into or stepped to move it.
 		class PivotTool : public GizmoTool {
 		public:
 			PivotTool();
 			const char* Label() const override { return "Pivot"; }
-			// Refresh the readout from the live pivot.
+			// Refresh the boxes from the live pivot.
 			void UpdateOptions(IEditorContext&) override;
-			void OnAction(IEditorContext&, const std::string& id) override;
+			void OnOptionNumberChanged(IEditorContext&, const std::string& id, float value,
+			                           bool committed) override;
+
+		private:
+			// The pivot is float-valued, and its gizmo steps down to 0.1, so the
+			// boxes are written to match what the finest drag can produce.
+			static constexpr int kDecimals = 1;
+			// Which axis `id` names, or -1 if it names none of them.
+			static int AxisOf(const std::string& id);
 		};
 	} // namespace gui
 } // namespace spades

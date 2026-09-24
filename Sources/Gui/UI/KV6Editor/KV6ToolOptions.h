@@ -34,7 +34,12 @@ namespace spades {
 			enum class Type {
 				Bool,  // a toggle button; value lives in `bvalue`
 				Label, // a read-only text readout; the tool updates `label` each frame
-				Action // a one-shot button; clicking calls EditorTool::OnAction(id)
+				Action, // a one-shot button; clicking calls EditorTool::OnAction(id)
+				// An editable number: a box that can be typed into, with arrows
+				// stepping it by `step`. Reported through
+				// EditorTool::OnOptionNumberChanged, while it is being typed and
+				// again once the user has settled on it.
+				Number
 			};
 
 			std::string id;    // stable key, e.g. "mirror.x"
@@ -43,6 +48,9 @@ namespace spades {
 			Type type = Type::Bool;
 			bool bvalue = false;     // Bool value
 			bool enabled = true;     // false greys a Bool or Action out (nothing to act on)
+			float value = 0.0F;      // Number value; the tool refreshes it via SetNumber
+			float step = 1.0F;       // what one press of a Number's arrows adds
+			int decimals = 1;        // decimal places a Number is written with
 		};
 
 		// An ordered list of a tool's options.
@@ -68,6 +76,25 @@ namespace spades {
 				o.group = group;
 				o.type = ToolOption::Type::Action;
 				items.push_back(o);
+			}
+			// An editable number, labelled (an axis letter) and stepped by `step`.
+			// The tool refreshes its value via SetNumber each frame, except while
+			// the user is typing into it.
+			void AddNumber(const std::string& id, const std::string& label,
+			               const std::string& group = "", float step = 1.0F,
+			               int decimals = 1) {
+				ToolOption o;
+				o.id = id;
+				o.label = label;
+				o.group = group;
+				o.type = ToolOption::Type::Number;
+				o.step = step;
+				o.decimals = decimals;
+				items.push_back(o);
+			}
+			void SetNumber(const std::string& id, float value) {
+				if (ToolOption* o = Find(id))
+					o->value = value;
 			}
 			// A read-only readout; the tool refreshes its text via SetLabel each frame.
 			void AddLabel(const std::string& id, const std::string& group = "") {

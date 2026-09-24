@@ -98,6 +98,17 @@ namespace spades {
 				(void)value;
 			}
 
+			// A ToolOption of type Number changed. `committed` is false while the
+			// value is still being typed — show it, but record nothing undo will
+			// have to unpick — and true once the user has settled on it (Enter, a
+			// click away, or a press of its arrows).
+			virtual void OnOptionNumberChanged(IEditorContext&, const std::string& id, float value,
+			                                   bool committed) {
+				(void)id;
+				(void)value;
+				(void)committed;
+			}
+
 			// A ToolOption of type Action was clicked; `id` is that option's id.
 			virtual void OnAction(IEditorContext&, const std::string& id) { (void)id; }
 

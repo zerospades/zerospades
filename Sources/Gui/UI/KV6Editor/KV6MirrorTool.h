@@ -42,8 +42,9 @@ namespace spades {
 		 *
 		 * The state itself lives on the editor, not here, so an edit mirrors
 		 * whichever tool made it — this tool only turns axes on and moves the
-		 * planes. Its one sub-tool, Move, is the plane gizmo; Reset to Pivot is a
-		 * one-shot action beside the X/Y/Z toggles.
+		 * planes. Its one sub-tool, Move, is the plane gizmo; beside the X/Y/Z
+		 * toggles sit an X, Y and Z box, which show where the planes are and are
+		 * typed into or stepped to move them, and Reset to Pivot.
 		 */
 		class MirrorTool : public GizmoTool {
 		public:
@@ -52,7 +53,17 @@ namespace spades {
 
 			void UpdateOptions(IEditorContext& ed) override;
 			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IEditorContext& ed, const std::string& id, float value,
+			                           bool committed) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
+
+		private:
+			// A reflection only shifts at half a voxel, and the editor holds the
+			// planes to that grid, so the boxes step and are written to match it.
+			static constexpr float kPlaneStep = 0.5F;
+			static constexpr int kDecimals = 1;
+			// Which axis `id` names a plane of, or -1 if it names none of them.
+			static int AxisOf(const std::string& id);
 		};
 	} // namespace gui
 } // namespace spades

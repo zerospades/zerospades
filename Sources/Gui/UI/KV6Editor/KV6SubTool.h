@@ -111,6 +111,11 @@ namespace spades {
 			void OnPointer(IEditorContext&, const PointerInput&) override;
 			std::string EscapeLabel(IEditorContext&) override;
 			void OnEscape(IEditorContext&) override;
+			// The recorded corners name voxels, and a volume that grows or is
+			// trimmed renames every one of them: the box is dropped whenever the
+			// document moves under it, or the editor acts behind the tool's back.
+			void CancelInteraction(IEditorContext&) override;
+			void OnDocumentChanged(IEditorContext&) override;
 			void DrawScene(IEditorContext&) override;
 
 		private:
