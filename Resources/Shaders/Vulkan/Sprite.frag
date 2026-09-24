@@ -41,6 +41,13 @@ layout(location = 0) out vec4 fragColor;
 void main() {
 	vec4 texColor = texture(mainTexture, texCoord);
 
+	// Linearize the sampled texel. Particle textures are uploaded as
+	// R8G8B8A8_UNORM, so the sampler hands back the raw sRGB bytes, and the
+	// offscreen target this blends into is linear in every mode. GL does the
+	// same square in Sprite.fs under `#if LINEAR_FRAMEBUFFER`, which is
+	// defined exactly when its own colour buffer is linear.
+	texColor.xyz *= texColor.xyz;
+
 	// Premultiplied alpha
 	texColor.xyz *= texColor.w;
 	texColor *= color;
