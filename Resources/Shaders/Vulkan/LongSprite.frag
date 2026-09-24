@@ -21,6 +21,9 @@ layout(location = 0) out vec4 fragColor;
 void main() {
 	vec4 texColor = texture(mainTexture, texCoord);
 
+	// Linearize the sampled texel; see the note in Sprite.frag.
+	texColor.xyz *= texColor.xyz;
+
 	// Premultiplied alpha
 	texColor.xyz *= texColor.w;
 	texColor *= color;

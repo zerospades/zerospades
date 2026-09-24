@@ -62,6 +62,9 @@ void main() {
 
 	fragColor = texture(mainTexture, texCoord.xy);
 
+	// Linearize the sampled texel; see the note in Sprite.frag.
+	fragColor.xyz *= fragColor.xyz;
+
 	// Premultiplied alpha
 	fragColor.xyz *= fragColor.w;
 	fragColor *= color;
