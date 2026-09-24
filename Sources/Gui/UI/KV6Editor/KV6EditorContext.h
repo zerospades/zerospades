@@ -185,6 +185,13 @@ namespace spades {
 			 */
 			virtual bool TransformPivot(IntVector3& out) const = 0;
 			/**
+			 * Quarter turns made about each world axis since the pending voxels
+			 * were lifted, each in 0..3; false when none are pending. A record of
+			 * the turns asked for, not a reading of the orientation (see
+			 * PendingPlacement::turns).
+			 */
+			virtual bool TransformTurns(IntVector3& out) const = 0;
+			/**
 			 * Whether turns go round the model's pivot rather than the middle of
 			 * the voxels being turned. Turns keep voxels on voxels only about a
 			 * whole voxel, so they go round the one nearest the pivot. An editor
@@ -220,8 +227,6 @@ namespace spades {
 			// step. A preview lasts until the user action ends or a command runs:
 			// commit it with SetPivot before then, or the pivot goes back.
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
-			// Open the modal prompt to type a new pivot (x y z).
-			virtual void BeginPivotEntry() = 0;
 
 			// --- Feedback -----------------------------------------------------
 			// A transient message: what an action did, or why it did nothing.
