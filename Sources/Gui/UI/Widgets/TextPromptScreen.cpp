@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include "Button.h"
+#include "DialogChrome.h"
 #include "Field.h"
 #include "Label.h"
 #include <Core/Strings.h>
@@ -42,26 +43,13 @@ namespace spades {
 			SetBounds(owner->GetBounds());
 
 			UIManager* manager = &GetManager();
-			float sw = manager->screenWidth;
-			float sh = manager->screenHeight;
-			float w = std::min(sw - 16.0F, 500.0F);
-			float h = 160.0F;
-			float x = (sw - w) * 0.5F;
-			float y = (sh - h) * 0.5F;
+			// Title, field, room for an error under it, then the button row: the
+			// rhythm every prompt in the game is laid out on.
+			contents = DialogChrome::Attach(*this, 500.0F, 160.0F);
+			float x = contents.min.x;
+			float y = contents.min.y;
+			float w = contents.GetWidth();
 
-			// Dims the screen behind the prompt, as the message boxes do.
-			{
-				Handle<Label> overlay = Handle<Label>::New(manager);
-				overlay->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
-				overlay->SetBounds(AABB2(0.0F, 0.0F, sw, sh));
-				AddChild(overlay.GetPointerOrNull());
-			}
-			{
-				Handle<Label> bg = Handle<Label>::New(manager);
-				bg->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.9F);
-				bg->SetBounds(AABB2(0.0F, y - 13.0F, size.x, h + 27.0F));
-				AddChild(bg.GetPointerOrNull());
-			}
 			{
 				Handle<Label> label = Handle<Label>::New(manager);
 				label->text = options.title;
@@ -99,17 +87,22 @@ namespace spades {
 				Handle<Button> btn = Handle<Button>::New(manager);
 				btn->caption = options.confirmCaption.empty() ? _Tr("MessageBox", "OK")
 				                                              : options.confirmCaption;
-				btn->SetBounds(AABB2(x + w - 310.0F, y + 130.0F, 150.0F, 30.0F));
+				btn->SetBounds(DialogChrome::ButtonSlot(contents, 1));
 				btn->activated = [this](UIElement&) { OnConfirm(); };
 				AddChild(btn.GetPointerOrNull());
 			}
 			{
 				Handle<Button> btn = Handle<Button>::New(manager);
 				btn->caption = _Tr("MessageBox", "Cancel");
-				btn->SetBounds(AABB2(x + w - 150.0F, y + 130.0F, 150.0F, 30.0F));
+				btn->SetBounds(DialogChrome::ButtonSlot(contents, 0));
 				btn->activated = [this](UIElement&) { OnCancel(); };
 				AddChild(btn.GetPointerOrNull());
 			}
+		}
+
+		void TextPromptScreen::Render() {
+			DialogChrome::DrawEdges(*this, contents);
+			UIElement::Render();
 		}
 
 		void TextPromptScreen::OnConfirm() {

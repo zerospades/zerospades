@@ -101,6 +101,7 @@ namespace spades {
 			bool HasPlacement() const override { return edit.placing; }
 			void TransformPlacement(const PlacementTransform& t) override;
 			bool TransformPivot(IntVector3& out) const override;
+			bool TransformTurns(IntVector3& out) const override;
 			bool TurnsAboutModelPivot() const override { return turnsAboutModelPivot; }
 			void SetTurnsAboutModelPivot(bool on) override { turnsAboutModelPivot = on; }
 			void ApplyPlacement() override;
@@ -136,7 +137,6 @@ namespace spades {
 			Vector3 GetPivot() const override;
 			void SetPivot(const Vector3& pivot) override;
 			void PreviewPivot(const Vector3& pivot) override;
-			void BeginPivotEntry() override;
 
 			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---
 			void Undo() override;

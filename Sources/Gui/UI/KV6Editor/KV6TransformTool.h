@@ -30,8 +30,16 @@ namespace spades {
 		 * Its one sub-tool is the gizmo (see TransformSubTool). Place writes the
 		 * pending voxels into the model and Cancel puts them back, so neither
 		 * waits on leaving the tool. "Turn about" picks whether turns go round
-		 * the middle of the voxels or the model's pivot; the readout names the
-		 * voxel they turn about.
+		 * the middle of the voxels or the model's pivot.
+		 *
+		 * The sub-toolbar carries the same two moves as boxes. Move shows the
+		 * voxel the pending ones are centred on, and typing or stepping it takes
+		 * them there. Turn shows how far these voxels have been turned about
+		 * each axis since they were lifted, whether by a box or by the gizmo,
+		 * and typing or stepping it turns them the rest of the way. The record
+		 * belongs to the pending voxels (see PendingPlacement::turns), so it
+		 * goes back to zero as soon as they are no longer the voxels in hand —
+		 * placed, dropped, or set aside by a change of selection.
 		 */
 		class TransformTool : public GizmoTool {
 		public:
@@ -39,6 +47,8 @@ namespace spades {
 			const char* Label() const override { return "Transform"; }
 			void UpdateOptions(IEditorContext& ed) override;
 			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IEditorContext& ed, const std::string& id, float value,
+			                           bool committed) override;
 			void OnAction(IEditorContext& ed, const std::string& id) override;
 		};
 	} // namespace gui

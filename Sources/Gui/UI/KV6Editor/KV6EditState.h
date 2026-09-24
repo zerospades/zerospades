@@ -102,6 +102,19 @@ namespace spades {
 			// cancelling puts them back.
 			CopyOnWrite<std::vector<IntVector3>> lifted;
 			std::string label = "Transform"; // names its undo steps
+			/**
+			 * Quarter turns made about each world axis since these voxels were
+			 * lifted, each held in 0..3.
+			 *
+			 * Turns compose, and the document keeps no orientation, so this is a
+			 * record of what was asked for rather than a reading of where the
+			 * voxels ended up. It is what the Transform tool's Turn boxes show,
+			 * so they hold what was turned instead of falling back to zero under
+			 * the hand that just turned it. Being part of the placement, it goes
+			 * exactly when the voxels do — placed, dropped or replaced — and undo
+			 * brings it back with them.
+			 */
+			IntVector3 turns = IntVector3::Make(0, 0, 0);
 
 			/** ExtentOf(voxels), cached until the voxels change. */
 			IntVector3 Extent() const {
@@ -119,8 +132,12 @@ namespace spades {
 			}
 
 			bool operator==(const PendingPlacement& o) const {
+				// `turns` counts: turning a shape that looks the same either way
+				// round leaves the voxels alone, and without it that step would
+				// read as nothing having happened and be dropped, leaving the
+				// boxes saying something the history has no record of.
 				return anchor == o.anchor && pivot == o.pivot && voxels == o.voxels &&
-				       lifted == o.lifted && label == o.label;
+				       lifted == o.lifted && label == o.label && turns == o.turns;
 			}
 
 		private:

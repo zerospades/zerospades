@@ -309,6 +309,9 @@ namespace spades {
 
 		void BoxSubTool::OnEscape(IEditorContext&) { seq.Reset(); }
 
+		void BoxSubTool::CancelInteraction(IEditorContext&) { seq.Reset(); }
+		void BoxSubTool::OnDocumentChanged(IEditorContext&) { seq.Reset(); }
+
 		void BoxSubTool::DrawScene(IEditorContext& ed) {
 			if (seq.Count() == 0) {
 				ed.DoPick();

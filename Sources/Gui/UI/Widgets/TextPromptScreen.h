@@ -70,8 +70,10 @@ namespace spades {
 			void Run();
 			void Close();
 			void HotKey(const std::string& key) override;
+			void Render() override;
 
 		private:
+			AABB2 contents;                  // where the shared dialog chrome put our widgets
 			ui::UIElement* owner;            // weak
 			bool disabledOwner = false;      // false: the owner hosts the prompt itself
 			ui::Field* field = nullptr;      // weak; owned as a child

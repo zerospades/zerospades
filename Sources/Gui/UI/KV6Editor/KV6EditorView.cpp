@@ -55,7 +55,6 @@
 #include <Gui/UI/Components/FileBrowser/FileBrowserDialog.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Widgets/MessageBox.h>
-#include <Gui/UI/Widgets/TextPromptScreen.h>
 
 SPADES_SETTING(cg_keyMoveForward);
 SPADES_SETTING(cg_keyMoveBackward);
@@ -575,6 +574,19 @@ namespace spades {
 			ui->GetOptionBar()->OnActionClicked = [this](const std::string& id) {
 				if (ActiveOption(id, ToolOption::Type::Action))
 					ActiveTool()->OnAction(*this, id);
+			};
+			ui->GetOptionBar()->OnNumberChanged = [this](const std::string& id, float value,
+			                                             bool committed) {
+				ToolOption* opt = ActiveOption(id, ToolOption::Type::Number);
+				if (!opt)
+					return;
+				// A settled value is one user action, so a typed number or an
+				// arrow press undoes in one go; an unsettled one only previews
+				// and has nothing to record.
+				if (committed)
+					undo.BeginAction();
+				UserActionEnd end(*this, committed);
+				ActiveTool()->OnOptionNumberChanged(*this, id, value, committed);
 			};
 
 			// The brush colour is the editor's, shared by every tool: its swatch
@@ -1624,6 +1636,9 @@ namespace spades {
 				SetStatus("Clipboard is empty");
 				return;
 			}
+			// Pending voxels land first, and landing them reframes the volume: the
+			// middle is read once the document is the one the paste goes into.
+			DocumentCommand command(*this);
 			IntVector3 anchor = MakeIntVector3(model->GetWidth() / 2, model->GetHeight() / 2,
 			                                   model->GetDepth() / 2);
 			StartPlacement(clipboard, "Paste", anchor);
@@ -1678,6 +1693,10 @@ namespace spades {
 				SetStatus("Could not load " + path);
 				return;
 			}
+
+			// Pending voxels land first, and landing them moves the pivot the
+			// import is aligned on: it is read once that has happened.
+			DocumentCommand command(*this);
 
 			// Collect the solid voxels relative to their own min corner. Interior
 			// voxels keep the sentinel colour the loader fills them with, exactly as
@@ -1838,6 +1857,11 @@ namespace spades {
 				// Their middle turns with them, so it is still their middle
 				// whichever centre they turned about.
 				out.pivot = turned(from.pivot);
+				// Every turn is recorded, wherever it came from — a gizmo handle
+				// or a typed box — so the bar shows the same figure either way.
+				int record[3] = {out.turns.x, out.turns.y, out.turns.z};
+				record[t.axis] = (record[t.axis] + turns) % 4;
+				out.turns = MakeIntVector3(record[0], record[1], record[2]);
 			}
 
 			out.anchor = out.anchor + t.shift;
@@ -1876,6 +1900,13 @@ namespace spades {
 					LiftIntoPlacement(std::move(selected));
 				edit.placement = std::move(next);
 			}
+		}
+
+		bool KV6EditorView::TransformTurns(IntVector3& out) const {
+			if (!edit.placing)
+				return false;
+			out = edit.placement.turns;
+			return true;
 		}
 
 		bool KV6EditorView::TransformPivot(IntVector3& out) const {
@@ -2230,57 +2261,6 @@ namespace spades {
 			ApplyOriginRaw(pivot * -1.0F);
 		}
 
-		namespace {
-			/** Reads "x y z", with commas allowed for decimal-comma keyboards. False
-			 *  when it is not three numbers. */
-			bool ParsePivot(const std::string& text, Vector3& out) {
-				std::string str = text;
-				for (char& c : str)
-					if (c == ',')
-						c = ' ';
-				float x, y, z;
-				if (std::sscanf(str.c_str(), "%f %f %f", &x, &y, &z) != 3)
-					return false;
-				out = MakeVector3(x, y, z);
-				return true;
-			}
-		} // namespace
-
-		void KV6EditorView::BeginPivotEntry() {
-			Vector3 p = GetPivot();
-			char buf[64];
-			std::snprintf(buf, sizeof(buf), "%.1f %.1f %.1f", p.x, p.y, p.z);
-
-			// The same prompt the rest of the game asks with, so a value typed here
-			// looks and behaves like a value typed anywhere else — and a bad one is
-			// reported in the prompt rather than after it has closed.
-			TextPromptScreen::Options options;
-			options.title = "Set pivot (x y z)";
-			options.initialText = buf;
-			options.validate = [](const std::string& text) {
-				Vector3 parsed;
-				return ParsePivot(text, parsed) ? std::string()
-				                                : std::string("Enter three numbers: x y z");
-			};
-
-			UIOverlayHost* overlay = ui->GetOverlay();
-			Handle<TextPromptScreen> prompt = Handle<TextPromptScreen>::New(
-			  &overlay->GetUIManager().GetRootElement(), std::move(options));
-			prompt->closed = [this](ui::UIElement& sender) {
-				TextPromptScreen* p = dynamic_cast<TextPromptScreen*>(&sender);
-				Vector3 parsed;
-				if (!p || !p->GetResult() || !ParsePivot(p->GetText(), parsed))
-					return;
-				SetPivot(parsed);
-				SetStatus("Pivot set");
-			};
-			ReleaseHeldInput();
-			// `Run` attaches the prompt and puts the caret in its field; the overlay
-			// only has to know it is there.
-			prompt->Run();
-			overlay->Show(prompt.GetPointerOrNull());
-		}
-
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {
@@ -2588,6 +2568,12 @@ namespace spades {
 		void KV6EditorView::Activate(int toolIndex, EditorMode mode) {
 			if (toolIndex == activeTool && mode == currentMode)
 				return;
+			// A number being typed into the sub-toolbar belongs to the tool whose
+			// box it is: it is settled here, while that tool is still the one
+			// listening. Left to the bar, the edit would be dropped on the next
+			// rebuild with whatever it was previewing still showing.
+			if (ui)
+				ui->GetOptionBar()->EndEditing(true);
 			// Leaving a tool ends what it had in progress: this is where a pending
 			// placement reaches the document.
 			if (EditorTool* previous = ActiveTool())
@@ -2845,11 +2831,28 @@ namespace spades {
 					opt.id = op.id;
 					opt.group = op.group;
 					opt.label = op.label;
-					opt.type = (op.type == ToolOption::Type::Label)  ? OptionBar::OptionType::Label
-							 : (op.type == ToolOption::Type::Action) ? OptionBar::OptionType::Action
-							 : OptionBar::OptionType::Bool;
+					// A type the bar does not know would be drawn as something the
+					// tool never asked for, so each one is named rather than
+					// defaulted.
+					switch (op.type) {
+						case ToolOption::Type::Label:
+							opt.type = OptionBar::OptionType::Label;
+							break;
+						case ToolOption::Type::Action:
+							opt.type = OptionBar::OptionType::Action;
+							break;
+						case ToolOption::Type::Number:
+							opt.type = OptionBar::OptionType::Number;
+							break;
+						case ToolOption::Type::Bool:
+							opt.type = OptionBar::OptionType::Bool;
+							break;
+					}
 					opt.bvalue = op.bvalue;
 					opt.enabled = op.enabled;
+					opt.value = op.value;
+					opt.step = op.step;
+					opt.decimals = op.decimals;
 					options.push_back(opt);
 				}
 			}
@@ -2990,6 +2993,11 @@ namespace spades {
 					return;
 				}
 
+				// A number being typed into the sub-toolbar is settled by a press
+				// anywhere but on that bar, which answers for its own boxes.
+				if (cursor.y < kRibbonH + kToolbarH || cursor.y >= BarsH())
+					ui->GetOptionBar()->EndEditing(true);
+
 				// The open picker owns every press on its panel, gaps included, so
 				// nothing behind it is ever edited through it.
 				if (ui->GetColorPicker()->IsOverPicker(cursor)) {
@@ -3002,6 +3010,10 @@ namespace spades {
 				if (cursor.y < BarsH()) {
 					if (!ui->GetToolbar()->Click(cursor, screenWidth))
 						ui->GetOptionBar()->Click(cursor);
+					// Typing into a box means the keyboard is the box's now, so
+					// nothing may stay held from before it was clicked.
+					if (ui->GetOptionBar()->IsEditing())
+						ReleaseHeldInput();
 					return;
 				}
 
@@ -3036,6 +3048,13 @@ namespace spades {
 				DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Down));
 				return;
 			}
+
+			// A box being typed into owns the keyboard, so none of what follows
+				// runs: a letter would otherwise fly the camera or switch tools.
+				// Releases still fall through, or a key held from before the box
+				// was clicked would never be let go.
+				if (down && ui->GetOptionBar()->KeyEvent(key))
+					return;
 
 			if (down && KV6CheckKey(cg_keyScreenshot, key)) { wantScreenShot = true; return; }
 			if (down && KV6CheckKey(cg_keyDelete, key)) {
@@ -3084,18 +3103,27 @@ namespace spades {
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
-			// Everything that takes typing — a name, a pivot, a folder — is a widget
-			// in the overlay; the menu itself only offers commands.
-			ui->GetOverlay()->TextInputEvent(text);
+			// A dialog takes typing over everything; otherwise it belongs to a
+			// number box on the sub-toolbar, when one is being typed into.
+			if (ui->GetOverlay()->IsActive())
+				ui->GetOverlay()->TextInputEvent(text);
+			else
+				ui->GetOptionBar()->TextInputEvent(text);
 		}
 
 		void KV6EditorView::TextEditingEvent(const std::string& text, int start, int len) {
 			ui->GetOverlay()->TextEditingEvent(text, start, len);
 		}
 
-		bool KV6EditorView::AcceptsTextInput() { return ui->GetOverlay()->AcceptsTextInput(); }
+		bool KV6EditorView::AcceptsTextInput() {
+			return ui->GetOverlay()->AcceptsTextInput() || ui->GetOptionBar()->IsEditing();
+		}
 
-		AABB2 KV6EditorView::GetTextInputRect() { return ui->GetOverlay()->GetTextInputRect(); }
+		AABB2 KV6EditorView::GetTextInputRect() {
+			if (ui->GetOverlay()->IsActive())
+				return ui->GetOverlay()->GetTextInputRect();
+			return ui->GetOptionBar()->EditingRect();
+		}
 
 		void KV6EditorView::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();
