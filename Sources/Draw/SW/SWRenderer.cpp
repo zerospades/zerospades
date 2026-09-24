@@ -1048,6 +1048,26 @@ namespace spades {
 
 			imageRenderer->DrawPolygon(whiteImage.GetPointerOrNull(), vtx0, vtx1, vtx2);
 		}
+		void SWRenderer::DrawShadedTriangle(const Vector2& v0, const Vector2& v1,
+		                                    const Vector2& v2, const Vector4& c0,
+		                                    const Vector4& c1, const Vector4& c2) {
+			SPADES_MARK_FUNCTION();
+
+			EnsureValid();
+			EnsureSceneNotStarted();
+
+			imageRenderer->SetShaderType(SWImageRenderer::ShaderType::Image);
+
+			// The rasterizer takes one colour per polygon, so use the average.
+			SWImageRenderer::Vertex vtx0, vtx1, vtx2;
+			vtx0.color = vtx1.color = vtx2.color = (c0 + c1 + c2) * (1.0F / 3.0F);
+			vtx0.position = MakeVector4(v0.x, v0.y, 1.0F, 1.0F);
+			vtx1.position = MakeVector4(v1.x, v1.y, 1.0F, 1.0F);
+			vtx2.position = MakeVector4(v2.x, v2.y, 1.0F, 1.0F);
+			vtx0.uv = vtx1.uv = vtx2.uv = MakeVector2(0.0F, 0.0F);
+
+			imageRenderer->DrawPolygon(whiteImage.GetPointerOrNull(), vtx0, vtx1, vtx2);
+		}
 		void SWRenderer::DrawFilledRectFade(float x0, float y0, float x1, float y1,
                                      Vector4 color0, Vector4 color1, bool horizontal) {
 			EnsureValid();

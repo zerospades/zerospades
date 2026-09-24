@@ -19,6 +19,7 @@
  */
 
 #include <algorithm> //std::sort
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
@@ -56,6 +57,8 @@
 #include <Gui/ConsoleScreen.h>
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/StartupScreen.h>
+#include <Gui/FileTypeRegistration.h>
+#include <Gui/ModelFileTypes.h>
 #include <ZeroSpades.h>
 
 #include <Core/VoxelModel.h>
@@ -207,6 +210,8 @@ namespace {
 	bool g_replayDemoMenuless = false;
 
 	bool g_printVersion = false;
+	bool g_registerFileTypes = false;
+	bool g_unregisterFileTypes = false;
 	bool g_printHelp = false;
 
 	std::string g_tryModPath;
@@ -242,6 +247,17 @@ namespace {
 		printf("  --demo FILE          demo to use (default: latest in Demos/); a bare\n");
 		printf("                       name resolves under Demos/\n");
 		printf("  --player ID|NAME     player to follow (default: first player)\n");
+		printf("  --register-file-types\n");
+		printf("                       offer this program for voxel model files, so a\n");
+		printf("                       file manager can open one with it. Windows\n");
+		printf("                       only, for the current user; elsewhere this is\n");
+		printf("                       done when the program is installed.\n");
+		printf("  --unregister-file-types\n");
+		printf("                       undo --register-file-types\n");
+		printf("  --open-model FILE    open a voxel model in the editor, skipping the\n");
+		printf("                       menus. A model file given on its own does the\n");
+		printf("                       same, which is what a file manager passes when\n");
+		printf("                       it opens one with this program.\n");
 		printf("  -h, --help           show this help message\n");
 		printf("  -v, --version        show version information\n");
 		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
@@ -251,6 +267,45 @@ namespace {
 	std::regex const hostNameRegex{"aos://.*"};
 	std::regex const v075Regex{"(?:v=)?0?\\.?75"};
 	std::regex const v076Regex{"(?:v=)?0?\\.?76"};
+
+	/**
+	 * A local path from what a desktop hands over. A file manager launched
+	 * through the `%U` field code passes a `file://` URL with its reserved
+	 * characters percent-encoded, so a model in a folder with a space in its
+	 * name arrives as `file:///home/u/My%20Models/a.kv6`. Anything that is not
+	 * such a URL is already a path and comes back unchanged.
+	 */
+	std::string LocalPathFromArgument(const std::string& arg) {
+		static const std::string scheme = "file://";
+		if (arg.compare(0, scheme.size(), scheme) != 0)
+			return arg;
+
+		// Everything between the scheme and the path is the host, which is empty
+		// or "localhost" for a file this machine can open; either way the path
+		// starts at the slash that follows it.
+		size_t start = arg.find('/', scheme.size());
+		if (start == std::string::npos)
+			return arg;
+
+		std::string path;
+		path.reserve(arg.size() - start);
+		for (size_t i = start; i < arg.size(); i++) {
+			if (arg[i] == '%' && i + 2 < arg.size() && std::isxdigit((unsigned char)arg[i + 1]) &&
+			    std::isxdigit((unsigned char)arg[i + 2])) {
+				path += char(std::stoi(arg.substr(i + 1, 2), nullptr, 16));
+				i += 2;
+			} else {
+				path += arg[i];
+			}
+		}
+
+		// A Windows URL names a drive after the leading slash (`file:///C:/a.kv6`),
+		// and the slash is not part of the path it stands for.
+		if (path.size() >= 3 && path[0] == '/' && path[2] == ':')
+			path.erase(0, 1);
+
+		return path;
+	}
 
 	int handleCommandLineArgument(int argc, char** argv, int& i) {
 		if (char* a = argv[i]) {
@@ -313,6 +368,41 @@ namespace {
 					return ++i;
 				}
 				return 0;
+			}
+			if (!strcasecmp(a, "--register-file-types")) {
+				g_registerFileTypes = true;
+				return ++i;
+			}
+			if (!strcasecmp(a, "--unregister-file-types")) {
+				g_unregisterFileTypes = true;
+				return ++i;
+			}
+			if (!strcasecmp(a, "--open-model")) {
+				if (i + 1 < argc) {
+					std::string path = LocalPathFromArgument(argv[++i]);
+					// Checked like a bare path is: the editor writes what it opens, so
+					// handing it something that is not a model is how a file that is
+					// not a model gets a model written over it.
+					if (spades::gui::KV6IsEditable(path)) {
+						spades::g_openModelPath = path;
+					} else {
+						fprintf(stderr, "Not a voxel model this program can open: %s\n",
+						        path.c_str());
+						return 0;
+					}
+					return ++i;
+				}
+				return 0;
+			}
+			// A bare model is how a file manager hands one over: "open with" passes
+			// the file and nothing else, as a path or as a `file://` URL. Anything
+			// else that is not a known option is left for the checks that follow.
+			if (a[0] != '-') {
+				std::string path = LocalPathFromArgument(a);
+				if (spades::gui::KV6IsEditable(path)) {
+					spades::g_openModelPath = path;
+					return ++i;
+				}
 			}
 			if (!strcasecmp(a, "--replay-demo")) {
 				g_replayDemoMenuless = true;
@@ -391,6 +481,7 @@ namespace spades {
 	std::string g_userResourceDirectory;
 	std::string g_executablePath;
 	bool g_openModsTab = false;
+	std::string g_openModelPath;
 	bool g_tryMod = false;
 
 	void StartClient(const spades::ServerAddress& addr) {
@@ -458,20 +549,23 @@ namespace spades {
 		runner.RunProtected();
 	}
 
-	void StartMainScreen() {
+	void StartMainScreen(const std::string& openModelPath) {
 		class ConcreteRunner : public spades::gui::Runner {
+		public:
+			std::string openModelPath;
+
 		protected:
 			spades::gui::View* CreateView(spades::client::IRenderer* renderer,
 										  spades::client::IAudioDevice* audio) override {
 				auto fontManager = Handle<client::FontManager>::New(renderer);
-				auto innerView = Handle<gui::MainScreen>::New(renderer, audio, fontManager);
+				auto innerView =
+				  Handle<gui::MainScreen>::New(renderer, audio, fontManager, openModelPath);
 				return new spades::gui::ConsoleScreen(renderer, audio, fontManager,
 													  std::move(innerView).Cast<gui::View>());
 			}
-
-		public:
 		};
 		ConcreteRunner runner;
+		runner.openModelPath = openModelPath;
 		runner.RunProtected();
 	}
 } // namespace spades
@@ -602,6 +696,19 @@ int main(int argc, char** argv) {
 
 	if (g_printVersion) {
 		printf("%s\n", PACKAGE_STRING);
+		return 0;
+	}
+
+	if (g_registerFileTypes || g_unregisterFileTypes) {
+		std::string error = g_registerFileTypes ? spades::RegisterModelFileTypes()
+		                                        : spades::UnregisterModelFileTypes();
+		if (!error.empty()) {
+			fprintf(stderr, "%s\n", error.c_str());
+			return 1;
+		}
+		printf("%s\n", g_registerFileTypes
+		                  ? "ZeroSpades is now offered for voxel model files."
+		                  : "ZeroSpades is no longer offered for voxel model files.");
 		return 0;
 	}
 
@@ -1012,12 +1119,14 @@ int main(int argc, char** argv) {
 			SPLog("Starting demo replay: %s", g_replayDemoPath.c_str());
 			spades::StartDemoReplay(g_replayDemoPath);
 		} else if (!g_autoconnect) {
-			if (spades::g_openModsTab || spades::g_tryMod ||
+			// A model to open is a destination of its own: the setup window would
+			// only stand between the player and the file they asked for.
+			if (spades::g_openModsTab || spades::g_tryMod || !spades::g_openModelPath.empty() ||
 			    !((int)cl_showStartupWindow != 0 || splashWindow->IsStartupScreenRequested())) {
 				splashWindow.reset();
 
 				SPLog("Starting main screen");
-				spades::StartMainScreen();
+				spades::StartMainScreen(spades::g_openModelPath);
 			} else {
 				splashWindow.reset();
 

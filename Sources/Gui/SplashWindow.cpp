@@ -22,6 +22,8 @@
 
 #include <Core/Bitmap.h>
 #include <Core/MemoryStream.h>
+#include <Gui/Main.h>
+#include <Gui/ModelFileTypes.h>
 #include <Gui/Utils/Icon.h>
 
 static const unsigned char splashImage[] = {
@@ -94,6 +96,18 @@ namespace spades
 						case SDLK_SPACE: startupScreenRequested = true; break;
 					}
 					break;
+				case SDL_DROPFILE: {
+					// How macOS hands over a file opened with this program: Finder
+					// starts it and sends the file to the process rather than putting
+					// it on the command line, so it lands here while the splash window
+					// is up. Anything that is not a model is not ours to act on. The
+					// name is SDL's to allocate and ours to free.
+					std::string path = e.drop.file ? e.drop.file : "";
+					SDL_free(e.drop.file);
+					if (gui::KV6IsEditable(path))
+						g_openModelPath = path;
+					break;
+				}
 				case SDL_QUIT: throw ExitRequestException();
 			}
 		}

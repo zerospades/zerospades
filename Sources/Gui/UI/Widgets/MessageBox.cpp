@@ -19,19 +19,15 @@
  */
 
 #include "Button.h"
-#include "DrawUtils.h"
-#include "Label.h"
+#include "DialogChrome.h"
 #include "MessageBox.h"
 #include "TextViewer.h"
-#include <Client/IRenderer.h>
 #include <Core/Strings.h>
 #include <Gui/UI/Framework/UIManager.h>
 
 namespace spades {
 	namespace gui {
 		using ui::Button;
-		using ui::Label;
-		using ui::SetColorNP;
 		using ui::TextViewer;
 		using ui::UIElement;
 
@@ -42,40 +38,15 @@ namespace spades {
 			SetFont(GetManager().GetRootElement().GetFont());
 			SetBounds(owner->GetBounds());
 
-			float sw = GetManager().screenWidth;
-			float sh = GetManager().screenHeight;
-
-			float contentsWidth = sw - 16.0F;
-			float maxContentsWidth = 800.0F;
-			if (contentsWidth > maxContentsWidth)
-				contentsWidth = maxContentsWidth;
-
-			float contentsLeft = (sw - contentsWidth) * 0.5F;
-			contentsHeight = height;
-			contentsTop = (sh - contentsHeight) * 0.5F;
-			
-			// draw full background
-			if (showOverlay) {
-				Handle<Label> overlay = Handle<Label>::New(&GetManager());
-				overlay->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
-				overlay->SetBounds(AABB2(0.0F, 0.0F, sw, sh));
-				AddChild(overlay.GetPointerOrNull());
-			}
-
-			{
-				Handle<Label> label = Handle<Label>::New(&GetManager());
-				label->backgroundColor = MakeVector4(0.0F, 0.0F, 0.0F, 0.9F);
-				label->SetBounds(AABB2(0.0F, contentsTop - 13.0F, size.x, contentsHeight + 27.0F));
-				AddChild(label.GetPointerOrNull());
-			}
+			contents = DialogChrome::Attach(*this, 800.0F, height, showOverlay);
 
 			for (size_t i = 0; i < buttons.size(); ++i) {
 				Handle<Button> button = Handle<Button>::New(&GetManager());
 				button->caption = buttons[i];
+				// The last button is the rightmost, so the row reads in the order
+				// it was given.
 				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - (150.0F + 10.0F) * (buttons.size() - i) +
-				              10.0F,
-				          contentsTop + contentsHeight - 30.0F, 150.0F, 30.0F));
+				  DialogChrome::ButtonSlot(contents, int(buttons.size() - 1 - i)));
 
 				int resultIdx = static_cast<int>(i);
 				button->activated = [this, resultIdx](UIElement&) { EndDialog(resultIdx); };
@@ -84,8 +55,8 @@ namespace spades {
 			{
 				Handle<TextViewer> viewer = Handle<TextViewer>::New(&GetManager());
 				AddChild(viewer.GetPointerOrNull());
-				viewer->SetBounds(
-				    AABB2(contentsLeft, contentsTop, contentsWidth, contentsHeight - 40.0F));
+				viewer->SetBounds(AABB2(contents.min.x, contents.min.y, contents.GetWidth(),
+				                        contents.GetHeight() - 40.0F));
 				viewer->SetText(text);
 			}
 		}
@@ -118,15 +89,7 @@ namespace spades {
 		}
 
 		void MessageBoxScreen::Render() {
-			client::IRenderer& r = GetManager().GetRenderer();
-			Vector2 pos = GetScreenPosition();
-			Vector2 sz = size;
-
-			SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.07F));
-			r.DrawImage(nullptr, AABB2(pos.x, pos.y + contentsTop - 14.0F, sz.x, 1.0F));
-			r.DrawImage(nullptr,
-			            AABB2(pos.x, pos.y + contentsTop + contentsHeight + 14.0F, sz.x, 1.0F));
-
+			DialogChrome::DrawEdges(*this, contents);
 			UIElement::Render();
 		}
 

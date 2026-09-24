@@ -18,6 +18,7 @@
 
  */
 
+#include "UI/KV6Editor/KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/Client.h>
@@ -36,10 +37,12 @@ namespace spades {
 	namespace gui {
 		MainScreen::MainScreen(Handle<client::IRenderer> _renderer,
 		                       Handle<client::IAudioDevice> _audioDevice,
-		                       Handle<client::FontManager> _fontManager)
+		                       Handle<client::FontManager> _fontManager,
+		                       const std::string& openModelPath)
 		    : renderer(std::move(_renderer)),
 		      audioDevice(std::move(_audioDevice)),
-		      fontManager(std::move(_fontManager)) {
+		      fontManager(std::move(_fontManager)),
+		      pendingModelPath(openModelPath) {
 			SPADES_MARK_FUNCTION();
 			if (!renderer)
 				SPInvalidArgument("renderer");
@@ -63,8 +66,25 @@ namespace spades {
 		// Restores renderer's state (game map, fog color)
 		// after returning from the game client.
 		void MainScreen::RestoreRenderer() {
-			if (ui)
+			if (ui) {
 				ui->SetupRenderer();
+				// A subview may have written files the visible tab lists (a saved
+				// model, a recorded demo), so the listing is re-read here.
+				ui->OnReturnedToMenu();
+			}
+		}
+
+		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew,
+		                                      SoftwareCursor* cursor) {
+			try {
+				subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice, &*fontManager,
+				                                     cursor, path, isNew)
+				            .Cast<View>();
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error while opening the KV6 editor: %s", ex.what());
+				return ex.what();
+			}
+			return "";
 		}
 
 		bool MainScreen::NeedsAbsoluteMouseCoordinate() {
@@ -208,6 +228,11 @@ namespace spades {
 				timeToStartInitialization -= dt;
 				if (timeToStartInitialization <= 0.0F) {
 					DoInit(); // do init
+					// Init may have gone straight to a subview (a model to open):
+					// this frame is that view's, not the menu's, and drawing the menu
+					// here would show it for a frame on the way past.
+					if (subview)
+						return;
 				} else {
 					return;
 				}
@@ -264,6 +289,25 @@ namespace spades {
 				// a hang.
 				SPLog("[!] Failed to initialize the main screen UI: %s", ex.what());
 				throw;
+			}
+
+			// Started to open a model: go straight to the editor, so opening one
+			// from a terminal or a file manager lands where the file belongs rather
+			// than in the menus.
+			if (!pendingModelPath.empty()) {
+				std::string path;
+				path.swap(pendingModelPath); // opened once, not on every return here
+				OpenModelFile(path);
+			}
+		}
+
+		void MainScreen::OpenModelFile(const std::string& path) {
+			SPADES_MARK_FUNCTION();
+			SPLog("Opening model '%s' in the editor", path.c_str());
+			std::string msg = OpenKV6Editor(path, false, nullptr);
+			if (!msg.empty()) {
+				SPLog("[!] Could not open the model editor: %s", msg.c_str());
+				helper->errorMessage = msg;
 			}
 		}
 

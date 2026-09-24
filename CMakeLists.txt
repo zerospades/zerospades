@@ -221,6 +221,7 @@ set(ZEROSPADES_INSTALL_ICONS	 "share/icons/hicolor"	CACHE STRING "Directory for 
 set(ZEROSPADES_INSTALL_PIXMAP	 "share/pixmaps"		CACHE STRING "Directory for installing .xpm icon. ")
 set(ZEROSPADES_INSTALL_BINARY	 "games"				CACHE STRING "Directory for installing result binary executable. ")
 set(ZEROSPADES_INSTALL_DESKTOP	 "share/applications"	CACHE STRING "Directory for installing .desktop file. ")
+set(ZEROSPADES_INSTALL_MIME		 "share/mime/packages"	CACHE STRING "Directory for installing the MIME type definition. ")
 set(ZEROSPADES_INSTALL_LIBS		 "lib/zerospades"		CACHE STRING "Directory for installing various non-media stuff. Currently not used")
 
 set(ZEROSPADES_RESDIR "" CACHE STRING "Resource dir to use while developing")
@@ -309,6 +310,12 @@ if(UNIX AND NOT APPLE)
 
 	# desktop file
 	install(FILES Resources/Unix/Desktop/zerospades.desktop DESTINATION ${ZEROSPADES_INSTALL_DESKTOP}/)
+
+	# MIME type for the model files the editor opens, so a file manager offers
+	# this program for them. The databases are rebuilt by the packaging step (or
+	# by update-mime-database and update-desktop-database), not from here.
+	install(FILES Resources/Unix/Desktop/zerospades-mime.xml
+		DESTINATION ${ZEROSPADES_INSTALL_MIME}/)
 
 	# Currently there is no files in lib/zerospades. But if you reading this message in future and want to
 	# place somewhere libs, binaries or other non-media stuff, place them in lib/zerospades. Thank you.

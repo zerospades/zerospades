@@ -355,11 +355,17 @@ namespace spades {
 			}
 		}
 
+		// 2D drawing and mouse input work in window units; the default framebuffer
+		// (`device->ScreenWidth()`) is in pixels, which is more on a high-DPI display.
 		float GLRenderer::ScreenWidth() {
-			return static_cast<float>(device->ScreenWidth());
+			return static_cast<float>(device->WindowWidth());
 		}
 		float GLRenderer::ScreenHeight() {
-			return static_cast<float>(device->ScreenHeight());
+			return static_cast<float>(device->WindowHeight());
+		}
+		float GLRenderer::ScreenPixelRatio() {
+			return static_cast<float>(device->ScreenWidth()) /
+			       static_cast<float>(device->WindowWidth());
 		}
 
 		void GLRenderer::SetFogColor(spades::Vector3 v) {
@@ -715,7 +721,7 @@ namespace spades {
 				device->Enable(IGLDevice::Blend, false);
 			}
 
-			if (settings.r_outlines && !mirror) {
+			if ((settings.r_outlines || sceneDef.forceOutlines) && !mirror) {
 				GLProfiler::Context p(*profiler, "Outline Pass");
 
 				device->DepthFunc(IGLDevice::Less);
@@ -862,7 +868,7 @@ namespace spades {
 			device->ClearDepth(1.0F);
 			device->DepthRange(0.0F, 1.0F);
 
-			if ((int)settings.r_water >= 2) {
+			if ((int)settings.r_water >= 2 && !sceneDef.skipWater) {
 				// for Water 2 (r_water >= 2), we need to render reflection
 				try {
 					// render mirrored scene
@@ -961,7 +967,7 @@ namespace spades {
 			}
 
 			device->Enable(IGLDevice::CullFace, false);
-			if (settings.r_water && waterRenderer) {
+			if (settings.r_water && waterRenderer && !sceneDef.skipWater) {
 				GLProfiler::Context p(*profiler, "Water");
 				waterRenderer->Update(dt);
 				waterRenderer->Render();
@@ -1206,9 +1212,11 @@ namespace spades {
 										 IGLDevice::Nearest);
 				}
 
+				// The viewport covers the framebuffer in pixels; the quad below is
+				// placed in 2D units (sw x sh), which the image renderer maps onto it.
 				device->BindFramebuffer(IGLDevice::Framebuffer, 0);
 				device->Enable(IGLDevice::Blend, false);
-				device->Viewport(0, 0, (int)sw, (int)sh);
+				device->Viewport(0, 0, device->ScreenWidth(), device->ScreenHeight());
 
 				Handle<GLImage> image(new GLImage(handle.GetTexture(), device.GetPointerOrNull(),
 												  static_cast<float>(handle.GetWidth()),
@@ -1385,6 +1393,17 @@ namespace spades {
 										col.x, col.y, col.z, col.w);
 		}
 
+		void GLRenderer::DrawShadedTriangle(const Vector2& v0, const Vector2& v1,
+		                                    const Vector2& v2, const Vector4& c0,
+		                                    const Vector4& c1, const Vector4& c2) {
+			SPADES_MARK_FUNCTION();
+
+			EnsureSceneNotStarted();
+
+			imageRenderer->SetImage(imageManager->GetWhiteImage());
+			imageRenderer->AddShadedTriangle(v0, v1, v2, c0, c1, c2);
+		}
+
 		void GLRenderer::DrawFilledRectFade(float x0, float y0, float x1, float y1,
                                     Vector4 color0, Vector4 color1, bool horizontal) {
 			EnsureSceneNotStarted();
@@ -1467,14 +1486,18 @@ namespace spades {
 			EnsureSceneNotStarted();
 			imageRenderer->Flush();
 
-			const float sh = ScreenHeight();
-			const int x = (int)floorf(outRect.GetMinX());
-			const int y = (int)floorf(sh - outRect.GetMaxY());
-			const int w = (int)ceilf(outRect.GetWidth());
-			const int h = (int)ceilf(outRect.GetHeight());
+			// `outRect` is in window units, the scissor box in framebuffer pixels
+			// (bottom-up). Round outwards so the clip never eats a partial pixel.
+			const float sx = static_cast<float>(device->ScreenWidth()) / ScreenWidth();
+			const float sy = static_cast<float>(device->ScreenHeight()) / ScreenHeight();
+			const int x0 = (int)floorf(outRect.GetMinX() * sx);
+			const int x1 = (int)ceilf(outRect.GetMaxX() * sx);
+			const int y0 = (int)floorf(outRect.GetMinY() * sy);
+			const int y1 = (int)ceilf(outRect.GetMaxY() * sy);
 
 			device->Enable(IGLDevice::ScissorTest, true);
-			device->Scissor(x, y, std::max(0, w), std::max(0, h));
+			device->Scissor(x0, device->ScreenHeight() - y1, std::max(0, x1 - x0),
+			                std::max(0, y1 - y0));
 		}
 
 		void GLRenderer::EndClippingRect() {
@@ -1519,7 +1542,7 @@ namespace spades {
 
 				device->BindFramebuffer(IGLDevice::Framebuffer, 0);
 				device->Enable(IGLDevice::Blend, false);
-				device->Viewport(0, 0, (int)sw, (int)sh);
+				device->Viewport(0, 0, device->ScreenWidth(), device->ScreenHeight());
 
 				auto image = Handle<GLImage>::New(lastColorBufferTexture,
 					device.GetPointerOrNull(), sw, sh, false);

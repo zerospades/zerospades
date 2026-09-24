@@ -213,7 +213,8 @@ if(WIN32 AND USE_INTERNAL_OPENAL)
 endif()
 
 if(WIN32)
-	target_link_libraries(ZeroSpades ws2_32.lib winmm.lib)
+	# shell32: the file type registration tells the shell its associations changed
+	target_link_libraries(ZeroSpades ws2_32.lib winmm.lib shell32.lib advapi32.lib)
 elseif(UNIX AND NOT APPLE)
 	target_link_libraries(ZeroSpades Xext)
 endif()

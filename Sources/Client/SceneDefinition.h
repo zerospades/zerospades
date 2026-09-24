@@ -32,11 +32,25 @@ namespace spades {
 			Vector3 viewAxis[3];
 			float zNear, zFar;
 			bool skipWorld;
+			/** Draw the world's terrain but not its water surface, nor the mirrored
+			 *  scene that feeds it (the model editor wants voxels under the model,
+			 *  not the map's sea). */
+			bool skipWater;
 
 			/** Whether the frame may draw models flagged `xray` through the world. The
 			 * renderer skips the whole pass when this is clear, so it has to be set on
 			 * any frame where a model asks to be revealed. */
 			bool allowPlayerXRay;
+
+			/** Light models from every direction at once instead of from the sun.
+			 *  A voxel has only six face normals, so a directional term splits one
+			 *  flat colour into a handful of visibly different shades; the model
+			 *  editor wants the voxel's own colour on screen. Ambient occlusion
+			 *  still applies, so corners keep a soft shape cue. */
+			bool flatModelLighting;
+			/** Draw the outline pass whatever `r_outlines` says. Flat lighting drops
+			 *  the shading that conveys depth, and a silhouette gives it back. */
+			bool forceOutlines;
 
 			float depthOfFieldFocalLength;
 			float depthOfFieldNearBlurStrength;
@@ -62,6 +76,9 @@ namespace spades {
 				zNear = zFar = 0.0F;
 				skipWorld = false;
 				allowPlayerXRay = false;
+				skipWater = false;
+				flatModelLighting = false;
+				forceOutlines = false;
 				depthOfFieldFocalLength = 0.0F;
 				depthOfFieldNearBlurStrength = 1.0F;
 				depthOfFieldFarBlurStrength = 0.0F;
