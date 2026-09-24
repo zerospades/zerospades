@@ -81,9 +81,12 @@ void main() {
 	// matches GL fixedPositionAttribute) so voxel-boundary vertices don't
 	// leak the neighboring column's shadow value (lit sliver on face edges),
 	// lifted off the face by normal * 0.1 as GL's PrepareShadowForMap does.
-	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin
-	            + normalFloat * 0.1;
-	shadowCoord = vec3(wPos.x / 512.0, (wPos.y - wPos.z) / 512.0, wPos.z / 255.0);
+	// The lift is for the shadow lookup only; the AO and radiosity coords
+	// below use the unbiased centre, as GL does.
+	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
+	vec3 shadowPos = wPos + normalFloat * 0.1;
+	shadowCoord = vec3(shadowPos.x / 512.0, (shadowPos.y - shadowPos.z) / 512.0,
+	                   shadowPos.z / 255.0);
 
 	// Fog
 	vec2 horzRelativePos = worldPos.xy - pushConstants.viewOrigin.xy;

@@ -108,10 +108,13 @@ void main() {
 	// GL's PrepareShadowForMap (Shadow/Common.vs) samples at
 	// `centerCoord + normal * 0.1`, lifting the sample just off the face so a
 	// surface never tests against its own column height. Omitting it biases
-	// every face toward shadowed.
-	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin
-	            + normalFloat * 0.1;
-	shadowCoord = vec3(wPos.x / 512.0, (wPos.y - wPos.z) / 512.0, wPos.z / 255.0);
+	// every face toward shadowed. The lift applies to the SHADOW lookup only —
+	// GL hands PrepareForMapRadiosityForMap the unbiased centre — so keep it
+	// out of wPos, which the AO and radiosity coords below also use.
+	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
+	vec3 shadowPos = wPos + normalFloat * 0.1;
+	shadowCoord = vec3(shadowPos.x / 512.0, (shadowPos.y - shadowPos.z) / 512.0,
+	                   shadowPos.z / 255.0);
 
 	// Fog density based on horizontal distance (matching SW/GL implementation)
 	vec2 horzRelativePos = worldPos.xy - pushConstants.viewOrigin.xy;
