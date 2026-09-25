@@ -165,6 +165,8 @@ namespace spades {
 				return;
 			}
 
+			// The menu takes the mouse for itself: the same motion cannot pick a slice
+			// and turn the head at once without doing both badly.
 			if (pieMenuView && pieMenuView->IsOpen()) {
 				pieMenuView->HandleMouseDelta(x, y);
 				return;
@@ -704,58 +706,76 @@ namespace spades {
 					return;
 				}
 
-				// Pie menu: hold to open, release to commit.
-				// Aim at a teammate to send a DM; otherwise broadcast on team chat, or
-				// drop a ping when the slice has a reason and the server allows it.
-				if (CheckKey(cg_keyPieMenu, name) && localPlayerIsAlive && !localPlayerIsSpectating) {
+				// Pie menu: hold to open, release to commit. Stays available while dead
+				// and waiting to respawn, which is when calling out what just happened
+				// matters most. Aim at a teammate to send a DM; otherwise broadcast on
+				// team chat, or drop a ping when the slice points somewhere and the
+				// server allows it.
+				if (CheckKey(cg_keyPieMenu, name) && !localPlayerIsSpectating) {
 					if (down && !pieMenuView->IsOpen()) {
-						auto hot = HotTrackedPlayer();
-						if (hot) {
-							Player& target = std::get<0>(*hot);
-							pieMenuView->Open(PieMenuView::Variant::Player, target.GetId());
-						} else {
-							pieMenuView->Open(PieMenuView::Variant::World);
-						}
-
-						// Freeze what the player was pointing at, along with the rest of
-						// the context the menu resolves once at open.
-						pieMenuPingValid = ResolveCrosshairWorldPos(pieMenuPingPos);
-
-						weapInput = WeaponInput();
+						OpenPieMenu();
 					} else if (!down && pieMenuView->IsOpen()) {
-						PieMenuView::Variant v = pieMenuView->GetVariant();
 						int targetId = pieMenuView->GetTargetPlayerId();
-						const auto& labels = pieMenuView->GetLabels();
+						// All three are read while the menu still stands: closing it
+						// forgets which ring was on show, and the ring is what says
+						// whether the slice points at somewhere and which channel it
+						// speaks on.
+						std::string msg = pieMenuView->GetSelectionLabel();
+						bool global = pieMenuView->IsCurrentPageGlobal();
 						bool slicePings = pieMenuView->SlicePings(pieMenuView->GetSelection());
-						int sel = pieMenuView->Close();
-						if (sel >= 0 && sel < PieMenuView::kSliceCount && net) {
-							size_t idx = static_cast<size_t>(sel);
-							const std::string& msg = labels[idx];
-							if (v == PieMenuView::Variant::Player && targetId >= 0) {
-								char cmd[128];
-								std::snprintf(cmd, sizeof(cmd), "/pm #%d %s", targetId, msg.c_str());
-								net->SendChat(cmd, false);
-							} else if (v == PieMenuView::Variant::World) {
+						pieMenuView->Close();
+						if (!msg.empty() && net) {
+							// Where a message goes is decided by the message, not by
+							// what the menu was opened on: a slice that points at a
+							// place is for the team, and one that only talks is for
+							// whoever it was aimed at.
+							if (slicePings) {
 								// The marker says it better than the message does, but
 								// the message is what reaches a server without the
 								// extension — so the chat is the fallback, not a double.
 								// Either way the same words go out, as the ping's reason
 								// or as the chat line.
-								bool pinged = slicePings && pieMenuPingValid &&
-											  SendTeamplayPing(pieMenuPingPos, msg);
-								if (!pinged)
-									net->SendChat(msg, false);
+								if (!(pieMenuPingValid && SendTeamplayPing(pieMenuPingPos, msg)))
+									net->SendChat(msg, global);
+							} else if (targetId >= 0) {
+								// Said to the player under the crosshair rather than to
+								// the room, whichever team they are on.
+								char cmd[128];
+								std::snprintf(cmd, sizeof(cmd), "/pm #%d %s", targetId, msg.c_str());
+								net->SendChat(cmd, false);
+							} else {
+								net->SendChat(msg, global);
 							}
 						}
 						pieMenuPingValid = false;
+						// The attack buttons were the menu's controls, so whatever is
+						// still held was held to browse rings, not to attack with. It
+						// takes a fresh press to mean that again: the menu can only
+						// ever cost an action, never invent one.
+						weapInput = WeaponInput();
 					}
 					return;
 				}
 
-				// Swallow attack inputs while the pie menu is open
+				// Cycle the pie menu's rings with the attack buttons, which are
+				// otherwise unusable while the menu is held. Right cycles forward,
+				// left cycles backward, so every ring is at most two taps away.
 				if (pieMenuView->IsOpen()) {
-					if (CheckKey(cg_keyAttack, name) || CheckKey(cg_keyAltAttack, name))
+					// The buttons belong to the menu while it is held, so a press
+					// here is a ring flip and nothing else: it is never written to
+					// `weapInput`, which the menu only ever clears (on closing).
+					// Recording it would make the button an attack again the moment
+					// the menu let go of it.
+					if (CheckKey(cg_keyAltAttack, name)) {
+						if (down)
+							pieMenuView->CyclePage(1);
 						return;
+					}
+					if (CheckKey(cg_keyAttack, name)) {
+						if (down)
+							pieMenuView->CyclePage(-1);
+						return;
+					}
 				}
 
 				switch (cameraMode) {

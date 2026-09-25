@@ -613,13 +613,20 @@ namespace spades {
 			PlayerInput inp = playerInput;
 			WeaponInput winp = weapInput;
 
+
 			bool isToolWeapon = player.IsToolWeapon();
 			bool isWeaponShotgun = weapon.IsReloadSlow();
 			bool isToggleADSMode = isToolWeapon && !cg_holdAimDownSight;
 
-			// disable tool input while pie menu is held
-			if (pieMenuView && pieMenuView->IsOpen())
-				winp = WeaponInput();
+			// Nothing acts while the pie menu is held. Aiming down sights is the one
+			// exception: it is a stance a weapon holds rather than an action, so a
+			// scoped player stays scoped through the menu. Every other tool's
+			// secondary digs, builds or cooks a grenade, and must stop.
+			if (pieMenuView && pieMenuView->IsOpen()) {
+				winp.primary = false;
+				if (!isToolWeapon)
+					winp.secondary = false;
+			}
 
 			// stop sprinting if player is moving too slow
 			float vel2D = player.GetVelocity().GetSquaredLength2D();

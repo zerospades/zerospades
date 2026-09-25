@@ -23,12 +23,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
 
 #include "Client.h"
 #include "IFont.h"
 #include "IRenderer.h"
+#include <Core/Debug.h>
+#include <Core/Settings.h>
 #include <Core/Strings.h>
+
+SPADES_SETTING(cg_keyAltAttack);
 
 namespace spades {
 	namespace client {
@@ -39,6 +44,8 @@ namespace spades {
 			constexpr float kRingOuter = 176.0F;
 			constexpr float kSliceGapDeg = 1.0F;
 			constexpr float kLabelRadius = 126.5F;
+			// How far past kRingOuter a slice reaches when it is fully highlighted.
+			constexpr float kHighlightReach = 10.0F;
 
 			// Normalized quarter-circle half-width table: table[i] = sqrt(1-(i/N)^2).
 			// Built once at program startup; radius-agnostic.
@@ -144,7 +151,7 @@ namespace spades {
 						xLoW = std::max(xLoW, yf * c2 / s2);
 					} else if (s2 < 0.0F) {
 						xHiW = std::min(xHiW, yf * c2 / s2);
-					} else if (yf * c2 < 0.0F) {
+					} else if (yf * c2 > 0.0F) {
 						continue;
 					}
 					if (xHiW <= xLoW)
@@ -168,61 +175,118 @@ namespace spades {
 					}
 				}
 			}
+
+			// Binding names are stored verbosely; the hint has to stay readable at
+			// the size it is drawn, so the mouse buttons get their common short forms.
+			std::string ShortKeyName(const std::string& key) {
+				if (EqualsIgnoringCase(key, "LeftMouseButton"))
+					return "LMB";
+				if (EqualsIgnoringCase(key, "RightMouseButton"))
+					return "RMB";
+				if (EqualsIgnoringCase(key, "MiddleMouseButton"))
+					return "MMB";
+				return ToUpperCase(key);
+			}
+
+			// Ring definitions. Slice order is top, then clockwise; Affirmative and
+			// Negative occupy the same slots in both variants so the gesture transfers.
+			struct PageDef {
+				const char* name;
+				bool global;
+				const char* labels[PieMenuView::kSliceCount];
+				// Slices that drop a Teamplay ping on whatever the crosshair was
+				// on instead of talking, falling back to the same message on chat
+				// where the server does not allow pings. The ping carries the
+				// slice's own label as its reason: the extension assigns no reason
+				// values, and a receiving client renders the string as it came, so
+				// a made-up token would only show up as "tear" on another screen.
+				bool pings[PieMenuView::kSliceCount];
+			};
+
+			// Layout rule, held across every ring: slice 0 is at the top and the
+			// rest follow clockwise, the vertical axis carries a pair of opposites,
+			// the right half is about them and the left half is about us.
+			//
+			// The ring a message sits on is what says how it travels, so nobody has
+			// to remember it slice by slice: the first ring points at a place, the
+			// second one talks, the third one calls the game.
+
+			// Offered when the crosshair is on terrain rather than on a player.
+			const PageDef kWorldPages[] = {
+				// Every slice names somewhere, so every slice drops a marker there.
+				// A server without the extension gets the same words on team chat.
+				{"Point", false,
+				 {"Enemy Here!", "Tear It Down!", "Watch This Spot",
+				  "Go Here!", "Let's Dig Here", "Help Me Build"},
+				 {true, true, true, true, true, true}},
+				// Said to the team, about nowhere in particular: a marker would only
+				// put "thank you" on a piece of ground.
+				{"Social", false,
+				 {"Affirmative", "Thank You", "Hi!",
+				  "Negative", "Sorry!", "Help Me"},
+				 {false, false, false, false, false, false}},
+				// The objective rather than the ground: where the intel is and what
+				// to do about it is already known to everyone, so none of it points.
+				{"Tactics", false,
+				 {"Attack!", "Get the Intel!", "Enemy Has the Intel!",
+				  "Fall Back!", "Regroup on Me", "Defend the Intel!"},
+				 {false, false, false, false, false, false}},
+				// Shouted at the whole server rather than said to anybody: a taunt
+				// that picked out the player under the crosshair could only do it by
+				// finding them first, and whether it found one is exactly what this
+				// menu must not tell the player who opened it.
+				{"Taunt", true,
+				 {"I See You", "Nice Try", "Miss Me?",
+				  "Too Easy", "Behind You...", "Say Goodbye"},
+				 {false, false, false, false, false, false}},
+			};
+
+			// Offered while the crosshair is on a teammate, and sent to them alone.
+			// A person is not a place, so nothing here points; the rings keep the
+			// order they have on terrain, and Social keeps the same six words, so
+			// the gesture is the same whoever it is aimed at.
+			const PageDef kTeammatePages[] = {
+				// Directions are relative to the teammate under the crosshair, which
+				// makes them exact in a way a broadcast "our right" cannot be. Up,
+				// down, left and right sit where they point; the two threats that
+				// have no direction take the lower corners.
+				{"Warn", false,
+				 {"Above You!", "On Your Right!", "Behind You!",
+				  "Below You!", "Sniper on You!", "On Your Left!"},
+				 {false, false, false, false, false, false}},
+				{"Social", false,
+				 {"Affirmative", "Thank You", "Hi!",
+				  "Negative", "Sorry!", "Help Me"},
+				 {false, false, false, false, false, false}},
+				{"Cooperate", false,
+				 {"Follow Me", "Cover Me", "Let Me Through",
+				  "Stay Here", "Boost Me Up", "Help Me Build"},
+				 {false, false, false, false, false, false}},
+			};
+
 		} // namespace
 
 		PieMenuView::PieMenuView(Client* c, IFont* f, IFont* big)
 			: renderer(c->GetRenderer()), font(f), bigFont(big) {
-			// Slice order: top, then clockwise.
-			//
-			// The World variant is aimed at a place, so its slices are callouts about
-			// somewhere rather than replies to somebody: four of them drop a
-			// Teamplay ping on whatever the crosshair was on when the menu opened, and
-			// fall back to the same message on team chat when the server does not allow
-			// pings. "Affirmative" and "Negative" have no place to point at and live on
-			// the Player variant, where a reply is what is wanted.
-			worldLabels = {
-				"Enemies!",
-				"Behind Us!",
-				"Spawnkiller!",
-				"Go Here!",
-				"Help Me Build",
-				"Tear It Down!",
-			};
-			playerLabels = {
-				"Affirmative",
-				"Behind You",
-				"Cover Me",
-				"Negative",
-				"Help Me",
-				"Thank You",
-			};
-			worldDisplayLabels = {
-				_Tr("Client", "Enemies!"),
-				_Tr("Client", "Behind Us!"),
-				_Tr("Client", "Spawnkiller!"),
-				_Tr("Client", "Go Here!"),
-				_Tr("Client", "Help Me Build"),
-				_Tr("Client", "Tear It Down!"),
+			auto buildPages = [](const PageDef* defs, size_t count) {
+				std::vector<Page> pages;
+				pages.reserve(count);
+				for (size_t i = 0; i < count; i++) {
+					const PageDef& def = defs[i];
+					Page p;
+					p.name = def.name;
+					p.global = def.global;
+					for (int s = 0; s < kSliceCount; s++) {
+						p.labels[static_cast<size_t>(s)] = def.labels[s];
+						p.pings[static_cast<size_t>(s)] = def.pings[s];
+					}
+					pages.push_back(std::move(p));
+				}
+				return pages;
 			};
 
-			// Which slices drop a ping instead of talking. The ping carries the slice's
-			// own message as its reason: the extension assigns no reason values, and a
-			// receiving client renders the string as it came, so a made-up token would
-			// only show up as "tear" on somebody else's screen.
-			//
-			// "Behind Us!" and "Spawnkiller!" stay chat-only — both are about a
-			// direction or an event, not a point on the map, so a marker would put them
-			// somewhere they do not belong.
-			worldSlicePings = {true, false, false, true, true, true};
-			playerSlicePings = {false, false, false, false, false, false};
-			playerDisplayLabels = {
-				_Tr("Client", "Affirmative"),
-				_Tr("Client", "Behind You"),
-				_Tr("Client", "Cover Me"),
-				_Tr("Client", "Negative"),
-				_Tr("Client", "Help Me"),
-				_Tr("Client", "Thank You"),
-			};
+			worldPages = buildPages(kWorldPages, std::size(kWorldPages));
+			teammatePages = buildPages(kTeammatePages, std::size(kTeammatePages));
 
 			const float halfSliceRad = kSliceSpan * 0.5F - DEG2RAD(kSliceGapDeg) * 0.5F;
 			for (int i = 0; i < kSliceCount; i++) {
@@ -236,6 +300,20 @@ namespace spades {
 
 		PieMenuView::~PieMenuView() {}
 
+		const PieMenuView::Page& PieMenuView::CurrentPage() const {
+			const auto& pages = CurrentPages();
+			SPAssert(!pages.empty());
+			size_t idx = static_cast<size_t>(std::max(0, page));
+			if (idx >= pages.size())
+				idx = pages.size() - 1;
+			return pages[idx];
+		}
+
+		void PieMenuView::RestorePage() {
+			int remembered = lastPage[static_cast<size_t>(variant)];
+			page = std::max(0, std::min(remembered, GetPageCount() - 1));
+		}
+
 		void PieMenuView::Open(Variant v, int tgtId) {
 			open = true;
 			variant = v;
@@ -243,7 +321,9 @@ namespace spades {
 			cursor = {0.0F, 0.0F};
 			selection = None;
 			openPhase = 0.0F;
+			pagePhase = 1.0F;
 			highlight.fill(0.0F);
+			RestorePage();
 		}
 
 		int PieMenuView::Close() {
@@ -252,9 +332,24 @@ namespace spades {
 			selection = None;
 			targetPlayerId = -1;
 			cursor = {0.0F, 0.0F};
+			page = 0;
 			openPhase = 0.0F;
 			highlight.fill(0.0F);
 			return result;
+		}
+
+		void PieMenuView::CyclePage(int dir) {
+			if (!open || dir == 0)
+				return;
+
+			int count = GetPageCount();
+			if (count <= 1)
+				return;
+
+			page = ((page + dir) % count + count) % count;
+			lastPage[static_cast<size_t>(variant)] = page;
+			pagePhase = 0.0F;
+			hintNeeded = false;
 		}
 
 		void PieMenuView::Update(float dt) {
@@ -262,10 +357,13 @@ namespace spades {
 				return;
 
 			constexpr float kOpenRate = 1.0F / 0.12F;
+			constexpr float kPageRate = 1.0F / 0.10F;
 			constexpr float kHighlightUpRate = 1.0F / 0.10F;
 			constexpr float kHighlightDownRate = 1.0F / 0.15F;
 
 			openPhase = std::min(1.0F, openPhase + dt * kOpenRate);
+			pagePhase = std::min(1.0F, pagePhase + dt * kPageRate);
+			hintTime += dt;
 
 			for (int i = 0; i < kSliceCount; i++) {
 				float target = (selection == i) ? 1.0F : 0.0F;
@@ -282,9 +380,7 @@ namespace spades {
 			static const std::string empty;
 			if (selection < 0 || selection >= kSliceCount)
 				return empty;
-			const auto& labels = (variant == Variant::Player)
-				? playerDisplayLabels : worldDisplayLabels;
-			return labels[static_cast<size_t>(selection)];
+			return CurrentPage().labels[static_cast<size_t>(selection)];
 		}
 
 		void PieMenuView::HandleMouseDelta(float dx, float dy) {
@@ -326,13 +422,15 @@ namespace spades {
 			
 			Vector2 center = {sw * 0.5F, sh * 0.5F};
 
-			const auto& labels = (variant == Variant::Player)
-				? playerDisplayLabels : worldDisplayLabels;
+			const auto& labels = CurrentPage().labels;
 
 			// Ease-out open animation: scale from 0.85 → 1.0, alpha from 0 → 1.
 			float eased = 1.0F - (1.0F - openPhase) * (1.0F - openPhase);
 			float scale = 0.85F + 0.15F * eased;
 			float alpha = eased;
+
+			// Labels fade back in after a ring flip so the swap reads as a change.
+			float easedPage = 1.0F - (1.0F - pagePhase) * (1.0F - pagePhase);
 
 			float rInner = kRingInner * scale;
 			float rOuter = kRingOuter * scale;
@@ -342,21 +440,32 @@ namespace spades {
 			renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.55F * alpha));
 			DrawDiscFill(renderer, center, rOuter);
 
+			// A highlighted slice reaches past the others, so how far out it goes
+			// is its own and is asked for in both passes below.
+			auto sliceOuter = [&](int i) { return rOuter + kHighlightReach * highlight[i]; };
+
 			// Slices
 			for (int i = 0; i < kSliceCount; i++) {
 				float h = highlight[i];
 				float fillA = (0.08F + (0.85F - 0.08F) * h) * alpha;
 				renderer.SetColorAlphaPremultiplied(MakeVector4(fillA, fillA, fillA, fillA));
-				float rOutSlice = rOuter + 10.0F * h;
 				const SliceRay& rr = sliceRays[i];
-				DrawSliceFill(renderer, center, rInner, rOutSlice,
+				DrawSliceFill(renderer, center, rInner, sliceOuter(i),
 							  rr.s1, rr.c1, rr.s2, rr.c2);
 			}
 
-			// Outer and inner outline rings (thin)
+			// Outer and inner outline rings (thin). The outer one is drawn slice by
+			// slice, along each one's own edge: a single ring across the whole pie
+			// would sit at the resting radius and cut over the top of whichever
+			// slice had reached past it.
 			renderer.SetColorAlphaPremultiplied(MakeVector4(alpha * 0.5F, alpha * 0.5F,
 															alpha * 0.5F, alpha * 0.5F));
-			DrawAnnulusFill(renderer, center, rOuter - 1.0F, rOuter);
+			for (int i = 0; i < kSliceCount; i++) {
+				const SliceRay& rr = sliceRays[i];
+				float rOutSlice = sliceOuter(i);
+				DrawSliceFill(renderer, center, rOutSlice - 1.0F, rOutSlice,
+							  rr.s1, rr.c1, rr.s2, rr.c2);
+			}
 			DrawAnnulusFill(renderer, center, rInner, rInner + 1.0F);
 
 			// Labels at kLabelRadius along each slice center
@@ -369,9 +478,9 @@ namespace spades {
 				Vector2 sz = font->Measure(label);
 				Vector2 textPos = {p.x - sz.x * 0.5F, p.y - sz.y * 0.5F};
 
-				float textA = (0.85F + 0.15F * h) * alpha;
+				float textA = (0.85F + 0.15F * h) * alpha * easedPage;
 				Vector4 textColor = MakeVector4(1, 1, 1, textA);
-				Vector4 textShadow = MakeVector4(0, 0, 0, 0.6F * alpha);
+				Vector4 textShadow = MakeVector4(0, 0, 0, 0.6F * textA);
 				font->DrawShadow(label, textPos, 1.0F, textColor, textShadow);
 			}
 
@@ -381,11 +490,58 @@ namespace spades {
 				const std::string& centerLabel = labels[selection];
 				Vector2 sz = bigFont->Measure(centerLabel);
 				Vector2 pos = {center.x - sz.x * 0.5F, center.y - sz.y * 0.5F};
-				float a = h * alpha;
+				float a = h * alpha * easedPage;
 				Vector4 col = MakeVector4(a, a, a, a);
 				Vector4 shd = MakeVector4(0, 0, 0, 0.7F * a);
 				bigFont->DrawShadow(centerLabel, pos, 1.0F, col, shd);
+			} else if (font) {
+				// Nothing aimed at yet: name the ring instead, so which one is up
+				// can be read at a glance rather than inferred from six labels.
+				const std::string& pageName = CurrentPage().name;
+				Vector2 sz = font->Measure(pageName);
+				Vector2 pos = {center.x - sz.x * 0.5F, center.y - sz.y * 0.5F};
+				float a = alpha * easedPage * 0.55F;
+				font->DrawShadow(pageName, pos, 1.0F, MakeVector4(1, 1, 1, a),
+								 MakeVector4(0, 0, 0, 0.6F * a));
 			}
+
+			DrawPageIndicator(center, rOuter, alpha);
+		}
+
+		void PieMenuView::DrawPageIndicator(Vector2 center, float rOuter, float alpha) {
+			int pageCount = GetPageCount();
+			if (pageCount <= 1)
+				return;
+
+			constexpr float kDotRadius = 3.0F;
+			constexpr float kDotSpacing = 13.0F;
+			constexpr float kDotOffset = 16.0F;
+
+			// Pulses only until the player finds the flip, then settles into a
+			// quiet position readout that never asks for attention again.
+			float pulse = 0.75F + 0.25F * sinf(hintTime * 4.0F);
+			float indicatorA = alpha * (hintNeeded ? pulse : 0.4F);
+
+			float dotY = center.y + rOuter + kDotOffset;
+			float dotX = center.x - kDotSpacing * static_cast<float>(pageCount - 1) * 0.5F;
+			for (int i = 0; i < pageCount; i++) {
+				bool active = (i == page);
+				float a = indicatorA * (active ? 0.95F : 0.35F);
+				renderer.SetColorAlphaPremultiplied(MakeVector4(a, a, a, a));
+				DrawDiscFill(renderer,
+							 MakeVector2(dotX + kDotSpacing * static_cast<float>(i), dotY),
+							 active ? kDotRadius : kDotRadius - 1.0F);
+			}
+
+			if (!hintNeeded || !font)
+				return;
+
+			std::string hint = _Tr("Client", "{0} More", ShortKeyName(cg_keyAltAttack));
+			Vector2 sz = font->Measure(hint);
+			Vector2 pos = {center.x - sz.x * 0.5F, dotY + kDotRadius + 6.0F};
+			float a = alpha * pulse;
+			font->DrawShadow(hint, pos, 1.0F, MakeVector4(1, 1, 1, a),
+							 MakeVector4(0, 0, 0, 0.6F * a));
 		}
 	} // namespace client
 } // namespace spades

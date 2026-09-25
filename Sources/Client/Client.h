@@ -566,6 +566,10 @@ namespace spades {
 			void DrawPlayerStats();
 
 			void UpdateDamageIndicators(float dt);
+
+			// Opens the pie menu on the ring set the crosshair calls for. The context
+			// is resolved once, here, and then stays put for as long as the menu is up.
+			void OpenPieMenu();
 			void DrawDamageIndicators();
 
 			// ── Teamplay ───────────────────────────────────────────
