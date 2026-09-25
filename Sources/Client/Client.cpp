@@ -90,7 +90,6 @@ namespace spades {
 			  readyToClose(false),
 
 			  worldSubFrame(0.0F),
-			  worldSubFrameFast(0.0F),
 			  frameToRendererInit(5),
 			  timeSinceInit(0.0F),
 			  aimingDownSight(false),
@@ -279,7 +278,6 @@ namespace spades {
 			inGameLimbo = false;
 
 			worldSubFrame = 0.0F;
-			worldSubFrameFast = 0.0F;
 			worldSetTime = time;
 		}
 

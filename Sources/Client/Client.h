@@ -147,7 +147,6 @@ namespace spades {
 			float time;
 			bool readyToClose;
 			float worldSubFrame;
-			float worldSubFrameFast;
 
 			int frameToRendererInit;
 			float timeSinceInit;

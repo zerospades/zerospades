@@ -60,15 +60,17 @@ namespace spades {
 			return numPlayers;
 		}
 
-		void World::UpdatePlayer(float dt, bool locked) {
+		void World::UpdatePlayers(float dt) {
 			for (const auto& p : players) {
-				if (p && !p->IsSpectator()) {
-					if (locked) {
-						p->Update(dt);
-					} else {
-						p->UpdateSmooth(dt);
-					}
-				}
+				if (p && !p->IsSpectator())
+					p->Update(dt);
+			}
+		}
+
+		void World::UpdatePlayersSmooth(float dt) {
+			for (const auto& p : players) {
+				if (p && !p->IsSpectator())
+					p->UpdateSmooth(dt);
 			}
 		}
 
@@ -77,7 +79,7 @@ namespace spades {
 
 			ApplyBlockActions();
 
-			UpdatePlayer(dt, true);
+			UpdatePlayers(dt);
 
 			while (!damagedBlocksQueue.empty()) {
 				auto it = damagedBlocksQueue.begin();
