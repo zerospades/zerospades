@@ -18,7 +18,7 @@
 
  */
 
-#include "UI/KV6Editor/KV6EditorView.h"
+#include "UI/Editor/KV6/KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/Client.h>

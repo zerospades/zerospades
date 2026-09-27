@@ -24,8 +24,8 @@
 
 #include <Gui/UI/Components/FileBrowser/FileBrowserView.h>
 #include <Gui/ModelFileTypes.h>
-#include <Gui/UI/KV6Editor/KV6FileDialog.h>
-#include <Gui/UI/KV6Editor/KV6ScreenHelper.h>
+#include <Gui/UI/Editor/Shell/EditorFileDialog.h>
+#include <Gui/UI/Editor/KV6/KV6ModelIO.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/Label.h>
 
@@ -64,7 +64,7 @@ namespace spades {
 		class KV6BrowserPanel : public ui::UIElement {
 			MainScreenHelper* helper;  // weak; provides OpenKV6Editor
 			ui::UIElement* modalOwner; // weak; modal dialogs disable and cover it
-			Handle<KV6ScreenHelper> fs;
+			Handle<KV6ModelIO> fs;
 			FileBrowserView* browser; // weak; owned as a child
 
 			void OpenModel(const std::string& absPath, bool isNew);

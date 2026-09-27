@@ -138,7 +138,7 @@ namespace spades {
 		                                 float contentsWidth, float headerPos, float headerHeight,
 		                                 float listPos, float footerPos)
 		    : UIElement(manager), helper(helper), modalOwner(modalOwner) {
-			fs = Handle<KV6ScreenHelper>::New();
+			fs = Handle<KV6ModelIO>::New();
 
 			SetBounds(AABB2(0.0F, 0.0F, manager->screenWidth, manager->screenHeight));
 
