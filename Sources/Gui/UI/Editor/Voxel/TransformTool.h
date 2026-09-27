@@ -25,21 +25,18 @@
 namespace spades {
 	namespace gui {
 		/**
-		 * Move and turn the selection, or voxels being pasted or imported.
+		 * Move and turn the selection, or a paste or an import waiting to be
+		 * placed.
 		 *
-		 * Its one sub-tool is the gizmo (see TransformSubTool). Place writes the
-		 * pending voxels into the model and Cancel puts them back, so neither
-		 * waits on leaving the tool. "Turn about" picks whether turns go round
-		 * the middle of the voxels or the model's pivot.
+		 * Its one sub-tool is the gizmo (see TransformSubTool). A selection
+		 * moves in the document itself, one undo step per drag; a paste or an
+		 * import waits until a click away from the gizmo or Enter places it.
+		 * "Turn about" picks whether turns go round the middle of the voxels or
+		 * the model's pivot.
 		 *
-		 * The sub-toolbar carries the same two moves as boxes. Move shows the
-		 * voxel the pending ones are centred on, and typing or stepping it takes
-		 * them there. Turn shows how far these voxels have been turned about
-		 * each axis since they were lifted, whether by a box or by the gizmo,
-		 * and typing or stepping it turns them the rest of the way. The record
-		 * belongs to the pending voxels (see PendingPlacement::turns), so it
-		 * goes back to zero as soon as they are no longer the voxels in hand —
-		 * placed, dropped, or set aside by a change of selection.
+		 * The sub-toolbar carries the same moves. Move shows the voxel the
+		 * moved ones are centred on, and typing or stepping it takes them
+		 * there. Turn turns them a right angle about an axis, right-handed.
 		 */
 		class TransformTool : public GizmoTool {
 		public:

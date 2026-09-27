@@ -193,18 +193,17 @@ namespace spades {
 		};
 
 		/**
-		 * Positions pending voxels with the gizmo: its arrows and squares move
+		 * Moves and turns voxels with the gizmo: its arrows and squares move
 		 * them by whole voxels, its axis rings turn them by quarter turns about
 		 * their pivot. The arrow keys move them too (Page Up/Down for the third
 		 * axis).
 		 *
-		 * The first move or turn lifts the selected voxels out of the document;
-		 * a paste or an import arrives already pending. Nothing is written back
-		 * until a click away from the gizmo, Place, leaving the tool, or another
-		 * command that needs the document as it stands, so voxels dragged over
-		 * others never destroy them; Cancel or Escape puts them back instead.
-		 * Every move and turn is an undo step. With nothing
-		 * pending, the next move takes whatever is selected at that moment.
+		 * A drag only previews; its release moves the selected voxels in the
+		 * document, as one undo step, and they stay selected. A paste or an
+		 * import waits instead, positioned the same way, until a click away
+		 * from the gizmo, Enter, leaving the tool, or another command that
+		 * needs the document as it stands places it; Escape or the right
+		 * button drops it.
 		 */
 		class TransformSubTool : public GizmoSubTool {
 		public:
@@ -212,6 +211,7 @@ namespace spades {
 			const char* Label() const override { return "Transform"; }
 			std::string Hint(IEditorContext&) override;
 			void OnDeactivate(IEditorContext&) override;
+			void OnPointer(IEditorContext&, const PointerInput&) override;
 			void OnKey(IEditorContext&, const KeyInput&) override;
 			void DrawScene(IEditorContext&) override;
 
@@ -219,7 +219,7 @@ namespace spades {
 			// A drag only previews: the voxels move once, on release.
 			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
 			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
-			// Places the pending voxels where they are.
+			// Places a waiting paste or import where it is.
 			void OnClickAway(IEditorContext& ed) override;
 		};
 
