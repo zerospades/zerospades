@@ -112,7 +112,7 @@ namespace spades {
             // `count` points evenly round a circle.
             void CirclePoints(const Vector2& center, float radius, std::size_t count,
                               PointScratch& out) {
-                const float step = 2.0F * M_PI_F / float(count);
+                const float step = kTwoPi / float(count);
                 for (std::size_t i = 0; i < count; i++) {
                     const float a = float(i) * step;
                     out[i] = center + MakeVector2(std::cos(a), std::sin(a)) * radius;
