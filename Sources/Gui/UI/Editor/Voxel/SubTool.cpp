@@ -417,7 +417,7 @@ namespace spades {
 			ed.DrawGizmo(gizmo);
 		}
 
-		// --- TransformSubTool (position the pending placement) ---------------
+		// --- TransformSubTool (move and turn voxels) -------------------------
 
 		TransformSubTool::TransformSubTool() : GizmoSubTool(TransformSnap(), TransformHandles()) {}
 
@@ -428,14 +428,24 @@ namespace spades {
 			                   "[PgUp/PgDn] nudge";
 			hint += kGizmoDragHint;
 			if (ed.HasPlacement())
-				hint += "  |  [LMB] away from the gizmo places them";
+				hint += "  |  [LMB] away or [Enter] places them  |  [RMB] drops them";
 			return hint;
 		}
 
 		void TransformSubTool::OnDeactivate(IEditorContext& ed) {
 			GizmoSubTool::OnDeactivate(ed);
-			// Leaving the tool is what writes the voxels into the document.
+			// Leaving the tool places a waiting paste or import.
 			ed.ApplyPlacement();
+		}
+
+		void TransformSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+			// The right button backs out of what is in hand, as in Blender: a
+			// drag first, then a paste or an import still waiting.
+			if (e.IsRight() && e.IsDown() && !gizmo.IsDragging() && ed.HasPlacement()) {
+				ed.CancelPlacement();
+				return;
+			}
+			GizmoSubTool::OnPointer(ed, e);
 		}
 
 		bool TransformSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
@@ -452,11 +462,11 @@ namespace spades {
 		}
 
 		void TransformSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
-			ed.TransformPlacement(WholeStep(total)); // one undo step, still only pending
+			ed.TransformPlacement(WholeStep(total)); // one undo step
 		}
 
 		void TransformSubTool::OnClickAway(IEditorContext& ed) {
-			// With nothing pending (a selection not yet moved) there is nothing to finish.
+			// A selection has moved already; only a paste or an import waits.
 			if (ed.HasPlacement())
 				ed.ApplyPlacement();
 		}
@@ -464,6 +474,10 @@ namespace spades {
 		void TransformSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
 			if (e.phase != KeyPhase::Down)
 				return;
+			if (e.key == "Enter") {
+				ed.ApplyPlacement(); // nothing to do unless a paste or an import waits
+				return;
+			}
 			PlacementTransform t;
 			if (e.key == "Left") t.shift.x = -1;
 			else if (e.key == "Right") t.shift.x = 1;

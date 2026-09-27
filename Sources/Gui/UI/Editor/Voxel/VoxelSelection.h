@@ -65,6 +65,10 @@ namespace spades {
 			/** Heap bytes this holds that `other` does not share with it. */
 			std::size_t UnsharedBytes(const VoxelSelection& other) const;
 
+			/** Names the content: selections with equal versions hold the same
+			 *  voxels, so what is worked out from one can be kept against it. */
+			std::uint64_t Version() const { return keys.Version(); }
+
 			bool operator==(const VoxelSelection& o) const { return keys == o.keys; }
 			bool operator!=(const VoxelSelection& o) const { return !(*this == o); }
 

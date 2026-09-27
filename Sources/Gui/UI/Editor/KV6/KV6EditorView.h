@@ -101,7 +101,6 @@ namespace spades {
 			bool HasPlacement() const override { return edit.placing; }
 			void TransformPlacement(const PlacementTransform& t) override;
 			bool TransformPivot(IntVector3& out) const override;
-			bool TransformTurns(IntVector3& out) const override;
 			bool TurnsAboutModelPivot() const override { return turnsAboutModelPivot; }
 			void SetTurnsAboutModelPivot(bool on) override { turnsAboutModelPivot = on; }
 			void ApplyPlacement() override;
@@ -119,8 +118,8 @@ namespace spades {
 			bool IsSelected(int x, int y, int z) const override;
 			void ClearSelection() override;
 			void DeleteSelection() override;
-			// While voxels are pending (lifted, pasted, imported) they are what is
-			// selected; the selection itself is empty then.
+			// While a paste or an import waits it is what the selection commands
+			// act on.
 			int SelectionCount() const override {
 				return edit.placing ? int(edit.placement.voxels->size()) : edit.selection.Size();
 			}
@@ -272,46 +271,57 @@ namespace spades {
 			void SelectIfSolid(const IntVector3& v);
 
 			// --- Clipboard / placement ----------------------------------------
-			// Placing voxels (paste, import, Transform) is one mechanism: a group of
-			// voxels waits, drawn where it would land, until it is placed. The
-			// clipboard is just one source for that group, so an import never
-			// disturbs a copy.
+			// A paste or an import waits, drawn where it would land, until it is
+			// placed. The clipboard is just one source for it, so an import never
+			// disturbs a copy. The selection itself never waits: moving it writes
+			// it into the document (see MoveSelection).
 			std::vector<ClipVoxel> clipboard; // Ctrl+C / Ctrl+X store
 
-			// The pending voxels live in `edit` (see PendingPlacement), so lifting,
-			// moving, turning, placing and cancelling them are undo steps like any
+			// The waiting voxels live in `edit` (see PendingPlacement), so pasting,
+			// moving, turning, placing and dropping them are undo steps like any
 			// edit. Turns go round the model's pivot rather than the voxels' middle.
 			bool turnsAboutModelPivot = false;
 			// The voxel a group with that middle turns about, per the setting above.
 			IntVector3 TurnCentre(const IntVector3& groupMiddle) const;
-			// Voxels in the document, counting those lifted by Transform (they only float).
-			int DocumentVoxelCount() const {
-				return voxelCount + (edit.placing ? int(edit.placement.lifted->size()) : 0);
-			}
-			// A group of `voxels` (relative to `anchor`) turning about their middle;
-			// `lifted` names where each came from, if anywhere.
+			// A group of `voxels` (relative to `anchor`) turning about their middle.
 			static PendingPlacement MakePlacement(std::vector<ClipVoxel> voxels,
 			                                      const IntVector3& anchor,
-			                                      std::vector<IntVector3> lifted,
 			                                      const std::string& label);
-			// What lifting the selection would take: false when nothing is
+			// The selected voxels as a group to move: false when nothing is
 			// selected. Changes nothing.
 			bool PlacementFromSelection(PendingPlacement& out) const;
-			// Takes the voxels of `taken` (see PlacementFromSelection) out of the
-			// document into the placement, as part of the undo step in progress.
-			void LiftIntoPlacement(PendingPlacement taken);
-			// Writes a pending voxel back into the document at `at`, selected;
-			// false when `at` lies outside the volume.
+			// Moves the selected voxels by `t` in the document, as one undo step:
+			// they leave where they were, replace whatever they land on, and stay
+			// selected.
+			void MoveSelection(const PlacementTransform& t);
+			// Writes `group` into the document, the volume growing to hold it,
+			// within the undo step open; the voxels it writes become the selection.
+			// Returns how many it wrote.
+			int LandGroup(const PendingPlacement& group);
+			// Writes a voxel into the document at `at`, selected; false when `at`
+			// lies outside the volume.
 			bool LandVoxel(const IntVector3& at, uint32_t color);
 			// The group `t` makes of `from`, kept within the model size limit
 			// (`clamped` says whether that held it back); false if it fits nowhere.
 			bool TransformedPlacement(const PendingPlacement& from, const PlacementTransform& t,
 			                          PendingPlacement& out, bool& clamped) const;
+			// The middle the selection turns about. A move keeps it with the voxels
+			// it moved, so the turns of one selection always go round the same
+			// voxel and four quarter turns bring it back where it was; any other
+			// change of the selection starts again from the middle of its box.
+			struct SelectionMiddle {
+				std::uint64_t selectionVersion = 0; // the selection it belongs to
+				bool valid = false;
+				IntVector3 at = IntVector3::Make(0, 0, 0);
+			} movedMiddle;
+			// Where the selection's middle is, per `movedMiddle`; false when
+			// nothing is selected.
+			bool SelectionMiddleOf(IntVector3& out) const;
 			// Forgets the pending voxels without touching the document or history:
-			// for a document being replaced, or once they are placed or put back.
+			// for a document being replaced, or once they are placed or dropped.
 			void DropPlacement();
 			// The pending voxels as a renderable model, so they are drawn solid at
-			// their temporary position while the document shows the gap they left.
+			// their temporary position, apart from the document.
 			// Rebuilt before a frame when the voxels changed (see RefreshRenderModels).
 			Handle<client::IModel> placementModel;
 			// The grid placementModel was made from, kept for the overlay lines to
