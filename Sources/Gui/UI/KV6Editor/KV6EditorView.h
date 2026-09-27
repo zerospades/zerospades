@@ -410,8 +410,8 @@ namespace spades {
 			GizmoView camera;
 
 			// --- Camera -------------------------------------------------------
-			float yaw = -M_PI_F * 0.25F;
-			float pitch = -M_PI_F * 0.30F;
+			float yaw = -kQuarterPi;
+			float pitch = -kPi * 0.30F;
 			float targetYaw = 0.0F, targetPitch = 0.0F; // navicube animates toward these
 			bool camAnim = false;
 			Vector3 orbitTarget;
