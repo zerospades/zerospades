@@ -33,7 +33,7 @@ namespace spades {
 		class TransformGizmo;
 
 		/**
-		 * A whole-voxel change to pending voxels: `quarterTurns` right-handed
+		 * A whole-voxel change to voxels being moved: `quarterTurns` right-handed
 		 * quarter turns about the world axis `axis` (0 = x, 1 = y, 2 = z) through
 		 * their pivot, then a shift by `shift`. Right angles and whole voxels
 		 * only, so every voxel still lands on a voxel and four turns are exactly
@@ -100,11 +100,11 @@ namespace spades {
 			// --- Selection (a set of solid-voxel coords, shared across tools) ---
 			virtual bool IsSelected(int x, int y, int z) const = 0;
 			virtual void ClearSelection() = 0;
-			// Removes the selected voxels from the model, or drops the pending
-			// ones while there are some (never the last voxel).
+			// Removes the selected voxels from the model, or drops a waiting paste
+			// or import while there is one (never the last voxel).
 			virtual void DeleteSelection() = 0;
-			// How many voxels the selection commands act on: the pending ones
-			// while there are some (lifted, pasted or imported), else the selected.
+			// How many voxels the selection commands act on: a waiting paste or
+			// import while there is one, else the selected.
 			virtual int SelectionCount() const = 0;
 			// The solid voxels 6-connected to (x,y,z) through its colour, itself
 			// included; empty if (x,y,z) holds no voxel. Changes nothing.
@@ -122,8 +122,8 @@ namespace spades {
 			virtual void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) = 0;
 
 			// --- Clipboard ----------------------------------------------------
-			// Copy and Cut take the selection, or the pending voxels while there
-			// are some, which they leave where they are rather than place. Each
+			// Copy and Cut take the selection, or a waiting paste or import while
+			// there is one, which they leave where it is rather than place. Each
 			// reports what it did, or why not, on the status line.
 			virtual void CopySelection() = 0;
 			// False when refused (nothing selected, or it would empty the model).
@@ -161,36 +161,33 @@ namespace spades {
 			virtual void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                                    const Vector4& color) = 0;
 
-			// --- Pending placement (floating voxels) --------------------------
-			// Paste, import and Transform park their voxels here first: nothing
-			// reaches the document until the placement is applied, so dragging
-			// voxels over others never destroys what they pass across. A click
-			// away from the gizmo, Place, or leaving the Transform tool applies
-			// the placement; Cancel or Escape puts it back. Every edit of the
+			// --- Moving voxels ------------------------------------------------
+			// Moving or turning the selection writes it straight into the
+			// document, one undo step per drag, key or typed value; the moved
+			// voxels replace what they land on and stay selected.
+			//
+			// A paste or an import instead waits (floats) where it would land, so
+			// positioning it over other voxels never destroys what it passes. A
+			// click away from the gizmo, Enter or leaving the Transform tool
+			// places it; Escape or the right button drops it. Every edit of the
 			// voxels, the selection or the pivot (and the editor's copy, cut and
-			// save) applies it first, so it acts on the document as it stands.
-			// Lifting, moving, turning, applying and cancelling are undo steps.
+			// save) places it first, so it acts on the document as it stands.
+			// Pasting, moving, turning, placing and dropping are undo steps.
 			virtual bool HasPlacement() const = 0;
 			/**
-			 * Turns and shifts the pending voxels, lifting the selected voxels out
-			 * of the document first when none are pending; one undo step. A shift
-			 * stops at the model size limit. Turns are about the pivot, which
-			 * moves only with a shift.
+			 * Turns and shifts the waiting voxels, or else the selected voxels in
+			 * the document; one undo step. A shift stops at the model size limit.
+			 * Turns are about TransformPivot.
 			 */
 			virtual void TransformPlacement(const PlacementTransform& t) = 0;
 			/**
-			 * The voxel a transform turns about: the middle of the pending voxels
+			 * The voxel a transform turns about: the middle of the waiting voxels
 			 * (or of the selection), or the model's pivot (see
-			 * TurnsAboutModelPivot); false when there is nothing to move.
+			 * TurnsAboutModelPivot); false when there is nothing to move. The
+			 * middle stays put through the turns of one selection, so four
+			 * quarter turns always bring it back where it was.
 			 */
 			virtual bool TransformPivot(IntVector3& out) const = 0;
-			/**
-			 * Quarter turns made about each world axis since the pending voxels
-			 * were lifted, each in 0..3; false when none are pending. A record of
-			 * the turns asked for, not a reading of the orientation (see
-			 * PendingPlacement::turns).
-			 */
-			virtual bool TransformTurns(IntVector3& out) const = 0;
 			/**
 			 * Whether turns go round the model's pivot rather than the middle of
 			 * the voxels being turned. Turns keep voxels on voxels only about a
@@ -199,11 +196,11 @@ namespace spades {
 			 */
 			virtual bool TurnsAboutModelPivot() const = 0;
 			virtual void SetTurnsAboutModelPivot(bool on) = 0;
-			/** Writes the pending voxels into the document as one undo step. */
+			/** Writes the waiting voxels into the document as one undo step. */
 			virtual void ApplyPlacement() = 0;
-			/** Puts lifted voxels back where they came from, or drops a paste. */
+			/** Drops the waiting voxels, as one undo step. */
 			virtual void CancelPlacement() = 0;
-			/** Outlines the pending voxels (or the selection) as they would land after `t`. */
+			/** Outlines the waiting voxels (or the selection) as they would land after `t`. */
 			virtual void DrawPlacementTransformed(const PlacementTransform& t,
 			                                      const Vector4& color) = 0;
 			// Opaque, shaded cube of half-size `half` centred at `center`. This is a

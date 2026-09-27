@@ -646,6 +646,7 @@ namespace spades {
 				kept.enabled[a] = edit.mirror.enabled[a];
 			edit = EditState();
 			edit.mirror = kept;
+			movedMiddle = SelectionMiddle();
 			previewedOrigin.reset();
 			previewedMirrorPlane.reset();
 			undo.Clear();
@@ -925,9 +926,7 @@ namespace spades {
 			switch (layer) {
 				case EscapeLayer::Eyedropper: return "stop picking";
 				case EscapeLayer::Tool: return ActiveTool()->EscapeLabel(*this);
-				case EscapeLayer::Placement:
-					return edit.placement.lifted->empty() ? "drop the pending voxels"
-					                                      : "put the voxels back";
+				case EscapeLayer::Placement: return "drop the pending voxels";
 				case EscapeLayer::Selection: return "select nothing";
 				case EscapeLayer::None: break;
 			}
@@ -1398,15 +1397,19 @@ namespace spades {
 			// land in the wrong place.
 			const IntVector3 offset = MakeIntVector3(ox, oy, oz);
 			edit.mirror.plane += shift;
+			// The middle a moved selection turns about goes with it, and stays
+			// its middle: the shifted selection is the same one, relabelled.
+			const bool middleKept =
+			  movedMiddle.valid && movedMiddle.selectionVersion == edit.selection.Version();
 			edit.selection.Shift(offset);
+			if (middleKept) {
+				movedMiddle.selectionVersion = edit.selection.Version();
+				movedMiddle.at = movedMiddle.at + offset;
+			}
 			if (edit.placing) {
 				PendingPlacement& pending = edit.placement;
 				pending.anchor = pending.anchor + offset;
 				pending.pivot = pending.pivot + offset;
-				if (!pending.lifted->empty()) {
-					for (IntVector3& v : pending.lifted.Edit())
-						v = v + offset;
-				}
 			}
 		}
 
@@ -1587,10 +1590,9 @@ namespace spades {
 
 		// --- Clipboard / paste -----------------------------------------------
 		//
-		// Copy, Cut and Delete act on the selection. While voxels are pending,
-		// they are what is selected (lifted voxels were the selection, a paste
-		// or an import is what the user is handling), so the commands act on
-		// them where they are, and never place them first.
+		// Copy, Cut and Delete act on the selection. While a paste or an import
+		// waits, it is what the user is handling, so the commands act on it
+		// where it is, and never place it first.
 
 		void KV6EditorView::CopySelection() {
 			DocumentCommand command(*this, DocumentCommand::Pending::Keep);
@@ -1648,8 +1650,7 @@ namespace spades {
 		int KV6EditorView::EraseSelection(const std::string& label) {
 			VoxelUndoStack::Step step(undo, label);
 			if (edit.placing) {
-				// A paste or an import vanishes; lifted voxels stay out of the
-				// document, where lifting already took them from.
+				// A paste or an import vanishes; the document never held it.
 				const int erased = int(edit.placement.voxels->size());
 				DropPlacement();
 				TrimVolume();
@@ -1689,7 +1690,7 @@ namespace spades {
 			}
 			{
 				VoxelUndoStack::Step step(undo, label);
-				edit.placement = MakePlacement(std::move(voxels), at, std::vector<IntVector3>(), label);
+				edit.placement = MakePlacement(std::move(voxels), at, label);
 				edit.placing = true;
 			}
 
@@ -1770,31 +1771,79 @@ namespace spades {
 		}
 
 		bool KV6EditorView::PlacementFromSelection(PendingPlacement& out) const {
-			IntVector3 lo, hi;
-			if (!edit.selection.Bounds(lo, hi))
+			IntVector3 lo, hi, middle;
+			if (!edit.selection.Bounds(lo, hi) || !SelectionMiddleOf(middle))
 				return false;
-			std::vector<IntVector3> lifted;
 			std::vector<ClipVoxel> voxels;
-			lifted.reserve(size_t(edit.selection.Size()));
 			voxels.reserve(size_t(edit.selection.Size()));
 			edit.selection.ForEach([&](const IntVector3& v) {
-				lifted.push_back(v);
 				voxels.push_back({v - lo, model->GetColor(v.x, v.y, v.z) & 0xFFFFFF});
 			});
-			out = MakePlacement(std::move(voxels), lo, std::move(lifted), "Transform");
+			out = MakePlacement(std::move(voxels), lo, "Transform");
+			out.pivot = middle;
 			return true;
 		}
 
-		void KV6EditorView::LiftIntoPlacement(PendingPlacement taken) {
-			// The voxels leave the document, journaled, so the gap they came from
-			// shows while they are positioned and undo puts them back. Erasing
-			// them also empties the selection: they are what is selected now.
-			for (const IntVector3& v : *taken.lifted) {
-				if (InBounds(v.x, v.y, v.z))
-					WriteVoxel(v.x, v.y, v.z, false, 0);
+		bool KV6EditorView::SelectionMiddleOf(IntVector3& out) const {
+			if (movedMiddle.valid && movedMiddle.selectionVersion == edit.selection.Version() &&
+			    !edit.selection.Empty()) {
+				out = movedMiddle.at;
+				return true;
 			}
-			edit.placement = std::move(taken);
-			edit.placing = true;
+			IntVector3 lo, hi;
+			if (!edit.selection.Bounds(lo, hi))
+				return false;
+			out = MiddleOf(lo, hi);
+			return true;
+		}
+
+		void KV6EditorView::MoveSelection(const PlacementTransform& t) {
+			PendingPlacement selected;
+			if (!PlacementFromSelection(selected))
+				return;
+			PendingPlacement moved;
+			bool clamped = false;
+			if (!TransformedPlacement(selected, t, moved, clamped)) {
+				SetStatus(kMaxModelSizeMessage);
+				return;
+			}
+			if (clamped)
+				SetStatus(kMaxModelSizeMessage); // went as far as the limit allows
+			// Where the moved voxels land must fit the volume they leave behind,
+			// grown to hold them; with every voxel moving, nothing else holds it.
+			const VolumeFrame frame = FrameHolding(
+			  moved.anchor, moved.anchor + moved.Extent() - MakeIntVector3(1, 1, 1));
+			if (!frame.Fits()) {
+				SetStatus(kMaxModelSizeMessage);
+				return;
+			}
+
+			VoxelUndoStack::Step step(undo, t.Turns() ? "Turn" : "Move");
+			// They leave first, so a voxel landing where another of them was is
+			// written, not wiped out by the one that left.
+			const VoxelSelection leaving = edit.selection;
+			edit.selection.Clear();
+			leaving.ForEach([&](const IntVector3& v) { WriteVoxel(v.x, v.y, v.z, false, 0); });
+			LandGroup(moved);
+			// The middle stays with the voxels: shifted by the reframe, and by
+			// the trim that follows, along with the selection it belongs to.
+			movedMiddle.valid = true;
+			movedMiddle.selectionVersion = edit.selection.Version();
+			movedMiddle.at = moved.pivot + frame.shift;
+			TrimVolume();
+		}
+
+		int KV6EditorView::LandGroup(const PendingPlacement& group) {
+			const VolumeFrame frame =
+			  FrameHolding(group.anchor, group.anchor + group.Extent() - MakeIntVector3(1, 1, 1));
+			Reframe(frame);
+			edit.selection.Clear(); // what lands is what is selected
+			int landed = 0;
+			for (const ClipVoxel& v : *group.voxels) {
+				if (LandVoxel(group.anchor + v.rel + frame.shift, v.color))
+					landed++;
+			}
+			return landed;
 		}
 
 		bool KV6EditorView::LandVoxel(const IntVector3& at, uint32_t color) {
@@ -1839,12 +1888,9 @@ namespace spades {
 
 		PendingPlacement KV6EditorView::MakePlacement(std::vector<ClipVoxel> voxels,
 		                                              const IntVector3& anchor,
-		                                              std::vector<IntVector3> lifted,
 		                                              const std::string& label) {
 			PendingPlacement p;
 			p.voxels = CopyOnWrite<std::vector<ClipVoxel>>(std::move(voxels));
-			if (!lifted.empty())
-				p.lifted = CopyOnWrite<std::vector<IntVector3>>(std::move(lifted));
 			p.anchor = anchor;
 			// A turn about their middle keeps them about where they were.
 			p.pivot = MiddleOf(anchor, anchor + p.Extent() - MakeIntVector3(1, 1, 1));
@@ -1888,11 +1934,6 @@ namespace spades {
 				// Their middle turns with them, so it is still their middle
 				// whichever centre they turned about.
 				out.pivot = turned(from.pivot);
-				// Every turn is recorded, wherever it came from — a gizmo handle
-				// or a typed box — so the bar shows the same figure either way.
-				int record[3] = {out.turns.x, out.turns.y, out.turns.z};
-				record[t.axis] = (record[t.axis] + turns) % 4;
-				out.turns = MakeIntVector3(record[0], record[1], record[2]);
 			}
 
 			out.anchor = out.anchor + t.shift;
@@ -1910,47 +1951,36 @@ namespace spades {
 		void KV6EditorView::TransformPlacement(const PlacementTransform& t) {
 			if (!t.IsValid() || t.IsIdentity())
 				return;
-			// Nothing pending yet: the move takes the selected voxels with it.
-			PendingPlacement selected;
-			const bool lifting = !edit.placing;
-			if (lifting && !PlacementFromSelection(selected))
+			if (!edit.placing) {
+				// The selection moves in the document itself.
+				DocumentCommand command(*this);
+				MoveSelection(t);
 				return;
-
+			}
 			PendingPlacement next;
 			bool clamped = false;
-			if (!TransformedPlacement(lifting ? selected : edit.placement, t, next, clamped)) {
+			if (!TransformedPlacement(edit.placement, t, next, clamped)) {
 				SetStatus(kMaxModelSizeMessage);
 				return;
 			}
 			if (clamped)
 				SetStatus(kMaxModelSizeMessage); // went as far as the limit allows
-
-			{
-				VoxelUndoStack::Step step(undo, t.Turns() ? "Turn" : "Move");
-				if (lifting)
-					LiftIntoPlacement(std::move(selected));
-				edit.placement = std::move(next);
-			}
-		}
-
-		bool KV6EditorView::TransformTurns(IntVector3& out) const {
-			if (!edit.placing)
-				return false;
-			out = edit.placement.turns;
-			return true;
+			DocumentCommand command(*this, DocumentCommand::Pending::Keep);
+			VoxelUndoStack::Step step(undo, t.Turns() ? "Turn" : "Move");
+			edit.placement = std::move(next);
 		}
 
 		bool KV6EditorView::TransformPivot(IntVector3& out) const {
-			// From what is known already (the pending voxels' middle, the
+			// From what is known already (the waiting voxels' middle, the
 			// selection's cached box): it is asked for every frame.
 			if (edit.placing) {
 				out = TurnCentre(edit.placement.pivot);
 				return true;
 			}
-			IntVector3 lo, hi;
-			if (!edit.selection.Bounds(lo, hi))
+			IntVector3 middle;
+			if (!SelectionMiddleOf(middle))
 				return false;
-			out = TurnCentre(MiddleOf(lo, hi)); // the pivot lifting it would give
+			out = TurnCentre(middle);
 			return true;
 		}
 
@@ -1986,8 +2016,8 @@ namespace spades {
 			const PendingPlacement pending = edit.placement;
 
 			// Every placement is kept where it fits (ClampPlacementAnchor), so the
-			// volume holding it does; were it ever not to, putting the voxels back
-			// would lose nothing.
+			// volume holding it does; were it ever not to, dropping the voxels
+			// loses nothing of the document.
 			const VolumeFrame frame = FrameHolding(
 			  pending.anchor, pending.anchor + pending.Extent() - MakeIntVector3(1, 1, 1));
 			if (!frame.Fits()) {
@@ -2000,14 +2030,9 @@ namespace spades {
 			{
 				VoxelUndoStack::Step step(undo, pending.label);
 				// No longer pending before the volume changes, so the relabelling
-				// below leaves `pending` in the frame it was measured in.
+				// leaves `pending` in the frame it was measured in.
 				DropPlacement();
-				Reframe(frame);
-				edit.selection.Clear(); // what was just placed is what is selected
-				for (const ClipVoxel& v : *pending.voxels) {
-					if (LandVoxel(pending.anchor + v.rel + frame.shift, v.color))
-						placed++;
-				}
+				placed = LandGroup(pending);
 				TrimVolume();
 			}
 			SetStatus(pending.label + ": placed " + std::to_string(placed) + " voxels");
@@ -2016,17 +2041,12 @@ namespace spades {
 		void KV6EditorView::CancelPlacement() {
 			if (!edit.placing)
 				return;
-			const PendingPlacement pending = edit.placement;
+			const std::string label = edit.placement.label;
 			{
-				VoxelUndoStack::Step step(undo, "Cancel " + pending.label);
+				VoxelUndoStack::Step step(undo, "Cancel " + label);
 				DropPlacement();
-				// Lifted voxels go back where they came from, selected as they were;
-				// `lifted` and `voxels` are parallel, so each keeps its colour.
-				const std::vector<IntVector3>& lifted = *pending.lifted;
-				for (size_t i = 0; i < lifted.size(); i++)
-					LandVoxel(lifted[i], (*pending.voxels)[i].color);
 			}
-			SetStatus(pending.label + " cancelled");
+			SetStatus(label + " cancelled");
 		}
 
 		void KV6EditorView::DrawPlacementPreview() {
@@ -2255,6 +2275,9 @@ namespace spades {
 		}
 
 		void KV6EditorView::HistoryReplayed() {
+			// The middle a moved selection turns about is no part of the history;
+			// the selection the replay restored starts again from its box.
+			movedMiddle.valid = false;
 			if (edit.placing)
 				ActivateTransformTool();
 			NotifyDocumentChanged();
@@ -2903,7 +2926,7 @@ namespace spades {
 			if (HasUnsavedChanges())
 				name += " *";
 			font.Draw("KV6 Editor", MakeVector2(12.0F, 4.0F), 0.95F, MakeVector4(1, 1, 1, 1));
-			font.Draw(name + "   (" + std::to_string(DocumentVoxelCount()) + " voxels)",
+			font.Draw(name + "   (" + std::to_string(voxelCount) + " voxels)",
 			          MakeVector2(120.0F, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
 
 			std::string cam = "[Ctrl+S] save";

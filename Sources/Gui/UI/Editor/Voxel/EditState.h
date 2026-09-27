@@ -77,20 +77,20 @@ namespace spades {
 		}
 
 		/**
-		 * Voxels waiting to be placed: a paste, an import, or a selection lifted
-		 * out of the document to be moved and turned. They are drawn where they
-		 * would land, and only written into the document when they are placed,
-		 * so dragging them over other voxels never destroys what they pass.
-		 * They are only ever kept where they fit the model size limit, so
-		 * placing them never fails.
+		 * Voxels waiting to be placed: a paste or an import. They are drawn
+		 * where they would land, and only written into the document when they
+		 * are placed, so positioning them over other voxels never destroys what
+		 * they pass. They are only ever kept where they fit the model size
+		 * limit, so placing them never fails.
 		 *
-		 * The voxel lists are shared between copies until changed, so an undo
-		 * step that only moves them keeps no second copy of them.
+		 * Voxels already in the document never wait here: moving or turning
+		 * the selection writes it straight into the document.
+		 *
+		 * The voxel list is shared between copies until changed, so an undo
+		 * step that only moves them keeps no second copy of it.
 		 */
 		struct PendingPlacement {
-			// Relative to `anchor`, filling a box from (0,0,0). Parallel to
-			// `lifted` when that is not empty: voxel i was taken from lifted[i],
-			// whatever turns it made since.
+			// Relative to `anchor`, filling a box from (0,0,0).
 			CopyOnWrite<std::vector<ClipVoxel>> voxels;
 			IntVector3 anchor = IntVector3::Make(0, 0, 0); // min corner, document coords
 			// The middle of the voxels, in document coords, which turns go round
@@ -98,23 +98,7 @@ namespace spades {
 			// through every shift and turn, so turning back always returns them
 			// exactly where they were.
 			IntVector3 pivot = IntVector3::Make(0, 0, 0);
-			// Where lifted voxels came from (empty for a paste or an import), so
-			// cancelling puts them back.
-			CopyOnWrite<std::vector<IntVector3>> lifted;
-			std::string label = "Transform"; // names its undo steps
-			/**
-			 * Quarter turns made about each world axis since these voxels were
-			 * lifted, each held in 0..3.
-			 *
-			 * Turns compose, and the document keeps no orientation, so this is a
-			 * record of what was asked for rather than a reading of where the
-			 * voxels ended up. It is what the Transform tool's Turn boxes show,
-			 * so they hold what was turned instead of falling back to zero under
-			 * the hand that just turned it. Being part of the placement, it goes
-			 * exactly when the voxels do — placed, dropped or replaced — and undo
-			 * brings it back with them.
-			 */
-			IntVector3 turns = IntVector3::Make(0, 0, 0);
+			std::string label = "Paste"; // names its undo steps
 
 			/** ExtentOf(voxels), cached until the voxels change. */
 			IntVector3 Extent() const {
@@ -127,17 +111,12 @@ namespace spades {
 
 			/** Heap bytes this holds that `other` does not share with it. */
 			std::size_t UnsharedBytes(const PendingPlacement& other) const {
-				return (voxels.Shares(other.voxels) ? 0 : voxels->size() * sizeof(ClipVoxel)) +
-				       (lifted.Shares(other.lifted) ? 0 : lifted->size() * sizeof(IntVector3));
+				return voxels.Shares(other.voxels) ? 0 : voxels->size() * sizeof(ClipVoxel);
 			}
 
 			bool operator==(const PendingPlacement& o) const {
-				// `turns` counts: turning a shape that looks the same either way
-				// round leaves the voxels alone, and without it that step would
-				// read as nothing having happened and be dropped, leaving the
-				// boxes saying something the history has no record of.
 				return anchor == o.anchor && pivot == o.pivot && voxels == o.voxels &&
-				       lifted == o.lifted && label == o.label && turns == o.turns;
+				       label == o.label;
 			}
 
 		private:
@@ -158,7 +137,7 @@ namespace spades {
 		struct EditState {
 			VoxelSelection selection; // only ever solid voxels
 			MirrorSetup mirror;
-			bool placing = false;       // whether `placement` holds voxels
+			bool placing = false;       // whether a paste or an import is waiting
 			PendingPlacement placement; // empty unless placing
 
 			/** Heap bytes this holds that `other` does not share: its cost on top of it. */
