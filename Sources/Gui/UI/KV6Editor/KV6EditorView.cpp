@@ -1060,7 +1060,7 @@ namespace spades {
 			sceneDef.viewAxis[0] = side;
 			sceneDef.viewAxis[1] = up;
 			sceneDef.viewAxis[2] = dir;
-			sceneDef.fovY = 60.0F * M_PI_F / 180.0F;
+			sceneDef.fovY = DEG2RAD(60.0F);
 			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (vpW / vpH));
 			sceneDef.zNear = kNearPlane;
 			sceneDef.zFar = ViewDistance();
@@ -2485,8 +2485,8 @@ namespace spades {
 				ty = atan2f(f.y, f.x);
 			}
 			// Shortest angular path for yaw.
-			while (ty - yaw > M_PI_F) ty -= 2.0F * M_PI_F;
-			while (ty - yaw < -M_PI_F) ty += 2.0F * M_PI_F;
+			while (ty - yaw > kPi) ty -= kTwoPi;
+			while (ty - yaw < -kPi) ty += kTwoPi;
 			targetYaw = ty;
 			targetPitch = tp;
 			camAnim = true;
@@ -2898,7 +2898,7 @@ namespace spades {
 				float sens = 0.003F;
 				yaw += dx * sens;
 				pitch -= dy * sens;
-				float lim = M_PI_F * 0.5F - 0.01F;
+				float lim = kHalfPi - 0.01F;
 				pitch = Clampf(pitch, -lim, lim);
 				return;
 			}

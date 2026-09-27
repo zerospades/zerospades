@@ -43,7 +43,7 @@ namespace spades {
 			const Vector4 kHover = MakeVector4(0.3F, 0.8F, 1.0F, 0.95F);
 			const Vector4 kSelected = MakeVector4(1.0F, 0.3F, 0.3F, 0.95F);
 			const Vector4 kTarget = MakeVector4(1.0F, 0.9F, 0.3F, 0.9F);
-			constexpr float kQuarterTurn = 0.5F * M_PI_F;
+			constexpr float kQuarterTurn = kHalfPi;
 			const char* const kGizmoDragHint = "  |  [RMB] cancel a drag";
 
 			// Adds the colour region of voxel `h` to the selection, or removes it.

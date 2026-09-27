@@ -272,7 +272,7 @@ namespace spades {
 				Vector3 e2 = Vector3::Cross(normal, e1);
 				std::vector<Vector2> run;
 				for (int i = 0; i <= kRingSegments; i++) {
-					float t = 2.0F * M_PI_F * float(i) / float(kRingSegments);
+					float t = kTwoPi * float(i) / float(kRingSegments);
 					Vector3 offset = (e1 * std::cos(t) + e2 * std::sin(t)) * radius;
 					Vector2 s;
 					bool front =
@@ -336,7 +336,7 @@ namespace spades {
 				if (!view.Project(tip, outline[kConeSegments]))
 					return;
 				for (int i = 0; i < kConeSegments; i++) {
-					float t = 2.0F * M_PI_F * float(i) / float(kConeSegments);
+					float t = kTwoPi * float(i) / float(kConeSegments);
 					if (!view.Project(base + (e1 * std::cos(t) + e2 * std::sin(t)) * radius, outline[i]))
 						return;
 				}
@@ -741,7 +741,7 @@ namespace spades {
 			float bestDistance = 1.0e30F;
 			Vector3 grabbed = e1;
 			for (int i = 0; i < kRingSegments; i++) {
-				float t = 2.0F * M_PI_F * float(i) / float(kRingSegments);
+				float t = kTwoPi * float(i) / float(kRingSegments);
 				Vector3 dir = e1 * std::cos(t) + e2 * std::sin(t);
 				Vector2 s;
 				if (!view.Project(frame.center + dir * (radius * frame.unit), s))
@@ -964,8 +964,8 @@ namespace spades {
 					float radius = ((info.shape == Shape::View) ? f.viewRing : f.ring) * f.unit;
 					const Vector3& n = drag.rotationAxis;
 					Vector3 v0 = drag.startDirection, v1 = Vector3::Cross(n, v0);
-					float angle = std::max(-2.0F * M_PI_F, std::min(2.0F * M_PI_F, drag.appliedAngle));
-					int segments = std::max(2, int(std::fabs(angle) / (2.0F * M_PI_F) * kRingSegments));
+					float angle = std::max(-kTwoPi, std::min(kTwoPi, drag.appliedAngle));
+					int segments = std::max(2, int(std::fabs(angle) / kTwoPi * kRingSegments));
 					Vector2 prev;
 					bool havePrev = false;
 					for (int i = 0; i <= segments; i++) {
