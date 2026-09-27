@@ -1270,6 +1270,35 @@ namespace spades {
 			// +0.5-shifted space where each integer cell maps to a voxel index.
 			Vector3 o = eye + MakeVector3(0.5F, 0.5F, 0.5F);
 
+			// Only the volume can hold a voxel: clip the ray to its box and walk
+			// from where it enters. Walking from the eye instead would cost steps
+			// in proportion to the camera's distance, and with any fixed budget a
+			// small volume seen from afar would never be reached at all.
+			const float size[3] = {float(model->GetWidth()), float(model->GetHeight()),
+			                       float(model->GetDepth())};
+			const float from[3] = {o.x, o.y, o.z};
+			const float along[3] = {dir.x, dir.y, dir.z};
+			float tEnter = 0.0F, tExit = std::numeric_limits<float>::infinity();
+			for (int a = 0; a < 3; a++) {
+				if (along[a] == 0.0F) {
+					if (from[a] < 0.0F || from[a] > size[a])
+						return; // parallel to this slab and outside it
+					continue;
+				}
+				float t0 = (0.0F - from[a]) / along[a];
+				float t1 = (size[a] - from[a]) / along[a];
+				if (t0 > t1)
+					std::swap(t0, t1);
+				tEnter = std::max(tEnter, t0);
+				tExit = std::min(tExit, t1);
+			}
+			if (tEnter > tExit)
+				return; // the ray misses the volume
+			// The cell before the first one inside is the one a voxel is placed
+			// in when the hit is on the volume's own face.
+			const float kInside = 1.0e-4F;
+			o = o + dir * std::max(0.0F, tEnter - kInside);
+
 			int cx = int(std::floor(o.x));
 			int cy = int(std::floor(o.y));
 			int cz = int(std::floor(o.z));
@@ -1290,8 +1319,10 @@ namespace spades {
 			float tMaxZ = (dir.z != 0.0F)
 			  ? ((float(cz) + (stepZ > 0 ? 1.0F : 0.0F) - o.z) / dir.z) : big;
 
+			// A straight line crosses at most one cell per unit of each axis, so
+			// this many steps take it from one side of the volume to the other.
 			int px = cx, py = cy, pz = cz;
-			int limit = (model->GetWidth() + model->GetHeight() + model->GetDepth()) * 3 + 8;
+			const int limit = model->GetWidth() + model->GetHeight() + model->GetDepth() + 3;
 			for (int i = 0; i < limit; i++) {
 				if (InBounds(cx, cy, cz) && model->IsSolid(cx, cy, cz)) {
 					pickHit = true;
