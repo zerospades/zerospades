@@ -535,7 +535,6 @@ namespace spades {
 				ownedCursor = std::make_unique<SoftwareCursor>(*renderer);
 				softwareCursor = ownedCursor.get();
 			}
-			io = Handle<KV6ModelIO>::New();
 
 			// Initialize UI manager
 			ui = Handle<EditorUI>::New(renderer.GetPointerOrNull(), audioDevice.GetPointerOrNull(),
@@ -671,7 +670,7 @@ namespace spades {
 		}
 
 		bool KV6EditorView::LoadModel(const std::string& path) {
-			VoxelModel* loaded = io->Load(path);
+			Handle<VoxelModel> loaded = KV6ModelIO::Load(path);
 			if (!loaded) {
 				// The document that is open is not the one that failed to load, so it
 				// stays exactly as it is; the caller says how to break the news.
@@ -679,7 +678,7 @@ namespace spades {
 				return false;
 			}
 			ResetDocumentState();
-			model = Handle<VoxelModel>(loaded, false); // adopt (Load returns a ref)
+			model = loaded;
 			cubeSize = std::max(model->GetWidth(), std::max(model->GetHeight(), model->GetDepth()));
 			voxelCount = CountSolids();
 			PlaceMirrorPlane(GetPivot());
@@ -745,7 +744,7 @@ namespace spades {
 
 			// Saving writes the document, so anything still pending belongs in it.
 			DocumentCommand command(*this);
-			if (!io->Save(&*model, filePath)) {
+			if (!KV6ModelIO::Save(*model, filePath)) {
 				SetStatus("Save failed");
 				return false;
 			}
@@ -843,11 +842,11 @@ namespace spades {
 				options.filters.push_back(
 				  FileFilter{DocumentFilterLabel(), {GetDocumentExtension()}});
 			}
-			options.homeDir = io->DefaultDir();
+			options.homeDir = EditorHomeDir();
 			// The document's own folder is where this document's dialogs belong;
 			// anything else opens where the player last was, here or on the main
 			// screen.
-			options.initialDir = filePath.empty() ? EditorRememberedFolder(io->DefaultDir())
+			options.initialDir = filePath.empty() ? EditorRememberedFolder(EditorHomeDir())
 			                                      : LocalFileSystem::ParentDir(filePath);
 			options.initialName = initialName;
 
@@ -1720,7 +1719,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::InsertModel(const std::string& path) {
-			Handle<VoxelModel> imported(io->Load(path), false); // adopt (Load returns a ref)
+			Handle<VoxelModel> imported = KV6ModelIO::Load(path);
 			if (!imported) {
 				SetStatus("Could not load " + path);
 				return;

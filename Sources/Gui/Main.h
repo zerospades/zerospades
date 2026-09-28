@@ -46,7 +46,7 @@ namespace spades {
 	void StartClient(const ServerAddress&);
 	/** Runs the main screen. A model path opens it straight in the editor, which
 	 * is how a file given on the command line or by the desktop gets there. */
-	void StartMainScreen(const std::string& openModelPath = std::string());
+	void StartMainScreen(const std::string& openDocumentPath = std::string());
 	void StartDemoReplay(const std::string& demoPath);
 
 	/** Play back a demo and auto-follow a player, skipping all menus. playerSpec

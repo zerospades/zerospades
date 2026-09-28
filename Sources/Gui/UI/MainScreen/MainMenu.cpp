@@ -519,7 +519,7 @@ namespace spades {
 				}
 
 				{
-					Handle<KV6BrowserPanel> panel = Handle<KV6BrowserPanel>::New(
+					Handle<EditorBrowserPanel> panel = Handle<EditorBrowserPanel>::New(
 					    manager, helper, this, contentsLeft, contentsWidth, headerPos,
 					    headerHeight, listPos, footerPos);
 					editorPanel = panel.GetPointerOrNull();
