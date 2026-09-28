@@ -53,7 +53,6 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		class EditorUI;
-		class KV6ModelIO;
 		class EditorTool;
 
 		/**
@@ -183,7 +182,6 @@ namespace spades {
 			Handle<client::IRenderer> renderer;
 			Handle<client::IAudioDevice> audioDevice;
 			Handle<client::FontManager> fontManager;
-			Handle<KV6ModelIO> io;
 
 			// --- Document -----------------------------------------------------
 			Handle<VoxelModel> model;

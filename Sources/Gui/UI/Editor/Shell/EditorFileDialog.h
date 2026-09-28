@@ -35,6 +35,13 @@ namespace spades {
 		 */
 		FileBrowserOptions EditorBrowserOptions();
 
+		/**
+		 * The editors' own folder (absolute): `kv6/` in the app-data folder,
+		 * beside Mods/ and Demos/, made on first use. The app-data folder itself
+		 * when it cannot be made, so a dialog always opens somewhere that exists.
+		 */
+		std::string EditorHomeDir();
+
 		/** The folder an editor dialog opens in, remembered across dialogs and
 		 *  across runs. Falls back to `fallbackDir` when nothing has been
 		 *  remembered yet. */

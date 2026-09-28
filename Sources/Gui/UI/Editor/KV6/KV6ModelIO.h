@@ -20,9 +20,7 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
-#include <vector>
 
 #include <Core/RefCountedObject.h>
 
@@ -30,32 +28,18 @@ namespace spades {
 	class VoxelModel;
 	namespace gui {
 		/**
-		 * Loads and saves KV6 models by absolute path, and names the folder the
-		 * editor opens in.
-		 *
-		 * Browsing and other file operations belong to `LocalFileSystem`; this only
-		 * covers what is specific to KV6 documents.
+		 * Reads and writes KV6 models by absolute path: what is specific to KV6
+		 * documents. Browsing and other file operations belong to
+		 * `LocalFileSystem`.
 		 */
-		class KV6ModelIO : public RefCountedObject {
-		public:
-			KV6ModelIO();
+		namespace KV6ModelIO {
+			/** The model at `absPath`, or null when it cannot be read (missing,
+			 *  corrupt); never throws. */
+			Handle<VoxelModel> Load(const std::string& absPath);
 
-			/** The folder to open in (absolute): the data dir's kv6/. */
-			std::string DefaultDir();
-
-			/**
-			 * Load / save a KV6 model by absolute path. `Load` returns null on
-			 * failure (e.g. missing or corrupt file) rather than throwing; `Save`
-			 * writes through a temp file so a failure cannot truncate the target.
-			 */
-			VoxelModel* Load(const std::string& absPath);
-			bool Save(VoxelModel* model, const std::string& absPath);
-
-		protected:
-			~KV6ModelIO();
-
-		private:
-			std::string defaultDirAbs; // <user data dir>/kv6
-		};
+			/** Writes `model` to `absPath` through a temporary file, so a failure
+			 *  can never truncate what was there; false on failure. */
+			bool Save(VoxelModel& model, const std::string& absPath);
+		} // namespace KV6ModelIO
 	} // namespace gui
 } // namespace spades

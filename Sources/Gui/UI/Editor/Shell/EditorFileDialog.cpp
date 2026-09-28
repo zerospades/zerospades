@@ -23,6 +23,7 @@
 #include <Gui/DocumentTypes.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
+#include <Gui/Main.h>
 
 DEFINE_SPADES_SETTING(cl_editorFolder, ""); // remembered folder (absolute)
 
@@ -49,6 +50,16 @@ namespace spades {
 			};
 
 			return options;
+		}
+
+		std::string EditorHomeDir() {
+			// The app-data folder exists (the game makes it at startup), so one
+			// level is all there is to make.
+			const std::string home =
+			  fs::Join(std::string(spades::g_userResourceDirectory), "kv6");
+			if (!fs::IsFolder(home))
+				fs::CreateFolder(home);
+			return fs::IsFolder(home) ? home : std::string(spades::g_userResourceDirectory);
 		}
 
 		std::string EditorRememberedFolder(const std::string& fallbackDir) {

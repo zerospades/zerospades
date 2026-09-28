@@ -121,7 +121,7 @@ namespace spades {
 
 			std::vector<std::string> GetDemoList();
 			std::string PlayDemo(const std::string& filename);
-			std::string OpenKV6Editor(const std::string& path, bool isNew, SoftwareCursor* cursor = nullptr);
+			std::string OpenEditor(const std::string& path, bool isNew, SoftwareCursor* cursor = nullptr);
 			int64_t GetDemoFileSize(const std::string& filename);
 			bool DeleteDemo(const std::string& filename);
 			bool RenameDemo(const std::string& oldName, const std::string& newName);
