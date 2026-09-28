@@ -144,11 +144,11 @@ namespace spades {
 
 			// The options every model dialog shares; this tab is the embedded one,
 			// so it drives the browser itself instead of showing a footer.
-			FileBrowserOptions options = KV6ModelBrowserOptions();
+			FileBrowserOptions options = EditorBrowserOptions();
 			options.purpose = FileBrowserPurpose::Open;
 			// Restore the last-used folder; the browser falls back to Home if it is
 			// gone.
-			options.initialDir = KV6RememberedFolder(fs->DefaultDir());
+			options.initialDir = EditorRememberedFolder(fs->DefaultDir());
 			options.homeDir = fs->DefaultDir();
 			options.showFooter = false;    // the tab itself has no OK/Cancel row
 			options.showListHeader = true; // "Name", like the other tabs
@@ -172,7 +172,7 @@ namespace spades {
 					OpenModel(result.paths.front(), false);
 			};
 			browser->directoryChanged = [](const std::string& dir) {
-				KV6RememberFolder(dir); // the editor's own dialogs open here too
+				EditorRememberFolder(dir); // the editor's own dialogs open here too
 			};
 			browser->entryRejected = [this](const FileBrowserEntry& entry) {
 				OnEntryRejected(entry);
@@ -186,7 +186,7 @@ namespace spades {
 
 			// The browser may have fallen back to another folder (the remembered one
 			// could be gone), and it settles that before anyone can subscribe.
-			KV6RememberFolder(browser->GetDirectory());
+			EditorRememberFolder(browser->GetDirectory());
 
 			(void)headerHeight;
 			(void)listPos;
@@ -205,7 +205,7 @@ namespace spades {
 
 		void KV6BrowserPanel::OnEntryRejected(const FileBrowserEntry&) {
 			Handle<AlertScreen> al =
-			  Handle<AlertScreen>::New(modalOwner, KV6UnsupportedMessage(), 120.0F);
+			  Handle<AlertScreen>::New(modalOwner, UnsupportedDocumentMessage(), 120.0F);
 			al->Run();
 		}
 
@@ -219,7 +219,7 @@ namespace spades {
 		}
 
 		std::string KV6BrowserPanel::ModelFileName(const std::string& name) {
-			return KV6DocumentFileName(name);
+			return DocumentFileName(name, DocumentKind::Model);
 		}
 
 		void KV6BrowserPanel::OnNewModel() {
@@ -240,7 +240,7 @@ namespace spades {
 				options.validate = [this](const std::string& name) {
 					// An extension on its own would silently become a hidden, nameless file.
 					std::string file = ModelFileName(name);
-					if (file.size() <= KV6DocumentExtension().size())
+					if (file.size() <= DefaultExtension(DocumentKind::Model).size())
 						return _Tr("MainScreen", "The name is empty.");
 					return ValidateNewName(file);
 				};

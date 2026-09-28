@@ -27,21 +27,23 @@
 namespace spades {
 	namespace gui {
 		/**
-		 * The browser options every model file dialog starts from: the main screen's
-		 * model tab and the editor's Open, Save As and Insert dialogs. Sharing them
-		 * is what keeps a model file behaving the same way in all of them — the same
-		 * types listed, a type that cannot be opened greyed out and saying why, and
-		 * folders that can be made, renamed and deleted.
+		 * The browser options every editor file dialog starts from: the main
+		 * screen's Editor tab and the editors' Open, Save As and Insert dialogs.
+		 * Sharing them is what keeps a file behaving the same way in all of them
+		 * — the same types listed, a type that cannot be opened greyed out and
+		 * saying why, and folders that can be made, renamed and deleted.
 		 */
-		FileBrowserOptions KV6ModelBrowserOptions();
+		FileBrowserOptions EditorBrowserOptions();
 
-		/** The folder a model dialog opens in, remembered across dialogs and across
-		 *  runs. Falls back to `fallbackDir` when nothing has been remembered yet. */
-		std::string KV6RememberedFolder(const std::string& fallbackDir);
+		/** The folder an editor dialog opens in, remembered across dialogs and
+		 *  across runs. Falls back to `fallbackDir` when nothing has been
+		 *  remembered yet. */
+		std::string EditorRememberedFolder(const std::string& fallbackDir);
 
-		/** Remembers `directory` as where the next model dialog opens. Every browser
-		 *  reports its folder here, so the editor and the main screen follow each
-		 *  other instead of each keeping their own idea of where the player is. */
-		void KV6RememberFolder(const std::string& directory);
+		/** Remembers `directory` as where the next editor dialog opens. Every
+		 *  browser reports its folder here, so the editors and the main screen
+		 *  follow each other instead of each keeping their own idea of where the
+		 *  player is. */
+		void EditorRememberFolder(const std::string& directory);
 	} // namespace gui
 } // namespace spades
