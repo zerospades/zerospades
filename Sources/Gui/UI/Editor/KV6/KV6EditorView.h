@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-#include <Gui/ModelFileTypes.h>
+#include <Gui/DocumentTypes.h>
 #include <Gui/UI/Editor/Shell/EditorContext.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 #include <Gui/UI/Editor/Shell/ToolRegistry.h>
@@ -643,7 +643,7 @@ namespace spades {
 
 			// --- Document commands behind the menu items ---
 			std::string GetDocumentPath() const { return filePath; }
-			std::string GetDocumentExtension() const { return KV6DocumentExtension(); }
+			std::string GetDocumentExtension() const { return DefaultExtension(DocumentKind::Model); }
 			bool SaveDocument(const std::string& path);
 			/** Asks for a path with the shared file browser, then saves to it.
 			 *  `after` runs only once the document has actually been written. */

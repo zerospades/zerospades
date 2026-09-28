@@ -20,20 +20,20 @@
 
 #include "EditorFileDialog.h"
 
-#include <Gui/ModelFileTypes.h>
+#include <Gui/DocumentTypes.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
 
-DEFINE_SPADES_SETTING(cl_kv6EditorFolder, ""); // remembered folder (absolute)
+DEFINE_SPADES_SETTING(cl_editorFolder, ""); // remembered folder (absolute)
 
 namespace spades {
 	namespace gui {
 		namespace fs = LocalFileSystem;
 
-		FileBrowserOptions KV6ModelBrowserOptions() {
+		FileBrowserOptions EditorBrowserOptions() {
 			FileBrowserOptions options;
 			options.target = FileBrowserTarget::Files;
-			options.filters.push_back(FileFilter{KV6ModelFilterLabel(), KV6ModelExtensions()});
+			options.filters.push_back(FileFilter{DocumentFilterLabel(), DocumentExtensions()});
 			options.appendFilterExtension = true;
 			options.allowCreateFolder = true;
 			options.allowRename = true;
@@ -41,9 +41,9 @@ namespace spades {
 
 			options.describeEntry = [](const fs::DirEntry& entry) {
 				FileEntryInfo info;
-				if (!entry.isFolder && !KV6IsEditable(entry.name)) {
+				if (!entry.isFolder && !IsEditableDocument(entry.name)) {
 					info.accepted = false;
-					info.hint = KV6UnsupportedHint();
+					info.hint = UnsupportedDocumentHint();
 				}
 				return info;
 			};
@@ -51,14 +51,14 @@ namespace spades {
 			return options;
 		}
 
-		std::string KV6RememberedFolder(const std::string& fallbackDir) {
-			std::string remembered = static_cast<std::string>(cl_kv6EditorFolder);
+		std::string EditorRememberedFolder(const std::string& fallbackDir) {
+			std::string remembered = static_cast<std::string>(cl_editorFolder);
 			return remembered.empty() ? fallbackDir : remembered;
 		}
 
-		void KV6RememberFolder(const std::string& directory) {
+		void EditorRememberFolder(const std::string& directory) {
 			if (!directory.empty())
-				cl_kv6EditorFolder = directory;
+				cl_editorFolder = directory;
 		}
 	} // namespace gui
 } // namespace spades
