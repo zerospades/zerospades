@@ -24,8 +24,8 @@
 
 namespace spades {
 	/**
-	 * Tells the desktop that this program opens voxel model files, so a file
-	 * manager offers it for one.
+	 * Tells the desktop that this program opens the document types an editor
+	 * can open (see DocumentTypes), so a file manager offers it for them.
 	 *
 	 * Only Windows needs this at runtime: there, an association is a registry
 	 * entry a program makes for itself. A package installs the equivalent on
@@ -33,12 +33,12 @@ namespace spades {
 	 * types in its Info.plist), so both report that there is nothing to do.
 	 *
 	 * The registration is per-user and additive: it adds this program to the
-	 * list of programs offered for a model without taking the file type from
+	 * list of programs offered for a file without taking the file type from
 	 * whatever already holds it, so it needs no administrator and displaces
 	 * nothing. `Unregister` removes exactly what `Register` wrote.
 	 *
 	 * Both return an empty string on success, or a message saying what failed.
 	 */
-	std::string RegisterModelFileTypes();
-	std::string UnregisterModelFileTypes();
+	std::string RegisterFileTypes();
+	std::string UnregisterFileTypes();
 } // namespace spades

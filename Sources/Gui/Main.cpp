@@ -59,7 +59,7 @@
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/StartupScreen.h>
 #include <Gui/FileTypeRegistration.h>
-#include <Gui/ModelFileTypes.h>
+#include <Gui/DocumentTypes.h>
 #include <ZeroSpades.h>
 
 #include <Core/VoxelModel.h>
@@ -250,16 +250,16 @@ namespace {
 		printf("                       name resolves under Demos/\n");
 		printf("  --player ID|NAME     player to follow (default: first player)\n");
 		printf("  --register-file-types\n");
-		printf("                       offer this program for voxel model files, so a\n");
-		printf("                       file manager can open one with it. Windows\n");
-		printf("                       only, for the current user; elsewhere this is\n");
-		printf("                       done when the program is installed.\n");
+		printf("                       offer this program for the files its editors\n");
+		printf("                       open, so a file manager can open one with it.\n");
+		printf("                       Windows only, for the current user; elsewhere\n");
+		printf("                       this is done when the program is installed.\n");
 		printf("  --unregister-file-types\n");
 		printf("                       undo --register-file-types\n");
-		printf("  --open-model FILE    open a voxel model in the editor, skipping the\n");
-		printf("                       menus. A model file given on its own does the\n");
-		printf("                       same, which is what a file manager passes when\n");
-		printf("                       it opens one with this program.\n");
+		printf("  --open FILE          open a file in its editor, skipping the menus.\n");
+		printf("                       A file given on its own does the same, which\n");
+		printf("                       is what a file manager passes when it opens\n");
+		printf("                       one with this program.\n");
 		printf("  -h, --help           show this help message\n");
 		printf("  -v, --version        show version information\n");
 		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
@@ -379,16 +379,16 @@ namespace {
 				g_unregisterFileTypes = true;
 				return ++i;
 			}
-			if (!strcasecmp(a, "--open-model")) {
+			if (!strcasecmp(a, "--open")) {
 				if (i + 1 < argc) {
 					std::string path = LocalPathFromArgument(argv[++i]);
-					// Checked like a bare path is: the editor writes what it opens, so
-					// handing it something that is not a model is how a file that is
-					// not a model gets a model written over it.
-					if (spades::gui::KV6IsEditable(path)) {
-						spades::g_openModelPath = path;
+					// Checked like a bare path is: an editor writes what it opens, so
+					// handing it a file of another type is how that file gets
+					// something else written over it.
+					if (spades::gui::IsEditableDocument(path)) {
+						spades::g_openDocumentPath = path;
 					} else {
-						fprintf(stderr, "Not a voxel model this program can open: %s\n",
+						fprintf(stderr, "Not a file this program can open: %s\n",
 						        path.c_str());
 						return 0;
 					}
@@ -396,13 +396,13 @@ namespace {
 				}
 				return 0;
 			}
-			// A bare model is how a file manager hands one over: "open with" passes
+			// A bare file is how a file manager hands one over: "open with" passes
 			// the file and nothing else, as a path or as a `file://` URL. Anything
 			// else that is not a known option is left for the checks that follow.
 			if (a[0] != '-') {
 				std::string path = LocalPathFromArgument(a);
-				if (spades::gui::KV6IsEditable(path)) {
-					spades::g_openModelPath = path;
+				if (spades::gui::IsEditableDocument(path)) {
+					spades::g_openDocumentPath = path;
 					return ++i;
 				}
 			}
@@ -483,7 +483,7 @@ namespace spades {
 	std::string g_userResourceDirectory;
 	std::string g_executablePath;
 	bool g_openModsTab = false;
-	std::string g_openModelPath;
+	std::string g_openDocumentPath;
 	bool g_tryMod = false;
 
 	void StartClient(const spades::ServerAddress& addr) {
@@ -702,8 +702,8 @@ int main(int argc, char** argv) {
 	}
 
 	if (g_registerFileTypes || g_unregisterFileTypes) {
-		std::string error = g_registerFileTypes ? spades::RegisterModelFileTypes()
-		                                        : spades::UnregisterModelFileTypes();
+		std::string error = g_registerFileTypes ? spades::RegisterFileTypes()
+		                                        : spades::UnregisterFileTypes();
 		if (!error.empty()) {
 			fprintf(stderr, "%s\n", error.c_str());
 			return 1;
@@ -1126,14 +1126,14 @@ int main(int argc, char** argv) {
 			SPLog("Starting demo replay: %s", g_replayDemoPath.c_str());
 			spades::StartDemoReplay(g_replayDemoPath);
 		} else if (!g_autoconnect) {
-			// A model to open is a destination of its own: the setup window would
+			// A file to open is a destination of its own: the setup window would
 			// only stand between the player and the file they asked for.
-			if (spades::g_openModsTab || spades::g_tryMod || !spades::g_openModelPath.empty() ||
+			if (spades::g_openModsTab || spades::g_tryMod || !spades::g_openDocumentPath.empty() ||
 			    !((int)cl_showStartupWindow != 0 || splashWindow->IsStartupScreenRequested())) {
 				splashWindow.reset();
 
 				SPLog("Starting main screen");
-				spades::StartMainScreen(spades::g_openModelPath);
+				spades::StartMainScreen(spades::g_openDocumentPath);
 			} else {
 				splashWindow.reset();
 

@@ -831,7 +831,7 @@ namespace spades {
 		                                        std::function<void(const std::string&)> picked) {
 			// The same options the model tab on the main screen is built from, so a
 			// model file behaves the same way wherever it is picked.
-			FileBrowserOptions options = KV6ModelBrowserOptions();
+			FileBrowserOptions options = EditorBrowserOptions();
 			options.purpose = purpose;
 
 			// Reading lists every type; writing offers only the one this editor
@@ -841,13 +841,13 @@ namespace spades {
 			if (purpose != FileBrowserPurpose::Open) {
 				options.filters.clear();
 				options.filters.push_back(
-				  FileFilter{KV6ModelFilterLabel(), {KV6DocumentExtension()}});
+				  FileFilter{DocumentFilterLabel(), {GetDocumentExtension()}});
 			}
 			options.homeDir = io->DefaultDir();
 			// The document's own folder is where this document's dialogs belong;
 			// anything else opens where the player last was, here or on the main
 			// screen.
-			options.initialDir = filePath.empty() ? KV6RememberedFolder(io->DefaultDir())
+			options.initialDir = filePath.empty() ? EditorRememberedFolder(io->DefaultDir())
 			                                      : LocalFileSystem::ParentDir(filePath);
 			options.initialName = initialName;
 
@@ -857,7 +857,7 @@ namespace spades {
 			dialog->closed = [picked](const FileBrowserResult& result) {
 				// Where the player ended up is where every model dialog opens next,
 				// whether or not they picked something here.
-				KV6RememberFolder(result.directory);
+				EditorRememberFolder(result.directory);
 				if (result.accepted && !result.paths.empty())
 					picked(result.paths.front());
 			};
@@ -879,7 +879,7 @@ namespace spades {
 
 		void KV6EditorView::OpenSaveAsDialog(std::function<void()> after) {
 			const std::string name =
-			  filePath.empty() ? KV6UntitledFileName() : LocalFileSystem::GetFileName(filePath);
+			  filePath.empty() ? UntitledFileName(DocumentKind::Model) : LocalFileSystem::GetFileName(filePath);
 			ShowModelFileDialog("Save As", FileBrowserPurpose::Save, name,
 			                    [this, after](const std::string& path) {
 				                    if (SaveDocument(path) && after)
