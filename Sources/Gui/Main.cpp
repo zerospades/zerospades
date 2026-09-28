@@ -551,23 +551,23 @@ namespace spades {
 		runner.RunProtected();
 	}
 
-	void StartMainScreen(const std::string& openModelPath) {
+	void StartMainScreen(const std::string& openDocumentPath) {
 		class ConcreteRunner : public spades::gui::Runner {
 		public:
-			std::string openModelPath;
+			std::string openDocumentPath;
 
 		protected:
 			spades::gui::View* CreateView(spades::client::IRenderer* renderer,
 										  spades::client::IAudioDevice* audio) override {
 				auto fontManager = Handle<client::FontManager>::New(renderer);
 				auto innerView =
-				  Handle<gui::MainScreen>::New(renderer, audio, fontManager, openModelPath);
+				  Handle<gui::MainScreen>::New(renderer, audio, fontManager, openDocumentPath);
 				return new spades::gui::ConsoleScreen(renderer, audio, fontManager,
 													  std::move(innerView).Cast<gui::View>());
 			}
 		};
 		ConcreteRunner runner;
-		runner.openModelPath = openModelPath;
+		runner.openDocumentPath = openDocumentPath;
 		runner.RunProtected();
 	}
 } // namespace spades

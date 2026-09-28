@@ -18,14 +18,14 @@
 
  */
 
-#include "KV6BrowserPanel.h"
+#include "EditorBrowserPanel.h"
 
 #include <algorithm>
 
 #include <Core/LocalFileSystem.h>
-#include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Gui/MainScreenHelper.h>
+#include <Gui/UI/Editor/Shell/EditorFileDialog.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/Label.h>
@@ -38,29 +38,35 @@ namespace {
 	const float kActionRowY = 200.0F;
 	const float kActionRowH = 30.0F;
 	const float kErrorRowH = 25.0F;
+
+	// The "New" prompt: the question, then a button per document type.
+	const float kPromptButtonsTop = 70.0F;
+	const float kPromptButtonPitch = 40.0F;
+	const float kPromptButtonW = 200.0F;
+	const float kPromptButtonH = 30.0F;
+	const float kPromptBottomGap = 10.0F;
 } // namespace
 
 namespace spades {
 	namespace gui {
 		using ui::Button;
-		using ui::Field;
 		using ui::Label;
-		using ui::ListView;
 		using ui::UIElement;
 		using ui::UIManager;
 
-		// -- KV6ModelTypePrompt --
+		// -- NewDocumentPrompt --
 
-		KV6ModelTypePrompt::KV6ModelTypePrompt(UIElement* owner)
+		NewDocumentPrompt::NewDocumentPrompt(UIElement* owner)
 		    : UIElement(&owner->GetManager()), owner(owner) {
 			SetFont(GetManager().GetRootElement().GetFont());
 			SetBounds(owner->GetBounds());
 
 			UIManager* manager = &GetManager();
+			const std::vector<DocumentType>& types = DocumentTypes();
 			float sw = manager->screenWidth;
 			float sh = manager->screenHeight;
 			float w = std::min(sw - 16.0F, 500.0F);
-			float h = 160.0F;
+			float h = kPromptButtonsTop + kPromptButtonPitch * float(types.size()) + kPromptBottomGap;
 			float x = (sw - w) * 0.5F;
 			float y = (sh - h) * 0.5F;
 
@@ -77,79 +83,63 @@ namespace spades {
 				label->alignment = MakeVector2(0.5F, 0.5F);
 				AddChild(label.GetPointerOrNull());
 			}
-			{
+			for (std::size_t i = 0; i < types.size(); i++) {
+				const DocumentType& type = types[i];
 				Handle<Button> btn = Handle<Button>::New(manager);
-				btn->caption = _Tr("MainScreen", "KV6");
-				btn->SetBounds(AABB2(x + (w - 150.0F) * 0.5F, y + 70.0F, 150.0F, 30.0F));
-				btn->activated = [this](UIElement& s) { OnKV6(s); };
-				AddChild(btn.GetPointerOrNull());
-			}
-			{
-				Handle<Button> btn = Handle<Button>::New(manager);
-				btn->caption = _Tr("MainScreen", "Map VXL");
-				vxlButton = btn.GetPointerOrNull();
-				btn->SetBounds(AABB2(x + (w - 150.0F) * 0.5F, y + 110.0F, 150.0F, 30.0F));
-				btn->activated = [this](UIElement& s) { OnVXL(s); };
-				btn->enable = false; // Disabled until supported
+				btn->caption = type.description;
+				btn->SetBounds(AABB2(x + (w - kPromptButtonW) * 0.5F,
+				                     y + kPromptButtonsTop + kPromptButtonPitch * float(i),
+				                     kPromptButtonW, kPromptButtonH));
+				btn->activated = [this, &type](UIElement&) { Choose(type); };
+				btn->enable = type.editable; // listed, but no editor opens it yet
 				AddChild(btn.GetPointerOrNull());
 			}
 		}
 
-		void KV6ModelTypePrompt::OnKV6(UIElement&) {
-			result = 0;
+		void NewDocumentPrompt::Choose(const DocumentType& type) {
+			result = &type;
 			Close();
 		}
 
-		void KV6ModelTypePrompt::OnVXL(UIElement&) {
-			result = 1;
-			Close();
-		}
-
-		void KV6ModelTypePrompt::OnCancel(UIElement&) {
-			result = -1;
-			Close();
-		}
-
-		void KV6ModelTypePrompt::Close() {
-			Handle<KV6ModelTypePrompt> keepAlive(this);
+		void NewDocumentPrompt::Close() {
+			Handle<NewDocumentPrompt> keepAlive(this);
 			owner->enable = true;
 			GetParent()->RemoveChild(this);
 			if (closed)
 				closed(*this);
 		}
 
-		void KV6ModelTypePrompt::Run() {
+		void NewDocumentPrompt::Run() {
 			owner->enable = false;
 			owner->GetParent()->AddChild(this);
 		}
 
-		void KV6ModelTypePrompt::HotKey(const std::string& key) {
+		void NewDocumentPrompt::HotKey(const std::string& key) {
 			if (IsEnabled() && key == "Escape") {
-				OnCancel(*this);
+				result = nullptr;
+				Close();
 			} else {
 				UIElement::HotKey(key);
 			}
 		}
 
-		// -- KV6BrowserPanel --
+		// -- EditorBrowserPanel --
 
-		KV6BrowserPanel::KV6BrowserPanel(UIManager* manager, MainScreenHelper* helper,
-		                                 UIElement* modalOwner, float contentsLeft,
-		                                 float contentsWidth, float headerPos, float headerHeight,
-		                                 float listPos, float footerPos)
+		EditorBrowserPanel::EditorBrowserPanel(UIManager* manager, MainScreenHelper* helper,
+		                                       UIElement* modalOwner, float contentsLeft,
+		                                       float contentsWidth, float headerPos,
+		                                       float headerHeight, float listPos, float footerPos)
 		    : UIElement(manager), helper(helper), modalOwner(modalOwner) {
-			fs = Handle<KV6ModelIO>::New();
-
 			SetBounds(AABB2(0.0F, 0.0F, manager->screenWidth, manager->screenHeight));
 
-			// The options every model dialog shares; this tab is the embedded one,
+			// The options every editor dialog shares; this tab is the embedded one,
 			// so it drives the browser itself instead of showing a footer.
 			FileBrowserOptions options = EditorBrowserOptions();
 			options.purpose = FileBrowserPurpose::Open;
 			// Restore the last-used folder; the browser falls back to Home if it is
 			// gone.
-			options.initialDir = EditorRememberedFolder(fs->DefaultDir());
-			options.homeDir = fs->DefaultDir();
+			options.initialDir = EditorRememberedFolder(EditorHomeDir());
+			options.homeDir = EditorHomeDir();
 			options.showFooter = false;    // the tab itself has no OK/Cancel row
 			options.showListHeader = true; // "Name", like the other tabs
 			// Line the rows up with the tab's own layout (action row, header, list).
@@ -158,7 +148,7 @@ namespace spades {
 				FileBrowserAction action;
 				action.caption = _Tr("MainScreen", "New");
 				action.width = 105.0F;
-				action.run = [this] { OnNewModel(); };
+				action.run = [this] { OnNew(); };
 				options.extraActions.push_back(std::move(action));
 			}
 
@@ -169,18 +159,18 @@ namespace spades {
 			                         (footerPos - 44.0F + kErrorRowH) - kActionRowY));
 			browser->accepted = [this](const FileBrowserResult& result) {
 				if (!result.paths.empty())
-					OpenModel(result.paths.front(), false);
+					OpenDocument(result.paths.front(), false);
 			};
 			browser->directoryChanged = [](const std::string& dir) {
-				EditorRememberFolder(dir); // the editor's own dialogs open here too
+				EditorRememberFolder(dir); // the editors' own dialogs open here too
 			};
 			browser->entryRejected = [this](const FileBrowserEntry& entry) {
 				OnEntryRejected(entry);
 			};
-			// Typing a path that does not exist yet creates that model, as the old
-			// explorer did.
+			// Typing a path that does not exist yet creates that document, a model
+			// unless the name says otherwise.
 			browser->unknownPathSubmitted = [this](const std::string& path) {
-				OpenModel(ModelFileName(path), true);
+				OpenDocument(DocumentFileName(path, DocumentKind::Model), true);
 			};
 			AddChild(browser);
 
@@ -192,24 +182,24 @@ namespace spades {
 			(void)listPos;
 		}
 
-		void KV6BrowserPanel::SubmitDefault() { browser->SubmitDefault(); }
-		void KV6BrowserPanel::Refresh() { browser->Refresh(); }
+		void EditorBrowserPanel::SubmitDefault() { browser->SubmitDefault(); }
+		void EditorBrowserPanel::Refresh() { browser->Refresh(); }
 
-		void KV6BrowserPanel::OpenModel(const std::string& absPath, bool isNew) {
-			std::string msg = helper->OpenKV6Editor(absPath, isNew);
+		void EditorBrowserPanel::OpenDocument(const std::string& absPath, bool isNew) {
+			std::string msg = helper->OpenEditor(absPath, isNew);
 			if (msg.size() > 0) {
 				Handle<AlertScreen> al = Handle<AlertScreen>::New(modalOwner, msg);
 				al->Run();
 			}
 		}
 
-		void KV6BrowserPanel::OnEntryRejected(const FileBrowserEntry&) {
+		void EditorBrowserPanel::OnEntryRejected(const FileBrowserEntry&) {
 			Handle<AlertScreen> al =
 			  Handle<AlertScreen>::New(modalOwner, UnsupportedDocumentMessage(), 120.0F);
 			al->Run();
 		}
 
-		std::string KV6BrowserPanel::ValidateNewName(const std::string& name) const {
+		std::string EditorBrowserPanel::ValidateNewName(const std::string& name) const {
 			std::string reason;
 			if (!LocalFileSystem::IsValidFileName(name, &reason))
 				return reason;
@@ -218,53 +208,41 @@ namespace spades {
 			return std::string();
 		}
 
-		std::string KV6BrowserPanel::ModelFileName(const std::string& name) {
-			return DocumentFileName(name, DocumentKind::Model);
-		}
-
-		void KV6BrowserPanel::OnNewModel() {
-			Handle<KV6ModelTypePrompt> prompt = Handle<KV6ModelTypePrompt>::New(modalOwner);
-			prompt->closed = [this](UIElement& s) { OnNewModelTypeClosed(s); };
+		void EditorBrowserPanel::OnNew() {
+			Handle<NewDocumentPrompt> prompt = Handle<NewDocumentPrompt>::New(modalOwner);
+			prompt->closed = [this](UIElement& s) { OnNewTypeClosed(s); };
 			prompt->Run();
 		}
 
-		void KV6BrowserPanel::OnNewModelTypeClosed(UIElement& sender) {
-			KV6ModelTypePrompt* p = dynamic_cast<KV6ModelTypePrompt*>(&sender);
-			if (!p)
+		void EditorBrowserPanel::OnNewTypeClosed(UIElement& sender) {
+			NewDocumentPrompt* p = dynamic_cast<NewDocumentPrompt*>(&sender);
+			if (!p || !p->result)
 				return;
+			newKind = p->result->kind;
 
-			if (p->result == 0) { // KV6 selected
-				TextPromptScreen::Options options;
-				options.title = _Tr("MainScreen", "New KV6 Model");
-				options.initialText = "untitled";
-				options.validate = [this](const std::string& name) {
-					// An extension on its own would silently become a hidden, nameless file.
-					std::string file = ModelFileName(name);
-					if (file.size() <= DefaultExtension(DocumentKind::Model).size())
-						return _Tr("MainScreen", "The name is empty.");
-					return ValidateNewName(file);
-				};
-				Handle<TextPromptScreen> namePrompt =
-				    Handle<TextPromptScreen>::New(modalOwner, std::move(options));
-				namePrompt->closed = [this](UIElement& s) { OnNewModelNameClosed(s); };
-				namePrompt->Run();
-			} else if (p->result == 1) { // VXL selected
-				Handle<AlertScreen> al = Handle<AlertScreen>::New(
-				    modalOwner,
-				    _Tr("MainScreen",
-				        "Map VXL support is not yet implemented. Please use KV6 models."),
-				    120.0F);
-				al->Run();
-			}
+			TextPromptScreen::Options options;
+			options.title = _Tr("MainScreen", "New {0}", std::string(p->result->description));
+			options.initialText = "untitled";
+			options.validate = [this](const std::string& name) {
+				// An extension on its own would silently become a hidden, nameless file.
+				std::string file = DocumentFileName(name, newKind);
+				if (file.size() <= DefaultExtension(newKind).size())
+					return _Tr("MainScreen", "The name is empty.");
+				return ValidateNewName(file);
+			};
+			Handle<TextPromptScreen> namePrompt =
+			  Handle<TextPromptScreen>::New(modalOwner, std::move(options));
+			namePrompt->closed = [this](UIElement& s) { OnNewNameClosed(s); };
+			namePrompt->Run();
 		}
 
-		void KV6BrowserPanel::OnNewModelNameClosed(UIElement& sender) {
+		void EditorBrowserPanel::OnNewNameClosed(UIElement& sender) {
 			TextPromptScreen* p = dynamic_cast<TextPromptScreen*>(&sender);
 			if (!p || !p->GetResult())
 				return;
-			OpenModel(LocalFileSystem::Join(browser->GetDirectory(),
-			                                ModelFileName(p->GetText())),
-			          true);
+			OpenDocument(LocalFileSystem::Join(browser->GetDirectory(),
+			                                   DocumentFileName(p->GetText(), newKind)),
+			             true);
 		}
 	} // namespace gui
 } // namespace spades

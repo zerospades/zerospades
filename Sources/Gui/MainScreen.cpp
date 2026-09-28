@@ -18,6 +18,7 @@
 
  */
 
+#include "DocumentTypes.h"
 #include "UI/Editor/KV6/KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
@@ -38,11 +39,11 @@ namespace spades {
 		MainScreen::MainScreen(Handle<client::IRenderer> _renderer,
 		                       Handle<client::IAudioDevice> _audioDevice,
 		                       Handle<client::FontManager> _fontManager,
-		                       const std::string& openModelPath)
+		                       const std::string& openDocumentPath)
 		    : renderer(std::move(_renderer)),
 		      audioDevice(std::move(_audioDevice)),
 		      fontManager(std::move(_fontManager)),
-		      pendingModelPath(openModelPath) {
+		      pendingDocumentPath(openDocumentPath) {
 			SPADES_MARK_FUNCTION();
 			if (!renderer)
 				SPInvalidArgument("renderer");
@@ -74,17 +75,29 @@ namespace spades {
 			}
 		}
 
-		std::string MainScreen::OpenKV6Editor(const std::string& path, bool isNew,
-		                                      SoftwareCursor* cursor) {
+		std::string MainScreen::OpenEditor(const std::string& path, bool isNew,
+		                                   SoftwareCursor* cursor) {
+			const DocumentType* type = FindDocumentType(path);
+			if (!type || !type->editable)
+				return UnsupportedDocumentMessage();
 			try {
-				subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice, &*fontManager,
-				                                     cursor, path, isNew)
-				            .Cast<View>();
+				switch (type->kind) {
+					case DocumentKind::Model:
+						subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice,
+						                                     &*fontManager, cursor, path, isNew)
+						            .Cast<View>();
+						return "";
+					case DocumentKind::Scene:
+					case DocumentKind::Map: break; // no editor for these yet
+				}
 			} catch (const std::exception& ex) {
-				SPLog("[!] Error while opening the KV6 editor: %s", ex.what());
+				SPLog("[!] Error while opening the editor: %s", ex.what());
 				return ex.what();
 			}
-			return "";
+			// A type marked editable with no editor behind it is a table mistake,
+			// said as one rather than as the player's.
+			SPLog("[!] No editor opens %s files", type->extension);
+			return UnsupportedDocumentMessage();
 		}
 
 		bool MainScreen::NeedsAbsoluteMouseCoordinate() {
@@ -293,19 +306,19 @@ namespace spades {
 			// Started to open a model: go straight to the editor, so opening one
 			// from a terminal or a file manager lands where the file belongs rather
 			// than in the menus.
-			if (!pendingModelPath.empty()) {
+			if (!pendingDocumentPath.empty()) {
 				std::string path;
-				path.swap(pendingModelPath); // opened once, not on every return here
-				OpenModelFile(path);
+				path.swap(pendingDocumentPath); // opened once, not on every return here
+				OpenDocumentFile(path);
 			}
 		}
 
-		void MainScreen::OpenModelFile(const std::string& path) {
+		void MainScreen::OpenDocumentFile(const std::string& path) {
 			SPADES_MARK_FUNCTION();
-			SPLog("Opening model '%s' in the editor", path.c_str());
-			std::string msg = OpenKV6Editor(path, false, nullptr);
+			SPLog("Opening '%s' in its editor", path.c_str());
+			std::string msg = OpenEditor(path, false, nullptr);
 			if (!msg.empty()) {
-				SPLog("[!] Could not open the model editor: %s", msg.c_str());
+				SPLog("[!] Could not open the editor: %s", msg.c_str());
 				helper->errorMessage = msg;
 			}
 		}

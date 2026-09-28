@@ -25,47 +25,24 @@
 #include <Core/LocalFileSystem.h>
 #include <Core/StdStream.h>
 #include <Core/VoxelModel.h>
-#include <Gui/Main.h>
 
 namespace spades {
 	namespace gui {
 		namespace fs = LocalFileSystem;
 
-		KV6ModelIO::KV6ModelIO() {
-			// Home is a dedicated `kv6/` folder inside the app-data dir (alongside
-			// Mods/, Demos/, ...), created on demand. The parent already exists (the
-			// game creates it at startup), so a single mkdir is enough.
-			defaultDirAbs = fs::Join(std::string(spades::g_userResourceDirectory), "kv6");
-			if (!fs::IsFolder(defaultDirAbs))
-				fs::CreateFolder(defaultDirAbs);
-		}
-
-		KV6ModelIO::~KV6ModelIO() {}
-
-		std::string KV6ModelIO::DefaultDir() {
-			// Fall back to the app-data root if the kv6/ folder couldn't be created
-			// (e.g. permissions, or the name is taken by a file), so the explorer
-			// always opens somewhere valid.
-			if (fs::IsFolder(defaultDirAbs))
-				return defaultDirAbs;
-			return std::string(spades::g_userResourceDirectory);
-		}
-
-		VoxelModel* KV6ModelIO::Load(const std::string& absPath) {
+		Handle<VoxelModel> KV6ModelIO::Load(const std::string& absPath) {
 			std::FILE* f = fs::OpenFile(absPath, "rb");
 			if (!f)
-				return nullptr;
+				return Handle<VoxelModel>();
 			try {
 				StdStream stream(f, true); // takes ownership of the FILE*
-				return VoxelModel::LoadKV6(stream).Unmanage();
+				return VoxelModel::LoadKV6(stream);
 			} catch (const std::exception&) {
-				return nullptr;
+				return Handle<VoxelModel>();
 			}
 		}
 
-		bool KV6ModelIO::Save(VoxelModel* model, const std::string& absPath) {
-			if (!model)
-				return false;
+		bool KV6ModelIO::Save(VoxelModel& model, const std::string& absPath) {
 			// Write to a sibling temp file first, then atomically replace the target,
 			// so a failure mid-write can never truncate or corrupt an existing model.
 			std::string tmpPath = absPath + ".savetmp";
@@ -74,7 +51,7 @@ namespace spades {
 				return false;
 			try {
 				StdStream stream(f, true); // takes ownership; closes/flushes at scope exit
-				model->SaveKV6(stream);
+				model.SaveKV6(stream);
 			} catch (const std::exception&) {
 				fs::Delete(tmpPath);
 				return false;
