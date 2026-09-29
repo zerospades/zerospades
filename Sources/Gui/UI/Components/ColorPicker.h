@@ -49,17 +49,15 @@ namespace spades {
 		 */
 		class ColorPicker {
 		public:
-			enum class ClickType { None, SV, Hue, Close, Eyedropper, Preset, Recent };
+			enum class ClickType { None, SV, Hue, Close, Eyedropper, Recent };
 
 			struct ClickResult {
 				ClickType type = ClickType::None;
-				int index = -1; // the swatch, for Preset and Recent
+				int index = -1; // the swatch, for Recent
 			};
 
 			ColorPicker() = default;
 
-			/** Swatches to offer, `columns` per row. */
-			void SetPresets(const std::vector<uint32_t>& presets, int columns = 8);
 			/** Shows `rgb`. Only the user's changes are reported (OnColorChanged). */
 			void SetColor(uint32_t rgb);
 			/** How many recently used colours the picker keeps, in one row. */
@@ -108,9 +106,7 @@ namespace spades {
 			// Drag tracking
 			int dragMode = 0; // 0 none, 1 SV square, 2 hue bar
 
-			// Swatches: presets, and recently used colours (newest first)
-			std::vector<uint32_t> presets;
-			int presetColumns = 8;
+			// Recently used colours, newest first
 			std::vector<uint32_t> recent;
 
 			// A grid of square swatches, `columns` to a row, from (x, y).
@@ -121,7 +117,7 @@ namespace spades {
 				// The swatch under `p` among the first `count`, or -1.
 				int At(const Vector2& p, int count) const;
 			};
-			SwatchGrid presetGrid, recentGrid;
+			SwatchGrid recentGrid;
 			float recentLabelY = 0.0F;
 
 			// Picker panel geometry

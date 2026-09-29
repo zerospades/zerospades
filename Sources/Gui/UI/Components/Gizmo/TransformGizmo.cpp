@@ -30,8 +30,8 @@ namespace spades {
 	namespace gui {
 		namespace {
 			// --- Behaviour -----------------------------------------------------
-			constexpr float kDefaultSizePixels = 80.0F;
-			constexpr float kMinSizePixels = 16.0F;
+			// On-screen radius of the rotation rings, in pixels; sizes the rest.
+			constexpr float kSizePixels = 80.0F;
 			constexpr float kPickTolerance = 6.0F; // pixels from a handle that still grab it
 			// An axis handle fades out as its on-screen length (a fraction of the
 			// gizmo size) drops from full to hide: it points at the viewer and
@@ -419,10 +419,7 @@ namespace spades {
 
 		TransformGizmo::TransformGizmo()
 		    : visible(GizmoHandleSet::Translation()),
-		      enabled(GizmoHandleSet::Translation()),
-		      sizePixels(kDefaultSizePixels) {}
-
-		void TransformGizmo::SetSize(float pixels) { sizePixels = std::max(kMinSizePixels, pixels); }
+		      enabled(GizmoHandleSet::Translation()) {}
 
 		GizmoFrame TransformGizmo::MakeFrame(const GizmoView& view) const {
 			GizmoFrame f;
@@ -451,8 +448,8 @@ namespace spades {
 			f.center = pose.position;
 			if (!view.Project(f.center, f.centerScreen))
 				return f; // behind the viewer
-			f.pixels = sizePixels;
-			f.unit = sizePixels * view.WorldPerPixel(f.center);
+			f.pixels = kSizePixels;
+			f.unit = kSizePixels * view.WorldPerPixel(f.center);
 			if (!(f.unit > 0.0F) || !Unit(view.eye - f.center, f.toEye))
 				return f;
 

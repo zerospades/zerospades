@@ -532,9 +532,6 @@ namespace spades {
 			void ApplyOriginRaw(const Vector3& origin) noexcept;
 			void TrimVolume();
 
-			// UI layout + hit testing
-			bool InRect(const Vector2& p, float x, float y, float w, float h) const;
-
 			// Editor overlay lines (cell/box outlines, tool wires) are collected here
 			// and drawn over the finished scene as 2D strokes: a dark casing under a
 			// coloured core where in view, a dim core where voxels hide them.
@@ -566,7 +563,6 @@ namespace spades {
 			// Drawing
 			void ColorNP(const Vector4& c);
 			void FillRect(float x, float y, float w, float h);
-			void StrokeRect(float x, float y, float w, float h, float t, const Vector4& c);
 			void DrawLine2D(const Vector2& a, const Vector2& b, float w, const Vector4& col);
 			void DrawHelpers();
 			void DrawOriginAxes();
