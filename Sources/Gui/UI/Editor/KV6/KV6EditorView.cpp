@@ -99,6 +99,11 @@ namespace spades {
 			// Every edit that removes voxels refuses to take the last one.
 			const char* const kLastVoxelMessage = "A model keeps at least one voxel";
 
+			// No cell the editor works with lies farther from the origin than this
+			// on any axis: the largest model, and a shape reaching past it, stay
+			// well within it, and so does anything it adds up in an int.
+			constexpr float kMaxCellCoordinate = float(kMaxModelWidth * 4);
+
 			bool FitsModelSize(int w, int h, int d) {
 				return w <= kMaxModelWidth && h <= kMaxModelHeight && d <= kMaxModelDepth;
 			}
@@ -871,6 +876,12 @@ namespace spades {
 			if (t <= 0.0F)
 				return false;
 			Vector3 hit = origin + dir * t;
+			// A ray grazing the plane meets it arbitrarily far away; no voxel
+			// lies there, and the cell would not even fit in an int.
+			for (float c : {hit.x, hit.y, hit.z}) {
+				if (!std::isfinite(c) || std::fabs(c) > kMaxCellCoordinate)
+					return false;
+			}
 			out = MakeIntVector3(int(std::floor(hit.x + 0.5F)), int(std::floor(hit.y + 0.5F)),
 			                     int(std::floor(hit.z + 0.5F)));
 			return true;

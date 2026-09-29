@@ -22,6 +22,7 @@
 #include "VoxelEditContext.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <string>
 
@@ -45,6 +46,27 @@ namespace spades {
 			const Vector4 kTarget = MakeVector4(1.0F, 0.9F, 0.3F, 0.9F);
 			constexpr float kQuarterTurn = kHalfPi;
 			const char* const kGizmoDragHint = "  |  [RMB] cancel a drag";
+
+			// How far, on each axis, a shape (a box, a cylinder) may reach from its
+			// first point. A KV6 is at most 64 voxels deep and its parts are
+			// rarely wider, while a point picked on a plane the view grazes can
+			// lie arbitrarily far away: the bound keeps a shape's preview and the
+			// cells it builds small wherever the cursor ray runs. It also keeps
+			// every squared distance a shape works out well within an int.
+			constexpr int kMaxShapeReach = 64;
+			// A cylinder's squared radius is at most twice the reach squared, and
+			// its loops square values one past its radius.
+			static_assert(2 * (kMaxShapeReach + 2) * (kMaxShapeReach + 2) < INT_MAX / 2,
+			              "shape distances must fit an int");
+
+			// `p` brought within kMaxShapeReach of `anchor` on every axis.
+			IntVector3 WithinReach(const IntVector3& p, const IntVector3& anchor) {
+				auto clamp = [](int v, int a) {
+					return std::max(a - kMaxShapeReach, std::min(a + kMaxShapeReach, v));
+				};
+				return IntVector3::Make(clamp(p.x, anchor.x), clamp(p.y, anchor.y),
+				                        clamp(p.z, anchor.z));
+			}
 
 			// Adds the colour region of voxel `h` to the selection, or removes it.
 			void ApplyColourRegion(IVoxelEditContext& ed, const IntVector3& h, bool remove) {
@@ -231,13 +253,19 @@ namespace spades {
 			Vector3 pp = VecOf(p0);
 			// Opposite corner: free on the face plane. Depth: free along the normal
 			// (use only the normal-axis component of a view-facing plane pick).
-			if (seq.Count() == 1)
-				return ed.RayPlaneCell(pp, AxisUnit(normalAxis), out);
+			// Either stays within reach of the first corner.
 			IntVector3 q;
+			if (seq.Count() == 1) {
+				if (!ed.RayPlaneCell(pp, AxisUnit(normalAxis), q))
+					return false;
+				out = WithinReach(q, p0);
+				return true;
+			}
 			if (!ed.RayPlaneCell(pp, ed.ViewDir(), q))
 				return false;
 			out = p0;
 			SetComp(out, normalAxis, Comp(q, normalAxis));
+			out = WithinReach(out, p0);
 			return true;
 		}
 
@@ -356,14 +384,20 @@ namespace spades {
 			const IntVector3& centre = seq.Points()[0];
 			const Vector3 at = VecOf(centre);
 			// Rim: free on the face plane. Depth: free along the normal (only the
-			// normal-axis component of a view-facing plane pick is used).
-			if (seq.Count() == 1)
-				return ed.RayPlaneCell(at, AxisUnit(normalAxis), out);
+			// normal-axis component of a view-facing plane pick is used). Either
+			// stays within reach of the centre.
 			IntVector3 q;
+			if (seq.Count() == 1) {
+				if (!ed.RayPlaneCell(at, AxisUnit(normalAxis), q))
+					return false;
+				out = WithinReach(q, centre);
+				return true;
+			}
 			if (!ed.RayPlaneCell(at, ed.ViewDir(), q))
 				return false;
 			out = centre;
 			SetComp(out, normalAxis, Comp(q, normalAxis));
+			out = WithinReach(out, centre);
 			return true;
 		}
 
