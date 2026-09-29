@@ -35,8 +35,7 @@ namespace spades {
 
 		/**
 		 * Runs retained `spades::ui` widgets inside a view that has no UI manager of
-		 * its own and navigates with a software cursor (the KV6 editor, and any
-		 * future editor built the same way).
+		 * its own and navigates with a software cursor (the editors).
 		 *
 		 * While a dialog is attached the host is "active": the owning view routes
 		 * input here instead of acting on it, and lets the host draw the pointer,
