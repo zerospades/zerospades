@@ -19,7 +19,6 @@
  */
 
 #include "EditorUI.h"
-#include <Gui/UI/Editor/KV6/KV6EditorView.h>
 #include <Client/Fonts.h>
 #include <Gui/UI/Components/ColorPicker.h>
 #include <Gui/UI/Components/EditorMenu.h>
@@ -32,10 +31,9 @@
 namespace spades {
 	namespace gui {
 		EditorUI::EditorUI(client::IRenderer* _renderer, client::IAudioDevice* _audioDevice,
-		                   client::FontManager* _fontManager, KV6EditorView* _editor,
+		                   client::FontManager* _fontManager, IEditorMenuHost& menuHost,
 		                   SoftwareCursor* cursor)
-		    : renderer(_renderer), audioDevice(_audioDevice), fontManager(_fontManager),
-		      editor(_editor) {
+		    : renderer(_renderer), audioDevice(_audioDevice), fontManager(_fontManager) {
 			SPADES_MARK_FUNCTION();
 			try {
 				overlay = std::make_unique<UIOverlayHost>(*_renderer, _audioDevice, *_fontManager,
@@ -43,38 +41,32 @@ namespace spades {
 				toolbar = std::make_unique<Toolbar>(_audioDevice);
 				optionBar = std::make_unique<OptionBar>(_audioDevice);
 				colorPicker = std::make_unique<ColorPicker>();
-				editorMenu = std::make_unique<EditorMenu>(*_editor, *_renderer, *_fontManager, *cursor, _audioDevice);
+				editorMenu = std::make_unique<EditorMenu>(menuHost, *_renderer, *_fontManager, *cursor,
+				                                          _audioDevice);
 			} catch (const std::exception& ex) {
 				SPLog("[!] Failed to initialize editor UI: %s", ex.what());
 				throw;
 			}
 		}
 
-		EditorUI::~EditorUI() {
-			EditorDestroyed();
-		}
+		EditorUI::~EditorUI() {}
 
 		ui::UIManager& EditorUI::GetUIManager() { return overlay->GetUIManager(); }
 
-		void EditorUI::EditorDestroyed() {
-			SPADES_MARK_FUNCTION();
-			editor = nullptr;
-		}
-
 		void EditorUI::MouseEvent(float x, float y) {
-			// Mouse events are not handled by EditorUI; delegated to KV6EditorView
+			// Mouse events are not handled by EditorUI; the editor view routes them
 		}
 
 		void EditorUI::WheelEvent(float x, float y) {
-			// Wheel events are not handled by EditorUI; delegated to KV6EditorView
+			// Wheel events are not handled by EditorUI; the editor view routes them
 		}
 
 		void EditorUI::KeyEvent(const std::string& key, bool down) {
-			// Key events are not handled by EditorUI; delegated to KV6EditorView
+			// Key events are not handled by EditorUI; the editor view routes them
 		}
 
 		void EditorUI::TextInputEvent(const std::string& text) {
-			// Text input events are not handled by EditorUI; delegated to KV6EditorView
+			// Text input events are not handled by EditorUI; the editor view routes them
 		}
 
 		bool EditorUI::AcceptsTextInput() {

@@ -31,18 +31,19 @@
 
 namespace spades {
 	namespace gui {
-		class KV6EditorView;
 		class ColorPicker;
 		class EditorMenu;
+		class IEditorMenuHost;
 		class OptionBar;
 		class SoftwareCursor;
 		class Toolbar;
 		class UIOverlayHost;
 
 		/**
-		 * UI management for the KV6 editor.
-		 * Owns toolbar, options panel, color picker, and menu.
-		 * Delegates most operations back to KV6EditorView as needed.
+		 * The chrome every editor view shares: the toolbar, the option bar, the
+		 * colour picker, the Esc menu, and the overlay its modal dialogs (the
+		 * file browser) are shown in. It only owns them; the view lays them
+		 * out, draws them and routes input to them.
 		 */
 		class EditorUI : public IGameModeUI {
 			Handle<client::IRenderer> renderer;
@@ -55,19 +56,17 @@ namespace spades {
 			std::unique_ptr<ColorPicker> colorPicker;
 			std::unique_ptr<EditorMenu> editorMenu;
 
-			// weak reference to the editor context
-			KV6EditorView* editor;
-
 			bool shouldClose = false;
 
 		protected:
 			~EditorUI();
 
 		public:
+			/** `menuHost` supplies the Esc menu's title and commands; it must
+			 *  outlive this. */
 			EditorUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
-			         client::FontManager* fontManager, KV6EditorView* editor,
+			         client::FontManager* fontManager, IEditorMenuHost& menuHost,
 			         SoftwareCursor* cursor);
-			void EditorDestroyed();
 
 			// IGameModeUI implementation
 			client::IRenderer* GetRenderer() override { return &*renderer; }
@@ -87,7 +86,7 @@ namespace spades {
 			void Closing() override;
 			bool WantsToClose() override { return shouldClose; }
 
-			// Component accessors for KV6EditorView
+			// The components, for the view that lays them out and drives them
 			Toolbar* GetToolbar() { return toolbar.get(); }
 			OptionBar* GetOptionBar() { return optionBar.get(); }
 			ColorPicker* GetColorPicker() { return colorPicker.get(); }
