@@ -29,6 +29,8 @@
 #include <vector>
 
 #include <Gui/DocumentTypes.h>
+#include <Gui/UI/Editor/Shell/EditorCamera.h>
+#include <Gui/UI/Editor/Shell/NavigationCube.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 #include <Gui/UI/Editor/Voxel/VoxelTool.h>
@@ -87,7 +89,7 @@ namespace spades {
 			bool HasPick() const override { return pickHit; }
 			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
 			IntVector3 PickSolid() const override { return MakeIntVector3(pickHX, pickHY, pickHZ); }
-			Vector3 ViewDir() const override { return camera.forward; }
+			Vector3 ViewDir() const override { return cam.View().forward; }
 			const Vector2& CursorPos() const override { return softwareCursor->GetPosition(); }
 			// Voxel whose centre is nearest where the cursor ray meets the plane
 			// (planePoint, normal). Lets tools place points in empty space.
@@ -406,36 +408,17 @@ namespace spades {
 			void PlaceMirrorPlane(const Vector3& plane);
 			bool MirrorOn(int axis) const; // shorthand for MirrorEnabled
 
-			// Orientation gizmo.
-			float gizCx, gizCy, gizR;
-
 			// --- Picking ------------------------------------------------------
 			bool pickHit = false;
 			int pickHX, pickHY, pickHZ; // solid voxel hit
 			int pickPX, pickPY, pickPZ; // adjacent empty cell (placement)
-			// The camera of the last frame drawn. Picking, projection, panning and
-			// the transform gizmo all go through it, so they agree on every pixel.
-			GizmoView camera;
 
 			// --- Camera -------------------------------------------------------
-			float yaw = -kQuarterPi;
-			float pitch = -kPi * 0.30F;
-			float targetYaw = 0.0F, targetPitch = 0.0F; // navicube animates toward these
-			bool camAnim = false;
-			Vector3 orbitTarget;
-			float orbitDist = 56.0F;
-			bool lookActive = false;
-			bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
-			bool keyUp = false, keyDown = false;
+			// Its view of the last frame drawn is what picking, projection and the
+			// transform gizmo all go through, so they agree on every pixel.
+			EditorCamera cam;
+			NavigationCube naviCube;
 			bool ctrlHeld = false, altHeld = false, shiftHeld = false;
-			bool keySprint = false; // cg_keySprint held (tracked like the modifiers)
-			// When the descend key went down, for the grace period that keeps a
-			// Ctrl chord from moving the camera at all.
-			float descendPressTime = 0.0F;
-			bool DescendKeyIsActive() const;
-			// Distance the Ctrl-bound descend key moved the view during the current
-			// Ctrl press; a Ctrl shortcut subtracts it so shortcuts don't move the view.
-			Vector3 ctrlDescent = MakeVector3(0.0F, 0.0F, 0.0F);
 			bool lmbHeld = false, rmbHeld = false; // for move/drag pointer events
 
 			// Build a typed pointer/key event stamped with the current cursor and
@@ -521,19 +504,10 @@ namespace spades {
 			/** Writes the document to its path; false if there is none, or on error. */
 			bool Save();
 
-			// Camera
-			Vector3 Forward() const;
-			Vector3 CameraEye() const;
-			// Far-plane / fog distance, scaled so zooming out never clips the scene.
-			float ViewDistance() const;
-			// Move the orbit target with cg_keyMove*, cg_keyJump (up) and
-			// cg_keyCrouch (down); faster while cg_keySprint is held.
-			void UpdateMovement(float dt);
-			// Shift + wheel-button drag: slide the view along the screen axes.
-			void PanView(float dx, float dy);
 			// Forget held movement/look keys whose release a modal may swallow.
 			void ReleaseHeldInput();
-			client::SceneDefinition SetupScene(float vpX, float vpY, float vpW, float vpH);
+			// The camera's scene for the full screen, lit and outlined for editing.
+			client::SceneDefinition SetupScene(float width, float height);
 
 			// Editing
 			// Index that voxel `i` reflects to across a mirror plane at `plane`.
@@ -605,15 +579,8 @@ namespace spades {
 			void DrawHelpers();
 			void DrawOriginAxes();
 			void DrawMirrorPlanes();
-			// FreeCAD-style navigation cube (replaces the orientation gizmo): a
-			// rotating cube whose faces are clickable to snap the view.
-			void DrawNaviCube();
 			// Hard-edged filled triangle, for shapes tiled from several triangles.
 			void FillTri(const Vector2& a, const Vector2& b, const Vector2& c, const Vector4& col);
-			// View direction for the cursor's spot on the cube (face / bevel edge /
-			// corner -> ortho / 45deg / isometric). Returns false if not over the cube.
-			bool NaviCubeDir(const Vector2& p, Vector3& dir);
-			void SnapCameraDir(const Vector3& dir); // animate to look from `dir`
 			// "Tool › Sub-tool:  hint" for the active tool, or what a click does
 			// while sampling a colour.
 			std::string ToolHintLine();
@@ -621,7 +588,6 @@ namespace spades {
 			// the transient status message, each wrapped to the free width.
 			void DrawOverlay(float sw, float sh);
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
-			void DrawCursor();
 
 			// Toolbar drawing (delegated to Toolbar/OptionBar components)
 			void DrawToolbar(float sw, float sh);
