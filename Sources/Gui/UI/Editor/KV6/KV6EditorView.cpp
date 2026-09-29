@@ -665,7 +665,7 @@ namespace spades {
 			PlaceMirrorPlane(GetPivot());
 			filePath = path;
 			FrameCamera();
-			savedGeomId = -1; // a fresh, never-saved document starts dirty
+			savedDocumentId = -1; // a fresh, never-saved document starts dirty
 			NotifyDocumentChanged();
 		}
 
@@ -684,7 +684,7 @@ namespace spades {
 			PlaceMirrorPlane(GetPivot());
 			filePath = path;
 			FrameCamera();
-			savedGeomId = undo.GeometryStateId(); // a freshly loaded document is clean
+			savedDocumentId = undo.DocumentStateId(); // a freshly loaded document is clean
 			NotifyDocumentChanged();
 			return true;
 		}
@@ -748,7 +748,7 @@ namespace spades {
 				SetStatus("Save failed");
 				return false;
 			}
-			savedGeomId = undo.GeometryStateId(); // this geometry state is now clean
+			savedDocumentId = undo.DocumentStateId(); // this document state is now clean
 			SetStatus("Saved " + filePath);
 			return true;
 		}
