@@ -117,6 +117,13 @@ namespace spades {
 			void Undo();
 			void Redo();
 
+			// --- Tools, for a host offering them elsewhere (a pie menu) ---------
+			int ToolCount() const { return int(tools.size()); }
+			/** The label of tool `index`, as on its toolbar button. */
+			std::string ToolLabel(int index) const;
+			/** Makes tool `index` the active one, as its toolbar button does. */
+			void SelectTool(int index);
+
 			// --- Input, in the host's routing order ---------------------------
 			/** Every key, even while a modal has the keyboard, so no modifier
 			 *  stays "held" after a release it swallowed. */
