@@ -159,7 +159,6 @@ namespace spades {
 				return lines;
 			}
 
-
 			// Top UI bands (full width): a title ribbon above the toolbar. The 3D
 			// viewport is inset below them by kBarsH.
 			const float kRibbonH = 24.0F;
@@ -2172,8 +2171,7 @@ namespace spades {
 			}
 		}
 
-		// --- Navigation cube -------------------------------------------------
-
+		// --- Transform gizmo -------------------------------------------------
 
 		GizmoView KV6EditorView::GetGizmoView() const { return cam.View(); }
 
@@ -2181,7 +2179,6 @@ namespace spades {
 			GizmoCanvas canvas(*renderer);
 			gizmo.Draw(canvas, GetGizmoView());
 		}
-
 
 		std::string KV6EditorView::ToolHintLine() {
 			std::string line;
@@ -2363,9 +2360,9 @@ namespace spades {
 			VoxelTool* t = ActiveTool();
 			if (!t)
 				return;
-			// The right button is the inverse of the left, and recolouring has
-			// none: the button does nothing in Paint, whatever the sub-tool.
-			if (e.IsRight() && t->Role() == EditorRole::Paint)
+			// The right button is the inverse of the left, and a tool with no
+			// inverse (Paint) takes nothing from it, whatever the sub-tool.
+			if (e.IsRight() && !t->RightButtonInverts())
 				return;
 			t->OnPointer(*this, e);
 		}

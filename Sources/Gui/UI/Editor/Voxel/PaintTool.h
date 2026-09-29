@@ -31,7 +31,7 @@ namespace spades {
 			PaintTool();
 			const char* Label() const override { return "Paint"; }
 			// Recolouring has no inverse, so the right button does nothing here.
-			EditorRole Role() const override { return EditorRole::Paint; }
+			bool RightButtonInverts() const override { return false; }
 		};
 	} // namespace gui
 } // namespace spades
