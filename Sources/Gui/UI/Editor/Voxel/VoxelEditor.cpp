@@ -306,11 +306,18 @@ namespace spades {
 		// --- Picking ----------------------------------------------------------
 
 		Vector3 VoxelEditor::ViewDir() const { return host.CurrentView().forward; }
+
+		GizmoView VoxelEditor::DocumentView() const {
+			// The same view, with the world shifted so voxel i is centred at i.
+			GizmoView view = host.CurrentView();
+			view.eye = view.eye - host.DocumentOrigin();
+			return view;
+		}
 		const Vector2& VoxelEditor::CursorPos() const { return host.AimPosition(); }
 
 		bool VoxelEditor::RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
 		                               IntVector3& out) {
-			const GizmoView& view = host.CurrentView();
+			const GizmoView view = DocumentView();
 			if (!view.IsValid())
 				return false;
 			Vector3 origin, dir;
@@ -339,7 +346,7 @@ namespace spades {
 
 		void VoxelEditor::DoPick() {
 			pickHit = false;
-			const GizmoView& view = host.CurrentView();
+			const GizmoView view = DocumentView();
 			if (!view.IsValid())
 				return;
 
@@ -1491,6 +1498,10 @@ namespace spades {
 			// the plane is a whole number of tiles and always shows a complete border
 			// (the volume spans [-0.5, dim-0.5]; the near edge -2.5 is already aligned).
 			auto stop = [](int n) { return (n % 2 == 0) ? n + 2 : n + 3; };
+			const Vector3 origin = host.DocumentOrigin();
+			auto line = [&](const Vector3& p, const Vector3& q, const Vector4& color) {
+				renderer->AddDebugLine(p + origin, q + origin, color);
+			};
 			float lo = -2.5F;
 			float hiX = float(stop(w)) - 0.5F;
 			float hiY = float(stop(h)) - 0.5F;
@@ -1500,37 +1511,37 @@ namespace spades {
 				float px = edit.mirror.plane.x;
 				Vector4 col = MakeVector4(1.0F, 0.35F, 0.35F, 0.25F);
 				for (int i = -2; i <= stop(h); i += 2)
-					renderer->AddDebugLine(MakeVector3(px, float(i) - 0.5F, lo),
+					line(MakeVector3(px, float(i) - 0.5F, lo),
 					                       MakeVector3(px, float(i) - 0.5F, hiZ), col);
 				for (int i = -2; i <= stop(d); i += 2)
-					renderer->AddDebugLine(MakeVector3(px, lo, float(i) - 0.5F),
+					line(MakeVector3(px, lo, float(i) - 0.5F),
 					                       MakeVector3(px, hiY, float(i) - 0.5F), col);
 			}
 			if (MirrorEnabled(1)) {
 				float py = edit.mirror.plane.y;
 				Vector4 col = MakeVector4(0.4F, 1.0F, 0.4F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
-					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, py, lo),
+					line(MakeVector3(float(i) - 0.5F, py, lo),
 					                       MakeVector3(float(i) - 0.5F, py, hiZ), col);
 				for (int i = -2; i <= stop(d); i += 2)
-					renderer->AddDebugLine(MakeVector3(lo, py, float(i) - 0.5F),
+					line(MakeVector3(lo, py, float(i) - 0.5F),
 					                       MakeVector3(hiX, py, float(i) - 0.5F), col);
 			}
 			if (MirrorEnabled(2)) {
 				float pz = edit.mirror.plane.z;
 				Vector4 col = MakeVector4(0.45F, 0.6F, 1.0F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
-					renderer->AddDebugLine(MakeVector3(float(i) - 0.5F, lo, pz),
+					line(MakeVector3(float(i) - 0.5F, lo, pz),
 					                       MakeVector3(float(i) - 0.5F, hiY, pz), col);
 				for (int i = -2; i <= stop(h); i += 2)
-					renderer->AddDebugLine(MakeVector3(lo, float(i) - 0.5F, pz),
+					line(MakeVector3(lo, float(i) - 0.5F, pz),
 					                       MakeVector3(hiX, float(i) - 0.5F, pz), col);
 			}
 		}
 
 		// --- Transform gizmo -------------------------------------------------
 
-		GizmoView VoxelEditor::GetGizmoView() const { return host.CurrentView(); }
+		GizmoView VoxelEditor::GetGizmoView() const { return DocumentView(); }
 
 		void VoxelEditor::DrawGizmo(const TransformGizmo& gizmo) {
 			GizmoCanvas canvas(*renderer);
@@ -1882,7 +1893,8 @@ namespace spades {
 				client::ModelRenderParam param;
 				param.matrix = Matrix4::Translate(MakeVector3(float(edit.placement.anchor.x),
 				                                             float(edit.placement.anchor.y),
-				                                             float(edit.placement.anchor.z)));
+				                                             float(edit.placement.anchor.z)) +
+				                                 host.DocumentOrigin());
 				renderer->RenderModel(*placementModel, param);
 			}
 			DrawMirrorPlanes();
@@ -1921,7 +1933,7 @@ namespace spades {
 				occluders.pendingAnchor = edit.placement.anchor;
 				occluders.pendingVersion = placementModelVersion;
 			}
-			overlayLines.Draw(*renderer, host.CurrentView(), occluders);
+			overlayLines.Draw(*renderer, DocumentView(), occluders);
 
 			// The picker is laid out first: the text under the viewport keeps clear of it.
 			ColorPicker& picker = *ui.GetColorPicker();
