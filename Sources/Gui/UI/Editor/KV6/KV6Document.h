@@ -57,6 +57,7 @@ namespace spades {
 			IntVector3 MaxSize() const override;
 			void Reframe(const IntVector3& size, const IntVector3& shift) override;
 			bool IsSolid(int x, int y, int z) const override;
+			bool IsEditable(int, int, int) const override { return true; }
 			std::uint32_t Color(int x, int y, int z) const override;
 			void Write(int x, int y, int z, bool solid, std::uint32_t color) override;
 			int RemovableVoxels() const override { return voxelCount - 1; }

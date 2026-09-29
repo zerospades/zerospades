@@ -243,6 +243,10 @@ namespace spades {
 			return x >= 0 && y >= 0 && z >= 0 && x < size.x && y < size.y && z < size.z;
 		}
 
+		bool VoxelEditor::Editable(int x, int y, int z) const {
+			return InBounds(x, y, z) && document.IsEditable(x, y, z);
+		}
+
 		void VoxelEditor::SetStatus(const std::string& s) {
 			statusMessage = s;
 			statusTimer = 2.5F;
@@ -596,7 +600,7 @@ namespace spades {
 			bool wrote = false;
 			for (const IntVector3& c : cells) {
 				const IntVector3 at = c + frame.shift;
-				if (InBounds(at.x, at.y, at.z) && !document.IsSolid(at.x, at.y, at.z)) {
+				if (Editable(at.x, at.y, at.z) && !document.IsSolid(at.x, at.y, at.z)) {
 					WriteVoxel(at.x, at.y, at.z, true, color);
 					wrote = true;
 				}
@@ -610,7 +614,7 @@ namespace spades {
 			ExpandMirrors(cells); // also erase the mirror images, if enabled
 			int count = 0;
 			for (const IntVector3& c : cells) {
-				if (document.IsSolid(c.x, c.y, c.z))
+				if (Editable(c.x, c.y, c.z) && document.IsSolid(c.x, c.y, c.z))
 					count++;
 			}
 			if (count == 0)
@@ -621,7 +625,7 @@ namespace spades {
 			}
 			VoxelUndoStack::Step step(undo, label);
 			for (const IntVector3& c : cells) {
-				if (document.IsSolid(c.x, c.y, c.z))
+				if (Editable(c.x, c.y, c.z) && document.IsSolid(c.x, c.y, c.z))
 					WriteVoxel(c.x, c.y, c.z, false, 0);
 			}
 			TrimVolume();
@@ -643,7 +647,7 @@ namespace spades {
 			VoxelUndoStack::Step step(undo, "Paint");
 			bool wrote = false;
 			for (const IntVector3& c : cells) {
-				if (!document.IsSolid(c.x, c.y, c.z))
+				if (!Editable(c.x, c.y, c.z) || !document.IsSolid(c.x, c.y, c.z))
 					continue; // paint only existing voxels; never grows the volume
 				if (document.Color(c.x, c.y, c.z) != rgb) {
 					WriteVoxel(c.x, c.y, c.z, true, rgb);
@@ -726,7 +730,7 @@ namespace spades {
 		}
 
 		void VoxelEditor::SelectIfSolid(const IntVector3& v) {
-			if (document.IsSolid(v.x, v.y, v.z))
+			if (Editable(v.x, v.y, v.z) && document.IsSolid(v.x, v.y, v.z))
 				edit.selection.Add(v);
 		}
 
@@ -1011,7 +1015,7 @@ namespace spades {
 		}
 
 		bool VoxelEditor::LandVoxel(const IntVector3& at, std::uint32_t color) {
-			if (!InBounds(at.x, at.y, at.z))
+			if (!Editable(at.x, at.y, at.z))
 				return false;
 			WriteVoxel(at.x, at.y, at.z, true, color);
 			edit.selection.Add(at);
@@ -1329,7 +1333,7 @@ namespace spades {
 		// --- Undo / redo ------------------------------------------------------
 
 		void VoxelEditor::WriteVoxel(int x, int y, int z, bool solid, std::uint32_t color) {
-			if (!InBounds(x, y, z))
+			if (!Editable(x, y, z))
 				return;
 			if (!solid)
 				edit.selection.Remove(MakeIntVector3(x, y, z)); // it holds solid voxels only

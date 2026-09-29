@@ -58,6 +58,12 @@ namespace spades {
 			// --- Voxels -------------------------------------------------------
 			/** False outside the volume. */
 			virtual bool IsSolid(int x, int y, int z) const = 0;
+			/**
+			 * Whether edits may change a voxel inside the volume. One that may not
+			 * (a map's bedrock) can still be aimed at and built on, but is never
+			 * written, selected, erased or painted.
+			 */
+			virtual bool IsEditable(int x, int y, int z) const = 0;
 			/** The colour of a voxel inside the volume. */
 			virtual std::uint32_t Color(int x, int y, int z) const = 0;
 			/** Sets a voxel inside the volume; not journaled (VoxelEditor does). */

@@ -241,6 +241,8 @@ namespace spades {
 			void UndoReplayed() override {}
 
 			bool InBounds(int x, int y, int z) const;
+			// Inside the volume and editable: the only voxels edits touch.
+			bool Editable(int x, int y, int z) const;
 			// The one place voxels are written: `WriteVoxel` journals the change
 			// for undo and drops a removed voxel from the selection, so the
 			// selection only ever holds solid voxels.
