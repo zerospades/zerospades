@@ -78,7 +78,8 @@ namespace spades {
 				void UndoApply(const VoxelUndoRecord& record, bool forward) final;
 			};
 
-			explicit VoxelUndoStack(Sink& sink) : UndoHistory(sink) {}
+			explicit VoxelUndoStack(Sink& sink, Limits limits = Limits())
+			    : UndoHistory(sink, limits) {}
 
 			// Append a voxel change to the step open (old -> new state); a change
 			// that changes nothing is not recorded.
