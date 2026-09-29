@@ -1539,6 +1539,17 @@ namespace spades {
 
 		// --- Tools and modes --------------------------------------------------
 
+		std::string VoxelEditor::ToolLabel(int index) const {
+			if (index < 0 || index >= int(tools.size()))
+				return std::string();
+			return tools[static_cast<size_t>(index)].tool->Label();
+		}
+
+		void VoxelEditor::SelectTool(int index) {
+			SetMode(EditorMode::Edit);
+			SetActiveTool(index);
+		}
+
 		void VoxelEditor::SetActiveTool(int index) {
 			if (index >= 0 && index < int(tools.size()))
 				Activate(index, currentMode);
