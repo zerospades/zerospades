@@ -48,8 +48,8 @@ namespace spades {
 		 * call making the edit; nested steps coalesce, and a step is committed
 		 * only if it recorded a change or changed the state. Steps committed
 		 * during one user action (a press-drag-release, a key press) then merge
-		 * into a single undo step, so a paint stroke or a scripted multi-step
-		 * edit undoes at once. Nothing stays open between events, so undo and
+		 * into a single undo step, so a paint stroke or a multi-step edit
+		 * undoes at once. Nothing stays open between events, so undo and
 		 * redo work at any moment. The history is capped at `kMaxGroups` steps
 		 * and `kMaxBytes` of memory, evicting the oldest.
 		 *

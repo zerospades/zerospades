@@ -44,9 +44,8 @@ namespace spades {
 		 *
 		 * The editor builds its toolbar from here instead of naming concrete tool
 		 * classes, so the list of available tools is data, not code. Each kind of
-		 * editor keeps one, seeded with its built-in tools in registration
-		 * (= toolbar) order; later this is where script-defined tools will
-		 * append, with no change to the editor.
+		 * editor keeps one, seeded with its tools in registration (= toolbar)
+		 * order.
 		 *
 		 * `BuildAll` makes fresh instances, so every editor view gets its own tools
 		 * (and their per-tool option state).
