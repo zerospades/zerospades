@@ -27,7 +27,7 @@ namespace spades {
 	namespace gui {
 		// A single declarative tool option, rendered generically in the sub-toolbar.
 		// Tools list the options they want and the editor draws/handles them, so a
-		// new (or scripted) tool gets its UI for free without touching the toolbar
+		// new tool gets its UI for free without touching the toolbar
 		// code. Options sharing a non-empty `group` are drawn together behind a
 		// separator and a group label (e.g. the three "Mirror" toggles).
 		struct ToolOption {

@@ -20,7 +20,6 @@
 
 #include "SelectTool.h"
 #include "VoxelEditContext.h"
-#include "SubToolRegistry.h"
 
 
 namespace spades {
@@ -35,7 +34,8 @@ namespace spades {
 		} // namespace
 
 		SelectTool::SelectTool() {
-			// Box adds its solid cells to the selection (LMB) or removes them (RMB).
+			// Box and Cylinder add their solid cells to the selection (LMB) or
+			// remove them (RMB).
 			auto select = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.SelectCells(cells);
 			};
@@ -46,10 +46,8 @@ namespace spades {
 			subs.push_back(std::unique_ptr<VoxelTool>(
 			  new BoxSubTool({select, "select"}, {deselect, "deselect"}, false)));
 			subs.push_back(std::unique_ptr<VoxelTool>(new ByColourSubTool()));
-
-			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
-			// the built-in ones.
-			SubToolRegistry::Instance().BuildFor(SubToolTarget::Select, subs);
+			subs.push_back(std::unique_ptr<VoxelTool>(
+			  new CylinderSubTool({select, "select"}, {deselect, "deselect"})));
 
 			// Whole-selection commands, available whichever sub-tool is active.
 			// Their keys work in every tool; these buttons are their one home.

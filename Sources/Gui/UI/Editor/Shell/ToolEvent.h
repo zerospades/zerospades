@@ -29,8 +29,7 @@ namespace spades {
 		// Typed editor input, replacing the old stringly-typed button names and the
 		// separate Down/Up/Drag callbacks. The editor view translates raw
 		// SDL/View events into these and feeds them to the active tool. Keeping the
-		// shape small and POD-like makes it cheap to forward and easy to expose to
-		// scripts later.
+		// shape small and POD-like makes it cheap to forward.
 
 		enum class PointerButton { None, Left, Right, Middle };
 

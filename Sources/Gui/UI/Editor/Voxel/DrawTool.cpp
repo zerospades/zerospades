@@ -20,12 +20,12 @@
 
 #include "DrawTool.h"
 #include "VoxelEditContext.h"
-#include "SubToolRegistry.h"
 
 namespace spades {
 	namespace gui {
 		DrawTool::DrawTool() {
-			// Box fills its cells with the current colour (LMB) or erases them (RMB).
+			// Box and Cylinder fill their cells with the current colour (LMB) or
+			// erase them (RMB).
 			auto fill = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.FillCells(cells, ed.CurrentColor());
 			};
@@ -35,10 +35,8 @@ namespace spades {
 			subs.push_back(std::unique_ptr<VoxelTool>(new DrawVoxelSubTool()));
 			subs.push_back(std::unique_ptr<VoxelTool>(
 			  new BoxSubTool({fill, "fill"}, {erase, "erase"}, true)));
-
-			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
-			// the built-in ones.
-			SubToolRegistry::Instance().BuildFor(SubToolTarget::Draw, subs);
+			subs.push_back(
+			  std::unique_ptr<VoxelTool>(new CylinderSubTool({fill, "fill"}, {erase, "erase"})));
 		}
 	} // namespace gui
 } // namespace spades

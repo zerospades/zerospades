@@ -95,8 +95,6 @@ namespace spades {
 			// (planePoint, normal). Lets tools place points in empty space.
 			bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
 			                  IntVector3& out) override;
-			// Project a world point to screen pixels. `ok` is false if behind the camera.
-			Vector2 WorldToScreen(const Vector3& w, bool& ok) const override;
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			// Pending placement (positioned by the Transform tool).
 			bool HasPlacement() const override { return edit.placing; }
@@ -108,10 +106,9 @@ namespace spades {
 			void CancelPlacement() override;
 			void DrawPlacementTransformed(const PlacementTransform& t,
 			                              const Vector4& color) override;
-			void DrawSolidCube(const Vector3& center, float half, const Vector4& color) override;
 			GizmoView GetGizmoView() const override;
 			void DrawGizmo(const TransformGizmo& gizmo) override;
-			bool InBounds(int x, int y, int z) const override;
+			bool InBounds(int x, int y, int z) const;
 			uint32_t CurrentColor() const override { return currentColor; }
 
 			// Selection (a set of solid-voxel coords, shared across tools).
@@ -138,10 +135,8 @@ namespace spades {
 			void PreviewPivot(const Vector3& pivot) override;
 
 			// --- Undo / redo (also driven by Ctrl+Z/Y and the toolbar buttons) ---
-			void Undo() override;
-			void Redo() override;
-			bool CanUndo() const override { return undo.CanUndo(); }
-			bool CanRedo() const override { return undo.CanRedo(); }
+			void Undo();
+			void Redo();
 			void PlaceCube() override;
 			void DeleteCube() override;
 			void SetStatus(const std::string&) override;
@@ -160,7 +155,7 @@ namespace spades {
 			void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                            const Vector4& color) override;
 			// Add every solid voxel in [lo, hi] to the selection.
-			void SelectBox(const IntVector3& lo, const IntVector3& hi) override;
+			void SelectBox(const IntVector3& lo, const IntVector3& hi);
 			void SelectAll() override;
 			// Add the solid voxels among `cells` to the selection.
 			void SelectCells(const std::vector<IntVector3>& cells) override;
@@ -172,9 +167,6 @@ namespace spades {
 			void PaintCells(const std::vector<IntVector3>& cells, uint32_t color) override;
 			// Remove `cells` from the selection.
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
-			// Fill/erase (Draw) or select/deselect (Select) `cells`, per the active
-			// tool's role.
-			void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) override;
 			Vector4 ColorToVec(uint32_t c) const override;
 
 		protected:
@@ -579,8 +571,6 @@ namespace spades {
 			void DrawHelpers();
 			void DrawOriginAxes();
 			void DrawMirrorPlanes();
-			// Hard-edged filled triangle, for shapes tiled from several triangles.
-			void FillTri(const Vector2& a, const Vector2& b, const Vector2& c, const Vector4& col);
 			// "Tool › Sub-tool:  hint" for the active tool, or what a click does
 			// while sampling a colour.
 			std::string ToolHintLine();

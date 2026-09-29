@@ -20,23 +20,21 @@
 
 #include "PaintTool.h"
 #include "VoxelEditContext.h"
-#include "SubToolRegistry.h"
 
 namespace spades {
 	namespace gui {
 		PaintTool::PaintTool() {
-			// Box recolours every existing voxel it spans with the current colour.
+			// Box and Cylinder recolour every existing voxel they span with the
+			// current colour.
 			// Recolouring has no inverse, so the right button does nothing.
 			auto paint = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.PaintCells(cells, ed.CurrentColor());
 			};
 			subs.push_back(std::unique_ptr<VoxelTool>(new PaintVoxelSubTool()));
 			subs.push_back(std::unique_ptr<VoxelTool>(
-			  new BoxSubTool({paint, "paint"}, BoxSubTool::Action(), true)));
-
-			// Sub-tools contributed by scripts (targeting Paint), appended after the
-			// built-in ones.
-			SubToolRegistry::Instance().BuildFor(SubToolTarget::Paint, subs);
+			  new BoxSubTool({paint, "paint"}, CellAction(), true)));
+			subs.push_back(
+			  std::unique_ptr<VoxelTool>(new CylinderSubTool({paint, "paint"}, CellAction())));
 		}
 	} // namespace gui
 } // namespace spades

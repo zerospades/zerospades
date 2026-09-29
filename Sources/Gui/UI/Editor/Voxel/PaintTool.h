@@ -30,7 +30,7 @@ namespace spades {
 		public:
 			PaintTool();
 			const char* Label() const override { return "Paint"; }
-			// Cells from sub-tools (incl. scripted ones) recolour rather than fill.
+			// Recolouring has no inverse, so the right button does nothing here.
 			EditorRole Role() const override { return EditorRole::Paint; }
 		};
 	} // namespace gui
