@@ -29,57 +29,57 @@
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 
 #include "ClickSequence.h"
-#include <Gui/UI/Editor/Shell/EditorTool.h>
+#include "VoxelTool.h"
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 
 namespace spades {
 	namespace gui {
-		class IEditorContext;
+		class IVoxelEditContext;
 
 		// Leaf tools shown as buttons in the secondary toolbar (e.g. Select's Voxel
-		// / Box). They are ordinary `EditorTool`s with no children of their own; a
+		// / Box). They are ordinary `VoxelTool`s with no children of their own; a
 		// `ContainerTool` (Draw, Select) groups them and forwards input to the active
 		// one. Throughout, the right button does the inverse of the left.
 
 		// Single-voxel placement (Draw's "Voxel"): LMB places, RMB deletes.
-		class DrawVoxelSubTool : public EditorTool {
+		class DrawVoxelSubTool : public VoxelTool {
 		public:
 			const char* Label() const override { return "Voxel"; }
-			std::string Hint(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void DrawScene(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void DrawScene(IVoxelEditContext&) override;
 		};
 
 		// Single-voxel recolour (Paint's "Voxel"): LMB recolours the hovered voxel
 		// and keeps painting while dragged.
-		class PaintVoxelSubTool : public EditorTool {
+		class PaintVoxelSubTool : public VoxelTool {
 		public:
 			const char* Label() const override { return "Voxel"; }
-			std::string Hint(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void DrawScene(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void DrawScene(IVoxelEditContext&) override;
 		};
 
 		// Single-voxel selection (Select's "Voxel"): LMB adds the voxel, RMB removes
 		// it; LMB on empty space selects nothing.
-		class SelectVoxelSubTool : public EditorTool {
+		class SelectVoxelSubTool : public VoxelTool {
 		public:
 			const char* Label() const override { return "Voxel"; }
-			std::string Hint(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void DrawScene(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void DrawScene(IVoxelEditContext&) override;
 		};
 
 		// Flood-fill selection by colour (Select's "By Colour"): LMB adds the
 		// clicked voxel's colour region, RMB removes it; [L] adds the region under
 		// the cursor.
-		class ByColourSubTool : public EditorTool {
+		class ByColourSubTool : public VoxelTool {
 		public:
 			const char* Label() const override { return "By Colour"; }
-			std::string Hint(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void OnKey(IEditorContext&, const KeyInput&) override;
-			void DrawScene(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void OnKey(IVoxelEditContext&, const KeyInput&) override;
+			void DrawScene(IVoxelEditContext&) override;
 		};
 
 		// A 3-point axis-aligned box: corner, opposite corner (on the clicked face's
@@ -87,9 +87,9 @@ namespace spades {
 		// can be sized beyond the existing model. The three clicks are tracked by a
 		// `ClickSequence`; what the box does to its cells (fill voxels, or add to
 		// the selection) is injected, so Draw, Paint and Select reuse the same code.
-		class BoxSubTool : public EditorTool {
+		class BoxSubTool : public VoxelTool {
 		public:
-			using ApplyFn = std::function<void(IEditorContext&, const std::vector<IntVector3>&)>;
+			using ApplyFn = std::function<void(IVoxelEditContext&, const std::vector<IntVector3>&)>;
 
 			// What a finished box does to its cells, and the verb the hint names
 			// it by ("fill").
@@ -106,17 +106,17 @@ namespace spades {
 			    : primary(std::move(primary)), secondary(std::move(secondary)), mirrored(mirrored) {}
 
 			const char* Label() const override { return "Box"; }
-			std::string Hint(IEditorContext&) override;
-			void OnActivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			std::string EscapeLabel(IEditorContext&) override;
-			void OnEscape(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnActivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			std::string EscapeLabel(IVoxelEditContext&) override;
+			void OnEscape(IVoxelEditContext&) override;
 			// The recorded corners name voxels, and a volume that grows or is
 			// trimmed renames every one of them: the box is dropped whenever the
 			// document moves under it, or the editor acts behind the tool's back.
-			void CancelInteraction(IEditorContext&) override;
-			void OnDocumentChanged(IEditorContext&) override;
-			void DrawScene(IEditorContext&) override;
+			void CancelInteraction(IVoxelEditContext&) override;
+			void OnDocumentChanged(IVoxelEditContext&) override;
+			void DrawScene(IVoxelEditContext&) override;
 
 		private:
 			Action primary;
@@ -129,7 +129,7 @@ namespace spades {
 			// Construction point for the current stage (seq.Count() == 1 -> opposite
 			// corner on the face plane; == 2 -> depth along the normal), placed in
 			// free space so the box can be sized beyond existing voxels.
-			bool StagePoint(IEditorContext& ed, IntVector3& out) const;
+			bool StagePoint(IVoxelEditContext& ed, IntVector3& out) const;
 			// Inclusive box spanned by the recorded points plus an in-progress one
 			// (`pts` holds 2 or 3 points: corner, opposite corner, [depth]).
 			void BBoxOf(const std::vector<IntVector3>& pts, IntVector3& lo, IntVector3& hi) const;
@@ -143,17 +143,17 @@ namespace spades {
 		 * Escape during a drag cancels), highlights and draws it, and leaves the
 		 * subclass to say where it sits and what a drag does to the document.
 		 */
-		class GizmoSubTool : public EditorTool {
+		class GizmoSubTool : public VoxelTool {
 		public:
-			void OnActivate(IEditorContext&) override;
-			void OnDeactivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			std::string EscapeLabel(IEditorContext&) override;
-			void OnEscape(IEditorContext&) override;
-			void CancelInteraction(IEditorContext&) override;
+			void OnActivate(IVoxelEditContext&) override;
+			void OnDeactivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			std::string EscapeLabel(IVoxelEditContext&) override;
+			void OnEscape(IVoxelEditContext&) override;
+			void CancelInteraction(IVoxelEditContext&) override;
 			// What the gizmo handles moved under it, so a drag in progress is void.
-			void OnDocumentChanged(IEditorContext&) override;
-			void DrawOverlay(IEditorContext&) override;
+			void OnDocumentChanged(IVoxelEditContext&) override;
+			void DrawOverlay(IVoxelEditContext&) override;
 
 			/**
 			 * Moves snap to multiples of `step`: moving by them, or with `toGrid`
@@ -173,23 +173,23 @@ namespace spades {
 			 * this drag already did to it applied. False hides the gizmo (nothing
 			 * to handle), and cancels a drag in progress.
 			 */
-			virtual bool CurrentPose(IEditorContext& ed, GizmoPose& pose) = 0;
-			virtual void OnGizmoBegin(IEditorContext&) {}
+			virtual bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) = 0;
+			virtual void OnGizmoBegin(IVoxelEditContext&) {}
 			/** The drag moved on; `gizmo.Total()` and `gizmo.Step()` hold the change. */
-			virtual void OnGizmoDrag(IEditorContext&) {}
+			virtual void OnGizmoDrag(IVoxelEditContext&) {}
 			/** The drag was released after changing things by `total`. */
-			virtual void OnGizmoEnd(IEditorContext&, const GizmoTransform& total) { (void)total; }
+			virtual void OnGizmoEnd(IVoxelEditContext&, const GizmoTransform& total) { (void)total; }
 			/** The drag was abandoned; `undo` reverses every step it reported. */
-			virtual void OnGizmoCancel(IEditorContext&, const GizmoTransform& undo) { (void)undo; }
+			virtual void OnGizmoCancel(IVoxelEditContext&, const GizmoTransform& undo) { (void)undo; }
 			/**
 			 * A left press landed off every handle: the user is done with the
 			 * gizmo, so work it left pending is completed here.
 			 */
-			virtual void OnClickAway(IEditorContext&) {}
+			virtual void OnClickAway(IVoxelEditContext&) {}
 
 		private:
-			bool SyncPose(IEditorContext& ed);
-			void CancelDrag(IEditorContext& ed);
+			bool SyncPose(IVoxelEditContext& ed);
+			void CancelDrag(IVoxelEditContext& ed);
 		};
 
 		/**
@@ -209,18 +209,18 @@ namespace spades {
 		public:
 			TransformSubTool();
 			const char* Label() const override { return "Transform"; }
-			std::string Hint(IEditorContext&) override;
-			void OnDeactivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void OnKey(IEditorContext&, const KeyInput&) override;
-			void DrawScene(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void OnDeactivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void OnKey(IVoxelEditContext&, const KeyInput&) override;
+			void DrawScene(IVoxelEditContext&) override;
 
 		protected:
 			// A drag only previews: the voxels move once, on release.
-			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
-			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
+			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
+			void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override;
 			// Places a waiting paste or import where it is.
-			void OnClickAway(IEditorContext& ed) override;
+			void OnClickAway(IVoxelEditContext& ed) override;
 		};
 
 		// Moves the model pivot with the gizmo, snapped as the Pivot tool sets it.
@@ -230,14 +230,14 @@ namespace spades {
 		public:
 			PivotGizmoSubTool();
 			const char* Label() const override { return "Move"; }
-			std::string Hint(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
 
 		protected:
-			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
-			void OnGizmoBegin(IEditorContext& ed) override;
-			void OnGizmoDrag(IEditorContext& ed) override;
-			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
-			void OnGizmoCancel(IEditorContext& ed, const GizmoTransform& undo) override;
+			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
+			void OnGizmoBegin(IVoxelEditContext& ed) override;
+			void OnGizmoDrag(IVoxelEditContext& ed) override;
+			void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override;
+			void OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform& undo) override;
 
 		private:
 			Vector3 startPivot; // pivot at the grab
@@ -251,14 +251,14 @@ namespace spades {
 		public:
 			MirrorGizmoSubTool();
 			const char* Label() const override { return "Move"; }
-			std::string Hint(IEditorContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
 
 		protected:
-			bool CurrentPose(IEditorContext& ed, GizmoPose& pose) override;
-			void OnGizmoBegin(IEditorContext& ed) override;
-			void OnGizmoDrag(IEditorContext& ed) override;
-			void OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) override;
-			void OnGizmoCancel(IEditorContext& ed, const GizmoTransform& undo) override;
+			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
+			void OnGizmoBegin(IVoxelEditContext& ed) override;
+			void OnGizmoDrag(IVoxelEditContext& ed) override;
+			void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override;
+			void OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform& undo) override;
 
 		private:
 			Vector3 startPlane; // planes at the grab

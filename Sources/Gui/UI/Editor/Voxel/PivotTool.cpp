@@ -19,7 +19,7 @@
  */
 
 #include "PivotTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 
 namespace spades {
 	namespace gui {
@@ -46,7 +46,7 @@ namespace spades {
 			return -1;
 		}
 
-		void PivotTool::UpdateOptions(IEditorContext& ed) {
+		void PivotTool::UpdateOptions(IVoxelEditContext& ed) {
 			GizmoTool::UpdateOptions(ed);
 			// Whatever moved the pivot — a gizmo drag, undo, a box — the boxes
 			// show where it is. The bar leaves the one being typed into alone.
@@ -56,7 +56,7 @@ namespace spades {
 				options.SetNumber(kAxisOption[a], axis[a]);
 		}
 
-		void PivotTool::OnOptionNumberChanged(IEditorContext& ed, const std::string& id,
+		void PivotTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
 		                                      float value, bool committed) {
 			const int a = AxisOf(id);
 			if (a < 0)

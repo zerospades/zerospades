@@ -26,7 +26,7 @@
 
 namespace spades {
 	namespace gui {
-		class EditorTool;
+		class VoxelTool;
 
 		// Which built-in container a registered sub-tool belongs to.
 		enum class SubToolTarget { Draw, Select, Paint };
@@ -43,7 +43,7 @@ namespace spades {
 		 */
 		class SubToolRegistry {
 		public:
-			using Factory = std::function<std::unique_ptr<EditorTool>()>;
+			using Factory = std::function<std::unique_ptr<VoxelTool>()>;
 
 			// The shared registry, seeded with the built-in script sub-tools.
 			static SubToolRegistry& Instance();
@@ -51,7 +51,7 @@ namespace spades {
 			void Register(SubToolTarget target, Factory f);
 			// Append every sub-tool registered for `target` to `out`. Factories that
 			// fail (e.g. their script is unavailable) yield null and are skipped.
-			void BuildFor(SubToolTarget target, std::vector<std::unique_ptr<EditorTool>>& out) const;
+			void BuildFor(SubToolTarget target, std::vector<std::unique_ptr<VoxelTool>>& out) const;
 
 		private:
 			struct Entry {

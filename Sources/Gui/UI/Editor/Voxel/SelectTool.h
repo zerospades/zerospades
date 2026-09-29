@@ -34,10 +34,8 @@ namespace spades {
 
 			ToolOptions* Options() override;
 			// Commands with nothing to act on are greyed out.
-			void UpdateOptions(IEditorContext& ed) override;
-			void OnAction(IEditorContext& ed, const std::string& id) override;
-
-			static void SelectAll(IEditorContext& ed);
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
 
 		private:
 			ToolOptions options;

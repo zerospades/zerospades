@@ -19,7 +19,7 @@
  */
 
 #include "TransformTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 
 #include <cmath>
 
@@ -59,7 +59,7 @@ namespace spades {
 			AddSnapOptions();
 		}
 
-		void TransformTool::UpdateOptions(IEditorContext& ed) {
+		void TransformTool::UpdateOptions(IVoxelEditContext& ed) {
 			GizmoTool::UpdateOptions(ed);
 			// The turn centre is the editor's setting; the pair only shows it.
 			const bool aboutPivot = ed.TurnsAboutModelPivot();
@@ -78,7 +78,7 @@ namespace spades {
 			}
 		}
 
-		void TransformTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) {
+		void TransformTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
 			GizmoTool::OnOptionToggled(ed, id, value);
 			// The pair acts as radio buttons: a click picks its choice, whatever
 			// the toggle it landed on was showing.
@@ -88,7 +88,7 @@ namespace spades {
 				ed.SetTurnsAboutModelPivot(true);
 		}
 
-		void TransformTool::OnOptionNumberChanged(IEditorContext& ed, const std::string& id,
+		void TransformTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
 		                                          float value, bool committed) {
 			// A move is journaled as it happens, and there is no preview of it to
 			// show, so a box does nothing until the value in it is settled: half
@@ -109,7 +109,7 @@ namespace spades {
 			ed.TransformPlacement(t);
 		}
 
-		void TransformTool::OnAction(IEditorContext& ed, const std::string& id) {
+		void TransformTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			const int axis = AxisOf(kTurnOption, id);
 			if (axis < 0)
 				return;

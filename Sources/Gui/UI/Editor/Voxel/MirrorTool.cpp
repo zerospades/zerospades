@@ -19,7 +19,7 @@
  */
 
 #include "MirrorTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 #include "SubTool.h"
 
 namespace spades {
@@ -38,12 +38,12 @@ namespace spades {
 			options.AddBool(kAxisOption[2], "Z", "Mirror");
 		}
 
-		void SyncMirrorToggles(ToolOptions& options, IEditorContext& ed) {
+		void SyncMirrorToggles(ToolOptions& options, IVoxelEditContext& ed) {
 			for (int a = 0; a < 3; a++)
 				options.SetBool(kAxisOption[a], ed.MirrorEnabled(a));
 		}
 
-		bool ApplyMirrorToggle(IEditorContext& ed, const std::string& id, bool value) {
+		bool ApplyMirrorToggle(IVoxelEditContext& ed, const std::string& id, bool value) {
 			for (int a = 0; a < 3; a++) {
 				if (id == kAxisOption[a]) {
 					ed.SetMirrorEnabled(a, value);
@@ -75,7 +75,7 @@ namespace spades {
 			return -1;
 		}
 
-		void MirrorTool::UpdateOptions(IEditorContext& ed) {
+		void MirrorTool::UpdateOptions(IVoxelEditContext& ed) {
 			GizmoTool::UpdateOptions(ed);
 			SyncMirrorToggles(options, ed);
 			// Whatever moved a plane — a gizmo drag, Reset, undo, a box — the
@@ -87,7 +87,7 @@ namespace spades {
 				options.SetNumber(kPlaneOption[a], at[a]);
 		}
 
-		void MirrorTool::OnOptionNumberChanged(IEditorContext& ed, const std::string& id,
+		void MirrorTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
 		                                       float value, bool committed) {
 			const int a = AxisOf(id);
 			if (a < 0)
@@ -105,12 +105,12 @@ namespace spades {
 				ed.PreviewMirrorPlane(plane);
 		}
 
-		void MirrorTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) {
+		void MirrorTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
 			GizmoTool::OnOptionToggled(ed, id, value);
 			ApplyMirrorToggle(ed, id, value);
 		}
 
-		void MirrorTool::OnAction(IEditorContext& ed, const std::string& id) {
+		void MirrorTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			if (id == kResetOption) {
 				ed.ResetMirrorPlane();
 				ed.SetStatus("Mirror planes reset to the pivot");

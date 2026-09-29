@@ -29,9 +29,9 @@
 #include <vector>
 
 #include <Gui/DocumentTypes.h>
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
-#include <Gui/UI/Editor/Shell/ToolRegistry.h>
+#include <Gui/UI/Editor/Voxel/VoxelTool.h>
 #include <Gui/UI/Editor/Voxel/VoxelUndoStack.h>
 #include <Gui/UI/Components/EditorMenu.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
@@ -53,7 +53,7 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		class EditorUI;
-		class EditorTool;
+		class VoxelTool;
 
 		/**
 		 * In-app KV6 voxel model editor.
@@ -63,7 +63,7 @@ namespace spades {
 		 * motion to drive a spectator-style camera and uses a software cursor for
 		 * the 2D UI (which may be shared across views).
 		 */
-		class KV6EditorView : public View, public IEditorContext, public VoxelUndoStack::Sink, public IEditorMenuHost {
+		class KV6EditorView : public View, public IVoxelEditContext, public VoxelUndoStack::Sink, public IEditorMenuHost {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, SoftwareCursor* cursor,
@@ -82,7 +82,7 @@ namespace spades {
 			void Closing() override {}
 			bool WantsToBeClosed() override { return wantsClose; }
 
-			// --- IEditorContext (the seam EditorTool subclasses operate through) ---
+			// --- IVoxelEditContext (the seam VoxelTool subclasses operate through) ---
 			void DoPick() override;
 			bool HasPick() const override { return pickHit; }
 			IntVector3 PickPlace() const override { return MakeIntVector3(pickPX, pickPY, pickPZ); }
@@ -110,7 +110,6 @@ namespace spades {
 			GizmoView GetGizmoView() const override;
 			void DrawGizmo(const TransformGizmo& gizmo) override;
 			bool InBounds(int x, int y, int z) const override;
-			VoxelModel& Model() override { return *model; }
 			uint32_t CurrentColor() const override { return currentColor; }
 
 			// Selection (a set of solid-voxel coords, shared across tools).
@@ -160,6 +159,7 @@ namespace spades {
 			                            const Vector4& color) override;
 			// Add every solid voxel in [lo, hi] to the selection.
 			void SelectBox(const IntVector3& lo, const IntVector3& hi) override;
+			void SelectAll() override;
 			// Add the solid voxels among `cells` to the selection.
 			void SelectCells(const std::vector<IntVector3>& cells) override;
 			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
@@ -236,9 +236,9 @@ namespace spades {
 			static const std::vector<ModeInfo>& Modes();
 
 			// --- Tools (available in Edit mode) -------------------------------
-			std::vector<ToolSlot> tools;
+			std::vector<VoxelToolSlot> tools;
 			int activeTool = 0;
-			EditorTool* ActiveTool(); // active tool in Edit mode, else null
+			VoxelTool* ActiveTool(); // active tool in Edit mode, else null
 			// The index of the tool with `id` (as the toolbar reports it), or -1.
 			int ToolIndex(const std::string& id) const;
 			// The active tool's option `id` if it is of `type`, else null: where a

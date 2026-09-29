@@ -27,58 +27,48 @@
 
 namespace spades {
 	namespace gui {
-		class IEditorContext;
-
-		// What a top-level tool does with cells, so sub-tools (incl. scripted ones)
-		// can apply through IEditorContext::ApplyCells without knowing their host.
-		// The right button does the inverse of the left (erase, deselect); Paint
-		// has no inverse, so the editor keeps the right button from its sub-tools.
-		enum class EditorRole { Edit, Select, Paint };
-
 		/**
-		 * An editor tool (draw, select, ...).
+		 * An editor tool (draw, select, ...) of an editor whose tools work
+		 * through `Context`: the seam the editor offers them, deriving from
+		 * `IEditorContext` (a voxel editor's is `IVoxelEditContext`).
 		 *
 		 * Tools receive pointer/key events while active and may draw their own 3D
 		 * preview (between StartScene/EndScene) and 2D overlay. They operate on the
-		 * editor through the `IEditorContext` seam, so adding a tool is just a new
-		 * subclass registered in the `ToolRegistry`.
+		 * editor through the context alone, so adding a tool is just a new
+		 * subclass registered in the editor's tool registry.
 		 */
-		class EditorTool {
+		template <class Context> class BasicEditorTool {
 		public:
-			virtual ~EditorTool() {}
+			virtual ~BasicEditorTool() {}
 
 			// Short label shown on the toolbar button.
 			virtual const char* Label() const = 0;
 
-			// Whether this (top-level) tool edits voxels or builds a selection.
-			// `ApplyCells` routes by the active tool's role.
-			virtual EditorRole Role() const { return EditorRole::Edit; }
-
-			virtual void OnActivate(IEditorContext&) {}
-			virtual void OnDeactivate(IEditorContext&) {}
+			virtual void OnActivate(Context&) {}
+			virtual void OnDeactivate(Context&) {}
 
 			// What Escape would back out of in this tool now, as a short phrase
 			// for the hint line ("cancel the box"); empty when nothing is in
 			// progress. The editor shows it and, when Escape reaches the tool,
 			// calls OnEscape: one answer drives both, so they always agree.
-			virtual std::string EscapeLabel(IEditorContext&) { return std::string(); }
+			virtual std::string EscapeLabel(Context&) { return std::string(); }
 			// Back out of what EscapeLabel named.
-			virtual void OnEscape(IEditorContext&) {}
+			virtual void OnEscape(Context&) {}
 
 			// Abandon a gesture in progress (a drag) without applying it. The editor
 			// calls this before it acts behind the tool's back (a shortcut, a dialog
 			// taking the input), so no gesture outlives the state it started from.
-			virtual void CancelInteraction(IEditorContext&) {}
+			virtual void CancelInteraction(Context&) {}
 
 			// A command changed the document or the edit state (an edit, a shortcut,
 			// an option, undo, redo). A tool holding anything derived from them
 			// refreshes it here: a gizmo drops its drag, the Mirror tool its toggles.
-			virtual void OnDocumentChanged(IEditorContext&) {}
+			virtual void OnDocumentChanged(Context&) {}
 
 			// What the mouse and keys do in this tool right now, in "  |  "
 			// separated parts ("[LMB] place  |  [RMB] delete"). The editor shows
 			// it under the viewport after the tool's name; empty shows the name only.
-			virtual std::string Hint(IEditorContext&) { return std::string(); }
+			virtual std::string Hint(Context&) { return std::string(); }
 
 			// Declarative options shown in the secondary toolbar next to this tool's
 			// sub-tools (e.g. Mirror's axis toggles, Draw's colour swatch). Returning
@@ -89,11 +79,11 @@ namespace spades {
 			// Called just before the options are drawn: bring any option that
 			// shows editor state (a readout, the mirror toggles, a command that
 			// needs a selection) up to date with it.
-			virtual void UpdateOptions(IEditorContext&) {}
+			virtual void UpdateOptions(Context&) {}
 
 			// A ToolOption of type Bool was clicked; it has already been flipped to
 			// `value`. Tools that mirror a toggle into other state react here.
-			virtual void OnOptionToggled(IEditorContext&, const std::string& id, bool value) {
+			virtual void OnOptionToggled(Context&, const std::string& id, bool value) {
 				(void)id;
 				(void)value;
 			}
@@ -102,7 +92,7 @@ namespace spades {
 			// value is still being typed — show it, but record nothing undo will
 			// have to unpick — and true once the user has settled on it (Enter, a
 			// click away, or a press of its arrows).
-			virtual void OnOptionNumberChanged(IEditorContext&, const std::string& id, float value,
+			virtual void OnOptionNumberChanged(Context&, const std::string& id, float value,
 			                                   bool committed) {
 				(void)id;
 				(void)value;
@@ -110,7 +100,7 @@ namespace spades {
 			}
 
 			// A ToolOption of type Action was clicked; `id` is that option's id.
-			virtual void OnAction(IEditorContext&, const std::string& id) { (void)id; }
+			virtual void OnAction(Context&, const std::string& id) { (void)id; }
 
 			// Optional sub-tools, shown in a secondary toolbar under the main one
 			// while this tool is active (e.g. Select's Voxel / Box / By Colour).
@@ -118,19 +108,19 @@ namespace spades {
 			virtual const char* SubToolLabel(int) const { return ""; }
 			// The sub-tool itself, for callers that must find one by what it is
 			// rather than by its label; null when out of range.
-			virtual EditorTool* SubTool(int) { return nullptr; }
+			virtual BasicEditorTool* SubTool(int) { return nullptr; }
 			virtual int ActiveSubTool() const { return 0; }
-			virtual void SetSubTool(IEditorContext&, int) {}
+			virtual void SetSubTool(Context&, int) {}
 
 			// All pointer activity (press, release, move, drag) arrives here; the
 			// phase and button live on the event.
-			virtual void OnPointer(IEditorContext&, const PointerInput&) {}
-			virtual void OnKey(IEditorContext&, const KeyInput&) {}
+			virtual void OnPointer(Context&, const PointerInput&) {}
+			virtual void OnKey(Context&, const KeyInput&) {}
 
 			// 3D preview, drawn between StartScene and EndScene.
-			virtual void DrawScene(IEditorContext&) {}
+			virtual void DrawScene(Context&) {}
 			// 2D overlay (tool sub-UI / status), drawn over the scene.
-			virtual void DrawOverlay(IEditorContext&) {}
+			virtual void DrawOverlay(Context&) {}
 		};
 	} // namespace gui
 } // namespace spades
