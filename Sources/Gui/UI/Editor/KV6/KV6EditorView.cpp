@@ -23,6 +23,7 @@
 #include <Gui/UI/Editor/Voxel/DrawTool.h>
 #include <Gui/UI/Editor/Voxel/VoxelTool.h>
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
+#include <Gui/UI/Editor/Shell/EditorKeys.h>
 #include "KV6ModelIO.h"
 #include <Gui/UI/Editor/Voxel/SubTool.h>
 #include <Gui/UI/Editor/Voxel/VoxelTool.h>
@@ -70,17 +71,6 @@ DEFINE_SPADES_SETTING(cg_keyDelete, "Delete");
 namespace spades {
 	namespace gui {
 		namespace {
-			// Mirror the in-game key matching (handles the "space" aliases) so the
-			// editor honours the player's movement bindings.
-			bool KV6CheckKey(const std::string& cfg, const std::string& input) {
-				if (cfg.empty())
-					return false;
-				if (EqualsIgnoringCase(cfg, "space") || EqualsIgnoringCase(cfg, "spacebar") ||
-				    EqualsIgnoringCase(cfg, "spacekey"))
-					return input == " ";
-				return EqualsIgnoringCase(cfg, input);
-			}
-
 			// Keys that form an editor shortcut together with Ctrl.
 			bool IsCtrlShortcut(const std::string& key) {
 				// Ctrl is also the descend key, so a chord here costs the movement
@@ -99,15 +89,6 @@ namespace spades {
 			// and the plane snaps to the same count, so snapping never changes
 			// which voxels a plane pairs up.
 			int HalfSteps(float v) { return int(std::floor(v * 2.0F + 0.5F)); }
-
-			// Camera speed factor while the sprint key (cg_keySprint) is held.
-			constexpr float kSprintMultiplier = 3.0F;
-
-			// How long a descend key that doubles as a chord modifier (Ctrl, the
-			// default cg_keyCrouch) must be held alone before it moves the camera.
-			// Long enough that even an unhurried Ctrl+Z never nudges the view, while
-			// a deliberate hold still starts descending without feeling stuck.
-			constexpr float kDescendGracePeriod = 0.4F;
 
 			// The largest volume a model may grow to. A KV6 column is a 64-bit mask,
 			// so no model can be deeper than 64 voxels.
@@ -131,10 +112,15 @@ namespace spades {
 			constexpr int kGroundStep = 4;    // voxels between lines
 			constexpr int kGroundMajorEvery = 4; // every Nth line is brighter
 
-			// The far plane (and the fog that fades into it) has to sit beyond the
-			// camera, or zooming out puts the whole model behind it.
-			constexpr float kViewDistanceFactor = 4.0F;
-			constexpr float kMinViewDistance = 1000.0F;
+			// Camera speed, in voxels per second per voxel of the model's size.
+			constexpr float kCameraSpeedPerSize = 0.7F;
+
+			// The navigation cube's box on screen, its distance from the right
+			// edge and from the bars, and how far the cube sits inside the box.
+			constexpr float kNaviCubeBox = 174.0F;
+			constexpr float kNaviCubeMargin = 16.0F;
+			constexpr float kNaviCubeTopGap = 8.0F;
+			constexpr float kNaviCubeInset = 14.0F;
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
@@ -194,9 +180,6 @@ namespace spades {
 				emit(MakeVector3(a.x, b.y, a.z), MakeVector3(a.x, b.y, b.z));
 			}
 
-			// The viewport camera's near plane, which also cuts overlay lines.
-			constexpr float kNearPlane = 0.1F;
-
 			// Overlay lines (outlines, tool wires) are drawn as two-tone strokes, the
 			// way editors keep selection outlines legible over any image: a dark
 			// casing under a coloured core, so a line reads against light voxels by
@@ -240,7 +223,7 @@ namespace spades {
 			// line's screen length, and the work spent along it, covers what shows.
 			bool ClipToView(const GizmoView& view, float margin, Vector3& a, Vector3& b) {
 				const Vector3 eye = view.eye;
-				if (!ClipToPlane([&](const Vector3& p) { return view.Depth(p) - kNearPlane; }, a, b))
+				if (!ClipToPlane([&](const Vector3& p) { return view.Depth(p) - EditorCamera::kNearPlane; }, a, b))
 					return false;
 				// The sides, widened by the margin, as planes through the eye: a point
 				// is inside when its offset across the view is within the frustum's
@@ -412,116 +395,6 @@ namespace spades {
 				return true;
 			}
 
-			Vector3 AxisUnit3(int a) {
-				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
-			}
-			Vector4 AxisTint(int a) {
-				if (a == 0) return MakeVector4(0.78F, 0.5F, 0.5F, 1.0F);
-				if (a == 1) return MakeVector4(0.5F, 0.74F, 0.5F, 1.0F);
-				return MakeVector4(0.55F, 0.58F, 0.78F, 1.0F);
-			}
-			const char* FaceLabel(int ax, int sg) {
-				static const char* names[3][2] = {
-				  {"Right", "Left"}, {"Back", "Front"}, {"Top", "Bottom"}};
-				return names[ax][sg > 0 ? 1 : 0];
-			}
-			// Inside a convex polygon (n verts, ordered): consistent edge-cross signs.
-			bool PointInPoly(const Vector2& p, const Vector2* q, int n) {
-				float sign = 0.0F;
-				for (int i = 0; i < n; i++) {
-					const Vector2& a = q[i];
-					const Vector2& b = q[(i + 1) % n];
-					float cr = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-					if (i == 0) sign = cr;
-					else if (cr * sign < 0.0F) return false;
-				}
-				return true;
-			}
-
-			// One facet of the chamfered (beveled) navigation cube.
-			struct NaviFacet {
-				int n;             // 3 (corner bevel) or 4 (face / edge bevel)
-				Vector3 v[4];      // world-space vertices
-				Vector3 dir;       // outward normal = snap view direction
-				int tint;          // axis 0/1/2 for faces, -1 for bevels
-				const char* label; // for the 6 faces, else nullptr
-			};
-
-			Vector3 Comp3(int ax, float on, int u, float uu, int v, float vv) {
-				float c[3];
-				c[ax] = on; c[u] = uu; c[v] = vv;
-				return MakeVector3(c[0], c[1], c[2]);
-			}
-
-			// Build the 6 faces + 12 edge bevels + 8 corner bevels of the cube.
-			void BuildNaviFacets(std::vector<NaviFacet>& out) {
-				const float t = 0.66F; // face half-extent; bevels live in [t, 1]
-				out.clear();
-				// 6 faces (square, shrunk to +/-t).
-				for (int ax = 0; ax < 3; ax++) {
-					int u = (ax + 1) % 3, v = (ax + 2) % 3;
-					for (int s = -1; s <= 1; s += 2) {
-						NaviFacet f;
-						f.n = 4;
-						f.v[0] = Comp3(ax, float(s), u, -t, v, -t);
-						f.v[1] = Comp3(ax, float(s), u, t, v, -t);
-						f.v[2] = Comp3(ax, float(s), u, t, v, t);
-						f.v[3] = Comp3(ax, float(s), u, -t, v, t);
-						f.dir = AxisUnit3(ax) * float(s);
-						f.tint = ax;
-						f.label = FaceLabel(ax, s);
-						out.push_back(f);
-					}
-				}
-				// 12 edge bevels (one per axis-pair and sign pair).
-				const int pairs[3][2] = {{0, 1}, {1, 2}, {2, 0}};
-				for (int pi = 0; pi < 3; pi++) {
-					int a = pairs[pi][0], b = pairs[pi][1], c = 3 - a - b;
-					for (int sa = -1; sa <= 1; sa += 2)
-					for (int sb = -1; sb <= 1; sb += 2) {
-						NaviFacet f;
-						f.n = 4;
-						float c0[3], c1[3], c2[3], c3[3];
-						c0[a] = float(sa); c0[b] = sb * t; c0[c] = -t;
-						c1[a] = float(sa); c1[b] = sb * t; c1[c] = t;
-						c2[a] = sa * t; c2[b] = float(sb); c2[c] = t;
-						c3[a] = sa * t; c3[b] = float(sb); c3[c] = -t;
-						f.v[0] = MakeVector3(c0[0], c0[1], c0[2]);
-						f.v[1] = MakeVector3(c1[0], c1[1], c1[2]);
-						f.v[2] = MakeVector3(c2[0], c2[1], c2[2]);
-						f.v[3] = MakeVector3(c3[0], c3[1], c3[2]);
-						f.dir = (AxisUnit3(a) * float(sa) + AxisUnit3(b) * float(sb)).Normalize();
-						f.tint = -1;
-						f.label = nullptr;
-						out.push_back(f);
-					}
-				}
-				// 8 corner bevels (triangles).
-				for (int sx = -1; sx <= 1; sx += 2)
-				for (int sy = -1; sy <= 1; sy += 2)
-				for (int sz = -1; sz <= 1; sz += 2) {
-					NaviFacet f;
-					f.n = 3;
-					f.v[0] = MakeVector3(sx * 1.0F, sy * t, sz * t);
-					f.v[1] = MakeVector3(sx * t, sy * 1.0F, sz * t);
-					f.v[2] = MakeVector3(sx * t, sy * t, sz * 1.0F);
-					f.dir = MakeVector3(float(sx), float(sy), float(sz)).Normalize();
-					f.tint = -1;
-					f.label = nullptr;
-					out.push_back(f);
-				}
-			}
-
-			// The navigation cube is fixed geometry, so build the facet set once and
-			// hand back the shared copy (queried every frame for drawing and picking).
-			const std::vector<NaviFacet>& NaviFacets() {
-				static const std::vector<NaviFacet> facets = [] {
-					std::vector<NaviFacet> out;
-					BuildNaviFacets(out);
-					return out;
-				}();
-				return facets;
-			}
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -630,11 +503,10 @@ namespace spades {
 		// --- Document ---------------------------------------------------------
 
 		void KV6EditorView::FrameCamera() {
-			orbitTarget = MakeVector3(model->GetWidth() * 0.5F - 0.5F, model->GetHeight() * 0.5F - 0.5F,
-			                          model->GetDepth() * 0.5F - 0.5F);
-			orbitDist =
-			  float(std::max(model->GetWidth(), std::max(model->GetHeight(), model->GetDepth()))) *
-			  1.8F;
+			cam.Frame(MakeVector3(model->GetWidth() * 0.5F - 0.5F, model->GetHeight() * 0.5F - 0.5F,
+			                      model->GetDepth() * 0.5F - 0.5F),
+			          float(std::max(model->GetWidth(),
+			                         std::max(model->GetHeight(), model->GetDepth()))));
 		}
 
 		void KV6EditorView::ResetDocumentState() {
@@ -955,76 +827,8 @@ namespace spades {
 
 		// --- Camera -----------------------------------------------------------
 
-		Vector3 KV6EditorView::Forward() const {
-			float cp = cosf(pitch);
-			return MakeVector3(cp * cosf(yaw), cp * sinf(yaw), -sinf(pitch));
-		}
-
-		Vector3 KV6EditorView::CameraEye() const { return orbitTarget - Forward() * orbitDist; }
-
-		float KV6EditorView::ViewDistance() const {
-			// Far enough to keep the model visible at any zoom, and never nearer than
-			// the fixed distance the editor used before.
-			return std::max(kMinViewDistance, orbitDist * kViewDistanceFactor);
-		}
-
-		void KV6EditorView::UpdateMovement(float dt) {
-			Vector3 fwd = Forward();
-			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
-			// Cross(fwd, up) normalised, derived from the heading so it stays valid
-			// when looking straight up/down (navicube top/bottom), where the cross
-			// product collapses. Matches the camera side axis in SetupScene.
-			Vector3 right = MakeVector3(-sinf(yaw), cosf(yaw), 0.0F);
-
-			float step = float(cubeSize) * 0.7F * (keySprint ? kSprintMultiplier : 1.0F) * dt;
-			bool descending = keyDown && DescendKeyIsActive();
-			auto displacement = [&](bool withDescend) {
-				Vector3 move = MakeVector3(0, 0, 0);
-				if (keyFwd) move += fwd;
-				if (keyBack) move -= fwd;
-				if (keyRight) move += right;
-				if (keyLeft) move -= right;
-				if (keyUp) move += up;
-				if (withDescend && descending) move -= up;
-				if (move.x == 0.0F && move.y == 0.0F && move.z == 0.0F)
-					return MakeVector3(0, 0, 0);
-				return move.Normalize() * step;
-			};
-
-			Vector3 delta = displacement(true);
-			// Moving the orbited point carries the whole view along with it.
-			orbitTarget += delta;
-
-			// While Ctrl is both the descend key and held, remember how far the
-			// descend part alone moved us, so a Ctrl shortcut can take it back.
-			if (descending && ctrlHeld && KV6CheckKey(cg_keyCrouch, "Control"))
-				ctrlDescent += delta - displacement(false);
-		}
-
-		bool KV6EditorView::DescendKeyIsActive() const {
-			// A descend key that cannot start a shortcut moves the camera at once.
-			if (!KV6CheckKey(cg_keyCrouch, "Control"))
-				return true;
-			// Ctrl also opens Ctrl+S/C/X/V/Z/Y, so wait out the moment in which the
-			// letter of a chord would arrive: the view then never moves for a
-			// shortcut, and a deliberate hold still descends.
-			return globalTime - descendPressTime >= kDescendGracePeriod;
-		}
-
-		void KV6EditorView::PanView(float dx, float dy) {
-			if (!camera.IsValid())
-				return;
-			// World units per screen pixel at the orbited point, so the point under
-			// the cursor follows the drag at any zoom level.
-			float unitsPerPixel = camera.WorldPerPixel(orbitTarget);
-			orbitTarget +=
-			  camera.right * (-dx * unitsPerPixel) + camera.up * (dy * unitsPerPixel);
-		}
-
 		void KV6EditorView::ReleaseHeldInput() {
-			keyFwd = keyBack = keyLeft = keyRight = keyUp = keyDown = false;
-			ctrlDescent = MakeVector3(0, 0, 0);
-			lookActive = false;
+			cam.ReleaseHeld();
 			// The release of a held button may be swallowed too, so the press it
 			// began is over: the tool and the colour picker drop their drags and
 			// nothing reads as dragged.
@@ -1034,38 +838,8 @@ namespace spades {
 			CancelToolInteraction();
 		}
 
-		client::SceneDefinition KV6EditorView::SetupScene(float vpX, float vpY, float vpW, float vpH) {
-			client::SceneDefinition sceneDef;
-			Vector3 eye = CameraEye();
-			Vector3 at = orbitTarget;
-			Vector3 up = MakeVector3(0.0F, 0.0F, -1.0F);
-
-			Vector3 dir = (at - eye).Normalize();
-			// At the navicube Top/Bottom views dir is parallel to the world-up
-			// reference, so Cross(dir, up) collapses to NaN. For every non-vertical
-			// pitch Cross(dir, up).Normalize() equals (-sin(yaw), cos(yaw), 0); use
-			// that heading-derived value at the pole too. It is the continuous limit
-			// of the cross product, so the camera reaches top/bottom smoothly instead
-			// of snapping, and only flips if rotated past the pole.
-			Vector3 side;
-			if (std::fabs(Vector3::Dot(dir, up)) > 0.999F)
-				side = MakeVector3(-sinf(yaw), cosf(yaw), 0.0F);
-			else
-				side = Vector3::Cross(dir, up).Normalize();
-			up = -Vector3::Cross(dir, side);
-
-			sceneDef.viewOrigin = eye;
-			sceneDef.viewAxis[0] = side;
-			sceneDef.viewAxis[1] = up;
-			sceneDef.viewAxis[2] = dir;
-			sceneDef.fovY = DEG2RAD(60.0F);
-			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (vpW / vpH));
-			sceneDef.zNear = kNearPlane;
-			sceneDef.zFar = ViewDistance();
-			sceneDef.viewportLeft = int(vpX);
-			sceneDef.viewportTop = int(vpY);
-			sceneDef.viewportWidth = int(vpW);
-			sceneDef.viewportHeight = int(vpH);
+		client::SceneDefinition KV6EditorView::SetupScene(float width, float height) {
+			client::SceneDefinition sceneDef = cam.Scene(width, height);
 			// The editor draws its own ground: the game world brings chunk culling
 			// and terrain that crowds the model, and water is a plane following the
 			// camera at sea level with a mirrored scene rendered into it.
@@ -1086,10 +860,10 @@ namespace spades {
 
 		bool KV6EditorView::RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
 		                                 IntVector3& out) {
-			if (!camera.IsValid())
+			if (!cam.View().IsValid())
 				return false;
 			Vector3 origin, dir;
-			camera.Ray(softwareCursor->GetPosition(), origin, dir);
+			cam.View().Ray(softwareCursor->GetPosition(), origin, dir);
 			float denom = Vector3::Dot(dir, normal);
 			if (std::fabs(denom) < 1.0e-5F)
 				return false;
@@ -1104,7 +878,7 @@ namespace spades {
 
 		Vector2 KV6EditorView::WorldToScreen(const Vector3& w, bool& ok) const {
 			Vector2 screen = MakeVector2(0.0F, 0.0F);
-			ok = camera.Project(w, screen);
+			ok = cam.View().Project(w, screen);
 			return screen;
 		}
 
@@ -1155,12 +929,12 @@ namespace spades {
 
 			const IntVector3 pendingAnchor =
 			  edit.placing ? edit.placement.anchor : IntVector3::Make(0, 0, 0);
-			if (overlayCache.valid && !linesChanged && SameView(overlayCache.view, camera) &&
+			if (overlayCache.valid && !linesChanged && SameView(overlayCache.view, cam.View()) &&
 			    overlayCache.voxelsVersion == voxelsVersion && overlayCache.placing == edit.placing &&
 			    overlayCache.pendingVersion == placementModelVersion &&
 			    overlayCache.pendingAnchor == pendingAnchor)
 				return; // nothing the strokes depend on has moved
-			overlayCache.view = camera;
+			overlayCache.view = cam.View();
 			overlayCache.voxelsVersion = voxelsVersion;
 			overlayCache.placing = edit.placing;
 			overlayCache.pendingVersion = placementModelVersion;
@@ -1176,10 +950,10 @@ namespace spades {
 			std::vector<Vector2> ends; // screen points splitting a line into pieces
 			for (const OverlayLine& l : overlayCache.lines) {
 				Vector3 a = l.a, b = l.b;
-				if (!ClipToView(camera, kOverlayCasingWidth, a, b))
+				if (!ClipToView(cam.View(), kOverlayCasingWidth, a, b))
 					continue;
 				Vector2 pa, pb;
-				if (!camera.Project(a, pa) || !camera.Project(b, pb))
+				if (!cam.View().Project(a, pa) || !cam.View().Project(b, pb))
 					continue;
 
 				const float screenLength = (pb - pa).GetLength();
@@ -1194,7 +968,7 @@ namespace spades {
 				bool projected = true;
 				for (int p = 1; p < pieces && projected; p++) {
 					Vector2 s;
-					projected = camera.Project(a + (b - a) * (float(p) / float(pieces)), s);
+					projected = cam.View().Project(a + (b - a) * (float(p) / float(pieces)), s);
 					ends.push_back(s);
 				}
 				if (!projected)
@@ -1209,7 +983,7 @@ namespace spades {
 					bool pieceHidden = runHidden;
 					if (p < pieces) {
 						const Vector3 middle = a + (b - a) * ((float(p) + 0.5F) / float(pieces));
-						pieceHidden = occluders.Hide(camera.eye, middle);
+						pieceHidden = occluders.Hide(cam.View().eye, middle);
 						if (p == 0)
 							runHidden = pieceHidden;
 					}
@@ -1231,7 +1005,7 @@ namespace spades {
 		// buffer, as outlines lie on voxel faces and would fight them for depth, and
 		// a 3D line cannot be given a casing or a width.
 		void KV6EditorView::DrawOverlayLines2D() {
-			if (!camera.IsValid()) {
+			if (!cam.View().IsValid()) {
 				overlayLines.clear();
 				return;
 			}
@@ -1258,11 +1032,11 @@ namespace spades {
 
 		void KV6EditorView::DoPick() {
 			pickHit = false;
-			if (!camera.IsValid())
+			if (!cam.View().IsValid())
 				return;
 
 			Vector3 eye, dir;
-			camera.Ray(softwareCursor->GetPosition(), eye, dir);
+			cam.View().Ray(softwareCursor->GetPosition(), eye, dir);
 
 			// The renderer centres voxel (x,y,z) at world (x,y,z), so traverse in a
 			// +0.5-shifted space where each integer cell maps to a voxel index.
@@ -1388,7 +1162,7 @@ namespace spades {
 			dst->SetOrigin(model->GetOrigin() - shift);
 			model = dst;
 			InvalidateRenderModel();
-			orbitTarget += shift;
+			cam.Shift(shift); // the view stays on the relabelled voxels
 			cubeSize = std::max(nw, std::max(nh, nd));
 			// Everything else held in voxel coordinates follows the relabelling:
 			// the mirror planes (by whole voxels, so still on the half-step
@@ -2429,7 +2203,7 @@ namespace spades {
 			renderer->DrawFilledTriangle(A, B, C);
 		}
 
-		GizmoView KV6EditorView::GetGizmoView() const { return camera; }
+		GizmoView KV6EditorView::GetGizmoView() const { return cam.View(); }
 
 		void KV6EditorView::DrawGizmo(const TransformGizmo& gizmo) {
 			GizmoCanvas canvas(*renderer);
@@ -2450,7 +2224,7 @@ namespace spades {
 			                                  {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
 			for (int f = 0; f < 6; f++) {
 				Vector3 n = MakeVector3(faceN[f][0], faceN[f][1], faceN[f][2]);
-				Vector3 toCam = camera.eye - (center + n * half);
+				Vector3 toCam = cam.View().eye - (center + n * half);
 				float facing = Vector3::Dot(n, toCam);
 				if (facing <= 0.0F)
 					continue; // back-facing
@@ -2467,88 +2241,6 @@ namespace spades {
 				FillTri(q[0], q[1], q[2], col);
 				FillTri(q[0], q[2], q[3], col);
 			}
-		}
-
-		bool KV6EditorView::NaviCubeDir(const Vector2& p, Vector3& dir) {
-			const std::vector<NaviFacet>& facets = NaviFacets();
-			for (const NaviFacet& f : facets) {
-				if (-Vector3::Dot(f.dir, camera.forward) <= 0.02F)
-					continue; // back-facing
-				Vector2 q[4];
-				for (int i = 0; i < f.n; i++)
-					q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
-					                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
-				if (PointInPoly(p, q, f.n)) { dir = f.dir; return true; }
-			}
-			return false;
-		}
-
-		void KV6EditorView::DrawNaviCube() {
-			client::IFont& font = fontManager->GetSmallGuiFont();
-			const std::vector<NaviFacet>& facets = NaviFacets();
-			Vector3 hdir;
-			bool hov = NaviCubeDir(softwareCursor->GetPosition(), hdir);
-			// Draw bevels behind the faces: corners, then edges, then faces.
-			for (int pass = 0; pass < 3; pass++) {
-				for (const NaviFacet& f : facets) {
-					bool isFace = f.tint >= 0;
-					bool isCorner = (f.n == 3);
-					bool isEdge = !isFace && !isCorner;
-					if ((pass == 0 && !isCorner) || (pass == 1 && !isEdge) || (pass == 2 && !isFace))
-						continue;
-					float facing = -Vector3::Dot(f.dir, camera.forward);
-					if (facing <= 0.02F)
-						continue;
-					Vector2 q[4];
-					for (int i = 0; i < f.n; i++)
-						q[i] = MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
-						                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
-					float sh = 0.45F + 0.55F * facing;
-					Vector4 base = isFace ? AxisTint(f.tint) : MakeVector4(0.5F, 0.52F, 0.56F, 1.0F);
-					bool hl = hov && Vector3::Dot(hdir, f.dir) > 0.999F;
-					Vector4 col = hl ? MakeVector4(0.4F, 0.7F, 1.0F, 0.97F)
-					                 : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.97F);
-					// Each facet is one convex polygon so its whole outline is
-					// anti-aliased; the seams it leaves against its neighbours are
-					// covered by the edge lines drawn next.
-					OverlayFillConvexPolygon(*renderer, q, std::size_t(f.n), col);
-					Vector4 ec = MakeVector4(0.08F, 0.08F, 0.1F, 0.85F);
-					for (int e = 0; e < f.n; e++)
-						DrawLine2D(q[e], q[(e + 1) % f.n], 1.0F, ec);
-				}
-			}
-			// Face labels last, so they sit on top of the cube.
-			for (const NaviFacet& f : facets) {
-				if (!f.label || -Vector3::Dot(f.dir, camera.forward) <= 0.02F)
-					continue;
-				Vector2 ctr = MakeVector2(0.0F, 0.0F);
-				for (int i = 0; i < 4; i++)
-					ctr += MakeVector2(gizCx + Vector3::Dot(f.v[i], camera.right) * gizR,
-					                   gizCy - Vector3::Dot(f.v[i], camera.up) * gizR);
-				ctr = ctr * 0.25F;
-				float ls = 0.85F;
-				Vector2 ts = font.Measure(f.label);
-				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
-				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.8F));
-			}
-		}
-
-		void KV6EditorView::SnapCameraDir(const Vector3& dir) {
-			Vector3 f = dir * -1.0F; // camera forward = look toward the model
-			float tp, ty;
-			if (std::fabs(f.z) > 0.999F) {
-				tp = asinf(std::max(-1.0F, std::min(1.0F, -f.z)));
-				ty = yaw; // looking straight up/down: keep heading
-			} else {
-				tp = asinf(-f.z);
-				ty = atan2f(f.y, f.x);
-			}
-			// Shortest angular path for yaw.
-			while (ty - yaw > kPi) ty -= kTwoPi;
-			while (ty - yaw < -kPi) ty += kTwoPi;
-			targetYaw = ty;
-			targetPitch = tp;
-			camAnim = true;
 		}
 
 		std::string KV6EditorView::ToolHintLine() {
@@ -2674,7 +2366,7 @@ namespace spades {
 			                             cg_keyMoveRight,   cg_keyJump,         cg_keyCrouch,
 			                             cg_keySprint,      cg_keyDelete,       cg_keyScreenshot};
 			for (const std::string& b : bound) {
-				if (KV6CheckKey(b, key))
+				if (EditorKeyMatches(b, key))
 					return true;
 			}
 			return false;
@@ -2945,20 +2637,15 @@ namespace spades {
 		// --- View interface ---------------------------------------------------
 
 		void KV6EditorView::MouseEvent(float dx, float dy) {
-			if (lookActive && shiftHeld) { // Shift + wheel-button drag pans
+			if (cam.IsLooking() && shiftHeld) { // Shift + wheel-button drag pans
 				// The cursor travels with the drag, staying on the grabbed spot
 				// (it stops at the screen edge while the pan carries on).
 				softwareCursor->Accumulate(dx, dy);
-				PanView(dx, dy);
+				cam.Pan(dx, dy);
 				return;
 			}
-			if (lookActive) {
-				camAnim = false; // manual look cancels a navicube animation
-				float sens = 0.003F;
-				yaw += dx * sens;
-				pitch -= dy * sens;
-				float lim = kHalfPi - 0.01F;
-				pitch = Clampf(pitch, -lim, lim);
+			if (cam.IsLooking()) {
+				cam.Look(dx, dy);
 				return;
 			}
 			softwareCursor->Accumulate(dx, dy);
@@ -2988,7 +2675,7 @@ namespace spades {
 				return;
 			if (ui->GetEditorMenu()->IsActive())
 				return;
-			orbitDist = Clampf(orbitDist * (1.0F + y * 0.1F), 2.0F, 1000.0F);
+			cam.Zoom(y);
 		}
 
 		void KV6EditorView::KeyEvent(const std::string& key, bool down) {
@@ -2999,7 +2686,7 @@ namespace spades {
 			if (key == "Control") ctrlHeld = down;
 			if (key == "Alt") altHeld = down;
 			if (key == "Shift") shiftHeld = down;
-			if (KV6CheckKey(cg_keySprint, key)) keySprint = down;
+			cam.TrackModifiers(key, down);
 
 			// A modal dialog (file browser) owns every key while it is up.
 			if (ui->GetOverlay()->KeyEvent(key, down))
@@ -3016,11 +2703,7 @@ namespace spades {
 				// Ctrl is also the default descend key (cg_keyCrouch), so the view
 				// has been sinking since Ctrl went down: undo that drift and stop
 				// descending for the rest of this press.
-				if (KV6CheckKey(cg_keyCrouch, "Control")) {
-					orbitTarget -= ctrlDescent;
-					ctrlDescent = MakeVector3(0, 0, 0);
-					keyDown = false;
-				}
+				cam.CancelCtrlDescent();
 				// A shortcut changes the document or the placement under a drag
 				// in progress (a paste replaces it), so that drag is abandoned.
 				CancelToolInteraction();
@@ -3037,7 +2720,7 @@ namespace spades {
 				return;
 			}
 
-			if (key == "MiddleMouseButton") { lookActive = down; return; }
+			if (key == "MiddleMouseButton") { cam.SetLooking(down); return; }
 
 			// A release reaches the tool only when its press did: presses the
 			// picker, the bars, the navigation cube or colour sampling took are
@@ -3078,7 +2761,10 @@ namespace spades {
 
 				// Check navigation cube
 				Vector3 navDir;
-				if (NaviCubeDir(cursor, navDir)) { SnapCameraDir(navDir); return; }
+				if (naviCube.DirectionAt(cam.View(), cursor, navDir)) {
+					cam.SnapToward(navDir);
+					return;
+				}
 
 				// Sampling a colour works the same in every tool, which never sees
 				// the click.
@@ -3115,28 +2801,16 @@ namespace spades {
 				if (down && ui->GetOptionBar()->KeyEvent(key))
 					return;
 
-			if (down && KV6CheckKey(cg_keyScreenshot, key)) { wantScreenShot = true; return; }
-			if (down && KV6CheckKey(cg_keyDelete, key)) {
+			if (down && EditorKeyMatches(cg_keyScreenshot, key)) { wantScreenShot = true; return; }
+			if (down && EditorKeyMatches(cg_keyDelete, key)) {
 				// Like a Ctrl shortcut, it edits behind the tool's back.
 				CancelToolInteraction();
 				DeleteSelection();
 				return;
 			}
 
-			std::string fwd = cg_keyMoveForward, bk = cg_keyMoveBackward, lf = cg_keyMoveLeft;
-			std::string rt = cg_keyMoveRight, jp = cg_keyJump, cr = cg_keyCrouch;
-			if (KV6CheckKey(fwd, key)) { keyFwd = down; return; }
-			if (KV6CheckKey(bk, key)) { keyBack = down; return; }
-			if (KV6CheckKey(lf, key)) { keyLeft = down; return; }
-			if (KV6CheckKey(rt, key)) { keyRight = down; return; }
-			if (KV6CheckKey(jp, key)) { keyUp = down; return; }
-			if (KV6CheckKey(cr, key)) {
-				keyDown = down;
-				if (down)
-					descendPressTime = globalTime; // starts the grace period
-				ctrlDescent = MakeVector3(0, 0, 0); // a new press, or a finished one
+			if (cam.MovementKey(key, down, globalTime))
 				return;
-			}
 
 			// Tool and sub-tool keys, shown on their buttons. Plain keys only, so
 			// a chord never switches tools.
@@ -3190,43 +2864,23 @@ namespace spades {
 			float sh = renderer->ScreenHeight();
 			globalTime += dt;
 
-			// Smoothly rotate toward a navicube-selected view.
-			if (camAnim) {
-				float k = std::min(1.0F, dt * 12.0F);
-				yaw += (targetYaw - yaw) * k;
-				pitch += (targetPitch - pitch) * k;
-				if (std::fabs(targetYaw - yaw) < 0.002F && std::fabs(targetPitch - pitch) < 0.002F) {
-					yaw = targetYaw;
-					pitch = targetPitch;
-					camAnim = false;
-				}
-			}
-
-			if (!ui->GetEditorMenu()->IsActive() && !ui->GetOverlay()->IsActive())
-				UpdateMovement(dt);
+			// The movement keys fly the camera unless a modal has the keyboard;
+			// its speed follows the model's size, so any model is crossed as fast.
+			cam.Update(dt, globalTime, float(cubeSize) * kCameraSpeedPerSize,
+			           !ui->GetEditorMenu()->IsActive() && !ui->GetOverlay()->IsActive());
 			if (statusTimer > 0.0F)
 				statusTimer -= dt;
 
 			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
 			// Matches the far plane: fog that ended closer would swallow the model
 			// at the far end of the zoom range.
-			renderer->SetFogDistance(ViewDistance());
+			renderer->SetFogDistance(cam.ViewDistance());
 
 			// The scene is rendered full-screen (sub-viewport rendering isn't
 			// guaranteed across renderers — keep this renderer-agnostic), and the
 			// ribbon + toolbar bars are drawn opaque over the top. So the camera
 			// projection and the cursor->ray pick both use the full screen.
-			client::SceneDefinition sceneDef = SetupScene(0.0F, 0.0F, sw, sh);
-			camera.eye = sceneDef.viewOrigin;
-			camera.right = sceneDef.viewAxis[0];
-			camera.up = sceneDef.viewAxis[1];
-			camera.forward = sceneDef.viewAxis[2];
-			camera.tanHalfFovX = tanf(sceneDef.fovX * 0.5F);
-			camera.tanHalfFovY = tanf(sceneDef.fovY * 0.5F);
-			camera.viewportX = 0.0F;
-			camera.viewportY = 0.0F;
-			camera.viewportWidth = sw;
-			camera.viewportHeight = sh;
+			client::SceneDefinition sceneDef = SetupScene(sw, sh);
 
 			RefreshRenderModels(); // what edits since the last frame left stale
 			renderer->StartScene(sceneDef);
@@ -3267,12 +2921,12 @@ namespace spades {
 			DrawToolbar(sw, sh);
 			DrawSubToolbar(sw);
 
-			// Layout and draw navigation cube
-			float gizBox = 174.0F;
-			gizR = gizBox * 0.5F - 14.0F;
-			gizCx = sw - 16.0F - gizBox * 0.5F;
-			gizCy = BarsH() + 8.0F + gizBox * 0.5F;
-			DrawNaviCube();
+			// The navigation cube, top right under the bars.
+			naviCube.Layout(sw - kNaviCubeMargin - kNaviCubeBox * 0.5F,
+			                BarsH() + kNaviCubeTopGap + kNaviCubeBox * 0.5F,
+			                kNaviCubeBox * 0.5F - kNaviCubeInset);
+			naviCube.Draw(*renderer, fontManager->GetSmallGuiFont(), cam.View(),
+			              softwareCursor->GetPosition());
 
 			// Draw color picker
 			if (ui) {
