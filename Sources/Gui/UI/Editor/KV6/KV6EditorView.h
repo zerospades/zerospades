@@ -196,11 +196,11 @@ namespace spades {
 
 			// --- Undo / redo --------------------------------------------------
 			// The stack drives the model back and forth through the Sink interface
-			// below. The document is dirty while its geometry state differs from the
+			// below. The document is dirty while its state differs from the
 			// one captured at the last save (-1 = never saved).
 			VoxelUndoStack undo{*this};
-			long savedGeomId = -1;
-			bool IsDirty() const { return undo.GeometryStateId() != savedGeomId; }
+			long savedDocumentId = -1;
+			bool IsDirty() const { return undo.DocumentStateId() != savedDocumentId; }
 			// What saving would change: the journaled edits, plus voxels still
 			// waiting to be placed (a paste leaves the document itself untouched).
 			bool HasUnsavedChanges() const { return IsDirty() || edit.placing; }
