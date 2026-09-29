@@ -41,6 +41,12 @@ namespace spades {
 			virtual const GizmoView& CurrentView() const = 0;
 			/** Where tools aim, in screen pixels: the cursor, or the crosshair. */
 			virtual const Vector2& AimPosition() const = 0;
+			/**
+			 * Where the centre of the document's voxel (0,0,0) is in the world the
+			 * view looks at. The editor works with voxel `i` centred at `i`, as a
+			 * model is rendered; a map's voxel `i` spans `i` to `i + 1` instead.
+			 */
+			virtual Vector3 DocumentOrigin() const { return MakeVector3(0.0F, 0.0F, 0.0F); }
 
 			/** Keys the host acts on itself (the camera's, the screenshot key),
 			 *  which no tool may take as its hot key. */

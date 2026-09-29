@@ -390,6 +390,9 @@ namespace spades {
 			void DrawMirrorPlanes();
 
 			// --- Picking ------------------------------------------------------
+			// The host's view in document coordinates (see DocumentOrigin):
+			// what picking, projecting and the gizmos go through.
+			GizmoView DocumentView() const;
 			bool pickHit = false;
 			IntVector3 pickSolid = IntVector3::Make(0, 0, 0); // solid voxel hit
 			IntVector3 pickPlace = IntVector3::Make(0, 0, 0); // adjacent empty cell
