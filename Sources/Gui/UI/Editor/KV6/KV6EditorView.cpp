@@ -411,7 +411,7 @@ namespace spades {
 
 			// Initialize UI manager
 			ui = Handle<EditorUI>::New(renderer.GetPointerOrNull(), audioDevice.GetPointerOrNull(),
-			                           &*fontManager, this, softwareCursor);
+			                           &*fontManager, *this, softwareCursor);
 
 			// Wire up toolbar callbacks. Buttons report ids, resolved against the
 			// modes and tools as they are now; the toolbar only reports clicks on
