@@ -168,8 +168,6 @@ namespace spades {
 			const GizmoSnap& Snap() const { return snap; }
 			void SetPose(const GizmoPose& pose) { this->pose = pose; }
 			const GizmoPose& Pose() const { return pose; }
-			/** On-screen radius of the rotation rings, in pixels; sizes the rest. */
-			void SetSize(float pixels);
 
 			// --- Interaction (screen pixels) ----------------------------------
 			/** The handle a press at `cursor` would grab, or None. */
@@ -203,7 +201,6 @@ namespace spades {
 			GizmoHandleSet enabled;
 			GizmoSnap snap;
 			GizmoPose pose;
-			float sizePixels;
 
 			GizmoHandle hovered = GizmoHandle::None;
 			GizmoHandle active = GizmoHandle::None;
