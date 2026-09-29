@@ -38,10 +38,10 @@
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
 #include <Gui/UI/Editor/Shell/EditorKeys.h>
+#include <Gui/UI/Editor/Shell/EditorPrompts.h>
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditor.h>
 #include <Gui/UI/Editor/Voxel/VoxelOverlayLines.h>
-#include <Gui/UI/Widgets/MessageBox.h>
 
 #include "KV6ModelIO.h"
 
@@ -219,14 +219,8 @@ namespace spades {
 		}
 
 		void KV6EditorView::ShowMessage(const std::string& text) {
-			// An alert rather than a message box with one button: it is the same
-			// thing to look at, and it answers to Enter and Escape as every other
-			// dismissable box in the game does.
-			UIOverlayHost* overlay = ui->GetOverlay();
-			Handle<AlertScreen> box =
-			  Handle<AlertScreen>::New(&overlay->GetUIManager().GetRootElement(), text, 120.0F);
 			editor->ReleaseHeldInput();
-			overlay->Show(box.GetPointerOrNull());
+			ShowEditorMessage(*ui->GetOverlay(), text);
 		}
 
 		void KV6EditorView::ConfirmDiscardChanges(std::function<void()> proceed) {
@@ -236,28 +230,18 @@ namespace spades {
 				proceed();
 				return;
 			}
-
-			UIOverlayHost* overlay = ui->GetOverlay();
-			Handle<MessageBoxScreen> box = Handle<MessageBoxScreen>::New(
-			  &overlay->GetUIManager().GetRootElement(), "This model has unsaved changes.",
-			  std::vector<std::string>{"Save", "Discard", "Cancel"}, 160.0F);
-			box->closed = [this, proceed](ui::UIElement& sender) {
-				MessageBoxScreen* answer = dynamic_cast<MessageBoxScreen*>(&sender);
-				if (!answer)
-					return;
-				if (answer->resultIndex == 1) { // Discard
-					proceed();
-				} else if (answer->resultIndex == 0) { // Save
-					// A document that was never saved needs somewhere to go first;
-					// `proceed` then runs only if that save succeeds.
-					if (filePath.empty())
-						OpenSaveAsDialog(proceed);
-					else if (Save())
-						proceed();
-				}
-			};
 			editor->ReleaseHeldInput();
-			overlay->Show(box.GetPointerOrNull());
+			gui::ConfirmDiscardChanges(*ui->GetOverlay(), "This model has unsaved changes.",
+			                           [this](std::function<void()> after) {
+				                           // A document that was never saved needs
+				                           // somewhere to go first; `after` then runs
+				                           // only if that save succeeds.
+				                           if (filePath.empty())
+					                           OpenSaveAsDialog(after);
+				                           else if (Save())
+					                           after();
+			                           },
+			                           proceed);
 		}
 
 		void KV6EditorView::ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
