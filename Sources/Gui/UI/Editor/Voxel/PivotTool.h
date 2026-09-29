@@ -32,8 +32,8 @@ namespace spades {
 			PivotTool();
 			const char* Label() const override { return "Pivot"; }
 			// Refresh the boxes from the live pivot.
-			void UpdateOptions(IEditorContext&) override;
-			void OnOptionNumberChanged(IEditorContext&, const std::string& id, float value,
+			void UpdateOptions(IVoxelEditContext&) override;
+			void OnOptionNumberChanged(IVoxelEditContext&, const std::string& id, float value,
 			                           bool committed) override;
 
 		private:

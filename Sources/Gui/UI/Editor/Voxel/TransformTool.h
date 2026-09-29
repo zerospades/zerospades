@@ -42,11 +42,11 @@ namespace spades {
 		public:
 			TransformTool();
 			const char* Label() const override { return "Transform"; }
-			void UpdateOptions(IEditorContext& ed) override;
-			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
-			void OnOptionNumberChanged(IEditorContext& ed, const std::string& id, float value,
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
 			                           bool committed) override;
-			void OnAction(IEditorContext& ed, const std::string& id) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
 		};
 	} // namespace gui
 } // namespace spades

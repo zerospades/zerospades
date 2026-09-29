@@ -18,14 +18,14 @@
 
  */
 
-#include "ToolRegistry.h"
+#include "VoxelTool.h"
 
-#include <Gui/UI/Editor/Voxel/DrawTool.h>
-#include <Gui/UI/Editor/Voxel/MirrorTool.h>
-#include <Gui/UI/Editor/Voxel/PaintTool.h>
-#include <Gui/UI/Editor/Voxel/PivotTool.h>
-#include <Gui/UI/Editor/Voxel/SelectTool.h>
-#include <Gui/UI/Editor/Voxel/TransformTool.h>
+#include "DrawTool.h"
+#include "MirrorTool.h"
+#include "PaintTool.h"
+#include "PivotTool.h"
+#include "SelectTool.h"
+#include "TransformTool.h"
 
 namespace spades {
 	namespace gui {
@@ -35,13 +35,13 @@ namespace spades {
 			constexpr int kEditingGroup = 0;
 			constexpr int kSetupGroup = 1;
 
-			template <class T> ToolRegistry::Factory Make() {
-				return [] { return std::unique_ptr<EditorTool>(new T()); };
+			template <class T> VoxelToolRegistry::Factory Make() {
+				return [] { return std::unique_ptr<VoxelTool>(new T()); };
 			}
 		} // namespace
 
-		ToolRegistry& ToolRegistry::Instance() {
-			static ToolRegistry registry;
+		VoxelToolRegistry& VoxelTools() {
+			static VoxelToolRegistry registry;
 			static bool seeded = false;
 			if (!seeded) {
 				seeded = true;
@@ -58,24 +58,6 @@ namespace spades {
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
 			}
 			return registry;
-		}
-
-		void ToolRegistry::Register(Factory f, const std::string& id, int group,
-		                            const std::string& hotKey) {
-			entries.push_back({std::move(f), id, group, hotKey});
-		}
-
-		void ToolRegistry::BuildAll(std::vector<ToolSlot>& out) const {
-			out.clear();
-			out.reserve(entries.size());
-			for (const Entry& entry : entries) {
-				ToolSlot slot;
-				slot.tool = entry.make();
-				slot.id = entry.id;
-				slot.group = entry.group;
-				slot.hotKey = entry.hotKey;
-				out.push_back(std::move(slot));
-			}
 		}
 	} // namespace gui
 } // namespace spades

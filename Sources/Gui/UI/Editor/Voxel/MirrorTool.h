@@ -32,9 +32,9 @@ namespace spades {
 		 * mirror state: sync them in UpdateOptions and route their clicks here.
 		 */
 		void AddMirrorToggles(ToolOptions& options);
-		void SyncMirrorToggles(ToolOptions& options, IEditorContext& ed);
+		void SyncMirrorToggles(ToolOptions& options, IVoxelEditContext& ed);
 		/** Applies a clicked toggle to the editor; false if `id` is not one of them. */
-		bool ApplyMirrorToggle(IEditorContext& ed, const std::string& id, bool value);
+		bool ApplyMirrorToggle(IVoxelEditContext& ed, const std::string& id, bool value);
 
 		/**
 		 * The UI over the editor's mirror state: which axes reflect, and where the
@@ -51,11 +51,11 @@ namespace spades {
 			MirrorTool();
 			const char* Label() const override { return "Mirror"; }
 
-			void UpdateOptions(IEditorContext& ed) override;
-			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
-			void OnOptionNumberChanged(IEditorContext& ed, const std::string& id, float value,
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
 			                           bool committed) override;
-			void OnAction(IEditorContext& ed, const std::string& id) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
 
 		private:
 			// A reflection only shifts at half a voxel, and the editor holds the

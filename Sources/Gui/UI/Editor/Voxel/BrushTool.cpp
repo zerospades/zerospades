@@ -25,9 +25,9 @@ namespace spades {
 	namespace gui {
 		BrushTool::BrushTool() { AddMirrorToggles(options); }
 
-		void BrushTool::UpdateOptions(IEditorContext& ed) { SyncMirrorToggles(options, ed); }
+		void BrushTool::UpdateOptions(IVoxelEditContext& ed) { SyncMirrorToggles(options, ed); }
 
-		void BrushTool::OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) {
+		void BrushTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
 			ApplyMirrorToggle(ed, id, value);
 		}
 	} // namespace gui

@@ -65,7 +65,7 @@ namespace spades {
 
 		void GizmoTool::ApplySnap() { gizmo->SetTranslationSnap(step, toGrid && GridSnapApplies()); }
 
-		void GizmoTool::UpdateOptions(IEditorContext&) {
+		void GizmoTool::UpdateOptions(IVoxelEditContext&) {
 			// The steps act as radio buttons, so each shows whether it is the one
 			// in use, whatever a click on it flipped it to.
 			for (const StepChoice& choice : kStepChoices) {
@@ -77,7 +77,7 @@ namespace spades {
 			options.SetEnabled(kGridOption, GridSnapApplies());
 		}
 
-		void GizmoTool::OnOptionToggled(IEditorContext&, const std::string& id, bool value) {
+		void GizmoTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) {
 			if (id == kGridOption) {
 				toGrid = value;
 				ApplySnap();

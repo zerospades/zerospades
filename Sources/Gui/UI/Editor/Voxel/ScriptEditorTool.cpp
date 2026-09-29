@@ -19,7 +19,7 @@
  */
 
 #include "ScriptEditorTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 #include "SubToolRegistry.h"
 
 #include <string>
@@ -100,11 +100,11 @@ namespace spades {
 				obj->Release();
 		}
 
-		void ScriptEditorTool::OnActivate(IEditorContext& ed) { Call(fnActivate, ed); }
+		void ScriptEditorTool::OnActivate(IVoxelEditContext& ed) { Call(fnActivate, ed); }
 
-		void ScriptEditorTool::OnDeactivate(IEditorContext& ed) { Call(fnDeactivate, ed); }
+		void ScriptEditorTool::OnDeactivate(IVoxelEditContext& ed) { Call(fnDeactivate, ed); }
 
-		void ScriptEditorTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void ScriptEditorTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			Call(fnPointer, ed, [&](asIScriptContext& c) {
 				c.SetArgDWord(1, static_cast<asDWORD>(e.button));
 				c.SetArgDWord(2, static_cast<asDWORD>(e.phase));
@@ -114,7 +114,7 @@ namespace spades {
 			});
 		}
 
-		void ScriptEditorTool::OnKey(IEditorContext& ed, const KeyInput& e) {
+		void ScriptEditorTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
 			std::string key = e.key; // must outlive the call (copied into the arg)
 			Call(fnKey, ed, [&](asIScriptContext& c) {
 				c.SetArgObject(1, &key);
@@ -122,17 +122,17 @@ namespace spades {
 			});
 		}
 
-		std::string ScriptEditorTool::EscapeLabel(IEditorContext& ed) {
+		std::string ScriptEditorTool::EscapeLabel(IVoxelEditContext& ed) {
 			return CallForString(fnEscapeLabel, ed);
 		}
 
-		void ScriptEditorTool::OnEscape(IEditorContext& ed) { Call(fnEscape, ed); }
+		void ScriptEditorTool::OnEscape(IVoxelEditContext& ed) { Call(fnEscape, ed); }
 
-		std::string ScriptEditorTool::Hint(IEditorContext& ed) { return CallForString(fnHint, ed); }
+		std::string ScriptEditorTool::Hint(IVoxelEditContext& ed) { return CallForString(fnHint, ed); }
 
-		void ScriptEditorTool::DrawScene(IEditorContext& ed) { Call(fnDraw, ed); }
+		void ScriptEditorTool::DrawScene(IVoxelEditContext& ed) { Call(fnDraw, ed); }
 
-		void ScriptEditorTool::Call(asIScriptFunction* fn, IEditorContext& ed,
+		void ScriptEditorTool::Call(asIScriptFunction* fn, IVoxelEditContext& ed,
 		                            const std::function<void(asIScriptContext&)>& setArgs,
 		                            const std::function<void(asIScriptContext&)>& read) {
 			if (fn == nullptr)
@@ -146,7 +146,7 @@ namespace spades {
 				read(*c.GetContext());
 		}
 
-		std::string ScriptEditorTool::CallForString(asIScriptFunction* fn, IEditorContext& ed) {
+		std::string ScriptEditorTool::CallForString(asIScriptFunction* fn, IVoxelEditContext& ed) {
 			std::string result;
 			Call(fn, ed, nullptr, [&](asIScriptContext& c) {
 				result = *reinterpret_cast<std::string*>(c.GetReturnObject());
@@ -197,8 +197,8 @@ namespace spades {
 				auto registerFor = [&reg, factory](SubToolTarget target) {
 					reg.Register(target, [factory] {
 						asIScriptObject* o = CreateInstance(factory);
-						return o ? std::unique_ptr<EditorTool>(new ScriptEditorTool(o))
-						         : std::unique_ptr<EditorTool>();
+						return o ? std::unique_ptr<VoxelTool>(new ScriptEditorTool(o))
+						         : std::unique_ptr<VoxelTool>();
 					});
 				};
 				if ((targets & 1) != 0) registerFor(SubToolTarget::Draw);
