@@ -68,7 +68,6 @@ namespace spades {
 			                          IntVector3& out) = 0;
 
 			// --- Document -----------------------------------------------------
-			virtual bool InBounds(int x, int y, int z) const = 0;
 			virtual uint32_t CurrentColor() const = 0;
 			virtual Vector4 ColorToVec(uint32_t c) const = 0;
 			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
@@ -97,18 +96,11 @@ namespace spades {
 			// included; empty if (x,y,z) holds no voxel. Changes nothing.
 			virtual std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const = 0;
 
-			// Add every solid voxel in [lo, hi] to the selection.
-			virtual void SelectBox(const IntVector3& lo, const IntVector3& hi) = 0;
 			// Add every solid voxel of the document to the selection.
 			virtual void SelectAll() = 0;
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
-			// Apply `cells` with the active tool's action: fill (or erase, if
-			// `secondary`) under Draw, select (or deselect) under Select, recolour
-			// under Paint (which has no inverse). Lets a sub-tool act correctly in
-			// whichever container hosts it.
-			virtual void ApplyCells(const std::vector<IntVector3>& cells, bool secondary) = 0;
 
 			// --- Clipboard ----------------------------------------------------
 			// Copy and Cut take the selection, or a waiting paste or import while

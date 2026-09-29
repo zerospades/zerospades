@@ -82,6 +82,16 @@ namespace spades {
 			void DrawScene(IVoxelEditContext&) override;
 		};
 
+		// What a finished shape (a box, a cylinder) does to its cells, and the
+		// verb the hint names it by ("fill"). Injected by the container hosting
+		// the shape, so Draw, Paint and Select share one shape tool; an action
+		// without `apply` is none.
+		struct CellAction {
+			using ApplyFn = std::function<void(IVoxelEditContext&, const std::vector<IntVector3>&)>;
+			ApplyFn apply;
+			const char* verb = "";
+		};
+
 		// A 3-point axis-aligned box: corner, opposite corner (on the clicked face's
 		// plane), then depth. The corner/depth are placed in free space, so the box
 		// can be sized beyond the existing model. The three clicks are tracked by a
@@ -89,14 +99,7 @@ namespace spades {
 		// the selection) is injected, so Draw, Paint and Select reuse the same code.
 		class BoxSubTool : public VoxelTool {
 		public:
-			using ApplyFn = std::function<void(IVoxelEditContext&, const std::vector<IntVector3>&)>;
-
-			// What a finished box does to its cells, and the verb the hint names
-			// it by ("fill").
-			struct Action {
-				ApplyFn apply;
-				const char* verb = "";
-			};
+			using Action = CellAction;
 
 			// `primary` runs when the final click is LMB, `secondary` when it is
 			// RMB (e.g. fill vs erase, or select vs deselect). Without a secondary
@@ -134,6 +137,53 @@ namespace spades {
 			// (`pts` holds 2 or 3 points: corner, opposite corner, [depth]).
 			void BBoxOf(const std::vector<IntVector3>& pts, IntVector3& lo, IntVector3& hi) const;
 			void CellsOf(const std::vector<IntVector3>& pts, std::vector<IntVector3>& out) const;
+		};
+
+		// A 3-point circular cylinder: its centre on a voxel face, a point on its
+		// rim (on that face's plane, setting the radius), then its depth along the
+		// face's normal. The rim and the depth are placed in free space, so the
+		// cylinder can reach beyond the existing model. Like Box, what it does to
+		// its cells is injected by the container hosting it.
+		class CylinderSubTool : public VoxelTool {
+		public:
+			using Action = CellAction;
+
+			// `primary` runs when the final click is LMB, `secondary` when it is
+			// RMB; without a secondary action the right button does nothing.
+			CylinderSubTool(Action primary, Action secondary)
+			    : primary(std::move(primary)), secondary(std::move(secondary)) {}
+
+			const char* Label() const override { return "Cylinder"; }
+			std::string Hint(IVoxelEditContext&) override;
+			void OnActivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			std::string EscapeLabel(IVoxelEditContext&) override;
+			void OnEscape(IVoxelEditContext&) override;
+			// The recorded points name voxels, which a reframe renames: the
+			// cylinder is dropped whenever the document moves under it, or the
+			// editor acts behind the tool's back.
+			void CancelInteraction(IVoxelEditContext&) override;
+			void OnDocumentChanged(IVoxelEditContext&) override;
+			void DrawScene(IVoxelEditContext&) override;
+
+		private:
+			Action primary;
+			Action secondary;
+
+			ClickSequence seq;  // the centre / rim / depth clicks
+			int normalAxis = 2; // axis of the clicked face's normal (set on click 1)
+
+			// Construction point for the current stage (seq.Count() == 1 -> rim
+			// point on the face plane; == 2 -> depth along the normal).
+			bool StagePoint(IVoxelEditContext& ed, IntVector3& out) const;
+			// Squared distance, in the face plane, from the centre to `rim`.
+			int RadiusSq(const IntVector3& rim) const;
+			// The voxels of the solid cylinder of squared radius `radSq` about the
+			// centre, from the centre's layer to `depth`'s along the normal.
+			void CellsOf(int radSq, const IntVector3& depth, std::vector<IntVector3>& out) const;
+			// Outline of that cylinder between layers `nmin` and `nmax`: the edge of
+			// the disc on both caps, joined along the normal.
+			void DrawWire(IVoxelEditContext& ed, int radSq, int nmin, int nmax) const;
 		};
 
 		/**

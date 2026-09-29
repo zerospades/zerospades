@@ -337,6 +337,181 @@ namespace spades {
 				ed.DrawBoxOutline(lo, hi, kHover);
 		}
 
+		// --- CylinderSubTool (circular cylinder) ------------------------------
+
+		std::string CylinderSubTool::Hint(IVoxelEditContext&) {
+			if (seq.Count() == 0)
+				return "click the centre on a voxel face";
+			if (seq.Count() == 1)
+				return "click a point on the rim";
+			std::string hint = std::string("click the depth: [LMB] ") + primary.verb;
+			if (secondary.apply)
+				hint += std::string("  |  [RMB] ") + secondary.verb;
+			return hint;
+		}
+
+		void CylinderSubTool::OnActivate(IVoxelEditContext&) { seq.Reset(); }
+
+		bool CylinderSubTool::StagePoint(IVoxelEditContext& ed, IntVector3& out) const {
+			const IntVector3& centre = seq.Points()[0];
+			const Vector3 at = VecOf(centre);
+			// Rim: free on the face plane. Depth: free along the normal (only the
+			// normal-axis component of a view-facing plane pick is used).
+			if (seq.Count() == 1)
+				return ed.RayPlaneCell(at, AxisUnit(normalAxis), out);
+			IntVector3 q;
+			if (!ed.RayPlaneCell(at, ed.ViewDir(), q))
+				return false;
+			out = centre;
+			SetComp(out, normalAxis, Comp(q, normalAxis));
+			return true;
+		}
+
+		int CylinderSubTool::RadiusSq(const IntVector3& rim) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int u = (normalAxis + 1) % 3, v = (normalAxis + 2) % 3;
+			const int du = Comp(rim, u) - Comp(centre, u);
+			const int dv = Comp(rim, v) - Comp(centre, v);
+			return du * du + dv * dv;
+		}
+
+		void CylinderSubTool::CellsOf(int radSq, const IntVector3& depth,
+		                              std::vector<IntVector3>& out) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+			const int nmin = std::min(Comp(centre, na), Comp(depth, na));
+			const int nmax = std::max(Comp(centre, na), Comp(depth, na));
+			int r = 0; // reaches past the disc on every side
+			while (r * r <= radSq)
+				r++;
+			out.clear();
+			for (int n = nmin; n <= nmax; n++) {
+				for (int du = -r; du <= r; du++) {
+					for (int dv = -r; dv <= r; dv++) {
+						if (du * du + dv * dv > radSq)
+							continue; // outside the disc
+						IntVector3 cell = centre;
+						SetComp(cell, na, n);
+						SetComp(cell, u, Comp(centre, u) + du);
+						SetComp(cell, v, Comp(centre, v) + dv);
+						out.push_back(cell);
+					}
+				}
+			}
+		}
+
+		void CylinderSubTool::DrawWire(IVoxelEditContext& ed, int radSq, int nmin,
+		                               int nmax) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+			const float uc = float(Comp(centre, u)), vc = float(Comp(centre, v));
+			// The caps lie on the outer faces of the end layers: voxel n spans
+			// n - 0.5 to n + 0.5 along the normal.
+			const float nNear = float(nmin) - 0.5F, nFar = float(nmax) + 0.5F;
+			auto point = [&](float n, float pu, float pv) {
+				float c[3];
+				c[na] = n;
+				c[u] = pu;
+				c[v] = pv;
+				return MakeVector3(c[0], c[1], c[2]);
+			};
+			// One edge of the disc's outline, from (ua, va) to (ub, vb) in the face
+			// plane: on both caps, with the join between them at its start.
+			auto edge = [&](float ua, float va, float ub, float vb) {
+				const Vector3 a0 = point(nNear, ua, va), b0 = point(nNear, ub, vb);
+				const Vector3 a1 = point(nFar, ua, va), b1 = point(nFar, ub, vb);
+				ed.DrawLine3D(a0, b0, kHover);
+				ed.DrawLine3D(a1, b1, kHover);
+				ed.DrawLine3D(a0, a1, kHover);
+			};
+			int r = 0; // the disc's whole-voxel reach
+			while ((r + 1) * (r + 1) <= radSq)
+				r++;
+			auto inside = [&](int du, int dv) { return du * du + dv * dv <= radSq; };
+			// Every side of a disc cell with no disc cell beyond it is outline.
+			for (int du = -r; du <= r; du++) {
+				for (int dv = -r; dv <= r; dv++) {
+					if (!inside(du, dv))
+						continue;
+					const float fu = uc + float(du), fv = vc + float(dv);
+					if (!inside(du + 1, dv))
+						edge(fu + 0.5F, fv - 0.5F, fu + 0.5F, fv + 0.5F);
+					if (!inside(du - 1, dv))
+						edge(fu - 0.5F, fv - 0.5F, fu - 0.5F, fv + 0.5F);
+					if (!inside(du, dv + 1))
+						edge(fu - 0.5F, fv + 0.5F, fu + 0.5F, fv + 0.5F);
+					if (!inside(du, dv - 1))
+						edge(fu - 0.5F, fv - 0.5F, fu + 0.5F, fv - 0.5F);
+				}
+			}
+		}
+
+		void CylinderSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			const bool rmb = e.IsRight();
+			if (!e.IsLeft() && !(rmb && secondary.apply))
+				return;
+
+			// First click: the centre, on a solid face, whose normal it keeps.
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (!ed.HasPick())
+					return;
+				const IntVector3 centre = ed.PickSolid();
+				const IntVector3 d = ed.PickPlace() - centre;
+				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
+				seq.BeginFixed(3);
+				seq.Add(centre);
+				return;
+			}
+
+			IntVector3 q;
+			if (!StagePoint(ed, q))
+				return;
+			if (!seq.Add(q))
+				return; // still collecting (just set the rim)
+			// The final click's button decides the action. The cylinder is
+			// finished whatever the action makes of it, so it is reset first.
+			std::vector<IntVector3> cells;
+			CellsOf(RadiusSq(seq.Points()[1]), seq.Points()[2], cells);
+			seq.Reset();
+			(rmb ? secondary : primary).apply(ed, cells);
+		}
+
+		std::string CylinderSubTool::EscapeLabel(IVoxelEditContext&) {
+			return seq.Active() ? "cancel the cylinder" : std::string();
+		}
+
+		void CylinderSubTool::OnEscape(IVoxelEditContext&) { seq.Reset(); }
+
+		void CylinderSubTool::CancelInteraction(IVoxelEditContext&) { seq.Reset(); }
+		void CylinderSubTool::OnDocumentChanged(IVoxelEditContext&) { seq.Reset(); }
+
+		void CylinderSubTool::DrawScene(IVoxelEditContext& ed) {
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (ed.HasPick()) {
+					const IntVector3 h = ed.PickSolid();
+					ed.DrawCellOutline(h.x, h.y, h.z, kHover);
+				}
+				return;
+			}
+			const IntVector3& centre = seq.Points()[0];
+			IntVector3 q;
+			if (!StagePoint(ed, q)) {
+				ed.DrawCellOutline(centre.x, centre.y, centre.z, kHover);
+				return;
+			}
+			// While the rim is being placed the cylinder is one layer deep; then
+			// the rim is fixed and the depth follows the cursor.
+			const bool placingRim = seq.Count() == 1;
+			const int radSq = RadiusSq(placingRim ? q : seq.Points()[1]);
+			const int nA = Comp(centre, normalAxis);
+			const int nB = placingRim ? nA : Comp(q, normalAxis);
+			DrawWire(ed, radSq, std::min(nA, nB), std::max(nA, nB));
+		}
+
 		// --- GizmoSubTool (shared gizmo plumbing) ----------------------------
 
 		GizmoSubTool::GizmoSubTool(const GizmoSnap& snap, const GizmoHandleSet& handles) {

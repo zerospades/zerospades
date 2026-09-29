@@ -876,12 +876,6 @@ namespace spades {
 			return true;
 		}
 
-		Vector2 KV6EditorView::WorldToScreen(const Vector3& w, bool& ok) const {
-			Vector2 screen = MakeVector2(0.0F, 0.0F);
-			ok = cam.View().Project(w, screen);
-			return screen;
-		}
-
 		// Collected for DrawOverlayLines2D, which draws it once the scene is done.
 		void KV6EditorView::EmitLine(const Vector3& a, const Vector3& b, const Vector4& color) {
 			overlayLines.push_back({a, b, color});
@@ -1972,21 +1966,6 @@ namespace spades {
 			ui->GetColorPicker()->AddRecentColor(color);
 		}
 
-		void KV6EditorView::ApplyCells(const std::vector<IntVector3>& cells, bool secondary) {
-			VoxelTool* t = ActiveTool();
-			EditorRole role = t ? t->Role() : EditorRole::Edit;
-			if (role == EditorRole::Select) {
-				if (secondary) DeselectCells(cells);
-				else SelectCells(cells);
-			} else if (role == EditorRole::Paint) {
-				if (!secondary) // recolouring has no inverse
-					PaintCells(cells, currentColor);
-			} else {
-				if (secondary) EraseCells(cells);
-				else FillCells(cells, currentColor);
-			}
-		}
-
 		// --- Undo / redo ------------------------------------------------------
 
 		// The one place voxels are written: keeps `voxelCount` correct and (unlike
@@ -2194,14 +2173,6 @@ namespace spades {
 
 		// --- Navigation cube -------------------------------------------------
 
-		void KV6EditorView::FillTri(const Vector2& A, const Vector2& B, const Vector2& C,
-		                            const Vector4& col) {
-			// Hard-edged on purpose: triangles tiling a larger shape would show
-			// seams where two anti-aliased edges meet. Use OverlayFillConvexPolygon
-			// for a standalone shape.
-			ColorNP(col);
-			renderer->DrawFilledTriangle(A, B, C);
-		}
 
 		GizmoView KV6EditorView::GetGizmoView() const { return cam.View(); }
 
@@ -2210,38 +2181,6 @@ namespace spades {
 			gizmo.Draw(canvas, GetGizmoView());
 		}
 
-		// A solid, shaded cube drawn as a 2D overlay: project the camera-facing faces
-		// and fill them (offered to tool scripts for solid markers).
-		void KV6EditorView::DrawSolidCube(const Vector3& center, float half,
-		                                  const Vector4& color) {
-			Vector3 corner[8];
-			for (int i = 0; i < 8; i++)
-				corner[i] = center + MakeVector3((i & 1) ? half : -half, (i & 2) ? half : -half,
-				                                 (i & 4) ? half : -half);
-			static const int faceIdx[6][4] = {{0, 2, 6, 4}, {1, 5, 7, 3}, {0, 4, 5, 1},
-			                                  {2, 3, 7, 6}, {0, 1, 3, 2}, {4, 6, 7, 5}};
-			static const float faceN[6][3] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0},
-			                                  {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
-			for (int f = 0; f < 6; f++) {
-				Vector3 n = MakeVector3(faceN[f][0], faceN[f][1], faceN[f][2]);
-				Vector3 toCam = cam.View().eye - (center + n * half);
-				float facing = Vector3::Dot(n, toCam);
-				if (facing <= 0.0F)
-					continue; // back-facing
-				Vector2 q[4];
-				bool ok = true, o;
-				for (int i = 0; i < 4; i++) {
-					q[i] = WorldToScreen(corner[faceIdx[f][i]], o);
-					ok = ok && o;
-				}
-				if (!ok)
-					continue;
-				float sh = 0.55F + 0.45F * (facing / std::max(toCam.GetLength(), 1.0e-4F));
-				Vector4 col = MakeVector4(color.x * sh, color.y * sh, color.z * sh, color.w);
-				FillTri(q[0], q[1], q[2], col);
-				FillTri(q[0], q[2], q[3], col);
-			}
-		}
 
 		std::string KV6EditorView::ToolHintLine() {
 			std::string line;

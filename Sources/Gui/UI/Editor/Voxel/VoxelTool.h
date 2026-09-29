@@ -27,18 +27,16 @@ namespace spades {
 	namespace gui {
 		class IVoxelEditContext;
 
-		// What a top-level tool does with cells, so sub-tools (incl. scripted ones)
-		// can apply through IVoxelEditContext::ApplyCells without knowing their
-		// host. The right button does the inverse of the left (erase, deselect);
-		// Paint has no inverse, so the editor keeps the right button from its
-		// sub-tools.
+		// What a top-level tool does with cells. The right button does the
+		// inverse of the left (erase, deselect); Paint has no inverse, so the
+		// editor keeps the right button from its sub-tools.
 		enum class EditorRole { Edit, Select, Paint };
 
 		/** A tool of a voxel editor: one working on cells through IVoxelEditContext. */
 		class VoxelTool : public BasicEditorTool<IVoxelEditContext> {
 		public:
-			// Whether this (top-level) tool edits voxels or builds a selection.
-			// `ApplyCells` routes by the active tool's role.
+			// Whether this (top-level) tool edits voxels, builds a selection or
+			// recolours.
 			virtual EditorRole Role() const { return EditorRole::Edit; }
 		};
 
