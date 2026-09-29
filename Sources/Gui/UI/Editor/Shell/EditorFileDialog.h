@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include <Gui/UI/Components/FileBrowser/FileBrowserView.h>
@@ -52,5 +53,16 @@ namespace spades {
 		 *  follow each other instead of each keeping their own idea of where the
 		 *  player is. */
 		void EditorRememberFolder(const std::string& directory);
+
+		class UIOverlayHost;
+
+		/**
+		 * Shows an editor file dialog over `overlay`, from `options` (start from
+		 * EditorBrowserOptions). Wherever the player ends up is remembered for
+		 * the next dialog, picked or not; `picked` gets the chosen path.
+		 */
+		void ShowEditorFileDialog(UIOverlayHost& overlay, const std::string& title,
+		                          FileBrowserOptions options,
+		                          std::function<void(const std::string&)> picked);
 	} // namespace gui
 } // namespace spades

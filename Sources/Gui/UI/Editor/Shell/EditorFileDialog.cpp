@@ -24,6 +24,8 @@
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
 #include <Gui/Main.h>
+#include <Gui/UI/Components/FileBrowser/FileBrowserDialog.h>
+#include <Gui/UI/Components/UIOverlayHost.h>
 
 DEFINE_SPADES_SETTING(cl_editorFolder, ""); // remembered folder (absolute)
 
@@ -70,6 +72,21 @@ namespace spades {
 		void EditorRememberFolder(const std::string& directory) {
 			if (!directory.empty())
 				cl_editorFolder = directory;
+		}
+
+		void ShowEditorFileDialog(UIOverlayHost& overlay, const std::string& title,
+		                          FileBrowserOptions options,
+		                          std::function<void(const std::string&)> picked) {
+			Handle<FileBrowserDialog> dialog = Handle<FileBrowserDialog>::New(
+			  &overlay.GetUIManager().GetRootElement(), title, std::move(options));
+			dialog->closed = [picked](const FileBrowserResult& result) {
+				// Where the player ended up is where every editor dialog opens next,
+				// whether or not they picked something here.
+				EditorRememberFolder(result.directory);
+				if (result.accepted && !result.paths.empty() && picked)
+					picked(result.paths.front());
+			};
+			overlay.Show(dialog.GetPointerOrNull());
 		}
 	} // namespace gui
 } // namespace spades

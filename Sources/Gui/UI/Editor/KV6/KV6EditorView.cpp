@@ -34,7 +34,6 @@
 #include <Core/VoxelModel.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
-#include <Gui/UI/Components/FileBrowser/FileBrowserDialog.h>
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
@@ -285,19 +284,9 @@ namespace spades {
 			                                      : LocalFileSystem::ParentDir(filePath);
 			options.initialName = initialName;
 
-			UIOverlayHost* overlay = ui->GetOverlay();
-			Handle<FileBrowserDialog> dialog = Handle<FileBrowserDialog>::New(
-			  &overlay->GetUIManager().GetRootElement(), title, std::move(options));
-			dialog->closed = [picked](const FileBrowserResult& result) {
-				// Where the player ended up is where every model dialog opens next,
-				// whether or not they picked something here.
-				EditorRememberFolder(result.directory);
-				if (result.accepted && !result.paths.empty())
-					picked(result.paths.front());
-			};
 			// A dialog takes over input: nothing should stay held while it is up.
 			editor->ReleaseHeldInput();
-			overlay->Show(dialog.GetPointerOrNull());
+			ShowEditorFileDialog(*ui->GetOverlay(), title, std::move(options), std::move(picked));
 		}
 
 		void KV6EditorView::OpenDocument() {
