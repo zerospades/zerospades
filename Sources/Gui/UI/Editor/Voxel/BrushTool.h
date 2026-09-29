@@ -35,8 +35,8 @@ namespace spades {
 		class BrushTool : public ContainerTool {
 		public:
 			ToolOptions* Options() override { return &options; }
-			void UpdateOptions(IEditorContext& ed) override;
-			void OnOptionToggled(IEditorContext& ed, const std::string& id, bool value) override;
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
 
 		protected:
 			BrushTool();

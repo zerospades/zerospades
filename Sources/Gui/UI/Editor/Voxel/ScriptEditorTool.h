@@ -24,7 +24,7 @@
 #include <memory>
 #include <string>
 
-#include <Gui/UI/Editor/Shell/EditorTool.h>
+#include "VoxelTool.h"
 
 class asIScriptObject;
 class asIScriptFunction;
@@ -34,36 +34,36 @@ namespace spades {
 	namespace gui {
 		class SubToolRegistry;
 		// Adapts a script object implementing the `EditorTool` script interface to a
-		// C++ `EditorTool`, forwarding each callback into the script. The live
-		// `IEditorContext` is handed to the script as the bound `EditorContext@`, and
+		// C++ `VoxelTool`, forwarding each callback into the script. The live
+		// `IVoxelEditContext` is handed to the script as the bound `EditorContext@`, and
 		// pointer/key events are flattened to primitives so no event value type has
 		// to cross the boundary.
-		class ScriptEditorTool : public EditorTool {
+		class ScriptEditorTool : public VoxelTool {
 		public:
 			// Adopts `obj` (takes ownership of one reference; released on destruction).
 			explicit ScriptEditorTool(asIScriptObject* obj);
 			~ScriptEditorTool() override;
 
 			const char* Label() const override { return label.c_str(); }
-			void OnActivate(IEditorContext&) override;
-			void OnDeactivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void OnKey(IEditorContext&, const KeyInput&) override;
-			std::string EscapeLabel(IEditorContext&) override;
-			void OnEscape(IEditorContext&) override;
-			std::string Hint(IEditorContext&) override;
-			void DrawScene(IEditorContext&) override;
+			void OnActivate(IVoxelEditContext&) override;
+			void OnDeactivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void OnKey(IVoxelEditContext&, const KeyInput&) override;
+			std::string EscapeLabel(IVoxelEditContext&) override;
+			void OnEscape(IVoxelEditContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void DrawScene(IVoxelEditContext&) override;
 
 		private:
 			asIScriptObject* obj;
 			// Runs `fn` on the tool with the editor as its first argument;
 			// `setArgs` sets the others and `read` takes the result. A method the
 			// tool does not have is skipped, leaving its default.
-			void Call(asIScriptFunction* fn, IEditorContext& ed,
+			void Call(asIScriptFunction* fn, IVoxelEditContext& ed,
 			          const std::function<void(asIScriptContext&)>& setArgs = nullptr,
 			          const std::function<void(asIScriptContext&)>& read = nullptr);
 			// Call for a method returning a string; empty when skipped.
-			std::string CallForString(asIScriptFunction* fn, IEditorContext& ed);
+			std::string CallForString(asIScriptFunction* fn, IVoxelEditContext& ed);
 			// Concrete tool methods, resolved once from the object's type (null if the
 			// tool doesn't provide one).
 			asIScriptFunction* fnActivate = nullptr;
@@ -77,7 +77,7 @@ namespace spades {
 			std::string label;
 		};
 
-		// Discover every script class implementing the `EditorTool` interface in the
+		// Discover every script class implementing the `EditorTool` script interface in the
 		// compiled module and register it with `reg` for the targets it declares via
 		// `Targets()`. This is what makes a tool appear by just adding its script —
 		// no C++ change. Safe to call when no scripts are present (registers nothing).

@@ -23,15 +23,14 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
-
-#include "EditorTool.h"
 
 namespace spades {
 	namespace gui {
 		/** A tool as the editor holds it: the instance, and its toolbar button's place. */
-		struct ToolSlot {
-			std::unique_ptr<EditorTool> tool;
+		template <class Tool> struct BasicToolSlot {
+			std::unique_ptr<Tool> tool;
 			// Names the tool for the toolbar, whatever its label or position.
 			std::string id;
 			// Buttons of one group sit together, a separator apart from the next.
@@ -41,27 +40,40 @@ namespace spades {
 		};
 
 		/**
-		 * The set of editor tools, as factories.
+		 * An editor's set of tools, as factories.
 		 *
 		 * The editor builds its toolbar from here instead of naming concrete tool
-		 * classes, so the list of available tools is data, not code. Built-in tools
-		 * seed the registry in registration (= toolbar) order; later this is where
-		 * script-defined tools will append, with no change to the editor.
+		 * classes, so the list of available tools is data, not code. Each kind of
+		 * editor keeps one, seeded with its built-in tools in registration
+		 * (= toolbar) order; later this is where script-defined tools will
+		 * append, with no change to the editor.
 		 *
 		 * `BuildAll` makes fresh instances, so every editor view gets its own tools
 		 * (and their per-tool option state).
 		 */
-		class ToolRegistry {
+		template <class Tool> class BasicToolRegistry {
 		public:
-			using Factory = std::function<std::unique_ptr<EditorTool>()>;
-
-			// The shared registry, seeded with the built-in tools on first use.
-			static ToolRegistry& Instance();
+			using Factory = std::function<std::unique_ptr<Tool>()>;
+			using Slot = BasicToolSlot<Tool>;
 
 			// Append a tool factory; registration order is toolbar order.
-			void Register(Factory f, const std::string& id, int group, const std::string& hotKey);
+			void Register(Factory f, const std::string& id, int group, const std::string& hotKey) {
+				entries.push_back({std::move(f), id, group, hotKey});
+			}
+
 			// Instantiate every registered tool into `out` (cleared first).
-			void BuildAll(std::vector<ToolSlot>& out) const;
+			void BuildAll(std::vector<Slot>& out) const {
+				out.clear();
+				out.reserve(entries.size());
+				for (const Entry& entry : entries) {
+					Slot slot;
+					slot.tool = entry.make();
+					slot.id = entry.id;
+					slot.group = entry.group;
+					slot.hotKey = entry.hotKey;
+					out.push_back(std::move(slot));
+				}
+			}
 
 		private:
 			struct Entry {

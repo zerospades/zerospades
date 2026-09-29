@@ -21,11 +21,11 @@
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 #include "KV6EditorView.h"
 #include <Gui/UI/Editor/Voxel/DrawTool.h>
-#include <Gui/UI/Editor/Shell/EditorTool.h>
+#include <Gui/UI/Editor/Voxel/VoxelTool.h>
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
 #include "KV6ModelIO.h"
 #include <Gui/UI/Editor/Voxel/SubTool.h>
-#include <Gui/UI/Editor/Shell/ToolRegistry.h>
+#include <Gui/UI/Editor/Voxel/VoxelTool.h>
 #include <Gui/UI/Components/ColorPicker.h>
 #include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
@@ -561,7 +561,7 @@ namespace spades {
 				return static_cast<const void*>(ActiveTool());
 			};
 			ui->GetOptionBar()->OnSubToolClicked = [this](int index) {
-				if (EditorTool* tool = ActiveTool())
+				if (VoxelTool* tool = ActiveTool())
 					tool->SetSubTool(*this, index);
 			};
 			ui->GetOptionBar()->OnBoolToggled = [this](const std::string& id) {
@@ -605,7 +605,7 @@ namespace spades {
 			// The Edit-mode tools come from the registry (toolbar order = registration).
 			// Open on Draw, so the user can start modelling; found by type, so
 			// no button label decides it.
-			ToolRegistry::Instance().BuildAll(tools);
+			VoxelTools().BuildAll(tools);
 			activeTool = 0;
 			for (size_t i = 0; i < tools.size(); i++) {
 				if (dynamic_cast<DrawTool*>(tools[i].tool.get())) {
@@ -910,7 +910,7 @@ namespace spades {
 			const ColorPicker& picker = *ui->GetColorPicker();
 			if (picker.GetEyedropperMode())
 				return EscapeLayer::Eyedropper;
-			if (EditorTool* tool = ActiveTool()) {
+			if (VoxelTool* tool = ActiveTool()) {
 				if (!tool->EscapeLabel(*this).empty())
 					return EscapeLayer::Tool;
 			}
@@ -1705,7 +1705,7 @@ namespace spades {
 			// Matched by type rather than by label, so neither renaming a button nor
 			// another sub-tool taking the same label can send a placement elsewhere.
 			for (size_t i = 0; i < tools.size(); i++) {
-				EditorTool& tool = *tools[i].tool;
+				VoxelTool& tool = *tools[i].tool;
 				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
 					if (!dynamic_cast<TransformSubTool*>(tool.SubTool(sub)))
 						continue;
@@ -2147,6 +2147,12 @@ namespace spades {
 				SelectIfSolid(MakeIntVector3(x, y, z));
 		}
 
+		void KV6EditorView::SelectAll() {
+			SelectBox(MakeIntVector3(0, 0, 0), MakeIntVector3(model->GetWidth() - 1,
+			                                                  model->GetHeight() - 1,
+			                                                  model->GetDepth() - 1));
+		}
+
 		void KV6EditorView::SelectCells(const std::vector<IntVector3>& cells) {
 			DocumentCommand command(*this);
 			VoxelUndoStack::Step step(undo, "Select");
@@ -2193,7 +2199,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::ApplyCells(const std::vector<IntVector3>& cells, bool secondary) {
-			EditorTool* t = ActiveTool();
+			VoxelTool* t = ActiveTool();
 			EditorRole role = t ? t->Role() : EditorRole::Edit;
 			if (role == EditorRole::Select) {
 				if (secondary) DeselectCells(cells);
@@ -2549,7 +2555,7 @@ namespace spades {
 			std::string line;
 			if (SamplingArmed()) {
 				line = "Pick colour:  click a voxel";
-			} else if (EditorTool* tool = ActiveTool()) {
+			} else if (VoxelTool* tool = ActiveTool()) {
 				// A tool whose only sub-tool is itself goes by its own name alone.
 				line = tool->Label();
 				if (tool->SubToolCount() > 1)
@@ -2629,11 +2635,11 @@ namespace spades {
 				ui->GetOptionBar()->EndEditing(true);
 			// Leaving a tool ends what it had in progress: this is where a pending
 			// placement reaches the document.
-			if (EditorTool* previous = ActiveTool())
+			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
 			activeTool = toolIndex;
 			currentMode = mode;
-			if (EditorTool* current = ActiveTool())
+			if (VoxelTool* current = ActiveTool())
 				current->OnActivate(*this);
 		}
 
@@ -2653,7 +2659,7 @@ namespace spades {
 		}
 
 		ToolOption* KV6EditorView::ActiveOption(const std::string& id, ToolOption::Type type) {
-			EditorTool* tool = ActiveTool();
+			VoxelTool* tool = ActiveTool();
 			ToolOptions* options = tool ? tool->Options() : nullptr;
 			ToolOption* option = options ? options->Find(id) : nullptr;
 			return (option && option->type == type) ? option : nullptr;
@@ -2684,7 +2690,7 @@ namespace spades {
 					return true;
 				}
 			}
-			EditorTool* tool = ActiveTool();
+			VoxelTool* tool = ActiveTool();
 			if (!tool || tool->SubToolCount() < 2)
 				return false;
 			for (int sub = 0; sub < tool->SubToolCount(); sub++) {
@@ -2696,7 +2702,7 @@ namespace spades {
 			return false;
 		}
 
-		EditorTool* KV6EditorView::ActiveTool() {
+		VoxelTool* KV6EditorView::ActiveTool() {
 			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()))
 				return tools[activeTool].tool.get();
 			return nullptr;
@@ -2722,7 +2728,7 @@ namespace spades {
 			if (e.IsDown() && !(lmbHeld && rmbHeld))
 				undo.BeginAction();
 			UserActionEnd end(*this, e.IsUp() && !lmbHeld && !rmbHeld);
-			EditorTool* t = ActiveTool();
+			VoxelTool* t = ActiveTool();
 			if (!t)
 				return;
 			// The right button is the inverse of the left, and recolouring has
@@ -2733,7 +2739,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::CancelToolInteraction() {
-			if (EditorTool* t = ActiveTool())
+			if (VoxelTool* t = ActiveTool())
 				t->CancelInteraction(*this);
 			EndUserAction(); // whatever comes next is a separate step
 		}
@@ -2755,7 +2761,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::NotifyDocumentChanged() {
-			if (EditorTool* t = ActiveTool())
+			if (VoxelTool* t = ActiveTool())
 				t->OnDocumentChanged(*this);
 		}
 
@@ -2858,7 +2864,7 @@ namespace spades {
 				return;
 			// With no tool active the bar is drawn empty, so it never keeps
 			// answering clicks on buttons that are no longer there.
-			EditorTool* t = ActiveTool();
+			VoxelTool* t = ActiveTool();
 
 			// Sub-tool buttons for the option bar. A single sub-tool is the tool
 			// itself, and a lone button that is always on would only be noise.
@@ -3138,7 +3144,7 @@ namespace spades {
 				return;
 
 			// Remaining keys go to the active tool (e.g. Select's [L]).
-			if (EditorTool* t = ActiveTool()) {
+			if (VoxelTool* t = ActiveTool()) {
 				KeyInput e;
 				e.key = key;
 				e.phase = down ? KeyPhase::Down : KeyPhase::Up;
@@ -3245,7 +3251,7 @@ namespace spades {
 			DrawMirrorPlanes();
 			DrawSelection();
 
-			EditorTool* tool = ActiveTool();
+			VoxelTool* tool = ActiveTool();
 			if (tool)
 				tool->DrawScene(*this);
 			// Voxels waiting to be placed, drawn in their own colours.

@@ -19,10 +19,9 @@
  */
 
 #include "SelectTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 #include "SubToolRegistry.h"
 
-#include <Core/VoxelModel.h>
 
 namespace spades {
 	namespace gui {
@@ -37,16 +36,16 @@ namespace spades {
 
 		SelectTool::SelectTool() {
 			// Box adds its solid cells to the selection (LMB) or removes them (RMB).
-			auto select = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
+			auto select = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.SelectCells(cells);
 			};
-			auto deselect = [](IEditorContext& ed, const std::vector<IntVector3>& cells) {
+			auto deselect = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.DeselectCells(cells);
 			};
-			subs.push_back(std::unique_ptr<EditorTool>(new SelectVoxelSubTool()));
-			subs.push_back(std::unique_ptr<EditorTool>(
+			subs.push_back(std::unique_ptr<VoxelTool>(new SelectVoxelSubTool()));
+			subs.push_back(std::unique_ptr<VoxelTool>(
 			  new BoxSubTool({select, "select"}, {deselect, "deselect"}, false)));
-			subs.push_back(std::unique_ptr<EditorTool>(new ByColourSubTool()));
+			subs.push_back(std::unique_ptr<VoxelTool>(new ByColourSubTool()));
 
 			// Sub-tools contributed by scripts (e.g. the Cylinder), appended after
 			// the built-in ones.
@@ -64,7 +63,7 @@ namespace spades {
 
 		ToolOptions* SelectTool::Options() { return &options; }
 
-		void SelectTool::UpdateOptions(IEditorContext& ed) {
+		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
 			const bool selected = ed.SelectionCount() > 0;
 			options.SetEnabled(kClearSelectionOption, selected);
 			options.SetEnabled(kDeleteSelectionOption, selected);
@@ -73,19 +72,12 @@ namespace spades {
 			options.SetEnabled(kPasteOption, ed.CanPaste());
 		}
 
-		void SelectTool::SelectAll(IEditorContext& ed) {
-			VoxelModel& model = ed.Model();
-			ed.SelectBox(MakeIntVector3(0, 0, 0), MakeIntVector3(model.GetWidth() - 1,
-			                                                     model.GetHeight() - 1,
-			                                                     model.GetDepth() - 1));
-		}
-
-		void SelectTool::OnAction(IEditorContext& ed, const std::string& id) {
+		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			// Each reports a count: selecting is invisible on a model that was
 			// already fully selected, and a button that seems to do nothing reads
 			// as broken. Matches By Colour / Copy / Cut.
 			if (id == kSelectAllOption) {
-				SelectAll(ed);
+				ed.SelectAll();
 				ed.SetStatus("Selected " + std::to_string(ed.SelectionCount()) + " voxels");
 			} else if (id == kDeleteSelectionOption) {
 				ed.DeleteSelection(); // reports what it removed, or why not

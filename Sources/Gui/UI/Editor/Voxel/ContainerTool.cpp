@@ -22,63 +22,63 @@
 
 namespace spades {
 	namespace gui {
-		EditorTool* ContainerTool::Cur() {
+		VoxelTool* ContainerTool::Cur() {
 			return (active >= 0 && active < int(subs.size())) ? subs[active].get() : nullptr;
 		}
 
-		void ContainerTool::SetSubTool(IEditorContext& ed, int i) {
+		void ContainerTool::SetSubTool(IVoxelEditContext& ed, int i) {
 			if (i == active || i < 0 || i >= int(subs.size()))
 				return;
 			// The outgoing sub-tool finishes what it had in progress first.
-			if (EditorTool* s = Cur())
+			if (VoxelTool* s = Cur())
 				s->OnDeactivate(ed);
 			active = i;
-			if (EditorTool* s = Cur())
+			if (VoxelTool* s = Cur())
 				s->OnActivate(ed);
 		}
 
-		void ContainerTool::OnActivate(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnActivate(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->OnActivate(ed);
 		}
-		void ContainerTool::OnDeactivate(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnDeactivate(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->OnDeactivate(ed);
 		}
-		void ContainerTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (VoxelTool* s = Cur())
 				s->OnPointer(ed, e);
 		}
-		void ContainerTool::OnKey(IEditorContext& ed, const KeyInput& e) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
+			if (VoxelTool* s = Cur())
 				s->OnKey(ed, e);
 		}
-		std::string ContainerTool::EscapeLabel(IEditorContext& ed) {
-			EditorTool* s = Cur();
+		std::string ContainerTool::EscapeLabel(IVoxelEditContext& ed) {
+			VoxelTool* s = Cur();
 			return s ? s->EscapeLabel(ed) : std::string();
 		}
-		void ContainerTool::OnEscape(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnEscape(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->OnEscape(ed);
 		}
-		void ContainerTool::CancelInteraction(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::CancelInteraction(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->CancelInteraction(ed);
 		}
-		void ContainerTool::OnDocumentChanged(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::OnDocumentChanged(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->OnDocumentChanged(ed);
 		}
-		std::string ContainerTool::Hint(IEditorContext& ed) {
-			EditorTool* s = Cur();
+		std::string ContainerTool::Hint(IVoxelEditContext& ed) {
+			VoxelTool* s = Cur();
 			return s ? s->Hint(ed) : std::string();
 		}
-		void ContainerTool::DrawScene(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::DrawScene(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->DrawScene(ed);
 		}
-		void ContainerTool::DrawOverlay(IEditorContext& ed) {
-			if (EditorTool* s = Cur())
+		void ContainerTool::DrawOverlay(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
 				s->DrawOverlay(ed);
 		}
 	} // namespace gui

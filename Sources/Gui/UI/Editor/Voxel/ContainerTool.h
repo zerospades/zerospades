@@ -23,7 +23,7 @@
 #include <memory>
 #include <vector>
 
-#include <Gui/UI/Editor/Shell/EditorTool.h>
+#include "VoxelTool.h"
 #include "SubTool.h"
 
 namespace spades {
@@ -31,32 +31,32 @@ namespace spades {
 		// A tool that is just a set of child tools (shown in the secondary toolbar).
 		// All input/drawing forwards to the active child, so concrete tools (Draw,
 		// Select) only have to populate `subs` and provide a Label.
-		class ContainerTool : public EditorTool {
+		class ContainerTool : public VoxelTool {
 		public:
 			int SubToolCount() const override { return int(subs.size()); }
 			const char* SubToolLabel(int i) const override { return subs[i]->Label(); }
-			EditorTool* SubTool(int i) override {
+			VoxelTool* SubTool(int i) override {
 				return (i >= 0 && i < int(subs.size())) ? subs[i].get() : nullptr;
 			}
 			int ActiveSubTool() const override { return active; }
-			void SetSubTool(IEditorContext&, int) override;
+			void SetSubTool(IVoxelEditContext&, int) override;
 
-			void OnActivate(IEditorContext&) override;
-			void OnDeactivate(IEditorContext&) override;
-			void OnPointer(IEditorContext&, const PointerInput&) override;
-			void OnKey(IEditorContext&, const KeyInput&) override;
-			std::string EscapeLabel(IEditorContext&) override;
-			void OnEscape(IEditorContext&) override;
-			void CancelInteraction(IEditorContext&) override;
-			void OnDocumentChanged(IEditorContext&) override;
-			std::string Hint(IEditorContext&) override;
-			void DrawScene(IEditorContext&) override;
-			void DrawOverlay(IEditorContext&) override;
+			void OnActivate(IVoxelEditContext&) override;
+			void OnDeactivate(IVoxelEditContext&) override;
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void OnKey(IVoxelEditContext&, const KeyInput&) override;
+			std::string EscapeLabel(IVoxelEditContext&) override;
+			void OnEscape(IVoxelEditContext&) override;
+			void CancelInteraction(IVoxelEditContext&) override;
+			void OnDocumentChanged(IVoxelEditContext&) override;
+			std::string Hint(IVoxelEditContext&) override;
+			void DrawScene(IVoxelEditContext&) override;
+			void DrawOverlay(IVoxelEditContext&) override;
 
 		protected:
-			std::vector<std::unique_ptr<EditorTool>> subs;
+			std::vector<std::unique_ptr<VoxelTool>> subs;
 			int active = 0;
-			EditorTool* Cur();
+			VoxelTool* Cur();
 		};
 	} // namespace gui
 } // namespace spades

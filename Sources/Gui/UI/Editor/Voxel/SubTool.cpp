@@ -19,7 +19,7 @@
  */
 
 #include "SubTool.h"
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include "VoxelEditContext.h"
 
 #include <algorithm>
 #include <cmath>
@@ -47,7 +47,7 @@ namespace spades {
 			const char* const kGizmoDragHint = "  |  [RMB] cancel a drag";
 
 			// Adds the colour region of voxel `h` to the selection, or removes it.
-			void ApplyColourRegion(IEditorContext& ed, const IntVector3& h, bool remove) {
+			void ApplyColourRegion(IVoxelEditContext& ed, const IntVector3& h, bool remove) {
 				const std::vector<IntVector3> region = ed.LinkedColorRegion(h.x, h.y, h.z);
 				if (remove)
 					ed.DeselectCells(region);
@@ -107,10 +107,10 @@ namespace spades {
 
 		// --- DrawVoxelSubTool (Draw single) ----------------------------------
 
-		std::string DrawVoxelSubTool::Hint(IEditorContext&) {
+		std::string DrawVoxelSubTool::Hint(IVoxelEditContext&) {
 			return "[LMB] place  |  [RMB] delete";
 		}
-		void DrawVoxelSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void DrawVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (!e.IsDown())
 				return;
 			if (e.IsLeft())
@@ -118,7 +118,7 @@ namespace spades {
 			else if (e.IsRight())
 				ed.DeleteCube();
 		}
-		void DrawVoxelSubTool::DrawScene(IEditorContext& ed) {
+		void DrawVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -129,10 +129,10 @@ namespace spades {
 
 		// --- PaintVoxelSubTool (Paint single) --------------------------------
 
-		std::string PaintVoxelSubTool::Hint(IEditorContext&) {
+		std::string PaintVoxelSubTool::Hint(IVoxelEditContext&) {
 			return "[LMB] recolour, drag to keep going";
 		}
-		void PaintVoxelSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void PaintVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			// A press/drag/release of LMB is one stroke, which the editor keeps as
 			// one undo step however many voxels it recolours: recolour the hovered
 			// voxel, and keep doing so while the button is dragged.
@@ -145,7 +145,7 @@ namespace spades {
 			std::vector<IntVector3> cell(1, h);
 			ed.PaintCells(cell, ed.CurrentColor());
 		}
-		void PaintVoxelSubTool::DrawScene(IEditorContext& ed) {
+		void PaintVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -155,10 +155,10 @@ namespace spades {
 
 		// --- SelectVoxelSubTool (Select single) ------------------------------
 
-		std::string SelectVoxelSubTool::Hint(IEditorContext&) {
+		std::string SelectVoxelSubTool::Hint(IVoxelEditContext&) {
 			return "[LMB] select  |  [RMB] deselect  |  [LMB] on empty space selects nothing";
 		}
-		void SelectVoxelSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void SelectVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (!e.IsDown() || !(e.IsLeft() || e.IsRight()))
 				return;
 			ed.DoPick();
@@ -173,7 +173,7 @@ namespace spades {
 			else
 				ed.DeselectCells(cell);
 		}
-		void SelectVoxelSubTool::DrawScene(IEditorContext& ed) {
+		void SelectVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -183,11 +183,11 @@ namespace spades {
 
 		// --- ByColourSubTool (Select flood-fill) -----------------------------
 
-		std::string ByColourSubTool::Hint(IEditorContext&) {
+		std::string ByColourSubTool::Hint(IVoxelEditContext&) {
 			return "[LMB] select a colour region  |  [RMB] deselect it  |  [L] select the one under "
 			       "the cursor";
 		}
-		void ByColourSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void ByColourSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (!e.IsDown() || !(e.IsLeft() || e.IsRight()))
 				return;
 			ed.DoPick();
@@ -196,14 +196,14 @@ namespace spades {
 			else if (e.IsLeft())
 				ed.ClearSelection();
 		}
-		void ByColourSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
+		void ByColourSubTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
 			if (e.IsDown() && EqualsIgnoringCase(e.key, "L")) {
 				ed.DoPick();
 				if (ed.HasPick())
 					ApplyColourRegion(ed, ed.PickSolid(), false);
 			}
 		}
-		void ByColourSubTool::DrawScene(IEditorContext& ed) {
+		void ByColourSubTool::DrawScene(IVoxelEditContext& ed) {
 			ed.DoPick();
 			if (!ed.HasPick())
 				return;
@@ -213,7 +213,7 @@ namespace spades {
 
 		// --- BoxSubTool (axis-aligned box) -----------------------------------
 
-		std::string BoxSubTool::Hint(IEditorContext&) {
+		std::string BoxSubTool::Hint(IVoxelEditContext&) {
 			if (seq.Count() == 0)
 				return "click a corner on a voxel face";
 			if (seq.Count() == 1)
@@ -224,9 +224,9 @@ namespace spades {
 			return hint;
 		}
 
-		void BoxSubTool::OnActivate(IEditorContext&) { seq.Reset(); }
+		void BoxSubTool::OnActivate(IVoxelEditContext&) { seq.Reset(); }
 
-		bool BoxSubTool::StagePoint(IEditorContext& ed, IntVector3& out) const {
+		bool BoxSubTool::StagePoint(IVoxelEditContext& ed, IntVector3& out) const {
 			const IntVector3& p0 = seq.Points()[0];
 			Vector3 pp = VecOf(p0);
 			// Opposite corner: free on the face plane. Depth: free along the normal
@@ -270,7 +270,7 @@ namespace spades {
 				out.push_back(MakeIntVector3(x, y, z));
 		}
 
-		void BoxSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void BoxSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (!e.IsDown())
 				return;
 			const bool rmb = e.IsRight();
@@ -303,16 +303,16 @@ namespace spades {
 			(rmb ? secondary : primary).apply(ed, cells);
 		}
 
-		std::string BoxSubTool::EscapeLabel(IEditorContext&) {
+		std::string BoxSubTool::EscapeLabel(IVoxelEditContext&) {
 			return seq.Active() ? "cancel the box" : std::string();
 		}
 
-		void BoxSubTool::OnEscape(IEditorContext&) { seq.Reset(); }
+		void BoxSubTool::OnEscape(IVoxelEditContext&) { seq.Reset(); }
 
-		void BoxSubTool::CancelInteraction(IEditorContext&) { seq.Reset(); }
-		void BoxSubTool::OnDocumentChanged(IEditorContext&) { seq.Reset(); }
+		void BoxSubTool::CancelInteraction(IVoxelEditContext&) { seq.Reset(); }
+		void BoxSubTool::OnDocumentChanged(IVoxelEditContext&) { seq.Reset(); }
 
-		void BoxSubTool::DrawScene(IEditorContext& ed) {
+		void BoxSubTool::DrawScene(IVoxelEditContext& ed) {
 			if (seq.Count() == 0) {
 				ed.DoPick();
 				if (ed.HasPick()) {
@@ -345,7 +345,7 @@ namespace spades {
 			gizmo.SetEnabledHandles(handles);
 		}
 
-		bool GizmoSubTool::SyncPose(IEditorContext& ed) {
+		bool GizmoSubTool::SyncPose(IVoxelEditContext& ed) {
 			GizmoPose pose;
 			if (!CurrentPose(ed, pose))
 				return false;
@@ -353,16 +353,16 @@ namespace spades {
 			return true;
 		}
 
-		void GizmoSubTool::CancelDrag(IEditorContext& ed) {
+		void GizmoSubTool::CancelDrag(IVoxelEditContext& ed) {
 			if (gizmo.IsDragging())
 				OnGizmoCancel(ed, gizmo.Cancel());
 		}
 
 		// Whatever happened while the tool was away, a drag never outlives it.
-		void GizmoSubTool::OnActivate(IEditorContext& ed) { CancelDrag(ed); }
-		void GizmoSubTool::OnDeactivate(IEditorContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnActivate(IVoxelEditContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDeactivate(IVoxelEditContext& ed) { CancelDrag(ed); }
 
-		void GizmoSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void GizmoSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (e.IsRight() && e.IsDown()) {
 				CancelDrag(ed); // as in Blender: a right click abandons the drag
 				return;
@@ -394,11 +394,11 @@ namespace spades {
 			}
 		}
 
-		std::string GizmoSubTool::EscapeLabel(IEditorContext&) {
+		std::string GizmoSubTool::EscapeLabel(IVoxelEditContext&) {
 			return gizmo.IsDragging() ? "cancel the drag" : std::string();
 		}
 
-		void GizmoSubTool::OnEscape(IEditorContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnEscape(IVoxelEditContext& ed) { CancelDrag(ed); }
 
 		void GizmoSubTool::SetTranslationSnap(float step, bool toGrid) {
 			GizmoSnap snap = gizmo.Snap();
@@ -407,10 +407,10 @@ namespace spades {
 			gizmo.SetSnap(snap);
 		}
 
-		void GizmoSubTool::CancelInteraction(IEditorContext& ed) { CancelDrag(ed); }
-		void GizmoSubTool::OnDocumentChanged(IEditorContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::CancelInteraction(IVoxelEditContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDocumentChanged(IVoxelEditContext& ed) { CancelDrag(ed); }
 
-		void GizmoSubTool::DrawOverlay(IEditorContext& ed) {
+		void GizmoSubTool::DrawOverlay(IVoxelEditContext& ed) {
 			if (!SyncPose(ed))
 				return;
 			gizmo.Hover(ed.GetGizmoView(), ed.CursorPos());
@@ -421,7 +421,7 @@ namespace spades {
 
 		TransformSubTool::TransformSubTool() : GizmoSubTool(TransformSnap(), TransformHandles()) {}
 
-		std::string TransformSubTool::Hint(IEditorContext& ed) {
+		std::string TransformSubTool::Hint(IVoxelEditContext& ed) {
 			if (!ed.HasPlacement() && ed.SelectionCount() == 0)
 				return "select some voxels first, or paste some";
 			std::string hint = "drag an arrow to move, a ring to turn 90 degrees  |  [Arrows] "
@@ -432,13 +432,13 @@ namespace spades {
 			return hint;
 		}
 
-		void TransformSubTool::OnDeactivate(IEditorContext& ed) {
+		void TransformSubTool::OnDeactivate(IVoxelEditContext& ed) {
 			GizmoSubTool::OnDeactivate(ed);
 			// Leaving the tool places a waiting paste or import.
 			ed.ApplyPlacement();
 		}
 
-		void TransformSubTool::OnPointer(IEditorContext& ed, const PointerInput& e) {
+		void TransformSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			// The right button backs out of what is in hand, as in Blender: a
 			// drag first, then a paste or an import still waiting.
 			if (e.IsRight() && e.IsDown() && !gizmo.IsDragging() && ed.HasPlacement()) {
@@ -448,7 +448,7 @@ namespace spades {
 			GizmoSubTool::OnPointer(ed, e);
 		}
 
-		bool TransformSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+		bool TransformSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
 			IntVector3 pivot;
 			if (!ed.TransformPivot(pivot))
 				return false;
@@ -461,17 +461,17 @@ namespace spades {
 			return true;
 		}
 
-		void TransformSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+		void TransformSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
 			ed.TransformPlacement(WholeStep(total)); // one undo step
 		}
 
-		void TransformSubTool::OnClickAway(IEditorContext& ed) {
+		void TransformSubTool::OnClickAway(IVoxelEditContext& ed) {
 			// A selection has moved already; only a paste or an import waits.
 			if (ed.HasPlacement())
 				ed.ApplyPlacement();
 		}
 
-		void TransformSubTool::OnKey(IEditorContext& ed, const KeyInput& e) {
+		void TransformSubTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
 			if (e.phase != KeyPhase::Down)
 				return;
 			if (e.key == "Enter") {
@@ -489,7 +489,7 @@ namespace spades {
 			ed.TransformPlacement(t);
 		}
 
-		void TransformSubTool::DrawScene(IEditorContext& ed) {
+		void TransformSubTool::DrawScene(IVoxelEditContext& ed) {
 			const PlacementTransform t = WholeStep(gizmo.Total());
 			if (!t.IsIdentity())
 				ed.DrawPlacementTransformed(t, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
@@ -500,31 +500,31 @@ namespace spades {
 		// The Pivot tool sets the snap (GizmoTool).
 		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
 
-		std::string PivotGizmoSubTool::Hint(IEditorContext&) {
+		std::string PivotGizmoSubTool::Hint(IVoxelEditContext&) {
 			return std::string("drag a handle to move the pivot") + kGizmoDragHint;
 		}
 
-		bool PivotGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+		bool PivotGizmoSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
 			pose.position = ed.GetPivot(); // live during a drag (the preview moved it)
 			return true;
 		}
 
-		void PivotGizmoSubTool::OnGizmoBegin(IEditorContext& ed) { startPivot = ed.GetPivot(); }
+		void PivotGizmoSubTool::OnGizmoBegin(IVoxelEditContext& ed) { startPivot = ed.GetPivot(); }
 
-		void PivotGizmoSubTool::OnGizmoDrag(IEditorContext& ed) {
+		void PivotGizmoSubTool::OnGizmoDrag(IVoxelEditContext& ed) {
 			// A preview: the marker and the toolbar readout follow the drag, and
 			// the release commits it as one undo step.
 			ed.PreviewPivot(startPivot + gizmo.Total().translation);
 		}
 
-		void PivotGizmoSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+		void PivotGizmoSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
 			// One undo step from where the drag began; a drag that went nowhere
 			// commits nothing and its preview ends with the press.
 			if (!total.IsIdentity())
 				ed.SetPivot(startPivot + total.translation);
 		}
 
-		void PivotGizmoSubTool::OnGizmoCancel(IEditorContext& ed, const GizmoTransform&) {
+		void PivotGizmoSubTool::OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform&) {
 			ed.PreviewPivot(startPivot); // show the original pivot again, commit nothing
 		}
 
@@ -533,30 +533,30 @@ namespace spades {
 		// The Mirror tool sets the snap (GizmoTool).
 		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
 
-		std::string MirrorGizmoSubTool::Hint(IEditorContext&) {
+		std::string MirrorGizmoSubTool::Hint(IVoxelEditContext&) {
 			return std::string("drag a handle to move the planes") + kGizmoDragHint;
 		}
 
-		bool MirrorGizmoSubTool::CurrentPose(IEditorContext& ed, GizmoPose& pose) {
+		bool MirrorGizmoSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
 			pose.position = ed.MirrorPlane();
 			return true;
 		}
 
-		void MirrorGizmoSubTool::OnGizmoBegin(IEditorContext& ed) { startPlane = ed.MirrorPlane(); }
+		void MirrorGizmoSubTool::OnGizmoBegin(IVoxelEditContext& ed) { startPlane = ed.MirrorPlane(); }
 
-		void MirrorGizmoSubTool::OnGizmoDrag(IEditorContext& ed) {
+		void MirrorGizmoSubTool::OnGizmoDrag(IVoxelEditContext& ed) {
 			// The planes follow the drag live, without journaling each step.
 			ed.PreviewMirrorPlane(startPlane + gizmo.Total().translation);
 		}
 
-		void MirrorGizmoSubTool::OnGizmoEnd(IEditorContext& ed, const GizmoTransform& total) {
+		void MirrorGizmoSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
 			// One undo step from where the drag began; a drag that went nowhere
 			// commits nothing and its preview ends with the press.
 			if (!total.IsIdentity())
 				ed.SetMirrorPlane(startPlane + total.translation);
 		}
 
-		void MirrorGizmoSubTool::OnGizmoCancel(IEditorContext& ed, const GizmoTransform&) {
+		void MirrorGizmoSubTool::OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform&) {
 			ed.PreviewMirrorPlane(startPlane); // show the original planes again, commit nothing
 		}
 	} // namespace gui

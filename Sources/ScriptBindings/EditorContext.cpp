@@ -22,7 +22,7 @@
 #include <vector>
 
 #include <Core/Math.h>
-#include <Gui/UI/Editor/Shell/EditorContext.h>
+#include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
 
 namespace spades {
 	namespace {
@@ -39,27 +39,27 @@ namespace spades {
 			return out;
 		}
 
-		void Ctx_FillCells(gui::IEditorContext* c, CScriptArray* arr, uint32_t color) {
+		void Ctx_FillCells(gui::IVoxelEditContext* c, CScriptArray* arr, uint32_t color) {
 			c->FillCells(ToCells(arr), color);
 		}
-		void Ctx_EraseCells(gui::IEditorContext* c, CScriptArray* arr) {
+		void Ctx_EraseCells(gui::IVoxelEditContext* c, CScriptArray* arr) {
 			c->EraseCells(ToCells(arr));
 		}
-		void Ctx_PaintCells(gui::IEditorContext* c, CScriptArray* arr, uint32_t color) {
+		void Ctx_PaintCells(gui::IVoxelEditContext* c, CScriptArray* arr, uint32_t color) {
 			c->PaintCells(ToCells(arr), color);
 		}
-		void Ctx_SelectCells(gui::IEditorContext* c, CScriptArray* arr) {
+		void Ctx_SelectCells(gui::IVoxelEditContext* c, CScriptArray* arr) {
 			c->SelectCells(ToCells(arr));
 		}
-		void Ctx_DeselectCells(gui::IEditorContext* c, CScriptArray* arr) {
+		void Ctx_DeselectCells(gui::IVoxelEditContext* c, CScriptArray* arr) {
 			c->DeselectCells(ToCells(arr));
 		}
-		void Ctx_ApplyCells(gui::IEditorContext* c, CScriptArray* arr, bool secondary) {
+		void Ctx_ApplyCells(gui::IVoxelEditContext* c, CScriptArray* arr, bool secondary) {
 			c->ApplyCells(ToCells(arr), secondary);
 		}
 	} // namespace
 
-	// Exposes the editor's tool seam (`gui::IEditorContext`) to scripts as a
+	// Exposes the editor's tool seam (`gui::IVoxelEditContext`) to scripts as a
 	// non-counted reference type. The editor owns the object and outlives every
 	// script call, so no addref/release is needed.
 	class EditorContextRegistrar : public ScriptObjectRegistrar {
@@ -78,71 +78,71 @@ namespace spades {
 				case PhaseObjectMember: {
 					// --- picking ---
 					r = eng->RegisterObjectMethod("EditorContext", "void DoPick()",
-					                              asMETHOD(gui::IEditorContext, DoPick),
+					                              asMETHOD(gui::IVoxelEditContext, DoPick),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "bool HasPick()",
-					                              asMETHOD(gui::IEditorContext, HasPick),
+					                              asMETHOD(gui::IVoxelEditContext, HasPick),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "IntVector3 PickSolid()",
-					                              asMETHOD(gui::IEditorContext, PickSolid),
+					                              asMETHOD(gui::IVoxelEditContext, PickSolid),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "IntVector3 PickPlace()",
-					                              asMETHOD(gui::IEditorContext, PickPlace),
+					                              asMETHOD(gui::IVoxelEditContext, PickPlace),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "Vector3 ViewDir()",
-					                              asMETHOD(gui::IEditorContext, ViewDir),
+					                              asMETHOD(gui::IVoxelEditContext, ViewDir),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext",
 					  "bool RayPlaneCell(const Vector3&in, const Vector3&in, IntVector3 &out)",
-					  asMETHOD(gui::IEditorContext, RayPlaneCell), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, RayPlaneCell), asCALL_THISCALL);
 					manager->CheckError(r);
 
 					// --- document / colour ---
 					r = eng->RegisterObjectMethod("EditorContext", "uint CurrentColor()",
-					                              asMETHOD(gui::IEditorContext, CurrentColor),
+					                              asMETHOD(gui::IVoxelEditContext, CurrentColor),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "void SetStatus(const string&in)",
-					                              asMETHOD(gui::IEditorContext, SetStatus),
+					                              asMETHOD(gui::IVoxelEditContext, SetStatus),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 
 					// --- pivot ---
 					r = eng->RegisterObjectMethod("EditorContext", "Vector3 GetPivot()",
-					                              asMETHOD(gui::IEditorContext, GetPivot),
+					                              asMETHOD(gui::IVoxelEditContext, GetPivot),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "void SetPivot(const Vector3&in)",
-					                              asMETHOD(gui::IEditorContext, SetPivot),
+					                              asMETHOD(gui::IVoxelEditContext, SetPivot),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext",
 					                              "void PreviewPivot(const Vector3&in)",
-					                              asMETHOD(gui::IEditorContext, PreviewPivot),
+					                              asMETHOD(gui::IVoxelEditContext, PreviewPivot),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 
 					// --- undo / redo ---
 					r = eng->RegisterObjectMethod("EditorContext", "void Undo()",
-					                              asMETHOD(gui::IEditorContext, Undo),
+					                              asMETHOD(gui::IVoxelEditContext, Undo),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "void Redo()",
-					                              asMETHOD(gui::IEditorContext, Redo),
+					                              asMETHOD(gui::IVoxelEditContext, Redo),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "bool CanUndo()",
-					                              asMETHOD(gui::IEditorContext, CanUndo),
+					                              asMETHOD(gui::IVoxelEditContext, CanUndo),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod("EditorContext", "bool CanRedo()",
-					                              asMETHOD(gui::IEditorContext, CanRedo),
+					                              asMETHOD(gui::IVoxelEditContext, CanRedo),
 					                              asCALL_THISCALL);
 					manager->CheckError(r);
 
@@ -150,30 +150,30 @@ namespace spades {
 					r = eng->RegisterObjectMethod(
 					  "EditorContext",
 					  "void DrawLine3D(const Vector3&in, const Vector3&in, const Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawLine3D), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawLine3D), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext", "void DrawCellOutline(int, int, int, const Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawCellOutline), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawCellOutline), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext", "void DrawCellOutlineMirrored(int, int, int, const Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawCellOutlineMirrored), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawCellOutlineMirrored), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext",
 					  "void DrawBoxOutline(const IntVector3&in, const IntVector3&in, const Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawBoxOutline), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawBoxOutline), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext",
 					  "void DrawBoxOutlineMirrored(const IntVector3&in, const IntVector3&in, const "
 					  "Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawBoxOutlineMirrored), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawBoxOutlineMirrored), asCALL_THISCALL);
 					manager->CheckError(r);
 					r = eng->RegisterObjectMethod(
 					  "EditorContext", "void DrawSolidCube(const Vector3&in, float, const Vector4&in)",
-					  asMETHOD(gui::IEditorContext, DrawSolidCube), asCALL_THISCALL);
+					  asMETHOD(gui::IVoxelEditContext, DrawSolidCube), asCALL_THISCALL);
 					manager->CheckError(r);
 
 					// --- cell-list edits (array<IntVector3> -> std::vector) ---

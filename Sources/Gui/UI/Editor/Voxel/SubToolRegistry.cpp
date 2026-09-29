@@ -20,7 +20,7 @@
 
 #include "SubToolRegistry.h"
 
-#include <Gui/UI/Editor/Shell/EditorTool.h>
+#include "VoxelTool.h"
 #include "ScriptEditorTool.h"
 
 namespace spades {
@@ -30,7 +30,7 @@ namespace spades {
 			static bool seeded = false;
 			if (!seeded) {
 				seeded = true;
-				// Every script tool implementing the EditorTool interface registers
+				// Every script tool implementing the EditorTool script interface registers
 				// itself for the targets it declares — no tool is named here.
 				RegisterScriptTools(registry);
 			}
@@ -42,11 +42,11 @@ namespace spades {
 		}
 
 		void SubToolRegistry::BuildFor(SubToolTarget target,
-		                               std::vector<std::unique_ptr<EditorTool>>& out) const {
+		                               std::vector<std::unique_ptr<VoxelTool>>& out) const {
 			for (const Entry& e : entries) {
 				if (e.target != target)
 					continue;
-				if (std::unique_ptr<EditorTool> t = e.make())
+				if (std::unique_ptr<VoxelTool> t = e.make())
 					out.push_back(std::move(t));
 			}
 		}
