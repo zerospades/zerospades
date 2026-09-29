@@ -33,9 +33,9 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		/**
-		 * HSV colour picker popup: SV grid + hue bar + eyedropper, then preset
-		 * swatches (if any are set) and the colours used most recently, and a
-		 * close button. Positioned at bottom-right of the screen.
+		 * HSV colour picker popup: SV grid + hue bar + eyedropper, then the
+		 * colours used most recently, and a close button. Positioned at
+		 * bottom-right of the screen.
 		 *
 		 * The host says when a colour is used (AddRecentColor), since only it
 		 * knows: the recent row then holds the last colours actually applied,

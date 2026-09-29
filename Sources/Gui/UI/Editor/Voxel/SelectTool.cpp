@@ -21,7 +21,6 @@
 #include "SelectTool.h"
 #include "VoxelEditContext.h"
 
-
 namespace spades {
 	namespace gui {
 		namespace {

@@ -30,7 +30,6 @@ namespace spades {
 		public:
 			SelectTool();
 			const char* Label() const override { return "Select"; }
-			EditorRole Role() const override { return EditorRole::Select; }
 
 			ToolOptions* Options() override;
 			// Commands with nothing to act on are greyed out.
