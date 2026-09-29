@@ -66,6 +66,10 @@ namespace spades {
 				VoxelUndoStack::Limits undo;
 				// Registered tool ids to offer, in toolbar order; empty for all.
 				std::vector<std::string> tools;
+				// Pastes and imports start where the user aims, rather than in the
+				// middle of the document (a paste) or on its pivot (an import):
+				// for documents too large to see whole.
+				bool placeAtAim = false;
 			};
 
 			/** `document`, `host`, `ui` and `cursor` must outlive this; the
@@ -290,7 +294,11 @@ namespace spades {
 			void SelectBox(const IntVector3& lo, const IntVector3& hi);
 
 			// --- Clipboard / placement ----------------------------------------
+			const bool placeAtAim;
 			std::vector<ClipVoxel> clipboard; // Ctrl+C / Ctrl+X store
+			// Where voxels spanning `extent` start when placed at the aim: sitting
+			// on the voxel aimed at, centred across it. False when nothing is.
+			bool AimedAnchor(const IntVector3& extent, IntVector3& anchor);
 			bool turnsAboutModelPivot = false;
 			IntVector3 TurnCentre(const IntVector3& groupMiddle) const;
 			static PendingPlacement MakePlacement(std::vector<ClipVoxel> voxels,

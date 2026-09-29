@@ -124,7 +124,8 @@ namespace spades {
 		      fontManager(&fontManager),
 		      ui(ui),
 		      cursor(cursor),
-		      undo(*this, config.undo) {
+		      undo(*this, config.undo),
+		      placeAtAim(config.placeAtAim) {
 			SPADES_MARK_FUNCTION();
 
 			// The tools come from the registry (toolbar order = registration),
@@ -844,7 +845,27 @@ namespace spades {
 			// middle is read once the document is the one the paste goes into.
 			DocumentCommand command(*this);
 			const IntVector3 size = document.Size();
-			StartPlacement(clipboard, "Paste", MakeIntVector3(size.x / 2, size.y / 2, size.z / 2));
+			IntVector3 anchor = MakeIntVector3(size.x / 2, size.y / 2, size.z / 2);
+			if (placeAtAim)
+				AimedAnchor(ExtentOf(clipboard), anchor);
+			StartPlacement(clipboard, "Paste", anchor);
+		}
+
+		bool VoxelEditor::AimedAnchor(const IntVector3& extent, IntVector3& anchor) {
+			DoPick();
+			if (!pickHit)
+				return false;
+			// Centred across the cell before the hit, the box's near side on it.
+			const IntVector3 at = pickPlace;
+			anchor = MakeIntVector3(at.x - extent.x / 2, at.y - extent.y / 2, at.z - extent.z / 2);
+			const IntVector3 face = pickPlace - pickSolid;
+			if (face.x != 0)
+				anchor.x = face.x > 0 ? at.x : at.x - extent.x + 1;
+			if (face.y != 0)
+				anchor.y = face.y > 0 ? at.y : at.y - extent.y + 1;
+			if (face.z != 0)
+				anchor.z = face.z > 0 ? at.z : at.z - extent.z + 1;
+			return true;
 		}
 
 		void VoxelEditor::StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
@@ -935,6 +956,8 @@ namespace spades {
 			IntVector3 anchor = MakeIntVector3(int(std::floor(aligned.x + 0.5F)),
 			                                   int(std::floor(aligned.y + 0.5F)),
 			                                   int(std::floor(aligned.z + 0.5F)));
+			if (placeAtAim)
+				AimedAnchor(ExtentOf(voxels), anchor);
 			StartPlacement(std::move(voxels), "Insert", anchor);
 		}
 
