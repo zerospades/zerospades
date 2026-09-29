@@ -50,8 +50,8 @@ namespace spades {
 		 * during one user action (a press-drag-release, a key press) then merge
 		 * into a single undo step, so a paint stroke or a multi-step edit
 		 * undoes at once. Nothing stays open between events, so undo and
-		 * redo work at any moment. The history is capped at `kMaxGroups` steps
-		 * and `kMaxBytes` of memory, evicting the oldest.
+		 * redo work at any moment. The history is capped at a number of steps
+		 * and an amount of memory (see Limits), evicting the oldest.
 		 *
 		 * Recording never fails a command half way: a step that cannot be kept
 		 * (out of memory) would leave the history unable to replay back to the
@@ -80,7 +80,19 @@ namespace spades {
 				virtual void UndoReplayed() = 0;
 			};
 
-			explicit UndoHistory(Sink& sink) : sink(sink) {}
+			/**
+			 * How much history is kept. Past either cap the oldest steps go; the
+			 * most recent step is always kept, even if it alone exceeds `bytes`.
+			 * The memory cap keeps neither big edits nor the state kept per step
+			 * from growing the history without bound.
+			 */
+			struct Limits {
+				std::size_t steps = 256;
+				std::size_t bytes = std::size_t(256) << 20;
+			};
+
+			explicit UndoHistory(Sink& sink, Limits limits = Limits())
+			    : sink(sink), limits(limits) {}
 
 			// --- recording ----------------------------------------------------
 
@@ -262,7 +274,7 @@ namespace spades {
 				pending = Group();
 
 				// Evict the oldest history past either cap, but never the last step.
-				while ((undoGroups.size() > kMaxGroups || totalBytes > kMaxBytes) &&
+				while ((undoGroups.size() > limits.steps || totalBytes > limits.bytes) &&
 				       undoGroups.size() > 1) {
 					totalBytes -= undoGroups.front().bytes;
 					undoGroups.pop_front();
@@ -278,6 +290,7 @@ namespace spades {
 			}
 
 			Sink& sink;
+			const Limits limits;
 			std::deque<Group> undoGroups;
 			std::deque<Group> redoGroups;
 			Group pending;
@@ -285,12 +298,6 @@ namespace spades {
 			unsigned action = 0, nextAction = 0;
 			long documentId = 0, nextDocumentId = 0;
 			std::size_t totalBytes = 0; // BytesOf every group held, undo + redo
-
-			static constexpr std::size_t kMaxGroups = 256;
-			// Cap the memory too, so neither big edits nor the state kept per step
-			// grow the history without bound. The most recent step is always kept,
-			// even if it alone exceeds this.
-			static constexpr std::size_t kMaxBytes = std::size_t(256) << 20;
 		};
 	} // namespace gui
 } // namespace spades
