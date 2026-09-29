@@ -22,7 +22,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <set>
+#include <map>
 
 #include <Core/CopyOnWrite.h>
 #include <Core/Math.h>
@@ -36,18 +36,19 @@ namespace spades {
 		 * changes (see CopyOnWrite), so every undo step can keep one. Its box
 		 * is cached until the selection next changes, so asking for it every
 		 * frame costs nothing. Coordinates are non-negative voxel indices below
-		 * 2^20 on each axis, as a model's are.
+		 * 2^20 across and 2^20 deep, as a model's and a map's are.
+		 *
+		 * Stored as columns of 64 voxels, one bit each, the way a model and a
+		 * map store their own voxels: a selection as large as a map is a few
+		 * megabytes, not a node per voxel.
 		 */
 		class VoxelSelection {
 		public:
-			bool Empty() const { return keys->empty(); }
-			int Size() const { return int(keys->size()); }
-			bool Contains(const IntVector3& v) const { return keys->count(Key(v)) != 0; }
+			bool Empty() const { return columns->count == 0; }
+			int Size() const { return columns->count; }
+			bool Contains(const IntVector3& v) const;
 
-			void Add(const IntVector3& v) {
-				if (!Contains(v)) // changing nothing must not unshare the set
-					keys.Edit().insert(Key(v));
-			}
+			void Add(const IntVector3& v);
 			void Remove(const IntVector3& v);
 			void Clear();
 			/** Moves every coordinate by `offset`, as the volume's are relabelled. */
@@ -56,10 +57,17 @@ namespace spades {
 			/** The smallest box holding every voxel; false when there are none. */
 			bool Bounds(IntVector3& lo, IntVector3& hi) const;
 
-			/** Calls `visit(const IntVector3&)` for each voxel. */
+			/** Calls `visit(const IntVector3&)` for each voxel, column by column. */
 			template <class Visit> void ForEach(Visit visit) const {
-				for (std::int64_t key : *keys)
-					visit(Coordinates(key));
+				for (const auto& column : columns->bits) {
+					const IntVector3 base = ColumnBase(column.first);
+					std::uint64_t bits = column.second;
+					while (bits) {
+						const int z = LowestBit(bits);
+						visit(IntVector3::Make(base.x, base.y, base.z + z));
+						bits &= bits - 1;
+					}
+				}
 			}
 
 			/** Heap bytes this holds that `other` does not share with it. */
@@ -67,23 +75,32 @@ namespace spades {
 
 			/** Names the content: selections with equal versions hold the same
 			 *  voxels, so what is worked out from one can be kept against it. */
-			std::uint64_t Version() const { return keys.Version(); }
+			std::uint64_t Version() const { return columns.Version(); }
 
-			bool operator==(const VoxelSelection& o) const { return keys == o.keys; }
+			bool operator==(const VoxelSelection& o) const { return columns == o.columns; }
 			bool operator!=(const VoxelSelection& o) const { return !(*this == o); }
 
 		private:
-			CopyOnWrite<std::set<std::int64_t>> keys;
+			// Each column holds 64 voxels of one (x, y), from a z that is a
+			// multiple of 64: bit i is z + i.
+			struct Columns {
+				std::map<std::int64_t, std::uint64_t> bits; // column key -> voxels
+				int count = 0;                              // voxels, all columns
+				bool operator==(const Columns& o) const { return bits == o.bits; }
+			};
+			CopyOnWrite<Columns> columns;
 
-			// The box as of `boundsVersion` of `keys`. Copies carry it along, and
+			// The box as of `boundsVersion` of `columns`. Copies carry it along, and
 			// share its validity since they share the version.
 			mutable std::uint64_t boundsVersion = ~std::uint64_t(0); // none yet
 			mutable bool boundsValid = false;
 			mutable IntVector3 boundsLo = IntVector3::Make(0, 0, 0);
 			mutable IntVector3 boundsHi = IntVector3::Make(0, 0, 0);
 
-			static std::int64_t Key(const IntVector3& v);
-			static IntVector3 Coordinates(std::int64_t key);
+			static std::int64_t ColumnKey(const IntVector3& v);
+			// The voxel bit 0 of the column `key` stands for.
+			static IntVector3 ColumnBase(std::int64_t key);
+			static int LowestBit(std::uint64_t bits);
 		};
 	} // namespace gui
 } // namespace spades
