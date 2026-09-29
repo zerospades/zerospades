@@ -28,11 +28,6 @@
 
 namespace spades {
 	namespace gui {
-		void ColorPicker::SetPresets(const std::vector<uint32_t>& p, int cols) {
-			presets = p;
-			presetColumns = std::max(1, cols);
-		}
-
 		void ColorPicker::SetColor(uint32_t rgb) { RGBToHSV(rgb); }
 
 		void ColorPicker::AddRecentColor(uint32_t rgb) {
@@ -73,16 +68,12 @@ namespace spades {
 			const float headerH = 18.0F;
 			const float labelH = 14.0F; // the "Recent" caption
 			const float contentW = svSize + gap + hueW;
-			const float presetSwatch = contentW / float(presetColumns);
 			const float recentSwatch = contentW / float(kRecentSlots);
 			prevH = 22.0F;
-			// Only swatch rows that exist take room: the presets when there are
-			// any, and the recent row, which always has its slots.
-			const int presetRows = (int(presets.size()) + presetColumns - 1) / presetColumns;
-			const float presetsH = presets.empty() ? 0.0F : float(presetRows) * presetSwatch + gap;
+			// The recent row always has its slots, filled or not.
 			const float recentH = labelH + recentSwatch;
 			pkW = 8.0F * 2.0F + contentW;
-			pkH = 8.0F * 2.0F + headerH + svSize + gap + prevH + gap + presetsH + recentH;
+			pkH = 8.0F * 2.0F + headerH + svSize + gap + prevH + gap + recentH;
 			pkX = screenWidth - 16.0F - pkW;
 			pkY = screenHeight - bottomClear - pkH;
 			closeS = 13.0F;
@@ -98,9 +89,7 @@ namespace spades {
 			prevW = contentW - eyeS - 6.0F;
 			eyeX = prevX + prevW + 6.0F;
 			eyeY = prevY;
-			float y = prevY + prevH + gap;
-			presetGrid = {svX, y, presetSwatch, presetColumns};
-			y += presetsH;
+			const float y = prevY + prevH + gap;
 			recentLabelY = y;
 			recentGrid = {svX, y + labelH, recentSwatch, kRecentSlots};
 		}
@@ -184,9 +173,6 @@ namespace spades {
 			if (InRect(p, eyeX, eyeY, eyeS, eyeS))
 				return {ClickType::Eyedropper, -1};
 
-			const int preset = presetGrid.At(p, int(presets.size()));
-			if (preset >= 0)
-				return {ClickType::Preset, preset};
 			const int used = recentGrid.At(p, int(recent.size()));
 			if (used >= 0)
 				return {ClickType::Recent, used};
@@ -210,7 +196,6 @@ namespace spades {
 				case ClickType::Eyedropper:
 					eyedropperMode = !eyedropperMode;
 					break;
-				case ClickType::Preset: ChooseColor(presets[size_t(result.index)]); break;
 				case ClickType::Recent: ChooseColor(recent[size_t(result.index)]); break;
 				default:
 					break;
@@ -317,7 +302,6 @@ namespace spades {
 			                 eyedropperMode ? MakeVector4(0.5F, 1.0F, 0.6F, 1.0F)
 			                                : MakeVector4(0.5F, 0.5F, 0.5F, 0.7F));
 
-			DrawSwatches(renderer, presetGrid, presets, 0);
 			hf.Draw("Recent", MakeVector2(svX, recentLabelY), 0.75F,
 			        MakeVector4(0.7F, 0.7F, 0.7F, 1.0F));
 			DrawSwatches(renderer, recentGrid, recent, kRecentSlots);

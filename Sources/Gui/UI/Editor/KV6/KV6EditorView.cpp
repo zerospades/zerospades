@@ -1843,21 +1843,11 @@ namespace spades {
 			}
 		}
 
-		// --- Layout / hit testing --------------------------------------------
-
-		bool KV6EditorView::InRect(const Vector2& p, float x, float y, float w, float h) const {
-			return OverlayInRect(p, x, y, w, h);
-		}
-
 		// --- Drawing primitives ----------------------------------------------
 
 		void KV6EditorView::ColorNP(const Vector4& c) { OverlayColorNP(*renderer, c); }
 		void KV6EditorView::FillRect(float x, float y, float w, float h) {
 			OverlayFillRect(*renderer, x, y, w, h);
-		}
-		void KV6EditorView::StrokeRect(float x, float y, float w, float h, float t,
-		                               const Vector4& c) {
-			OverlayStrokeRect(*renderer, x, y, w, h, t, c);
 		}
 		void KV6EditorView::DrawLine2D(const Vector2& a, const Vector2& b, float w,
 		                               const Vector4& col) {
