@@ -382,8 +382,6 @@ namespace spades {
 				}
 			};
 			DebugFrameSampler debugFrames;
-			bool flashlightOn;
-			float flashlightOnTime;
 
 			struct GrenadeTracer {
 				std::vector<Vector3> positions;
