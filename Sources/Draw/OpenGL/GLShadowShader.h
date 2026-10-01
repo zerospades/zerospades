@@ -32,6 +32,9 @@ namespace spades {
 		class GLShadowShader {
 			GLProgramUniform mapShadowTexture;
 			GLProgramUniform fogColor;
+			GLProgramUniform daylight;
+			GLProgramUniform sunlight;
+			GLProgramUniform skyLightColor;
 			GLProgramUniform ambientColor;
 			GLProgramUniform cascadeSplit1;
 			GLProgramUniform cascadeSplit2;

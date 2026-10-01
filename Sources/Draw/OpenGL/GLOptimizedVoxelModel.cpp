@@ -530,14 +530,14 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::Prerender(
-			std::vector<client::ModelRenderParam> params, bool ghostPass) {
+			const std::vector<client::ModelRenderParam>& params, bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
 			RenderSunlightPass(params, ghostPass);
 		}
 
 		void GLOptimizedVoxelModel::RenderShadowMapPass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			device.Enable(IGLDevice::CullFace, true);
@@ -613,7 +613,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderSunlightPass(
-			std::vector<client::ModelRenderParam> params, bool ghostPass) {
+			const std::vector<client::ModelRenderParam>& params, bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -923,7 +923,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderOutlinePass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -1027,7 +1027,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderXRayPass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			// The pass runs for every model type in the scene, but only a handful of

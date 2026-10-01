@@ -53,6 +53,7 @@ namespace spades {
 			static GLProgramUniform lensViewAxisSide("viewAxisSide");
 			static GLProgramUniform lensViewAxisFront("viewAxisFront");
 			static GLProgramUniform zNearFar("zNearFar");
+			static GLProgramUniform sunlight("sunlight");
 
 			static GLProgramUniform fogColor("fogColor");
 			static GLProgramUniform fogDistance("fogDistance");
@@ -70,6 +71,7 @@ namespace spades {
 			lensViewAxisSide(lens);
 			lensViewAxisFront(lens);
 			zNearFar(lens);
+			sunlight(lens);
 			fogColor(lens);
 			fogDistance(lens);
 
@@ -88,6 +90,7 @@ namespace spades {
 			lensViewAxisSide.SetValue(def.viewAxis[0].x, def.viewAxis[0].y, def.viewAxis[0].z);
 			lensViewAxisFront.SetValue(def.viewAxis[2].x, def.viewAxis[2].y, def.viewAxis[2].z);
 			zNearFar.SetValue(def.zNear, def.zFar);
+			sunlight.SetValue(renderer.GetSunlight());
 
 			Vector3 fogCol = renderer.GetFogColor();
 			fogCol *= fogCol; // linearize

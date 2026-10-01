@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "GLDynamicLight.h"
@@ -54,6 +55,7 @@ namespace spades {
 			// What is bound for the pass under way: the textures every batch shares,
 			// for `GLRenderer::GetDynamicLightPass`, and the last batch's image. The
 			// passes in between use the same texture stages for something else.
+			bool bound = false;
 			std::uint32_t boundPass = 0;
 			GLImage* boundImage = nullptr;
 
@@ -120,6 +122,9 @@ namespace spades {
 			 * maps, and sets the program up for `batch`. */
 			void SetUp(GLRenderer*, GLProgram*, GLImage* image, int texStage);
 
+			/** Sets the program up for the batch of `pending` nearest to `eye`. */
+			void SetUpNearestBatch(GLRenderer*, GLProgram*, int texStage, const Vector3& eye);
+
 		public:
 			GLDynamicLightShader();
 			~GLDynamicLightShader();
@@ -154,6 +159,24 @@ namespace spades {
 					draw();
 					pending.swap(deferred);
 				}
+			}
+
+			/**
+			 * Lights a draw that must take its lights in one go, as it replaces what is
+			 * under it instead of adding to it, and that runs outside the dynamic light
+			 * pass: sets `program` up with the one batch of the lights `reaches` accepts
+			 * whose origins are nearest to `eye`, with its textures on `texStage` and
+			 * the stages after it, as `Render` does. The lights that batch has no room
+			 * for are left out. With no light, the program is set up to take none.
+			 */
+			template <class Reaches>
+			void SetUpSingleDraw(GLRenderer* renderer, GLProgram* program,
+			                     const std::vector<GLDynamicLight>& lights, int texStage,
+			                     const Vector3& eye, Reaches&& reaches) {
+				Gather(lights, std::forward<Reaches>(reaches));
+				// Outside the pass, anything may have been bound on these stages since.
+				bound = false;
+				SetUpNearestBatch(renderer, program, texStage, eye);
 			}
 		};
 	} // namespace draw

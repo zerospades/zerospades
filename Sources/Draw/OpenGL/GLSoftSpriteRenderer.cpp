@@ -18,6 +18,8 @@
 
  */
 
+#include <cmath>
+
 #include "GLSoftSpriteRenderer.h"
 #include "GLFramebufferManager.h"
 #include "GLImage.h"
@@ -66,9 +68,10 @@ namespace spades {
 			spr.center = center;
 			spr.radius = rad;
 			spr.angle = ang;
+			const bool emissive = color.x > color.w || color.y > color.w || color.z > color.w;
 			if (settings.r_hdr) {
 				// linearize color
-				if (color.x > color.w || color.y > color.w || color.z > color.w) {
+				if (emissive) {
 					// emissive material
 					color.x *= color.x;
 					color.y *= color.y;
@@ -80,6 +83,16 @@ namespace spades {
 					color.y *= color.y * rcp;
 					color.z *= color.z * rcp;
 				}
+			}
+			if (!emissive) {
+				// These sprites are not lit, so a scattering one would glow in the dark:
+				// the daylight dims it as it dims the world, in linear light (hence the
+				// root for a gamma-encoded colour).
+				const float daylight = renderer.GetDaylight();
+				const float scale = settings.r_hdr ? daylight : std::sqrt(daylight);
+				color.x *= scale;
+				color.y *= scale;
+				color.z *= scale;
 			}
 			spr.color = color;
 			spr.area = rad * rad * 4.0F / std::max(Vector3::Dot(center - def.viewOrigin, def.viewAxis[2]), 0.01F);

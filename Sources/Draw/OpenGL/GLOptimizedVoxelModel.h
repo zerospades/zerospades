@@ -89,12 +89,12 @@ namespace spades {
 
 			static void PreloadShaders(GLRenderer&);
 
-			void Prerender(std::vector<client::ModelRenderParam> params, bool ghostPass) override;
-			void RenderShadowMapPass(std::vector<client::ModelRenderParam> params) override;
-			void RenderSunlightPass(std::vector<client::ModelRenderParam> params, bool ghostPass) override;
+			void Prerender(const std::vector<client::ModelRenderParam>& params, bool ghostPass) override;
+			void RenderShadowMapPass(const std::vector<client::ModelRenderParam>& params) override;
+			void RenderSunlightPass(const std::vector<client::ModelRenderParam>& params, bool ghostPass) override;
 			void RenderDynamicLightPass(const std::vector<client::ModelRenderParam>& params, const std::vector<GLDynamicLight>& lights) override;
-			void RenderOutlinePass(std::vector<client::ModelRenderParam> params) override;
-			void RenderXRayPass(std::vector<client::ModelRenderParam> params) override;
+			void RenderOutlinePass(const std::vector<client::ModelRenderParam>& params) override;
+			void RenderXRayPass(const std::vector<client::ModelRenderParam>& params) override;
 
 			IntVector3 GetDimensions() override { return dimensions; }
 			AABB3 GetBoundingBox() override { return boundingBox; }

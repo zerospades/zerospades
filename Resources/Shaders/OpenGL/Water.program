@@ -1,4 +1,6 @@
 Shaders/OpenGL/Water.fs
+Shaders/OpenGL/DynamicLight/Lights.fs
+Shaders/OpenGL/WaterDynamicLight.fs
 Shaders/OpenGL/Water.vs
 *shadow*
 Shaders/OpenGL/Fog.vs

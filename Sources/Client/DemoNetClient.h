@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include "DaytimeWeather.h"
 #include "DemoPlayer.h"
 #include "GameConstants.h"
 #include "GameMap.h"
@@ -73,6 +74,8 @@ namespace spades {
 			bool seekingMode;
 
 			FlashlightBeams flashlightBeams;
+
+			stmp::optional<TimeOfDay> timeOfDay;
 
 			stmp::optional<World&> GetWorld();
 			Player& GetPlayer(int);
@@ -159,6 +162,8 @@ namespace spades {
 
 			// Damage Markers are never recorded, so a replay predicts its own numbers.
 			bool ServerReportsDamage() const override { return false; }
+
+			stmp::optional<TimeOfDay> GetTimeOfDay() override { return timeOfDay; }
 
 		};
 	} // namespace client

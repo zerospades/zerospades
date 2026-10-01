@@ -210,9 +210,29 @@ namespace spades {
 			void SetFogColor(Vector3 v) override;
 			void SetFogDistance(float f) override { fogDistance = f; }
 
-			Vector3 GetFogColor() { return fogColor; }
+			/** The factor the world's lighting but the sun's, the fog and the sky are
+			 * drawn with, in `[0, 1]`. */
+			float GetDaylight() { return sceneDef.daylight; }
+
+			/** The Fog Colour as set: the colour of the fog and the sky in full daylight. */
+			Vector3 GetFullDaylightFogColor() { return fogColor; }
+
+			/** The colour the fog and the sky are drawn in: the Fog Colour times the
+			 * daylight. */
+			Vector3 GetFogColor() { return fogColor * GetDaylight(); }
 			float GetFogDistance() { return fogDistance; }
+
+			/** The colour solid geometry fades to with distance: none when a fog filter
+			 * draws the fog over it afterwards. */
 			Vector3 GetFogColorForSolidPass();
+
+			/** `GetFogColorForSolidPass` in full daylight: the sky's light, which the
+			 * lighting shaders scale by the daylight themselves. */
+			Vector3 GetFullDaylightFogColorForSolidPass();
+
+			/** The factor the sun's light is drawn with. At `0` the sun casts no light
+			 * and no shadow. */
+			float GetSunlight() { return sceneDef.sunlight; }
 
 			void StartScene(const client::SceneDefinition&) override;
 
@@ -278,10 +298,10 @@ namespace spades {
 			GLMapOccupancy* GetMapOccupancy() { return mapOccupancy.get(); }
 			/** This frame's dynamic lights, as the lighting shaders look them up. Made
 			 * for the first frame with dynamic lights on, as are the occlusion maps. */
-			GLDynamicLightTable& GetDynamicLightTable() { return *dynamicLightTable; }
+			GLDynamicLightTable* GetDynamicLightTable() { return dynamicLightTable.get(); }
 			/** Where the map stops this frame's spotlights. */
-			GLDynamicLightOcclusionMaps& GetDynamicLightOcclusionMaps() {
-				return *dynamicLightOcclusionMaps;
+			GLDynamicLightOcclusionMaps* GetDynamicLightOcclusionMaps() {
+				return dynamicLightOcclusionMaps.get();
 			}
 			GLRadiosityRenderer* GetRadiosityRenderer() { return radiosityRenderer; }
 			GLModelRenderer* GetModelRenderer() { return modelRenderer; }

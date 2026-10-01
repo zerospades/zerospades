@@ -1,4 +1,6 @@
 Shaders/OpenGL/Water3.fs
+Shaders/OpenGL/DynamicLight/Lights.fs
+Shaders/OpenGL/WaterDynamicLight.fs
 Shaders/OpenGL/Water3.vs
 # Use lite version of shadow shaders because SSAO is not computed for the water surface
 *shadow-lite*
