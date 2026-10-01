@@ -858,7 +858,7 @@ namespace spades {
 				case PacketTypeTeamplay: {
 					switch (r.ReadByte()) { // sub packet id
 						case TeamplaySubConfig: {
-							if (r.GetNumRemainingBytes() < kTeamplayConfigBytes)
+							if (!HasSubPacketBytes(r, kTeamplayConfigBytes, "Teamplay"))
 								break;
 
 							uint8_t features = r.ReadByte();
@@ -867,7 +867,7 @@ namespace spades {
 							client->TeamplayConfigured(features, northX, northY);
 						} break;
 						case TeamplaySubPing: {
-							if (r.GetNumRemainingBytes() < kTeamplayPingBytes)
+							if (!HasSubPacketBytes(r, kTeamplayPingBytes, "Teamplay"))
 								break;
 
 							int pId = r.ReadByte();
@@ -896,7 +896,7 @@ namespace spades {
 																	 color, std::move(reason));
 						} break;
 						case TeamplaySubESPMark: {
-							if (r.GetNumRemainingBytes() < kTeamplayMarkBytes)
+							if (!HasSubPacketBytes(r, kTeamplayMarkBytes, "Teamplay"))
 								break;
 
 							int pId = r.ReadByte();
