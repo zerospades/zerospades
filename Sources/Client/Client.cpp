@@ -1389,7 +1389,7 @@ namespace spades {
 
 			// No feature bit gates this: a relayed ping is drawn on the surfaces the
 			// packet names, and a server that wants one unseen does not send it.
-			std::string who = (playerId == Teamplay::kServerPlayerId)
+			std::string who = (playerId == kServerPlayerId)
 				? _Tr("Client", "The server")
 				: world ? world->GetPlayerName(playerId) : std::string();
 
@@ -1403,7 +1403,7 @@ namespace spades {
 			// exactly the surfaces its packet named.
 			uint8_t placed = Teamplay::ResolveSurfaces(surfaces);
 			if (duration != 0.0F && !(placed & Teamplay::SurfaceWorld) &&
-				playerId != Teamplay::kServerPlayerId) {
+				playerId != kServerPlayerId) {
 				std::string line = who;
 				if (!reason.empty())
 					line += line.empty() ? reason : ": " + reason;

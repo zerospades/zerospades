@@ -119,6 +119,10 @@ namespace spades {
 		constexpr std::size_t kTeamplayMarkBytes =
 		  1 + 4 + 1 + 1 + 3 + 1; // player, duration, surfaces, flags, colour, message
 
+		/** The player id that stands for the server: Player Limit reserves it, so no
+		 * player ever has it. */
+		constexpr int kServerPlayerId = 255;
+
 		inline PlayerInput ParsePlayerInput(uint8_t bits) {
 			PlayerInput inp;
 			inp.moveForward  = (bits & (1 << 0)) != 0;
