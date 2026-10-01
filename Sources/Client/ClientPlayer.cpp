@@ -74,6 +74,20 @@ SPADES_SETTING(cg_pngScope);
 namespace spades {
 	namespace client {
 
+		namespace {
+			/** The widest cone the Flashlight extension allows, in radians. */
+			const float kMaxFlashlightConeAngle = DEG2RAD(179.0F);
+
+			/**
+			 * Where the lamp sits in the third-person head's frame, in blocks: on the
+			 * front of the head, halfway between the eyes and its top. Every head model
+			 * has its front 3.5 voxels ahead of the pivot there, its eyes 2 voxels
+			 * above the pivot and its top 5.5; the frame's front is -Y and its up is
+			 * -Z. Just proud of the front, so the voxels don't swallow it.
+			 */
+			const Vector3 kHeadLampOffset = MakeVector3(0.0F, -0.36F, -0.375F);
+		} // namespace
+
 		class SandboxedRenderer : public IRenderer {
 			Handle<IRenderer> base;
 			AABB3 clipBox;
@@ -723,21 +737,61 @@ namespace spades {
 			if (!p.IsFlashlightOn())
 				return;
 
-			// Fade in when the flashlight is switched on.
-			float brightness = p.GetWorld().GetTime() - p.GetFlashlightOnTime();
-			brightness = 1.0F - expf(-brightness * 5.0F);
-			brightness *= r_hdr ? 3.0F : 1.5F;
+			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
+			if (!beam.Emits())
+				return;
 
 			DynamicLightParam light;
 			light.type = DynamicLightTypeSpotlight;
 			light.origin = lightOrigin;
-			light.radius = 60.0F;
-			light.color = MakeVector3(1.0F, 0.7F, 0.5F) * brightness;
-			light.spotAngle = DEG2RAD(90);
+			light.radius = beam.GetReach();
+			light.color = beam.GetColor() * (GetFlashlightFadeIn() * (r_hdr ? 3.0F : 1.5F));
+			light.spotAngle = std::min(beam.GetConeAngle(), kMaxFlashlightConeAngle);
 			light.spotAxis = GetFlashlightAxes();
 			Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
 			light.image = img.GetPointerOrNull();
 			renderer.AddLight(light);
+		}
+
+		float ClientPlayer::GetFlashlightFadeIn() {
+			Player& p = player;
+			float sinceOn = p.GetWorld().GetTime() - p.GetFlashlightOnTime();
+			return 1.0F - expf(-sinceOn * 5.0F);
+		}
+
+		void ClientPlayer::UpdateFlashlightGlare(const Vector3& lampPosition) {
+			Player& p = player;
+
+			if (!p.IsFlashlightOn())
+				return;
+
+			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
+			if (!beam.Emits())
+				return;
+
+			World* world = client.GetWorld();
+			if (!world)
+				return;
+
+			GameMap* map = world->GetMap().GetPointerOrNull();
+			if (!map)
+				return;
+
+			FlashlightGlare::Lamp lamp;
+			lamp.position = lampPosition;
+			lamp.direction = flashlightOrientation;
+			lamp.coneAngle = std::min(beam.GetConeAngle(), kMaxFlashlightConeAngle);
+			lamp.reach = beam.GetReach();
+			lamp.color = beam.GetColor();
+			lamp.brightness = GetFlashlightFadeIn();
+			flashlightGlare.Update(lamp, client.GetLastSceneDef().viewOrigin, *map, time);
+		}
+
+		void ClientPlayer::DrawFlashlightGlare(float ambient) {
+			stmp::optional<Vector3> position = flashlightGlare.GetPosition();
+			Vector2 screenPos;
+			if (position && client.Project(*position, screenPos))
+				flashlightGlare.Draw(client.GetRenderer(), screenPos, ambient);
 		}
 
 		void ClientPlayer::AddToSceneFirstPersonView() {
@@ -1344,6 +1398,9 @@ namespace spades {
 			if (!IsLampBuried(p.GetEye()))
 				AddFlashlightToScene(p.GetEye());
 
+			// The lamp itself is seen on the face of the head as drawn, though.
+			UpdateFlashlightGlare((head * kHeadLampOffset).GetXYZ());
+
 			// third person player rendering, done
 		}
 
@@ -1353,6 +1410,9 @@ namespace spades {
 			Player& p = player;
 
 			hasValidOriginMatrix = false;
+
+			// Only the third-person path, which draws the lamp, gives it a glare.
+			flashlightGlare.Clear();
 
 			if (p.IsSpectator())
 				return; // spectator

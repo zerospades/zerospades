@@ -198,8 +198,11 @@ namespace spades {
 			bool IsToolGrenade() { return tool == ToolGrenade; }
 
 			/**
-			 * Whether this player's flashlight is lit. Only the local player switches its
-			 * own. It starts off with each new player object.
+			 * Whether this player's flashlight is lit.
+			 *
+			 * With the *Flashlight* extension the server switches it for every player;
+			 * without it, only the local player switches its own. It starts off with
+			 * each new player object and goes off on Kill Action.
 			 */
 			bool IsFlashlightOn() { return flashlightOn; }
 			void SetFlashlightOn(bool on);

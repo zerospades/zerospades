@@ -25,6 +25,7 @@
 #include "CTFGameMode.h"
 #include "Client.h"
 #include "DemoNetClient.h"
+#include "Flashlight.h"
 #include "NetProtocol.h"
 #include "GameMap.h"
 #include "GameMapLoader.h"
@@ -666,6 +667,10 @@ namespace spades {
 					}
 
 					auto victim = GetPlayerOrNull(victimId);
+					// Kill Action ends the victim's light, already dead or not, and even
+					// when the kill itself cannot be replayed below.
+					if (victim)
+						victim->SetFlashlightOn(false);
 					auto killer = GetPlayerOrNull(killerId);
 					if (!victim || !killer) {
 						SPLog("Demo: KillAction skipped - player not found (victim=%d, killer=%d)", victimId, killerId);
@@ -699,6 +704,7 @@ namespace spades {
 					auto p = GetPlayerOrNull(pId);
 					if (p && !seekingMode)
 						client->PlayerLeaving(*p);
+					flashlightBeams.Forget(pId);
 					GetWorld()->GetPlayerPersistent(pId).score = 0;
 					if (pId >= 0 && pId < (int)savedPlayerTeam.size())
 						savedPlayerTeam[pId] = -1;
@@ -921,6 +927,9 @@ namespace spades {
 						default: break; // a sub packet from a newer extension version
 					}
 				} break;
+				case PacketTypeFlashlight:
+					ApplyFlashlightPacket(r, *client, flashlightBeams, seekingMode);
+					break;
 				default:
 					SPLog("Demo: dropped unknown packet %d", (int)r.GetType());
 					break;
@@ -992,6 +1001,10 @@ namespace spades {
 			World* w = new World(properties);
 			w->SetMap(initialMap->Clone());
 			client->SetWorld(w);
+
+			// The replay sends the beams in force again, so none can leak back from
+			// later in the recording.
+			flashlightBeams.Clear();
 
 			// Reset all per-player tracking state
 			recordedLocalPlayerId = -1;

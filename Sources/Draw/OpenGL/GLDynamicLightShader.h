@@ -45,6 +45,9 @@ namespace spades {
 			GLProgramUniform dynamicLightIsLinear;
 			GLProgramUniform dynamicLightLinearDirection;
 			GLProgramUniform dynamicLightLinearLength;
+			GLProgramUniform dynamicLightMapOccupancy;
+			GLProgramUniform dynamicLightMapSizeInversed;
+			GLProgramUniform dynamicLightMapOcclusion;
 
 		public:
 			GLDynamicLightShader();

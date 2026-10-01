@@ -50,6 +50,7 @@ namespace spades {
 		class IGLShadowMapRenderer;
 		class GLWaterRenderer;
 		class GLAmbientShadowRenderer;
+		class GLMapOccupancy;
 		class GLRadiosityRenderer;
 		class GLLensDustFilter;
 		class GLSoftLitSpriteRenderer;
@@ -102,6 +103,7 @@ namespace spades {
 			IGLSpriteRenderer* spriteRenderer;
 			GLLongSpriteRenderer* longSpriteRenderer;
 			std::unique_ptr<GLWaterRenderer> waterRenderer;
+			std::unique_ptr<GLMapOccupancy> mapOccupancy;
 			GLAmbientShadowRenderer* ambientShadowRenderer;
 			GLRadiosityRenderer* radiosityRenderer;
 
@@ -250,6 +252,7 @@ namespace spades {
 			IGLShadowMapRenderer* GetShadowMapRenderer() { return shadowMapRenderer.get(); }
 			GLAmbientShadowRenderer* GetAmbientShadowRenderer() { return ambientShadowRenderer; }
 			GLMapShadowRenderer* GetMapShadowRenderer() { return mapShadowRenderer; }
+			GLMapOccupancy* GetMapOccupancy() { return mapOccupancy.get(); }
 			GLRadiosityRenderer* GetRadiosityRenderer() { return radiosityRenderer; }
 			GLModelRenderer* GetModelRenderer() { return modelRenderer; }
 

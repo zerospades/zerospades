@@ -30,6 +30,8 @@ void PrepareForMapShadow(vec3 vertexCoord);
 varying vec3 lightPos;
 varying vec3 lightNormal;
 varying vec3 lightTexCoord;
+// Where the lit point is, for the map to occlude the light from it
+varying vec3 lightSurfacePos;
 
 void PrepareForDynamicLightNoBump(vec3 vertexCoord, vec3 normal) {
 	PrepareForMapShadow(vertexCoord);
@@ -45,6 +47,7 @@ void PrepareForDynamicLightNoBump(vec3 vertexCoord, vec3 normal) {
 
 	lightPos = lightPosition - vertexCoord;
 	lightNormal = normal;
+	lightSurfacePos = vertexCoord;
 
 	// projection
 	lightTexCoord = (dynamicLightSpotMatrix * vec4(vertexCoord, 1.0)).xyw;

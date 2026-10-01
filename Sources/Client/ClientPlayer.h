@@ -22,6 +22,7 @@
 
 #include <array>
 
+#include "FlashlightGlare.h"
 #include "Player.h"
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
@@ -63,6 +64,9 @@ namespace spades {
 			Vector3 flashlightOrientation;
 			Vector3 classicViewWeaponOrigin;
 
+			/** This player's lamp as the camera sees it, this frame. */
+			FlashlightGlare flashlightGlare;
+
 			asIScriptObject* spadeSkin;
 			asIScriptObject* blockSkin;
 			asIScriptObject* weaponSkin;
@@ -87,8 +91,9 @@ namespace spades {
 
 			/**
 			 * Whether a lamp at `lightOrigin` sits inside a solid voxel, in which case
-			 * it would light the far side of that block, since spotlights aren't
-			 * shadowed. Only meaningful for a lamp the camera isn't standing at.
+			 * it would light the far side of that block: the map only hides a light
+			 * from the blocks between it and its own. Only meaningful for a lamp the
+			 * camera isn't standing at.
 			 */
 			bool IsLampBuried(const Vector3& lightOrigin);
 
@@ -98,6 +103,16 @@ namespace spades {
 			 * in where the lamp sits.
 			 */
 			void AddFlashlightToScene(const Vector3& lightOrigin);
+
+			/** How far this player's lamp has come up since it was switched on, from
+			 * 0 to 1. */
+			float GetFlashlightFadeIn();
+
+			/**
+			 * Work out this frame's glare of this player's lamp, which sits at
+			 * `lampPosition`. Only for a lamp the camera isn't standing at.
+			 */
+			void UpdateFlashlightGlare(const Vector3& lampPosition);
 
 			void AddToSceneThirdPersonView();
 			void AddToSceneFirstPersonView();
@@ -122,6 +137,11 @@ namespace spades {
 			void Update(float dt);
 			void AddToScene();
 			void Draw2D();
+
+			/** Draws the glare of this player's lamp worked out by `AddToScene`, over
+			 * the finished frame, in a scene as bright as `ambient` (see
+			 * `FlashlightGlare::Draw`). */
+			void DrawFlashlightGlare(float ambient);
 
 			bool IsChangingTool();
 			void FiredWeapon();

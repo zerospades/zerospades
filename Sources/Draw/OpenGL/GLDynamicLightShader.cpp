@@ -20,6 +20,7 @@
 
 #include "GLDynamicLightShader.h"
 #include "GLImage.h"
+#include "GLMapOccupancy.h"
 #include "GLProgramManager.h"
 #include "GLRenderer.h"
 #include <Core/Settings.h>
@@ -35,7 +36,10 @@ namespace spades {
 		      dynamicLightProjectionTexture("dynamicLightProjectionTexture"),
 		      dynamicLightIsLinear("dynamicLightIsLinear"),
 		      dynamicLightLinearDirection("dynamicLightLinearDirection"),
-		      dynamicLightLinearLength("dynamicLightLinearLength") {
+		      dynamicLightLinearLength("dynamicLightLinearLength"),
+		      dynamicLightMapOccupancy("dynamicLightMapOccupancy"),
+		      dynamicLightMapSizeInversed("dynamicLightMapSizeInversed"),
+		      dynamicLightMapOcclusion("dynamicLightMapOcclusion") {
 			lastRenderer = NULL;
 		}
 
@@ -47,6 +51,7 @@ namespace spades {
 
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.vs"));
+			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapOcclusion.fs"));
 
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.vs"));
@@ -74,6 +79,9 @@ namespace spades {
 			dynamicLightIsLinear(program);
 			dynamicLightLinearDirection(program);
 			dynamicLightLinearLength(program);
+			dynamicLightMapOccupancy(program);
+			dynamicLightMapSizeInversed(program);
+			dynamicLightMapOcclusion(program);
 
 			dynamicLightOrigin.SetValue(param.origin.x, param.origin.y, param.origin.z);
 			dynamicLightColor.SetValue(param.color.x, param.color.y, param.color.z);
@@ -125,6 +133,20 @@ namespace spades {
 			} else {
 				SPUnreachable();
 			}
+
+			// The map hides the light from what is behind it, once it is loaded.
+			device.ActiveTexture(texStage);
+			if (GLMapOccupancy* occupancy = renderer->GetMapOccupancy()) {
+				device.BindTexture(IGLDevice::Texture3D, occupancy->GetTexture());
+				const Vector3 size = occupancy->GetSize();
+				dynamicLightMapSizeInversed.SetValue(1.0F / size.x, 1.0F / size.y, 1.0F / size.z);
+				dynamicLightMapOcclusion.SetValue(1.0F);
+			} else {
+				device.BindTexture(IGLDevice::Texture3D, 0);
+				dynamicLightMapOcclusion.SetValue(0.0F);
+			}
+			dynamicLightMapOccupancy.SetValue(texStage);
+			texStage++;
 
 			device.ActiveTexture(texStage);
 

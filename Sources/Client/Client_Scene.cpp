@@ -850,6 +850,11 @@ namespace spades {
 			flashDlightsOld.swap(flashDlights);
 
 			renderer->EndScene();
+
+			// The glare of the lamps is seen by the camera like the rest of the scene,
+			// so it goes onto the frame with it, whatever is drawn over it afterwards.
+			if (world)
+				DrawFlashlightGlares();
 		}
 
 		void Client::UpdateMatrices() {

@@ -404,6 +404,7 @@ namespace spades {
 			renderer->RegisterImage("Gfx/Ball.png");
 			renderer->RegisterImage("Gfx/HurtRing.png");
 			renderer->RegisterImage("Gfx/HurtSprite.png");
+			renderer->RegisterImage("Gfx/Glare.png");
 			renderer->RegisterImage("Gfx/ReflexSight.png");
 			renderer->RegisterImage("Gfx/Spotlight.jpg");
 			renderer->RegisterImage("Textures/Fluid.png");

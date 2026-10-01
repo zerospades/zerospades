@@ -29,8 +29,16 @@ float VisibilityOfLight() {
 	return EvaluateLighting();
 }
 
+float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition);
+
+varying vec3 lightPos;
+varying vec3 lightNormal;
+varying vec3 lightSurfacePos;
+
 float EvaluateDynamicLightShadow() {
-	return VisibilityOfLight();
+	return VisibilityOfLight() *
+	       DynamicLightMapVisibility(lightSurfacePos, normalize(lightNormal),
+	                                 lightSurfacePos + lightPos);
 }
 
 // -- lighting (without bumpmapping)
@@ -40,8 +48,6 @@ uniform float dynamicLightRadius;
 uniform float dynamicLightRadiusInversed;
 uniform sampler2D dynamicLightProjectionTexture;
 
-varying vec3 lightPos;
-varying vec3 lightNormal;
 varying vec3 lightTexCoord;
 
 vec3 EvaluateDynamicLightNoBump() {

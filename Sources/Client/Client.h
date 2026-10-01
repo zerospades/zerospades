@@ -584,6 +584,10 @@ namespace spades {
 			void Draw2DWithoutWorld();
 			void Draw2DWithWorld();
 
+			/** Draws the glare of every lamp the scene shows the camera onto the
+			 * finished scene, before anything 2D. */
+			void DrawFlashlightGlares();
+
 			Vector4 GetHUDColor(Player&);
 
 			/** Called when the local player is alive. */
@@ -886,6 +890,9 @@ namespace spades {
 			void PlayerLeaving(Player&);
 			void PlayerJoinedTeam(Player&);
 			void PlayerSpawned(Player&);
+
+			/** Called after a player's flashlight was switched, to give the feedback. */
+			void PlayerSwitchedFlashlight(Player&);
 
 			// IWorldListener begin
 			void PlayerObjectSet(int) override;

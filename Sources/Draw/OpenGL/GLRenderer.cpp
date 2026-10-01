@@ -37,6 +37,7 @@
 #include "GLLensDustFilter.h"
 #include "GLLensFilter.h"
 #include "GLLensFlareFilter.h"
+#include "GLMapOccupancy.h"
 #include "GLLongSpriteRenderer.h"
 #include "GLMapRenderer.h"
 #include "GLMapShadowRenderer.h"
@@ -244,6 +245,7 @@ namespace spades {
 			delete mapRenderer;
 			mapRenderer = NULL;
 			waterRenderer.reset();
+			mapOccupancy.reset();
 			delete ambientShadowRenderer;
 			ambientShadowRenderer = NULL;
 			shadowMapRenderer.reset();
@@ -332,6 +334,8 @@ namespace spades {
 				flatMapRenderer = new GLFlatMapRenderer(*this, *newMap);
 				SPLog("Creating Water Renderer");
 				waterRenderer.reset(new GLWaterRenderer(*this, newMap.get_pointer()));
+				SPLog("Creating Map Occupancy");
+				mapOccupancy.reset(new GLMapOccupancy(*this, *newMap));
 
 				if (settings.r_radiosity) {
 					SPLog("Creating Ray-traced Ambient Occlusion Renderer");
@@ -852,6 +856,8 @@ namespace spades {
 					mapShadowRenderer->Update();
 				if (ambientShadowRenderer)
 					ambientShadowRenderer->Update();
+				if (mapOccupancy)
+					mapOccupancy->Update();
 				if (radiosityRenderer)
 					radiosityRenderer->Update();
 				if (mapRenderer)
@@ -1594,6 +1600,8 @@ namespace spades {
 				mapShadowRenderer->GameMapChanged(x, y, z, map);
 			if (waterRenderer)
 				waterRenderer->GameMapChanged(x, y, z, map);
+			if (mapOccupancy)
+				mapOccupancy->GameMapChanged(x, y, z);
 			if (ambientShadowRenderer)
 				ambientShadowRenderer->GameMapChanged(x, y, z, map);
 		}

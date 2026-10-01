@@ -2536,6 +2536,17 @@ namespace spades {
 			}
 		}
 
+		void Client::DrawFlashlightGlares() {
+			// How lit the world around the lamps is: always full daylight.
+			const float ambient = 1.0F;
+
+			// The players `DrawScene` added to the scene this frame.
+			for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
+				if (world->GetPlayer(static_cast<unsigned int>(i)))
+					clientPlayers[i]->DrawFlashlightGlare(ambient);
+			}
+		}
+
 		void Client::Draw2DWithWorld() {
 			SPADES_MARK_FUNCTION();
 
