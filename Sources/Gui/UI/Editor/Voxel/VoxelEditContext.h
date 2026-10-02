@@ -89,6 +89,10 @@ namespace spades {
 			// Removes the selected voxels from the model, or drops a waiting paste
 			// or import while there is one (never the last voxel).
 			virtual void DeleteSelection() = 0;
+			// Recolours the selected voxels to `color`, or a waiting paste or
+			// import while there is one, which stays waiting. Mirroring does not
+			// apply: the selection names every voxel it acts on.
+			virtual void RecolorSelection(uint32_t color) = 0;
 			// How many voxels the selection commands act on: a waiting paste or
 			// import while there is one, else the selected.
 			virtual int SelectionCount() const = 0;
