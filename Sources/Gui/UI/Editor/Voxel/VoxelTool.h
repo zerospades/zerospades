@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <Gui/UI/Editor/Shell/EditorTool.h>
 #include <Gui/UI/Editor/Shell/ToolRegistry.h>
 
@@ -35,6 +37,16 @@ namespace spades {
 			// whose action has no inverse (recolouring) says no, and the editor
 			// then keeps the right button from all of its sub-tools.
 			virtual bool RightButtonInverts() const { return true; }
+
+			// The user changed the brush colour on the colour picker. `committed`
+			// is false while the picker is still being dragged -- show it, but
+			// record nothing undo will have to unpick -- and true once the press
+			// is over.
+			virtual void OnBrushColorChanged(IVoxelEditContext&, std::uint32_t color,
+			                                 bool committed) {
+				(void)color;
+				(void)committed;
+			}
 		};
 
 		using VoxelToolSlot = BasicToolSlot<VoxelTool>;

@@ -93,6 +93,10 @@ namespace spades {
 			// import while there is one, which stays waiting. Mirroring does not
 			// apply: the selection names every voxel it acts on.
 			virtual void RecolorSelection(uint32_t color) = 0;
+			// Shows the selection recoloured to `color` without recording it, for
+			// a colour still being chosen. Put back at the end of the user action
+			// unless committed with RecolorSelection.
+			virtual void PreviewRecolorSelection(uint32_t color) = 0;
 			// How many voxels the selection commands act on: a waiting paste or
 			// import while there is one, else the selected.
 			virtual int SelectionCount() const = 0;
