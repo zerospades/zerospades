@@ -33,7 +33,7 @@ namespace spades {
 		 * A FreeCAD-style navigation cube: a chamfered cube turning with the
 		 * view, whose faces, edges and corners are clickable to look from that
 		 * side (face / bevel edge / corner -> ortho / 45 degrees / isometric),
-		 * with a home button at its top left to go back to the opening view.
+		 * with a home button off its bottom left to go back to the opening view.
 		 */
 		class NavigationCube {
 		public:
@@ -43,8 +43,7 @@ namespace spades {
 			/** The direction to look from for the spot `p` on the cube, as seen
 			 *  through `view`; false when `p` is not over the cube. */
 			bool DirectionAt(const GizmoView& view, const Vector2& p, Vector3& dir) const;
-			/** Whether `p` is over the home button. It sits over the cube, so it is
-			 *  asked first. */
+			/** Whether `p` is over the home button, off the cube's bottom left. */
 			bool HomeAt(const Vector2& p) const;
 
 			/** Draws the cube as `view` sees it, lighting the facet under `cursor`. */
