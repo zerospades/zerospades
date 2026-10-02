@@ -811,6 +811,46 @@ namespace spades {
 			SetStatus("Deleted " + std::to_string(EraseSelection("Delete")) + " voxels");
 		}
 
+		void VoxelEditor::RecolorSelection(std::uint32_t color) {
+			// Pending voxels are recoloured where they wait, not placed first.
+			DocumentCommand command(*this, DocumentCommand::Pending::Keep);
+			if (SelectionCount() == 0) {
+				SetStatus("Nothing selected");
+				return;
+			}
+			const std::uint32_t rgb = color & 0xFFFFFF;
+			VoxelUndoStack::Step step(undo, "Recolour");
+			int recolored = 0;
+			if (edit.placing) {
+				bool differs = false;
+				for (const ClipVoxel& v : *edit.placement.voxels)
+					differs = differs || v.color != rgb;
+				// Editing the shared list would copy it even for no change.
+				if (differs) {
+					for (ClipVoxel& v : edit.placement.voxels.Edit()) {
+						if (v.color != rgb) {
+							v.color = rgb;
+							recolored++;
+						}
+					}
+				}
+			} else {
+				// A copy to walk: the selection is shared until changed, so it costs
+				// nothing, and writing voxels never touches what it is walking.
+				const VoxelSelection selected = edit.selection;
+				selected.ForEach([&](const IntVector3& v) {
+					if (!Editable(v.x, v.y, v.z) || !document.IsSolid(v.x, v.y, v.z) ||
+					    document.Color(v.x, v.y, v.z) == rgb)
+						return;
+					WriteVoxel(v.x, v.y, v.z, true, rgb);
+					recolored++;
+				});
+			}
+			if (recolored > 0)
+				NoteColorUsed(rgb);
+			SetStatus("Recoloured " + std::to_string(recolored) + " voxels");
+		}
+
 		bool VoxelEditor::CanEraseSelection() {
 			const int count =
 			  edit.placing ? int(edit.placement.voxels->size()) : edit.selection.Size();
