@@ -118,6 +118,11 @@ namespace spades {
 			void Undo();
 			void Redo();
 
+			/** The box of what the selection commands act on: the voxels waiting
+			 *  to be placed while there are some, else the selection. False when
+			 *  that is nothing. For a host framing it in its camera. */
+			bool SelectionBounds(IntVector3& lo, IntVector3& hi) const;
+
 			// --- Tools, for a host offering them elsewhere (a pie menu) ---------
 			int ToolCount() const { return int(tools.size()); }
 			/** The label of tool `index`, as on its toolbar button. */
