@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <Core/Math.h>
@@ -199,6 +200,7 @@ namespace spades {
 			void ClearSelection() override;
 			void DeleteSelection() override;
 			void RecolorSelection(std::uint32_t color) override;
+			void PreviewRecolorSelection(std::uint32_t color) override;
 			int SelectionCount() const override;
 			std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const override;
 			void SelectAll() override;
@@ -381,6 +383,12 @@ namespace spades {
 			// The brush colour, shared by every tool; a setting of the editor, not
 			// of the document, so choosing one is never an undo step.
 			std::uint32_t currentColor = 0xC8C8C8; // packed 0x00BBGGRR
+			// A press on the colour picker is a user action of its own: the tool
+			// follows the colour live while it lasts, and records it on release.
+			bool pickerHeld = false;
+			bool pickerChangedColor = false; // during the press in progress
+			void BrushColorChanged(bool committed);
+			void EndPickerPress(bool commit);
 			void NoteColorUsed(std::uint32_t color);
 			// Alt+click, or a click while the eyedropper is armed, samples in any tool.
 			bool SamplingArmed() const;
@@ -425,6 +433,11 @@ namespace spades {
 			};
 			std::optional<Vector3> previewedOrigin;
 			std::optional<Vector3> previewedMirrorPlane;
+			// What a live recolour (PreviewRecolorSelection) painted over: the
+			// selected voxels with their own colours, or the waiting voxels as
+			// they were.
+			std::optional<std::vector<std::pair<IntVector3, std::uint32_t>>> previewedColors;
+			std::optional<PendingPlacement> previewedPlacement;
 			void EndPreviews() noexcept;
 
 			// --- Escape -------------------------------------------------------

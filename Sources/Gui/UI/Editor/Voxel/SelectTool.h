@@ -25,7 +25,8 @@
 namespace spades {
 	namespace gui {
 		// Select voxels: Voxel (single), Box (box region), By Colour. Its bar holds
-		// the commands that act on the selection, clipboard included.
+		// the commands that act on the selection, clipboard included, and the
+		// colour picker recolours what is selected.
 		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
@@ -35,6 +36,11 @@ namespace spades {
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			// A colour chosen on the picker recolours the selection, live while
+			// it is being chosen.
+			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+			                         bool committed) override;
+			std::string Hint(IVoxelEditContext& ed) override;
 
 		private:
 			ToolOptions options;
