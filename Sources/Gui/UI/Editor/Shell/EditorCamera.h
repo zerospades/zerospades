@@ -35,7 +35,8 @@ namespace spades {
 		 * The movement keys (cg_keyMoveForward, ..., cg_keyJump up, cg_keyCrouch
 		 * down, cg_keySprint faster) carry the orbited point, the wheel button
 		 * turns the view round it (panning with Shift), the wheel zooms, and a
-		 * navigation cube click turns it smoothly to look from a side. Each
+		 * navigation cube click turns it smoothly to look from a side, and a
+		 * framing (FlyToFrame, FlyHome) carries it there just as smoothly. Each
 		 * frame `Scene` sets up the scene camera from it and remembers the view
 		 * it made, so picking, projection, panning and gizmos all agree on
 		 * every pixel with what was drawn.
@@ -48,9 +49,18 @@ namespace spades {
 
 			/** Looks at `centre` from far enough to take in a subject `size` across. */
 			void Frame(const Vector3& centre, float size);
+			/** As Frame, but flying there smoothly, still looking from the same
+			 *  angle. */
+			void FlyToFrame(const Vector3& centre, float size);
+			/** As FlyToFrame, also turning to the angle the camera starts at:
+			 *  back to the view a document opens with. */
+			void FlyHome(const Vector3& centre, float size);
 			/** Carries the orbited point by `delta`: with a document relabelled by
 			 *  as much, the view stays where it is on it. */
-			void Shift(const Vector3& delta) { target += delta; }
+			void Shift(const Vector3& delta) {
+				target += delta;
+				flyTarget += delta;
+			}
 
 			// --- Input --------------------------------------------------------
 			/** Follows the modifiers the movement depends on (Control and the
@@ -94,12 +104,21 @@ namespace spades {
 			float ViewDistance() const;
 
 		private:
-			float yaw = -kQuarterPi;
-			float pitch = -kPi * 0.30F;
+			// The angle the camera starts at, and FlyHome turns back to.
+			static constexpr float kHomeYaw = -kQuarterPi;
+			static constexpr float kHomePitch = -kPi * 0.30F;
+
+			float yaw = kHomeYaw;
+			float pitch = kHomePitch;
 			float targetYaw = 0.0F, targetPitch = 0.0F; // a snap animates toward these
 			bool snapping = false;
 			Vector3 target = MakeVector3(0.0F, 0.0F, 0.0F);
 			float distance = 56.0F;
+			// A flight in progress carries `target` and `distance` toward these.
+			// Moving, panning or zooming by hand takes over from it.
+			bool flying = false;
+			Vector3 flyTarget = MakeVector3(0.0F, 0.0F, 0.0F);
+			float flyDistance = 0.0F;
 			bool looking = false;
 
 			bool keyFwd = false, keyBack = false, keyLeft = false, keyRight = false;
@@ -115,6 +134,8 @@ namespace spades {
 
 			Vector3 Forward() const;
 			bool DescendKeyIsActive(float now) const;
+			/** Starts turning smoothly to (`yaw`, `pitch`), the short way round. */
+			void TurnTo(float yaw, float pitch);
 		};
 	} // namespace gui
 } // namespace spades
