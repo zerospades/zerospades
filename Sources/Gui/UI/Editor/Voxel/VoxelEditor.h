@@ -395,6 +395,10 @@ namespace spades {
 			void BrushColorChanged(bool committed);
 			void EndPickerPress(bool commit);
 			void NoteColorUsed(std::uint32_t color);
+			// Puts the colours the document shows most into the picker's recent
+			// row, most used first: a model just opened is one click from its
+			// own palette.
+			void NoteDocumentColors();
 			// Alt+click, or a click while the eyedropper is armed, samples in any tool.
 			bool SamplingArmed() const;
 			bool SampleColor();

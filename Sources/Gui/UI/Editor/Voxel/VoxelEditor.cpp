@@ -24,6 +24,8 @@
 #include <cmath>
 #include <exception>
 #include <limits>
+#include <unordered_map>
+#include <utility>
 
 #include <Client/Fonts.h>
 #include <Client/IFont.h>
@@ -263,6 +265,7 @@ namespace spades {
 			undo.Clear();
 			// The mirror planes start on the new document's pivot.
 			PlaceMirrorPlane(GetPivot());
+			NoteDocumentColors();
 			NotifyDocumentChanged();
 		}
 
@@ -717,6 +720,45 @@ namespace spades {
 
 		void VoxelEditor::NoteColorUsed(std::uint32_t color) {
 			ui.GetColorPicker()->AddRecentColor(color);
+		}
+
+		void VoxelEditor::NoteDocumentColors() {
+			// Only voxels with a face open to the air count: those inside are
+			// never seen, and a solid interior would outweigh every colour
+			// that is.
+			const IntVector3 size = document.Size();
+			std::unordered_map<std::uint32_t, int> uses;
+			for (int x = 0; x < size.x; x++)
+				for (int y = 0; y < size.y; y++)
+					for (int z = 0; z < size.z; z++) {
+						if (!document.IsSolid(x, y, z))
+							continue;
+						bool exposed = false;
+						for (const IntVector3& step : kFaceNeighbours) {
+							const IntVector3 n = MakeIntVector3(x, y, z) + step;
+							if (!InBounds(n.x, n.y, n.z) || !document.IsSolid(n.x, n.y, n.z)) {
+								exposed = true;
+								break;
+							}
+						}
+						if (exposed)
+							uses[document.Color(x, y, z) & 0xFFFFFF]++;
+					}
+
+			std::vector<std::pair<std::uint32_t, int>> ranked(uses.begin(), uses.end());
+			const std::size_t kept =
+			  std::min(ranked.size(), std::size_t(ColorPicker::kRecentSlots));
+			// Most used first; equal counts in colour order, so the row is the
+			// same every time the model is opened.
+			std::partial_sort(ranked.begin(), ranked.begin() + std::ptrdiff_t(kept), ranked.end(),
+			                  [](const std::pair<std::uint32_t, int>& a,
+			                     const std::pair<std::uint32_t, int>& b) {
+				                  return a.second != b.second ? a.second > b.second
+				                                              : a.first < b.first;
+			                  });
+			// Each colour noted goes first in the row, so the most used goes last.
+			for (std::size_t i = kept; i-- > 0;)
+				NoteColorUsed(ranked[i].first);
 		}
 
 		// --- Selection --------------------------------------------------------
