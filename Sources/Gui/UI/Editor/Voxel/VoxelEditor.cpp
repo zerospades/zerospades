@@ -725,6 +725,15 @@ namespace spades {
 			return edit.selection.Contains(MakeIntVector3(x, y, z));
 		}
 
+		bool VoxelEditor::SelectionBounds(IntVector3& lo, IntVector3& hi) const {
+			if (edit.placing) {
+				lo = edit.placement.anchor;
+				hi = lo + edit.placement.Extent() - MakeIntVector3(1, 1, 1);
+				return true;
+			}
+			return edit.selection.Bounds(lo, hi);
+		}
+
 		int VoxelEditor::SelectionCount() const {
 			// While a paste or an import waits it is what the selection commands
 			// act on.

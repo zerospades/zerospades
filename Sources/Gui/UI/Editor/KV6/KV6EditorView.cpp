@@ -89,6 +89,35 @@ namespace spades {
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
+
+			// The view keys: back to the opening view, and frame the selection.
+			// Named as SDL names them (Home), compared ignoring case.
+			const char* const kHomeViewKey = "Home";
+			const char* const kFrameSelectionKey = "F";
+
+			// Whether one of the player's key settings the view acts on (the
+			// camera's, the screenshot key) is bound to `key`; those come before
+			// the view keys.
+			bool BoundToKeySetting(const std::string& key) {
+				const std::string bound[] = {cg_keyMoveForward, cg_keyMoveBackward, cg_keyMoveLeft,
+				                             cg_keyMoveRight,   cg_keyJump,         cg_keyCrouch,
+				                             cg_keySprint,      cg_keyScreenshot};
+				for (const std::string& b : bound) {
+					if (EditorKeyMatches(b, key))
+						return true;
+				}
+				return false;
+			}
+
+			// Where the voxels [lo, hi] are seen whole from: their middle, each
+			// voxel centred on its index, and their largest extent.
+			void BoxFrame(const IntVector3& lo, const IntVector3& hi, Vector3& centre,
+			              float& size) {
+				centre = MakeVector3(float(lo.x + hi.x), float(lo.y + hi.y), float(lo.z + hi.z)) *
+				         0.5F;
+				const IntVector3 extent = hi - lo + MakeIntVector3(1, 1, 1);
+				size = float(std::max(extent.x, std::max(extent.y, extent.z)));
+			}
 		} // namespace
 
 		KV6EditorView::KV6EditorView(client::IRenderer* r, client::IAudioDevice* dev,
@@ -128,9 +157,36 @@ namespace spades {
 		bool KV6EditorView::HasUnsavedChanges() const { return IsDirty() || editor->HasPlacement(); }
 
 		void KV6EditorView::FrameCamera() {
-			const IntVector3 size = document.Size();
-			cam.Frame(MakeVector3(size.x * 0.5F - 0.5F, size.y * 0.5F - 0.5F, size.z * 0.5F - 0.5F),
-			          float(std::max(size.x, std::max(size.y, size.z))));
+			Vector3 centre;
+			float size;
+			BoxFrame(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1), centre,
+			         size);
+			cam.Frame(centre + DocumentOrigin(), size);
+		}
+
+		bool KV6EditorView::ViewKey(const std::string& key) {
+			const IntVector3 last = document.Size() - MakeIntVector3(1, 1, 1);
+			Vector3 centre;
+			float size;
+			if (EqualsIgnoringCase(key, kHomeViewKey)) {
+				BoxFrame(MakeIntVector3(0, 0, 0), last, centre, size);
+				cam.FlyHome(centre + DocumentOrigin(), size);
+				editor->SetStatus("View reset");
+				return true;
+			}
+			if (EqualsIgnoringCase(key, kFrameSelectionKey)) {
+				IntVector3 lo, hi;
+				const bool selected = editor->SelectionBounds(lo, hi);
+				if (!selected) {
+					lo = MakeIntVector3(0, 0, 0);
+					hi = last;
+				}
+				BoxFrame(lo, hi, centre, size);
+				cam.FlyToFrame(centre + DocumentOrigin(), size);
+				editor->SetStatus(selected ? "Framed the selection" : "Framed the model");
+				return true;
+			}
+			return false;
 		}
 
 		void KV6EditorView::NewModel(int n, const std::string& path) {
@@ -324,14 +380,8 @@ namespace spades {
 		// --- Host -------------------------------------------------------------
 
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
-			const std::string bound[] = {cg_keyMoveForward, cg_keyMoveBackward, cg_keyMoveLeft,
-			                             cg_keyMoveRight,   cg_keyJump,         cg_keyCrouch,
-			                             cg_keySprint,      cg_keyScreenshot};
-			for (const std::string& b : bound) {
-				if (EditorKeyMatches(b, key))
-					return true;
-			}
-			return false;
+			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
+			       EqualsIgnoringCase(key, kFrameSelectionKey);
 		}
 
 		bool KV6EditorView::ClickViewportWidget(const Vector2& cursor) {
@@ -439,6 +489,14 @@ namespace spades {
 			keys({cg_keyJump, cg_keyCrouch}, "up/down");
 			keys({cg_keySprint}, "faster");
 			help += "  |  [Wheel] zoom";
+			// A view key that a key setting is bound to does that instead, so it
+			// is not named for what it no longer does.
+			auto viewKey = [&](const char* key, const char* what) {
+				if (!BoundToKeySetting(key))
+					help += std::string("  |  [") + key + "] " + what;
+			};
+			viewKey(kHomeViewKey, "reset view");
+			viewKey(kFrameSelectionKey, "frame selection");
 			return help;
 		}
 
@@ -537,6 +595,8 @@ namespace spades {
 			if (editor->CommandKey(key, down))
 				return;
 			if (cam.MovementKey(key, down, globalTime))
+				return;
+			if (down && !editor->IsCtrlHeld() && ViewKey(key))
 				return;
 			editor->ToolKey(key, down);
 		}

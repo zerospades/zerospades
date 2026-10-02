@@ -125,6 +125,9 @@ namespace spades {
 			EditorCamera cam;
 			NavigationCube naviCube;
 			void FrameCamera();
+			// Home flies back to the view the model opened with, F frames the
+			// selection (or the model); true when `key` was one of them.
+			bool ViewKey(const std::string& key);
 			// The camera's scene for the full screen, lit and outlined for editing.
 			client::SceneDefinition SetupScene(float width, float height);
 
