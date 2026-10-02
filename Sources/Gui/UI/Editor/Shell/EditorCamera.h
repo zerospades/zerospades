@@ -78,6 +78,10 @@ namespace spades {
 			 *  the view. */
 			void SetLooking(bool on) { looking = on; }
 			bool IsLooking() const { return looking; }
+			/** Slides the orbited point along the line of sight to the depth of
+			 *  `point`, leaving the view exactly as it is: the next turn goes
+			 *  round what is there, not round a point left far off by flying. */
+			void OrbitAtDepthOf(const Vector3& point);
 			/** Turns the view round the orbited point by a mouse motion. */
 			void Look(float dx, float dy);
 			/** Slides the view along the screen axes by a mouse motion, so the
