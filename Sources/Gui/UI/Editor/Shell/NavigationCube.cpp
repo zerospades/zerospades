@@ -20,6 +20,7 @@
 
 #include "NavigationCube.h"
 
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
@@ -142,6 +143,12 @@ namespace spades {
 			}
 			// Facets turned further away than this are not drawn or picked.
 			constexpr float kFacingThreshold = 0.02F;
+
+			// The home button: its side in pixels, and its house glyph's half
+			// width as a fraction of that side.
+			constexpr float kHomeSize = 22.0F;
+			constexpr float kHomeGlyph = 0.3F;
+			const Vector4 kHighlight = MakeVector4(0.4F, 0.7F, 1.0F, 0.97F);
 		} // namespace
 
 		void NavigationCube::Layout(float centreX, float centreY, float radius) {
@@ -155,8 +162,45 @@ namespace spades {
 			                   cy - Vector3::Dot(v, view.up) * r);
 		}
 
+		Vector2 NavigationCube::HomeCentre() const {
+			// Beside the cube's top left, clear of the cube in every view but the
+			// corners it reaches looking along a diagonal.
+			return MakeVector2(cx - r - kHomeSize * 0.5F, cy - r + kHomeSize * 0.5F);
+		}
+
+		bool NavigationCube::HomeAt(const Vector2& p) const {
+			const Vector2 c = HomeCentre();
+			const float h = kHomeSize * 0.5F;
+			return std::fabs(p.x - c.x) <= h && std::fabs(p.y - c.y) <= h;
+		}
+
+		void NavigationCube::DrawHome(client::IRenderer& renderer, bool hovered) const {
+			const Vector2 c = HomeCentre();
+			const float h = kHomeSize * 0.5F;
+			const Vector2 box[4] = {c + MakeVector2(-h, -h), c + MakeVector2(h, -h),
+			                        c + MakeVector2(h, h), c + MakeVector2(-h, h)};
+			OverlayFillConvexPolygon(renderer, box, 4,
+			                         hovered ? kHighlight : MakeVector4(0.2F, 0.21F, 0.24F, 0.92F));
+			const Vector4 ec = MakeVector4(0.08F, 0.08F, 0.1F, 0.85F);
+			for (int e = 0; e < 4; e++)
+				OverlayStrokeLine(renderer, box[e], box[(e + 1) % 4], 1.0F, ec);
+
+			// A house: a roof over a square body.
+			const float g = kHomeSize * kHomeGlyph;
+			const Vector4 ink = MakeVector4(0.92F, 0.92F, 0.95F, 1.0F);
+			const Vector2 roof[3] = {c + MakeVector2(0.0F, -g), c + MakeVector2(g, -g * 0.1F),
+			                         c + MakeVector2(-g, -g * 0.1F)};
+			OverlayFillConvexPolygon(renderer, roof, 3, ink);
+			const float b = g * 0.65F;
+			const Vector2 body[4] = {c + MakeVector2(-b, -g * 0.1F), c + MakeVector2(b, -g * 0.1F),
+			                         c + MakeVector2(b, g), c + MakeVector2(-b, g)};
+			OverlayFillConvexPolygon(renderer, body, 4, ink);
+		}
+
 		bool NavigationCube::DirectionAt(const GizmoView& view, const Vector2& p,
 		                                 Vector3& dir) const {
+			if (HomeAt(p))
+				return false; // the button is over the cube
 			for (const NaviFacet& f : NaviFacets()) {
 				if (-Vector3::Dot(f.dir, view.forward) <= kFacingThreshold)
 					continue; // back-facing
@@ -193,7 +237,7 @@ namespace spades {
 					float sh = 0.45F + 0.55F * facing;
 					Vector4 base = isFace ? AxisTint(f.tint) : MakeVector4(0.5F, 0.52F, 0.56F, 1.0F);
 					bool hl = hov && Vector3::Dot(hdir, f.dir) > 0.999F;
-					Vector4 col = hl ? MakeVector4(0.4F, 0.7F, 1.0F, 0.97F)
+					Vector4 col = hl ? kHighlight
 					                 : MakeVector4(base.x * sh, base.y * sh, base.z * sh, 0.97F);
 					// Each facet is one convex polygon so its whole outline is
 					// anti-aliased; the seams it leaves against its neighbours are
@@ -217,6 +261,7 @@ namespace spades {
 				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
 				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.8F));
 			}
+			DrawHome(renderer, HomeAt(cursor));
 		}
 	} // namespace gui
 } // namespace spades
