@@ -569,6 +569,16 @@ namespace spades {
 			}
 
 			if (key == "MiddleMouseButton") {
+				// Turning and panning go round the voxel under the cursor, wherever
+				// flying has left the orbited point.
+				if (down) {
+					editor->DoPick();
+					if (editor->HasPick()) {
+						const IntVector3 v = editor->PickSolid();
+						cam.OrbitAtDepthOf(MakeVector3(float(v.x), float(v.y), float(v.z)) +
+						                   DocumentOrigin());
+					}
+				}
 				cam.SetLooking(down);
 				return;
 			}

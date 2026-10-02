@@ -127,6 +127,20 @@ namespace spades {
 			keyDown = false;
 		}
 
+		void EditorCamera::OrbitAtDepthOf(const Vector3& point) {
+			const Vector3 fwd = Forward();
+			const Vector3 eye = target - fwd * distance;
+			const float depth = Vector3::Dot(point - eye, fwd);
+			// Nothing in front of the eye to turn round.
+			if (!std::isfinite(depth) || depth <= 0.0F)
+				return;
+			// The eye stays put; only how far ahead of it the orbited point lies
+			// changes, so nothing on screen moves.
+			distance = std::max(kMinDistance, std::min(kMaxDistance, depth));
+			target = eye + fwd * distance;
+			flying = false;
+		}
+
 		void EditorCamera::Look(float dx, float dy) {
 			snapping = false; // turning by hand cancels a snap
 			yaw += dx * kLookSensitivity;
