@@ -58,8 +58,11 @@ namespace spades {
 			constexpr float kMaxDistance = 1000.0F;
 			// Radians turned per pixel of mouse motion while looking.
 			constexpr float kLookSensitivity = 0.003F;
-			// How fast a snap closes on its target, per second.
+			// How fast a snap or a flight closes on its target, per second.
 			constexpr float kSnapRate = 12.0F;
+			// A flight lands once within this fraction of its distance of where it
+			// is going: far below a voxel at any framing.
+			constexpr float kFlyLandingFraction = 1.0e-3F;
 			constexpr float kVerticalFovDegrees = 60.0F;
 
 			// Whether the descend binding is Control, which also opens shortcuts.
@@ -69,6 +72,19 @@ namespace spades {
 		void EditorCamera::Frame(const Vector3& centre, float size) {
 			target = centre;
 			distance = std::max(kMinDistance, size * kFrameDistancePerSize);
+			flying = false;
+		}
+
+		void EditorCamera::FlyToFrame(const Vector3& centre, float size) {
+			flyTarget = centre;
+			flyDistance =
+			  std::max(kMinDistance, std::min(kMaxDistance, size * kFrameDistancePerSize));
+			flying = true;
+		}
+
+		void EditorCamera::FlyHome(const Vector3& centre, float size) {
+			TurnTo(kHomeYaw, kHomePitch);
+			FlyToFrame(centre, size);
 		}
 
 		Vector3 EditorCamera::Forward() const {
@@ -126,9 +142,11 @@ namespace spades {
 			// the cursor follows the drag at any zoom level.
 			float unitsPerPixel = view.WorldPerPixel(target);
 			target += view.right * (-dx * unitsPerPixel) + view.up * (dy * unitsPerPixel);
+			flying = false;
 		}
 
 		void EditorCamera::Zoom(float wheel) {
+			flying = false;
 			distance = std::max(kMinDistance, std::min(kMaxDistance, distance * (1.0F + wheel * 0.1F)));
 		}
 
@@ -142,6 +160,10 @@ namespace spades {
 				tp = asinf(-f.z);
 				ty = atan2f(f.y, f.x);
 			}
+			TurnTo(ty, tp);
+		}
+
+		void EditorCamera::TurnTo(float ty, float tp) {
 			// Shortest angular path for yaw.
 			while (ty - yaw > kPi) ty -= kTwoPi;
 			while (ty - yaw < -kPi) ty += kTwoPi;
@@ -178,6 +200,20 @@ namespace spades {
 					snapping = false;
 				}
 			}
+			// Carry the view toward a framing; the distance closes in proportion,
+			// so a long way out reads as fast as a short one.
+			if (flying) {
+				float k = std::min(1.0F, dt * kSnapRate);
+				target += (flyTarget - target) * k;
+				distance *= powf(flyDistance / distance, k);
+				const float landing = flyDistance * kFlyLandingFraction;
+				if ((flyTarget - target).GetLength() < landing &&
+				    std::fabs(flyDistance - distance) < landing) {
+					target = flyTarget;
+					distance = flyDistance;
+					flying = false;
+				}
+			}
 			if (!moving)
 				return;
 
@@ -204,7 +240,10 @@ namespace spades {
 			};
 
 			Vector3 delta = displacement(true);
-			// Moving the orbited point carries the whole view along with it.
+			// Moving the orbited point carries the whole view along with it, and
+			// takes over from a flight.
+			if (delta.x != 0.0F || delta.y != 0.0F || delta.z != 0.0F)
+				flying = false;
 			target += delta;
 
 			// While Ctrl is both the descend key and held, remember how far the
