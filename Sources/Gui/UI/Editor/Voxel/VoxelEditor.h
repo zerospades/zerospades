@@ -198,6 +198,7 @@ namespace spades {
 			bool IsSelected(int x, int y, int z) const override;
 			void ClearSelection() override;
 			void DeleteSelection() override;
+			void RecolorSelection(std::uint32_t color) override;
 			int SelectionCount() const override;
 			std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const override;
 			void SelectAll() override;

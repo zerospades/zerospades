@@ -27,6 +27,7 @@ namespace spades {
 			const char* const kSelectAllOption = "select.all";
 			const char* const kClearSelectionOption = "select.clear";
 			const char* const kDeleteSelectionOption = "select.delete";
+			const char* const kFillSelectionOption = "select.fill";
 			const char* const kCopyOption = "clipboard.copy";
 			const char* const kCutOption = "clipboard.cut";
 			const char* const kPasteOption = "clipboard.paste";
@@ -53,6 +54,7 @@ namespace spades {
 			options.AddAction(kSelectAllOption, "Select All");
 			options.AddAction(kClearSelectionOption, "Select None");
 			options.AddAction(kDeleteSelectionOption, "Delete");
+			options.AddAction(kFillSelectionOption, "Fill");
 			options.AddAction(kCopyOption, "Copy", "Clipboard");
 			options.AddAction(kCutOption, "Cut", "Clipboard");
 			options.AddAction(kPasteOption, "Paste", "Clipboard");
@@ -64,6 +66,7 @@ namespace spades {
 			const bool selected = ed.SelectionCount() > 0;
 			options.SetEnabled(kClearSelectionOption, selected);
 			options.SetEnabled(kDeleteSelectionOption, selected);
+			options.SetEnabled(kFillSelectionOption, selected);
 			options.SetEnabled(kCopyOption, selected);
 			options.SetEnabled(kCutOption, selected);
 			options.SetEnabled(kPasteOption, ed.CanPaste());
@@ -78,6 +81,8 @@ namespace spades {
 				ed.SetStatus("Selected " + std::to_string(ed.SelectionCount()) + " voxels");
 			} else if (id == kDeleteSelectionOption) {
 				ed.DeleteSelection(); // reports what it removed, or why not
+			} else if (id == kFillSelectionOption) {
+				ed.RecolorSelection(ed.CurrentColor());
 			} else if (id == kClearSelectionOption) {
 				int count = ed.SelectionCount();
 				ed.ClearSelection();
