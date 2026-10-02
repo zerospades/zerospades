@@ -164,14 +164,21 @@ namespace spades {
 			cam.Frame(centre + DocumentOrigin(), size);
 		}
 
+		void KV6EditorView::ResetView() {
+			Vector3 centre;
+			float size;
+			BoxFrame(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1), centre,
+			         size);
+			cam.FlyHome(centre + DocumentOrigin(), size);
+			editor->SetStatus("View reset");
+		}
+
 		bool KV6EditorView::ViewKey(const std::string& key) {
 			const IntVector3 last = document.Size() - MakeIntVector3(1, 1, 1);
 			Vector3 centre;
 			float size;
 			if (EqualsIgnoringCase(key, kHomeViewKey)) {
-				BoxFrame(MakeIntVector3(0, 0, 0), last, centre, size);
-				cam.FlyHome(centre + DocumentOrigin(), size);
-				editor->SetStatus("View reset");
+				ResetView();
 				return true;
 			}
 			if (EqualsIgnoringCase(key, kFrameSelectionKey)) {
@@ -385,6 +392,10 @@ namespace spades {
 		}
 
 		bool KV6EditorView::ClickViewportWidget(const Vector2& cursor) {
+			if (naviCube.HomeAt(cursor)) {
+				ResetView();
+				return true;
+			}
 			Vector3 navDir;
 			if (!naviCube.DirectionAt(cam.View(), cursor, navDir))
 				return false;
