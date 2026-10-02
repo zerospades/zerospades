@@ -214,7 +214,31 @@ namespace spades {
 					picker.Open();
 				}
 			};
-			ui.GetColorPicker()->OnColorChanged = [this](std::uint32_t c) { currentColor = c; };
+			// The active tool follows the colour as it is chosen (Select
+			// recolours the selection with it), live while the picker is pressed.
+			ui.GetColorPicker()->OnColorChanged = [this](std::uint32_t c) {
+				currentColor = c;
+				if (pickerHeld)
+					pickerChangedColor = true;
+				BrushColorChanged(!pickerHeld);
+			};
+		}
+
+		void VoxelEditor::BrushColorChanged(bool committed) {
+			if (VoxelTool* t = ActiveTool())
+				t->OnBrushColorChanged(*this, currentColor, committed);
+		}
+
+		void VoxelEditor::EndPickerPress(bool commit) {
+			pickerHeld = false;
+			ui.GetColorPicker()->MouseUp();
+			const bool changed = pickerChangedColor;
+			pickerChangedColor = false;
+			// A press of the other button began the action this one joined, and
+			// ends it on its own release.
+			UserActionEnd end(*this, !rmbHeld);
+			if (commit && changed)
+				BrushColorChanged(true);
 		}
 
 		float VoxelEditor::RibbonHeight() { return kRibbonH; }
@@ -233,6 +257,9 @@ namespace spades {
 			movedMiddle = SelectionMiddle();
 			previewedOrigin.reset();
 			previewedMirrorPlane.reset();
+			// What a live recolour painted over was the old document's.
+			previewedColors.reset();
+			previewedPlacement.reset();
 			undo.Clear();
 			// The mirror planes start on the new document's pivot.
 			PlaceMirrorPlane(GetPivot());
@@ -849,6 +876,32 @@ namespace spades {
 			if (recolored > 0)
 				NoteColorUsed(rgb);
 			SetStatus("Recoloured " + std::to_string(recolored) + " voxels");
+		}
+
+		// Live, non-journaled recolour for a colour still being chosen; the tool
+		// commits the final one with RecolorSelection, which puts this back first.
+		void VoxelEditor::PreviewRecolorSelection(std::uint32_t color) {
+			if (SelectionCount() == 0)
+				return;
+			const std::uint32_t rgb = color & 0xFFFFFF;
+			if (edit.placing) {
+				if (!previewedPlacement)
+					previewedPlacement = edit.placement; // shares the voxels until edited
+				for (ClipVoxel& v : edit.placement.voxels.Edit())
+					v.color = rgb;
+				return;
+			}
+			if (!previewedColors) {
+				previewedColors.emplace();
+				edit.selection.ForEach([&](const IntVector3& v) {
+					if (Editable(v.x, v.y, v.z) && document.IsSolid(v.x, v.y, v.z))
+						previewedColors->emplace_back(v, document.Color(v.x, v.y, v.z));
+				});
+			}
+			for (const auto& voxel : *previewedColors) {
+				const IntVector3& v = voxel.first;
+				document.Write(v.x, v.y, v.z, true, rgb);
+			}
 		}
 
 		bool VoxelEditor::CanEraseSelection() {
@@ -1718,6 +1771,10 @@ namespace spades {
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
+			// A colour being chosen is abandoned like a drag: its live recolour
+			// is put back, and the colour stays the brush colour.
+			if (pickerHeld)
+				EndPickerPress(false);
 			if (VoxelTool* t = ActiveTool())
 				t->CancelInteraction(*this);
 			EndUserAction(); // whatever comes next is a separate step
@@ -1736,6 +1793,17 @@ namespace spades {
 			if (previewedMirrorPlane) {
 				edit.mirror.plane = *previewedMirrorPlane;
 				previewedMirrorPlane.reset();
+			}
+			if (previewedColors) {
+				for (const auto& voxel : *previewedColors) {
+					const IntVector3& v = voxel.first;
+					document.Write(v.x, v.y, v.z, true, voxel.second);
+				}
+				previewedColors.reset();
+			}
+			if (previewedPlacement) {
+				edit.placement = std::move(*previewedPlacement);
+				previewedPlacement.reset();
 			}
 		}
 
@@ -1807,6 +1875,8 @@ namespace spades {
 			if (button == PointerButton::Left) {
 				if (!down) {
 					ui.GetColorPicker()->MouseUp();
+					if (pickerHeld)
+						EndPickerPress(true);
 					if (lmbHeld) {
 						lmbHeld = false;
 						DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Up));
@@ -1822,6 +1892,12 @@ namespace spades {
 				// The open picker owns every press on its panel, gaps included, so
 				// nothing behind it is ever edited through it.
 				if (ui.GetColorPicker()->IsOverPicker(at)) {
+					// The press is one user action, ended by its release, so a drag
+					// across the colours undoes as one step, whatever it recoloured.
+					if (!rmbHeld)
+						undo.BeginAction();
+					pickerHeld = true;
+					pickerChangedColor = false;
 					ui.GetColorPicker()->MouseDown(at);
 					return;
 				}

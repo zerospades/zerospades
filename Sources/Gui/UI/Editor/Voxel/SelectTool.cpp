@@ -96,5 +96,22 @@ namespace spades {
 				ed.Paste();
 			}
 		}
+
+		void SelectTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+		                                     bool committed) {
+			if (ed.SelectionCount() == 0)
+				return;
+			if (committed)
+				ed.RecolorSelection(color);
+			else
+				ed.PreviewRecolorSelection(color);
+		}
+
+		std::string SelectTool::Hint(IVoxelEditContext& ed) {
+			std::string hint = ContainerTool::Hint(ed);
+			if (ed.SelectionCount() > 0)
+				hint += std::string(hint.empty() ? "" : "  |  ") + "colour picker recolours the selection";
+			return hint;
+		}
 	} // namespace gui
 } // namespace spades
