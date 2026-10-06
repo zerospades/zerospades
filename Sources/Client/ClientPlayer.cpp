@@ -1363,6 +1363,16 @@ namespace spades {
 				renderer.RenderModel(*model, param);
 			}
 
+			// Headlamp, shown while the flashlight is lit
+			if (p.IsFlashlightOn()) {
+				model = renderer.RegisterModel("Models/Player/Headlamp.kv6");
+
+				param.matrix = head * scaler
+					* Matrix4::Translate(0.0F, 0.0F, -1.0F)
+					* Matrix4::Scale(0.55F);
+				renderer.RenderModel(*model, param);
+			}
+
 			// Tool
 			{
 				ScriptIThirdPersonToolSkin interface(curSkin);
