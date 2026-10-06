@@ -98,6 +98,18 @@ namespace spades {
 			bool IsLampBuried(const Vector3& lightOrigin);
 
 			/**
+			 * Where the flashlight emits from for a view whose eye is at `eye`: above
+			 * it at the height of the headlamp model as the third-person head wears it.
+			 */
+			Vector3 GetFlashlightOrigin(const Vector3& eye);
+
+			/** Where the glare shows: on the front of the headlamp worn by `head`. */
+			Vector3 GetHeadlampLens(const Matrix4& head);
+
+			/** The headlamp model's bounds, in its own voxels. */
+			AABB3 GetHeadlampBounds();
+
+			/**
 			 * Emit this player's flashlight from `lightOrigin`, if it should be lit
 			 * at all. Shared by the first- and third-person paths, which differ only
 			 * in where the lamp sits.

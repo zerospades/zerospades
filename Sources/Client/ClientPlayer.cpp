@@ -79,13 +79,23 @@ namespace spades {
 			const float kMaxFlashlightConeAngle = DEG2RAD(179.0F);
 
 			/**
-			 * Where the lamp sits in the third-person head's frame, in blocks: on the
-			 * front of the head, halfway between the eyes and its top. Every head model
-			 * has its front 3.5 voxels ahead of the pivot there, its eyes 2 voxels
-			 * above the pivot and its top 5.5; the frame's front is -Y and its up is
-			 * -Z. Just proud of the front, so the voxels don't swallow it.
+			 * How far the glare sits ahead of the headlamp model's front face, in the
+			 * model's voxels, so the voxels don't swallow it.
 			 */
-			const Vector3 kHeadLampOffset = MakeVector3(0.0F, -0.36F, -0.375F);
+			const float kHeadlampLensClearance = 0.5F;
+
+			/** How far above the lower body's origin the torso is posed, in blocks. */
+			float TorsoHeight(bool crouch) { return crouch ? 0.5F : 1.0F; }
+
+			/** How far below the torso's top the head is posed, in blocks. */
+			float HeadDrop(bool crouch) { return crouch ? 0.05F : 0.0F; }
+
+			/** Places the headlamp model on the third-person head, in the head's frame. */
+			Matrix4 HeadlampModelMatrix() {
+				return Matrix4::Scale(0.1F) * Matrix4::Scale(-1, -1, 1)
+					* Matrix4::Translate(0.0F, 0.0F, -1.0F)
+					* Matrix4::Scale(0.55F);
+			}
 		} // namespace
 
 		class SandboxedRenderer : public IRenderer {
@@ -730,6 +740,41 @@ namespace spades {
 			return map->IsSolidWrapped(block.x, block.y, block.z);
 		}
 
+		Vector3 ClientPlayer::GetFlashlightOrigin(const Vector3& eye) {
+			Player& p = player;
+			bool const crouch = p.GetInput().crouch;
+
+			Vector3 o = p.GetFront(cg_orientationSmoothing);
+			float yaw = atan2f(o.y, o.x) + kHalfPi;
+			float pitch = -atan2f(o.z, o.GetLength2D());
+
+			// The head as the third-person body poses it
+			Matrix4 const head = Matrix4::Translate(p.GetOrigin())
+				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw)
+				* Matrix4::Translate(0.0F, 0.0F, -(TorsoHeight(crouch) + HeadDrop(crouch)))
+				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
+
+			AABB3 const bounds = GetHeadlampBounds();
+			Vector3 const centre = (bounds.min + bounds.max) * 0.5F;
+			float const lampZ = (head * HeadlampModelMatrix() * centre).z;
+
+			return MakeVector3(eye.x, eye.y, eye.z + (lampZ - p.GetEye().z));
+		}
+
+		Vector3 ClientPlayer::GetHeadlampLens(const Matrix4& head) {
+			// The model's front is +Y, which the head's frame turns to face forward
+			AABB3 const bounds = GetHeadlampBounds();
+			Vector3 const lens = MakeVector3((bounds.min.x + bounds.max.x) * 0.5F,
+				bounds.max.y + kHeadlampLensClearance,
+				(bounds.min.z + bounds.max.z) * 0.5F);
+			return (head * HeadlampModelMatrix() * lens).GetXYZ();
+		}
+
+		AABB3 ClientPlayer::GetHeadlampBounds() {
+			Handle<IModel> model = client.GetRenderer().RegisterModel("Models/Player/Headlamp.kv6");
+			return model->GetBoundingBox();
+		}
+
 		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
 			Player& p = player;
 			IRenderer& renderer = client.GetRenderer();
@@ -818,7 +863,7 @@ namespace spades {
 			sandboxedRenderer->SetPlayerXRay(false, MakeVector3(1, 1, 1));
 
 			// This path also runs for a remote player the camera is following.
-			AddFlashlightToScene(eyeMatrix.GetOrigin());
+			AddFlashlightToScene(GetFlashlightOrigin(eyeMatrix.GetOrigin()));
 
 			Vector3 leftHand, rightHand;
 			leftHand = MakeVector3(0, 0, 0);
@@ -1050,7 +1095,7 @@ namespace spades {
 			float const legsPosX = 0.25F;
 			float const legsPosY = inp.crouch ? 1.25F : 1.0F;
 			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
-			float const torsoPosZ = inp.crouch ? 0.5F : 1.0F;
+			float const torsoPosZ = TorsoHeight(inp.crouch);
 
 			Vector2 legsRot;
 			legsRot.x = Vector3::Dot(vel, p.GetFront2D());
@@ -1244,8 +1289,8 @@ namespace spades {
 			float const legsPosX = 0.25F;
 			float const legsPosY = inp.crouch ? 0.25F : 0.0F;
 			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
-			float const headPosZ = inp.crouch ? 0.05F : 0.0F;
-			float const torsoPosZ = inp.crouch ? 0.5F : 1.0F;
+			float const headPosZ = HeadDrop(inp.crouch);
+			float const torsoPosZ = TorsoHeight(inp.crouch);
 			float const armsPosZ = inp.crouch ? 0.0F : 0.1F;
 
 			float armPitch = pitch;
@@ -1367,9 +1412,7 @@ namespace spades {
 			if (p.IsFlashlightOn()) {
 				model = renderer.RegisterModel("Models/Player/Headlamp.kv6");
 
-				param.matrix = head * scaler
-					* Matrix4::Translate(0.0F, 0.0F, -1.0F)
-					* Matrix4::Scale(0.55F);
+				param.matrix = head * HeadlampModelMatrix();
 				renderer.RenderModel(*model, param);
 			}
 
@@ -1403,13 +1446,14 @@ namespace spades {
 				}
 			}
 
-			// Emit from the eye, so the lamp matches the first-person one and doesn't
-			// shift when the observer changes camera mode or the player crouches.
-			if (!IsLampBuried(p.GetEye()))
-				AddFlashlightToScene(p.GetEye());
+			// Emit at the headlamp's height above the eye, as the first-person view
+			// does, so the beam doesn't shift when the observer changes camera mode.
+			Vector3 const lightOrigin = GetFlashlightOrigin(p.GetEye());
+			if (!IsLampBuried(lightOrigin))
+				AddFlashlightToScene(lightOrigin);
 
-			// The lamp itself is seen on the face of the head as drawn, though.
-			UpdateFlashlightGlare((head * kHeadLampOffset).GetXYZ());
+			// The lamp itself is seen on the front of the headlamp as drawn, though.
+			UpdateFlashlightGlare(GetHeadlampLens(head));
 
 			// third person player rendering, done
 		}
