@@ -1,324 +1,324 @@
-#: Sources/Client/Client.cpp:185 Sources/Client/Client.cpp:1220
+#: Sources/Client/Client.cpp:186 Sources/Client/Client.cpp:1221
 #: Sources/Client/Client_NetHandler.cpp:407
 #: Sources/Gui/UI/Components/LimboMenu.cpp:66
 msgctxt "Client"
 msgid "Spectator"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1179
+#: Sources/Client/Client.cpp:1180
 #, c++-format
 msgctxt "Client"
 msgid "Map saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1183 Sources/Client/Client.cpp:1188
+#: Sources/Client/Client.cpp:1184 Sources/Client/Client.cpp:1189
 msgctxt "Client"
 msgid "Saving map failed: "
 msgstr ""
 
-#: Sources/Client/Client.cpp:1217 Sources/Gui/UI/InGame/ChatWindow.cpp:224
+#: Sources/Client/Client.cpp:1218 Sources/Gui/UI/InGame/ChatWindow.cpp:224
 msgctxt "Client"
 msgid "Global"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1217 Sources/Gui/UI/InGame/ChatWindow.cpp:234
+#: Sources/Client/Client.cpp:1218 Sources/Gui/UI/InGame/ChatWindow.cpp:234
 msgctxt "Client"
 msgid "Team"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1227
+#: Sources/Client/Client.cpp:1228
 msgctxt "Client"
 msgid "(DEAD)"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1229
+#: Sources/Client/Client.cpp:1230
 msgctxt "Client"
 msgid "(SPEC)"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1237 Sources/Client/Client.cpp:1264
+#: Sources/Client/Client.cpp:1238 Sources/Client/Client.cpp:1265
 msgctxt "Client"
 msgid "[Global]"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1310
+#: Sources/Client/Client.cpp:1311
 msgctxt "Client"
 msgid "The server"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1408
+#: Sources/Client/Client.cpp:1446
 msgctxt "Client"
 msgid "This server does not allow team pings."
 msgstr ""
 
-#: Sources/Client/Client.cpp:1463
+#: Sources/Client/Client.cpp:1501
 msgctxt "Client"
 msgid "[PM] "
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:132
+#: Sources/Client/Client_Draw.cpp:135
 msgctxt "Client"
 msgid "Unbound"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:178
+#: Sources/Client/Client_Draw.cpp:181
 #, c++-format
 msgctxt "Client"
 msgid "Sceneshot saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:179
+#: Sources/Client/Client_Draw.cpp:182
 #, c++-format
 msgctxt "Client"
 msgid "Screenshot saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:184 Sources/Client/Client_Draw.cpp:189
+#: Sources/Client/Client_Draw.cpp:187 Sources/Client/Client_Draw.cpp:192
 msgctxt "Client"
 msgid "Screenshot failed: "
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:227
+#: Sources/Client/Client_Draw.cpp:230
 msgctxt "Client"
 msgid "NOW LOADING"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1085
+#: Sources/Client/Client_Draw.cpp:1088
 msgctxt "Client"
 msgid "YOU ARE MARKED"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1449
+#: Sources/Client/Client_Draw.cpp:1486
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Grab color"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1450
+#: Sources/Client/Client_Draw.cpp:1487
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1452
+#: Sources/Client/Client_Draw.cpp:1489
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate left/right"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1454
+#: Sources/Client/Client_Draw.cpp:1491
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle extended palette"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1462
+#: Sources/Client/Client_Draw.cpp:1499
 #, c++-format
 msgctxt "Client"
 msgid "#{0} / RGB({1}, {2}, {3})"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1511
+#: Sources/Client/Client_Draw.cpp:1548
 #, c++-format
 msgctxt "Client"
 msgid "Accuracy: {0}%"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1515
+#: Sources/Client/Client_Draw.cpp:1552
 #, c++-format
 msgctxt "Client"
 msgid "Kill/Death Ratio: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1516
+#: Sources/Client/Client_Draw.cpp:1553
 #, c++-format
 msgctxt "Client"
 msgid "Kill Streak: {0}, Best: {1}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1517
+#: Sources/Client/Client_Draw.cpp:1554
 #, c++-format
 msgctxt "Client"
 msgid "Melee Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1518
+#: Sources/Client/Client_Draw.cpp:1555
 #, c++-format
 msgctxt "Client"
 msgid "Grenade Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1521
+#: Sources/Client/Client_Draw.cpp:1558
 #, c++-format
 msgctxt "Client"
 msgid "Blocks Placed: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1854
+#: Sources/Client/Client_Draw.cpp:1891
 msgctxt "Client"
 msgid "Reloading"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1862
+#: Sources/Client/Client_Draw.cpp:1899
 #, c++-format
 msgctxt "Client"
 msgid "Press [{0}] to Reload"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2016
+#: Sources/Client/Client_Draw.cpp:2053
 #, c++-format
 msgctxt "Client"
 msgid "You will respawn in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2017
+#: Sources/Client/Client_Draw.cpp:2054
 msgctxt "Client"
 msgid "Waiting for respawn"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2093
+#: Sources/Client/Client_Draw.cpp:2130
 #, c++-format
 msgctxt "Client"
 msgid "Following {0} [#{1}]"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2098
+#: Sources/Client/Client_Draw.cpp:2135
 #, c++-format
 msgctxt "Client"
 msgid "Respawning in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2103
+#: Sources/Client/Client_Draw.cpp:2140
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Cycle camera mode"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2104
+#: Sources/Client/Client_Draw.cpp:2141
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Next/Prev player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2107
+#: Sources/Client/Client_Draw.cpp:2144
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Unfollow"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2110
+#: Sources/Client/Client_Draw.cpp:2147
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Follow a player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2115
+#: Sources/Client/Client_Draw.cpp:2152
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Go up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2117
+#: Sources/Client/Client_Draw.cpp:2154
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Hold to Zoom"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2121
+#: Sources/Client/Client_Draw.cpp:2158
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle player names"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2124
+#: Sources/Client/Client_Draw.cpp:2161
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle ESP"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2132
+#: Sources/Client/Client_Draw.cpp:2169
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Resume"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2133
+#: Sources/Client/Client_Draw.cpp:2170
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Pause"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2134
+#: Sources/Client/Client_Draw.cpp:2171
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Seek +/-5s"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2139
+#: Sources/Client/Client_Draw.cpp:2176
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Speed: {2}x"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2141
+#: Sources/Client/Client_Draw.cpp:2178
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle Demo HUD"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2143
+#: Sources/Client/Client_Draw.cpp:2180
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Select Team/Weapon"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2209
+#: Sources/Client/Client_Draw.cpp:2246
 msgctxt "Client"
 msgid "N"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2209
+#: Sources/Client/Client_Draw.cpp:2246
 msgctxt "Client"
 msgid "NE"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2210
+#: Sources/Client/Client_Draw.cpp:2247
 msgctxt "Client"
 msgid "E"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2210
+#: Sources/Client/Client_Draw.cpp:2247
 msgctxt "Client"
 msgid "SE"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2211
+#: Sources/Client/Client_Draw.cpp:2248
 msgctxt "Client"
 msgid "S"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2211
+#: Sources/Client/Client_Draw.cpp:2248
 msgctxt "Client"
 msgid "SW"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2212
+#: Sources/Client/Client_Draw.cpp:2249
 msgctxt "Client"
 msgid "W"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2212
+#: Sources/Client/Client_Draw.cpp:2249
 msgctxt "Client"
 msgid "NW"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2699
+#: Sources/Client/Client_Draw.cpp:2736
 #, c++-format
 msgctxt "Client"
 msgid "Connecting to {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2705
+#: Sources/Client/Client_Draw.cpp:2742
 msgctxt "Client"
 msgid "[Esc] Cancel"
 msgstr ""
@@ -593,53 +593,53 @@ msgctxt "Client"
 msgid "You have killed {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1589
+#: Sources/Client/Client_Update.cpp:1573
 #, c++-format
 msgctxt "Client"
 msgid "You hit {0} from: {1} blocks "
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1609
+#: Sources/Client/Client_Update.cpp:1593
 msgctxt "Client"
 msgid "TORSO"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1610
+#: Sources/Client/Client_Update.cpp:1594
 msgctxt "Client"
 msgid "ARMS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1611
+#: Sources/Client/Client_Update.cpp:1595
 msgctxt "Client"
 msgid "LEGS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1612
+#: Sources/Client/Client_Update.cpp:1596
 msgctxt "Client"
 msgid "MELEE"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1613
+#: Sources/Client/Client_Update.cpp:1597
 msgctxt "Client"
 msgid "HEAD"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1947
+#: Sources/Client/Client_Update.cpp:1926
 msgctxt "Client"
 msgid "You are taking damage. Find solid ground!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1965
+#: Sources/Client/Client_Update.cpp:1944
 msgctxt "Client"
 msgid "Insufficient blocks."
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1968
+#: Sources/Client/Client_Update.cpp:1947
 msgctxt "Client"
 msgid "You cannot place a block there."
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:103 Sources/Client/NetClient.cpp:320
+#: Sources/Client/DemoNetClient.cpp:103 Sources/Client/NetClient.cpp:321
 msgctxt "NetClient"
 msgid "Not connected"
 msgstr ""
@@ -682,78 +682,78 @@ msgctxt "NetClient"
 msgid "Loading map from demo ({0}%)"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:309
+#: Sources/Client/NetClient.cpp:310
 msgctxt "NetClient"
 msgid "Connecting to the server"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:442
+#: Sources/Client/NetClient.cpp:445
 msgctxt "NetClient"
 msgid "Awaiting for state"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:458 Sources/Client/NetClient.cpp:1334
+#: Sources/Client/NetClient.cpp:461 Sources/Client/NetClient.cpp:1359
 msgctxt "NetClient"
 msgid "Loading snapshot"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:504
+#: Sources/Client/NetClient.cpp:507
 msgctxt "NetClient"
 msgid "Connected"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:513 Sources/Client/NetClient.cpp:518
+#: Sources/Client/NetClient.cpp:516 Sources/Client/NetClient.cpp:521
 msgctxt "NetClient"
 msgid "Error"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:598
+#: Sources/Client/NetClient.cpp:601
 msgctxt "NetClient"
 msgid "You are banned from this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:599
+#: Sources/Client/NetClient.cpp:602
 msgctxt "NetClient"
 msgid "Your network's public address has too many connections to this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:600
+#: Sources/Client/NetClient.cpp:603
 msgctxt "NetClient"
 msgid "Incompatible client protocol version."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:601
+#: Sources/Client/NetClient.cpp:604
 msgctxt "NetClient"
 msgid "Server full"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:602
+#: Sources/Client/NetClient.cpp:605
 msgctxt "NetClient"
 msgid "Server shutdown"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:603
+#: Sources/Client/NetClient.cpp:606
 msgctxt "NetClient"
 msgid "You were kicked from this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:604
+#: Sources/Client/NetClient.cpp:607
 msgctxt "NetClient"
 msgid "Invalid name"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:605
+#: Sources/Client/NetClient.cpp:608
 msgctxt "NetClient"
 msgid "Unknown Reason"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:616
+#: Sources/Client/NetClient.cpp:620
 #, c++-format
 msgctxt "NetClient"
 msgid "Unknown (ID {0})"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:2013
+#: Sources/Client/NetClient.cpp:2038
 #, c++-format
 msgctxt "NetClient"
 msgid "{0} second remaining"
@@ -761,7 +761,7 @@ msgid_plural "{0} seconds remaining"
 msgstr[0] ""
 msgstr[1] ""
 
-#: Sources/Client/NetClient.cpp:2016
+#: Sources/Client/NetClient.cpp:2041
 #, c++-format
 msgctxt "NetClient"
 msgid "{0} minute remaining"
@@ -799,12 +799,12 @@ msgctxt "ServerAddress"
 msgid "Localhost"
 msgstr ""
 
-#: Sources/Gui/Main.cpp:976
+#: Sources/Gui/Main.cpp:982
 msgctxt "Main"
 msgid "Localization System Loaded"
 msgstr ""
 
-#: Sources/Gui/Main.cpp:1054 Sources/Gui/Runner.cpp:56
+#: Sources/Gui/Main.cpp:1060 Sources/Gui/Runner.cpp:56
 #, c++-format
 msgctxt "Main"
 msgid ""
@@ -815,7 +815,7 @@ msgid ""
 "See SystemMessages.log for more details."
 msgstr ""
 
-#: Sources/Gui/Main.cpp:1062 Sources/Gui/Runner.cpp:62
+#: Sources/Gui/Main.cpp:1068 Sources/Gui/Runner.cpp:62
 msgctxt "Main"
 msgid "ZeroSpades Fatal Error"
 msgstr ""
@@ -876,10 +876,10 @@ msgid "Select Weapon:"
 msgstr ""
 
 #: Sources/Gui/UI/Components/LimboMenu.cpp:325
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:94
+#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:95
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:204
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:631
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:132
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:632
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:138
 msgctxt "Client"
 msgid "[Esc]"
 msgstr ""
@@ -889,22 +889,58 @@ msgctxt "Client"
 msgid "[1, 2, 3]"
 msgstr ""
 
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:93
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"ZeroSpades {0} is available (you have {1}). Click to open the release page."
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:112
+#, c++-format
+msgctxt "MainScreen"
+msgid "Up to date ({0})"
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:181
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"A new version of ZeroSpades is available!\n"
+"\n"
+"Installed version: {0}\n"
+"Latest version: {1}\n"
+"\n"
+"Open the release page to download it? ZeroSpades will close so the update "
+"can be installed."
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:197
+msgctxt "MainScreen"
+msgid "Open Release Page"
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:197
+msgctxt "MainScreen"
+msgid "Later"
+msgstr ""
+
 #: Sources/Gui/UI/Console/ConsoleWindow.cpp:62
 msgctxt "Console"
 msgid "Command"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:93
+#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:94
 msgctxt "Client"
 msgid "Close"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:102
+#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:103
 msgctxt "Client"
 msgid "Say Global"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:111
+#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:112
 msgctxt "Client"
 msgid "Say Team"
 msgstr ""
@@ -915,8 +951,8 @@ msgid "Send"
 msgstr ""
 
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:195
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:239
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:448
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:240
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:449
 #: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:54
 msgctxt "Client"
 msgid "[Enter]"
@@ -1027,234 +1063,234 @@ msgctxt "CreateProfileScreen"
 msgid "You can change it later in the Setup dialog."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:109
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:110
 msgctxt "MainScreen"
 msgid "Rename Demo"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:124
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:438
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:125
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:439
 msgctxt "MainScreen"
 msgid "Rename"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:131
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:132
 msgctxt "MainScreen"
 msgid "Cancel"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:238
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:239
 msgctxt "MainScreen"
 msgid "Connect"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:250
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:251
 msgctxt "MainScreen"
 msgid "Quick Connect"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:267
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:372
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:268
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:373
 msgctxt "MainScreen"
 msgid "0.75"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:278
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:385
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:279
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:386
 msgctxt "MainScreen"
 msgid "0.76"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:294
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:295
 msgctxt "MainScreen"
 msgid "Server Name"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:302
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:303
 msgctxt "MainScreen"
 msgid "Slots"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:311
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:312
 msgctxt "MainScreen"
 msgid "Map Name"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:319
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:478
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:320
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:479
 msgctxt "MainScreen"
 msgid "Game Mode"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:328
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:329
 msgctxt "MainScreen"
 msgid "Ver."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:337
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:338
 msgctxt "MainScreen"
 msgid "Ping"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:362
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:409
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:363
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:410
 msgctxt "MainScreen"
 msgid "Filter"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:399
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:400
 msgctxt "MainScreen"
 msgid "Not Full"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:421
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:422
 msgctxt "MainScreen"
 msgid "Select a demo"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:429
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:430
 msgctxt "MainScreen"
 msgid "Delete"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:447
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:448
 msgctxt "MainScreen"
 msgid "Play"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:464
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:465
 msgctxt "MainScreen"
 msgid "Server"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:471
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:472
 msgctxt "MainScreen"
 msgid "Map"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:485
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:486
 msgctxt "MainScreen"
 msgid "Timestamp"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:492
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:589
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:493
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:590
 msgctxt "MainScreen"
 msgid "Size"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:508
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:509
 msgctxt "MainScreen"
 msgid "Download official mods..."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:518
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:519
 msgctxt "MainScreen"
 msgid "Disable all"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:527
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:528
 msgctxt "MainScreen"
 msgid "Apply changes"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:554
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:555
 msgctxt "MainScreen"
 msgid "Status"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:561
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:562
 msgctxt "MainScreen"
 msgid "Apply Order"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:568
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:569
 msgctxt "MainScreen"
 msgid "Type"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:575
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:576
 msgctxt "MainScreen"
 msgid "Mod"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:582
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:583
 msgctxt "MainScreen"
 msgid "Author"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:610
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:611
 msgctxt "MainScreen"
 msgid "Servers"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:611
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:612
 msgctxt "MainScreen"
 msgid "Demos"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:615
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:616
 msgctxt "MainScreen"
 msgid "Mods"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:630
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:631
 msgctxt "MainScreen"
 msgid "Quit"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:639
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:640
 msgctxt "MainScreen"
 msgid "Credits"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:647
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:648
 msgctxt "MainScreen"
 msgid "Setup"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:777
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:787
 msgctxt "MainScreen"
 msgid "Fetching mod list..."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:798
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:808
 msgctxt "MainScreen"
 msgid "Press 'Apply changes' to restart and apply your mods."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:808
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:818
 msgctxt "MainScreen"
 msgid "Download the official ZeroSpades mod pack?"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:810
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:820
 msgctxt "MainScreen"
 msgid "These are mods reviewed and hosted by the ZeroSpades team."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:812
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:822
 msgctxt "MainScreen"
 msgid "Source: "
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:813
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:823
 msgctxt "MainScreen"
 msgid ""
 "Files will be saved into your Mods/ folder, overwriting any existing copies."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:842
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:852
 msgctxt "MainScreen"
 msgid "Disable all mods? This takes effect after a restart."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:884
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:894
 msgctxt "MainScreen"
 msgid "Mod download failed:"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:922
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:932
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1262,12 +1298,12 @@ msgid ""
 "This action cannot be undone."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:960
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:970
 msgctxt "MainScreen"
 msgid "Failed to rename demo."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1182
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1192
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1459,8 +1495,8 @@ msgstr ""
 
 #: Sources/Gui/UI/Settings/Formatters.cpp:99
 #: Sources/Gui/UI/Settings/Formatters.cpp:147
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:113
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:231
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:128
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:261
 msgctxt "Preferences"
 msgid "Default"
 msgstr ""
@@ -1548,7 +1584,7 @@ msgstr ""
 #: Sources/Gui/UI/Settings/Formatters.cpp:176
 #: Sources/Gui/UI/Settings/Formatters.cpp:197
 #: Sources/Gui/UI/Settings/Formatters.cpp:210
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:232
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:262
 msgctxt "Preferences"
 msgid "Custom"
 msgstr ""
@@ -1573,54 +1609,54 @@ msgctxt "Preferences"
 msgid "Iron Sight"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:260
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:267
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:67
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:71
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:163
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:261
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:268
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:82
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:86
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:194
 msgctxt "Preferences"
 msgid "ON"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:260
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:268
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:261
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:269
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:50
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:62
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:68
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:72
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:79
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:77
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:83
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:163
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:186
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:190
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:87
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:94
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:98
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:194
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:216
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:220
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:231
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:274
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:250
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:261
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:304
 msgctxt "Preferences"
 msgid "OFF"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:267
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:268
 msgctxt "Preferences"
 msgid "REVERSED"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:295
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:296
 msgctxt "Preferences"
 msgid "Reset"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:302
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:303
 msgctxt "Preferences"
 msgid "Randomize"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:362
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:363
 msgctxt "Preferences"
 msgid "NEW"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:368
+#: Sources/Gui/UI/Settings/PreferenceLayouter.cpp:369
 msgctxt "Preferences"
 msgid "MOD."
 msgstr ""
@@ -1651,12 +1687,12 @@ msgid "FAST"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:49
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:61
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:78
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:82
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:89
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:91
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:178
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:76
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:93
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:97
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:104
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:106
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:209
 msgctxt "Preferences"
 msgid "NORMAL"
 msgstr ""
@@ -1666,1194 +1702,1339 @@ msgctxt "Preferences"
 msgid "Full Aim Down Sight"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:53
-msgctxt "Preferences"
-msgid "Classic Weapon Recoil"
-msgstr ""
-
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:54
 msgctxt "Preferences"
-msgid "Classic Sprinting"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:55
-msgctxt "Preferences"
-msgid "Classic Zoom"
+msgid ""
+"Lets the viewmodel reach full aiming. When off, ADS stops halfway (partial / "
+"hip-style aim)."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:56
 msgctxt "Preferences"
-msgid "Automatic Unscope"
+msgid "Classic Weapon Recoil"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:59
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:58
 msgctxt "Preferences"
-msgid "Effects"
+msgid ""
+"Original `AoS 0.75` recoil (stronger while jumping/moving, especially with "
+"the SMG). When off, uses the more controllable `OpenSpades 0.1.3` style."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:60
 msgctxt "Preferences"
-msgid "Blood"
+msgid "Classic Sprinting"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:61
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:62
 msgctxt "Preferences"
-msgid "MARKS"
+msgid ""
+"Sprint input stays active even while standing still. When off, sprint "
+"cancels as soon as you stop moving."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:64
 msgctxt "Preferences"
-msgid "Ragdoll Corpses"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:65
-msgctxt "Preferences"
-msgid "Enhanced Ragdoll Physics"
+msgid "Classic Zoom"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:66
 msgctxt "Preferences"
-msgid "Bullet Tracers"
+msgid ""
+"Uses the same zoom level for every weapon, `AoS 0.75` behavior. When off, "
+"each weapon has its own zoom: rifle stronger, SMG moderate, shotgun weaker."
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:67
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:71
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:68
 msgctxt "Preferences"
-msgid "3rd Person"
+msgid "Automatic Unscope"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:70
 msgctxt "Preferences"
-msgid "Muzzle Flashes"
+msgid ""
+"Automatically exits aim down sights after firing (except with the SMG). "
+"Useful for faster follow-up shots with rifle and shotgun."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:74
 msgctxt "Preferences"
-msgid "Eject Bullet Casings"
+msgid "Effects"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:75
 msgctxt "Preferences"
-msgid "Hurt Screen Effects"
+msgid "Blood"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:76
 msgctxt "Preferences"
-msgid "Heal Screen Effects"
+msgid "MARKS"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:77
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:79
 msgctxt "Preferences"
-msgid "Camera Shake"
+msgid "Ragdoll Corpses"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:78
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:82
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:80
 msgctxt "Preferences"
-msgid "MORE"
+msgid "Enhanced Ragdoll Physics"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:81
 msgctxt "Preferences"
-msgid "Particles"
+msgid "Bullet Tracers"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:82
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:86
+msgctxt "Preferences"
+msgid "3rd Person"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:85
 msgctxt "Preferences"
-msgid "Water Splash"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:87
-msgctxt "Preferences"
-msgid "Feedbacks"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:88
-msgctxt "Preferences"
-msgid "Center Messages"
+msgid "Muzzle Flashes"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:89
 msgctxt "Preferences"
-msgid "LESS"
+msgid "Eject Bullet Casings"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:90
 msgctxt "Preferences"
-msgid "Center Messages Size"
+msgid "Hurt Screen Effects"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:91
 msgctxt "Preferences"
-msgid "SMALL"
+msgid "Heal Screen Effects"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:92
+msgctxt "Preferences"
+msgid "Camera Shake"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:93
-msgctxt "Preferences"
-msgid "Ignore Chat Messages"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:94
-msgctxt "Preferences"
-msgid "Ignore Private Messages"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:95
-msgctxt "Preferences"
-msgid "Master Volume"
-msgstr ""
-
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:97
 msgctxt "Preferences"
-msgid "Death Camera Volume"
+msgid "MORE"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:98
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:96
 msgctxt "Preferences"
-msgid "Respawn Beep Volume"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:99
-msgctxt "Preferences"
-msgid "Hit Feedback Volume"
+msgid "Particles"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:100
 msgctxt "Preferences"
-msgid "Headshot Feedback Volume"
+msgid "Water Splash"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:102
 msgctxt "Preferences"
-msgid "Chat Notify Sounds"
+msgid "Feedbacks"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:103
 msgctxt "Preferences"
-msgid "Show Alerts"
+msgid "Center Messages"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:104
 msgctxt "Preferences"
-msgid "Show Server Alerts"
+msgid "LESS"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:105
 msgctxt "Preferences"
-msgid "Alert Sounds"
+msgid "Center Messages Size"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:106
 msgctxt "Preferences"
-msgid "Hit Log"
+msgid "SMALL"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:107
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:108
 msgctxt "Preferences"
-msgid "Hit Indicator"
+msgid "Ignore Chat Messages"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:109
 msgctxt "Preferences"
-msgid "Viewmodel"
+msgid "Ignore Private Messages"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:110
 msgctxt "Preferences"
-msgid "Weapon Keychains"
+msgid "Master Volume"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:112
 msgctxt "Preferences"
-msgid "Viewmodel Position"
+msgid "Death Camera Volume"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:113
 msgctxt "Preferences"
-msgid "Balanced"
+msgid "Respawn Beep Volume"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:114
 msgctxt "Preferences"
-msgid "Minimal"
+msgid "Hit Feedback Volume"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:116
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:115
 msgctxt "Preferences"
-msgid "Viewmodel Alignment"
+msgid "Headshot Feedback Volume"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:117
+msgctxt "Preferences"
+msgid "Chat Notify Sounds"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:118
 msgctxt "Preferences"
-msgid "Switch Viewmodel Handedness"
+msgid "Show Alerts"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:119
 msgctxt "Preferences"
-msgid "Hide Player Arms"
+msgid "Show Server Alerts"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:120
 msgctxt "Preferences"
-msgid "Hide Player Body"
+msgid "Alert Sounds"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:121
 msgctxt "Preferences"
-msgid "Classic Player Model"
+msgid "Hit Log"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:122
 msgctxt "Preferences"
-msgid "Classic Viewmodel"
+msgid "Hit Indicator"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:124
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:418
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:125
 msgctxt "Preferences"
-msgid "Misc"
+msgid "Viewmodel"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:125
 msgctxt "Preferences"
-msgid "Field of View"
+msgid "Weapon Keychains"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:127
 msgctxt "Preferences"
-msgid "Horizontal FOV"
+msgid "Viewmodel Position"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:128
 msgctxt "Preferences"
-msgid "Environmental Audio"
+msgid "Balanced"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:129
 msgctxt "Preferences"
-msgid "Skip dead players (death cam)"
+msgid "Minimal"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:131
 msgctxt "Preferences"
-msgid "Save Final Score Screenshot"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:132
-msgctxt "Preferences"
-msgid "Debug Hit Detection"
+msgid "Viewmodel Alignment"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:133
 msgctxt "Preferences"
-msgid "Hit Debugger Size"
+msgid "Switch Viewmodel Handedness"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:134
+msgctxt "Preferences"
+msgid "Hide Player Arms"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:135
 msgctxt "Preferences"
-msgid "Toggle Hit Debugger Zoom"
+msgid "Hide Player Body"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:136
 msgctxt "Preferences"
-msgid "Hit Debugger Fade Time"
+msgid "Classic Player Model"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:138
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:137
 msgctxt "Preferences"
-msgid "Debug Weapon Spread"
+msgid "Classic Viewmodel"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:139
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:468
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:131
 msgctxt "Preferences"
-msgid "Debug Block Cursor"
+msgid "Misc"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:140
 msgctxt "Preferences"
-msgid "Debug Players Hitbox"
+msgid "Field of View"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:141
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:142
 msgctxt "Preferences"
-msgid "Debug Weapon Anchor Points"
+msgid "Horizontal FOV"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:144
+msgctxt "Preferences"
+msgid ""
+"Applies the FOV value to the horizontal axis instead of the vertical. Useful "
+"on ultrawide monitors to keep a consistent horizontal view."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:146
+msgctxt "Preferences"
+msgid "Environmental Audio"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:148
+msgctxt "Preferences"
+msgid ""
+"Adds environmental reverb to weapon sounds based on the surroundings. When "
+"off, gunshots sound more direct and consistent."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:150
+msgctxt "Preferences"
+msgid "Skip dead players (death cam)"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:152
+msgctxt "Preferences"
+msgid ""
+"When dead, other dead players will be skipped when cycling through players. "
+"When off, you can also follow dead players."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:154
+msgctxt "Preferences"
+msgid "Save Final Score Screenshot"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:156
+msgctxt "Preferences"
+msgid "Automatically takes a screenshot of the scoreboard when a team wins."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:157
+msgctxt "Preferences"
+msgid "Debug Hit Detection"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:159
+msgctxt "Preferences"
+msgid ""
+"Shows a debug overlay of player hitboxes and bullet impact points after each "
+"shot. Useful for diagnosing hit registration issues."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:161
 msgctxt "Preferences"
-msgid "World Markers"
+msgid "Hit Debugger Size"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:162
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:163
 msgctxt "Preferences"
-msgid "Damage Indicators"
+msgid "Toggle Hit Debugger Zoom"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:164
 msgctxt "Preferences"
-msgid "Grenades"
+msgid "Hit Debugger Fade Time"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:166
 msgctxt "Preferences"
-msgid "Show Hover Player Names"
+msgid "Debug Weapon Spread"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:167
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:168
 msgctxt "Preferences"
-msgid "Show Dead Player Names"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:169
-msgctxt "Preferences"
-msgid "Heads-Up Display"
+msgid ""
+"Draws a visual indicator of the current weapon's spread cone. Useful for "
+"understanding accuracy while moving, jumping, or aiming."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:170
 msgctxt "Preferences"
-msgid "Hide HUD"
+msgid "Debug Block Cursor"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:171
 msgctxt "Preferences"
-msgid "HUD Color"
+msgid "Debug Players Hitbox"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:173
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:237
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:172
 msgctxt "Preferences"
-msgid "Custom Color"
+msgid "Debug Weapon Anchor Points"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:175
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:192
 msgctxt "Preferences"
-msgid "HUD Edge Positions"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:175
-msgctxt "Preferences"
-msgid "Edit"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:177
-msgctxt "Preferences"
-msgid "HUD Ammo Style"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:178
-msgctxt "Preferences"
-msgid "SIMPLE"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:179
-msgctxt "Preferences"
-msgid "Show Tool Hotbar"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:183
-msgctxt "Preferences"
-msgid "Show Compass Bar"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:185
-msgctxt "Preferences"
-msgid "Show Alive Player Count"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:186
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:190
-msgctxt "Preferences"
-msgid "Top"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:187
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:191
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:220
-msgctxt "Preferences"
-msgid "Bottom"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:189
-msgctxt "Preferences"
-msgid "Show Client Statistics"
+msgid "World Markers"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:193
 msgctxt "Preferences"
-msgid "Small Stats Font"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:194
-msgctxt "Preferences"
-msgid "Show Player Statistics"
+msgid "Damage Indicators"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:195
 msgctxt "Preferences"
-msgid "Show Placed Blocks"
+msgid "Grenades"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:197
 msgctxt "Preferences"
-msgid "Player Statistics Height"
+msgid "Show Hover Player Names"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:199
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:198
 msgctxt "Preferences"
-msgid "Chat Height"
+msgid "Show Dead Player Names"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:200
+msgctxt "Preferences"
+msgid "Heads-Up Display"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:201
 msgctxt "Preferences"
-msgid "Chat Fade Time"
+msgid "Hide HUD"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:203
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:202
 msgctxt "Preferences"
-msgid "Killfeed Height"
+msgid "HUD Color"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:205
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:204
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:267
 msgctxt "Preferences"
-msgid "Killfeed Fade Time"
+msgid "Custom Color"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:207
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:206
 msgctxt "Preferences"
-msgid "Killfeed Icons"
+msgid "HUD Edge Positions"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:206
+msgctxt "Preferences"
+msgid "Edit"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:208
 msgctxt "Preferences"
-msgid "Show Dominations"
+msgid "HUD Ammo Style"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:209
+msgctxt "Preferences"
+msgid "SIMPLE"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:210
 msgctxt "Preferences"
-msgid "Minimap"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:211
-msgctxt "Preferences"
-msgid "Minimap Size"
+msgid "Show Tool Hotbar"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:213
 msgctxt "Preferences"
-msgid "Minimap Scale Mode"
+msgid "Show Compass Bar"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:215
 msgctxt "Preferences"
-msgid "Minimap Opacity"
+msgid "Show Alive Player Count"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:216
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:220
+msgctxt "Preferences"
+msgid "Top"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:217
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:221
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:250
 msgctxt "Preferences"
-msgid "Use Weapon Icons"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:218
-msgctxt "Preferences"
-msgid "Use Random Colors"
+msgid "Bottom"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:219
 msgctxt "Preferences"
-msgid "Show Map Location"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:221
-msgctxt "Preferences"
-msgid "Side"
+msgid "Show Client Statistics"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:223
 msgctxt "Preferences"
-msgid "Show Player Names"
+msgid "Small Stats Font"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:224
 msgctxt "Preferences"
-msgid "Circular Minimap"
+msgid "Show Player Statistics"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:225
 msgctxt "Preferences"
-msgid "Rotating Minimap"
+msgid "Show Placed Blocks"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:227
 msgctxt "Preferences"
+msgid "Player Statistics Height"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:229
+msgctxt "Preferences"
+msgid "Chat Height"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:231
+msgctxt "Preferences"
+msgid "Chat Fade Time"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:233
+msgctxt "Preferences"
+msgid "Killfeed Height"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:235
+msgctxt "Preferences"
+msgid "Killfeed Fade Time"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:237
+msgctxt "Preferences"
+msgid "Killfeed Icons"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:238
+msgctxt "Preferences"
+msgid "Show Dominations"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:240
+msgctxt "Preferences"
+msgid "Minimap"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:241
+msgctxt "Preferences"
+msgid "Minimap Size"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:243
+msgctxt "Preferences"
+msgid "Minimap Scale Mode"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:245
+msgctxt "Preferences"
+msgid "Minimap Opacity"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:247
+msgctxt "Preferences"
+msgid "Use Weapon Icons"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:248
+msgctxt "Preferences"
+msgid "Use Random Colors"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:249
+msgctxt "Preferences"
+msgid "Show Map Location"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:251
+msgctxt "Preferences"
+msgid "Side"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:253
+msgctxt "Preferences"
+msgid "Show Player Names"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:254
+msgctxt "Preferences"
+msgid "Circular Minimap"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:255
+msgctxt "Preferences"
+msgid "Rotating Minimap"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:257
+msgctxt "Preferences"
 msgid "Target"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:230
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:260
 msgctxt "Preferences"
 msgid "Target Type"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:234
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:279
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:264
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:309
 msgctxt "Preferences"
 msgid "Lines"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:235
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:280
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:265
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:310
 msgctxt "Preferences"
 msgid "Color"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:239
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:282
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:269
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:312
 msgctxt "Preferences"
 msgid "Opacity"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:241
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:284
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:271
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:314
 msgctxt "Preferences"
 msgid "Length"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:244
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:287
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:274
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:317
 msgctxt "Preferences"
 msgid "Thickness"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:246
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:289
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:276
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:319
 msgctxt "Preferences"
 msgid "Gap"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:248
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:291
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:278
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:321
 msgctxt "Preferences"
 msgid "Dynamic"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:249
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:292
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:279
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:322
 msgctxt "Preferences"
 msgid "Dynamic Split Dist"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:251
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:294
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:281
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:324
 msgctxt "Preferences"
 msgid "Outline"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:252
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:295
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:282
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:325
 msgctxt "Preferences"
 msgid "Outline Color"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:255
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:298
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:285
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:328
 msgctxt "Preferences"
 msgid "Outline Opacity"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:257
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:300
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:287
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:330
 msgctxt "Preferences"
 msgid "Outline Thickness"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:259
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:302
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:289
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:332
 msgctxt "Preferences"
 msgid "Rounded Corners Style"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:261
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:304
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:291
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:334
 msgctxt "Preferences"
 msgid "Center Dot"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:262
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:305
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:292
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:335
 msgctxt "Preferences"
 msgid "Center Dot Color"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:264
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:307
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:294
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:337
 msgctxt "Preferences"
 msgid "Center Dot Opacity"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:266
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:309
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:296
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:339
 msgctxt "Preferences"
 msgid "Center Dot Thickness"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:268
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:311
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:298
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:341
 msgctxt "Preferences"
 msgid "T Style"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:270
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:300
 msgctxt "Preferences"
 msgid "Scope"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:273
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:303
 msgctxt "Preferences"
 msgid "Reflex Sight"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:274
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:304
 msgctxt "Preferences"
 msgid "Dot"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:275
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:305
 msgctxt "Preferences"
 msgid "Cross"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:277
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:307
 msgctxt "Preferences"
 msgid "Scope Type"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:328
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:456
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:358
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:508
 msgctxt "Preferences"
 msgid "General"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:329
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:359
 msgctxt "Preferences"
 msgid "Render Scale"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:331
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:361
 msgctxt "Preferences"
 msgid "Render Scaling Filter"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:333
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:363
 msgctxt "Preferences"
 msgid "Rendering Statistics"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:334
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:364
 msgctxt "Preferences"
 msgid "Allow CPU Rendering"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:336
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:366
+msgctxt "Preferences"
+msgid ""
+"Allows OpenGL to fall back to a software implementation if no GPU is "
+"available. Very slow; mainly useful on Linux. Prefer the dedicated Software "
+"renderer instead."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:370
 msgctxt "Preferences"
 msgid "World"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:337
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:371
 msgctxt "Preferences"
 msgid "Dynamic Lights"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:338
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:372
 msgctxt "Preferences"
 msgid "Tracers Lights"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:339
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:373
 msgctxt "Preferences"
 msgid "Depth Prepass"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:340
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:375
+msgctxt "Preferences"
+msgid ""
+"Fills the depth buffer before shading so hidden pixels can be skipped. "
+"Usually improves performance. Forced on when SSAO is enabled."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:377
 msgctxt "Preferences"
 msgid "Occlusion Querying"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:341
-msgctxt "Preferences"
-msgid "Object Outlines"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:343
-msgctxt "Preferences"
-msgid "Post-processing"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:344
-msgctxt "Preferences"
-msgid "Depth Of Field"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:345
-msgctxt "Preferences"
-msgid "Camera Blur"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:346
-msgctxt "Preferences"
-msgid "FXAA Anti-Aliasing"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:347
-msgctxt "Preferences"
-msgid "Lens Flares"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:348
-msgctxt "Preferences"
-msgid "Flares Lights"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:349
-msgctxt "Preferences"
-msgid "Color Correction"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:350
-msgctxt "Preferences"
-msgid "Sharpening"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:352
-msgctxt "Preferences"
-msgid "Saturation"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:354
-msgctxt "Preferences"
-msgid "Exposure"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:357
-msgctxt "Preferences"
-msgid "Software Renderer"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:358
-msgctxt "Preferences"
-msgid "Thread Count"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:359
-msgctxt "Preferences"
-msgid " Threads"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:360
-msgctxt "Preferences"
-msgid "Undersampling"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:378
-msgctxt "Preferences"
-msgid "Weapons/Tools"
-msgstr ""
-
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:379
 msgctxt "Preferences"
-msgid "Attack"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:380
-msgctxt "Preferences"
-msgid "Alt. Attack"
+msgid ""
+"Uses GPU occlusion queries when rendering water to skip it when fully "
+"hidden. Can improve FPS, but may crash some drivers."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:381
 msgctxt "Preferences"
-msgid "Hold Aim Down Sight"
+msgid "Object Outlines"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:382
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:383
 msgctxt "Preferences"
-msgid "Mouse Sensitivity Type"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:384
-msgctxt "Preferences"
-msgid "Mouse Sensitivity"
+msgid ""
+"Draws cartoon-style outlines around players and map. OpenGL renderer only."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:386
 msgctxt "Preferences"
-msgid "ADS Mouse Sens. Scale"
+msgid "Post-processing"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:387
+msgctxt "Preferences"
+msgid "Depth Of Field"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:388
 msgctxt "Preferences"
-msgid "Mouse Acceleration"
+msgid "Camera Blur"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:389
 msgctxt "Preferences"
-msgid "Exponential Power"
+msgid "FXAA Anti-Aliasing"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:390
+msgctxt "Preferences"
+msgid "Lens Flares"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:391
 msgctxt "Preferences"
-msgid "Invert Y-axis Mouse Input"
+msgid "Flares Lights"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:392
 msgctxt "Preferences"
-msgid "Reload"
+msgid "Color Correction"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:393
 msgctxt "Preferences"
-msgid "Equip Spade"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:394
-msgctxt "Preferences"
-msgid "Equip Block"
+msgid "Sharpening"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:395
 msgctxt "Preferences"
-msgid "Equip Weapon"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:396
-msgctxt "Preferences"
-msgid "Equip Grenade"
+msgid "Saturation"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:397
 msgctxt "Preferences"
-msgid "Last Used Tool"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:398
-msgctxt "Preferences"
-msgid "Switch Tools by Wheel"
+msgid "Exposure"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:400
 msgctxt "Preferences"
-msgid "Movement"
+msgid "Software Renderer"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:401
 msgctxt "Preferences"
-msgid "Move Forward"
+msgid "Thread Count"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:402
 msgctxt "Preferences"
-msgid "Move Backward"
+msgid " Threads"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:403
 msgctxt "Preferences"
-msgid "Move Left"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:404
-msgctxt "Preferences"
-msgid "Move Right"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:405
-msgctxt "Preferences"
-msgid "Crouch"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:406
-msgctxt "Preferences"
-msgid "Sneak"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:407
-msgctxt "Preferences"
-msgid "Jump"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:408
-msgctxt "Preferences"
-msgid "Sprint"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:410
-msgctxt "Preferences"
-msgid "Color Palette"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:411
-msgctxt "Preferences"
-msgid "Capture Color"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:412
-msgctxt "Preferences"
-msgid "Navigate up"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:413
-msgctxt "Preferences"
-msgid "Navigate down"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:414
-msgctxt "Preferences"
-msgid "Navigate left"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:415
-msgctxt "Preferences"
-msgid "Navigate right"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:416
-msgctxt "Preferences"
-msgid "Toggle extended palette"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:419
-msgctxt "Preferences"
-msgid "Scoreboard"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:420
-msgctxt "Preferences"
-msgid "Hold Large Map"
+msgid "Undersampling"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:421
 msgctxt "Preferences"
-msgid "Minimap Scale"
+msgid "Weapons/Tools"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:422
 msgctxt "Preferences"
-msgid "Toggle Map"
+msgid "Attack"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:423
 msgctxt "Preferences"
-msgid "Flashlight"
+msgid "Alt. Attack"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:424
 msgctxt "Preferences"
-msgid "Global Chat"
+msgid "Hold Aim Down Sight"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:425
 msgctxt "Preferences"
-msgid "Team Chat"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:426
-msgctxt "Preferences"
-msgid "Chat Log"
+msgid "Mouse Sensitivity Type"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:427
 msgctxt "Preferences"
-msgid "Chat Zoom"
+msgid "Mouse Sensitivity"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:428
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:429
 msgctxt "Preferences"
-msgid "Pie Menu"
+msgid "ADS Mouse Sens. Scale"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:430
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:431
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:440
 msgctxt "Preferences"
-msgid "Show Teammates"
+msgid "Mouse Acceleration"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:432
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:433
 msgctxt "Preferences"
-msgid "Team Ping"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:434
-msgctxt "Preferences"
-msgid "Limbo Menu"
+msgid ""
+"Scales mouse sensitivity by movement speed. Fast flicks turn more, slow "
+"movements less. When off, response is linear."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:435
 msgctxt "Preferences"
-msgid "Save Map"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:436
-msgctxt "Preferences"
-msgid "Save Sceneshot"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:437
-msgctxt "Preferences"
-msgid "Save Screenshot"
+msgid "Exponential Power"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:438
+#, c++-format
 msgctxt "Preferences"
-msgid "Master Volume Up"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:439
-msgctxt "Preferences"
-msgid "Master Volume Down"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:440
-msgctxt "Preferences"
-msgid "Network Graph"
+msgid ""
+"Curve strength. Above 1.0 dampens slow movements, below 1.0 boosts them. "
+"Requires `{0}`."
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:441
 msgctxt "Preferences"
-msgid "Force Spectator Mode"
+msgid "Invert Y-axis Mouse Input"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:442
+msgctxt "Preferences"
+msgid "Reload"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:443
+msgctxt "Preferences"
+msgid "Equip Spade"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:444
+msgctxt "Preferences"
+msgid "Equip Block"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:445
+msgctxt "Preferences"
+msgid "Equip Weapon"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:446
+msgctxt "Preferences"
+msgid "Equip Grenade"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:447
+msgctxt "Preferences"
+msgid "Last Used Tool"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:448
+msgctxt "Preferences"
+msgid "Switch Tools by Wheel"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:450
+msgctxt "Preferences"
+msgid "Movement"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:451
+msgctxt "Preferences"
+msgid "Move Forward"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:452
+msgctxt "Preferences"
+msgid "Move Backward"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:453
+msgctxt "Preferences"
+msgid "Move Left"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:454
+msgctxt "Preferences"
+msgid "Move Right"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:455
+msgctxt "Preferences"
+msgid "Crouch"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:456
+msgctxt "Preferences"
+msgid "Sneak"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:457
 msgctxt "Preferences"
-msgid "FPS Limit"
+msgid "Jump"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:458
+msgctxt "Preferences"
+msgid "Sprint"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:460
 msgctxt "Preferences"
-msgid "Console Scrollback Lines"
+msgid "Color Palette"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:461
+msgctxt "Preferences"
+msgid "Capture Color"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:462
 msgctxt "Preferences"
-msgid "Server List URL"
+msgid "Navigate up"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:463
 msgctxt "Preferences"
-msgid "Server List Alt. URL"
+msgid "Navigate down"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:464
+msgctxt "Preferences"
+msgid "Navigate left"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:465
 msgctxt "Preferences"
-msgid "Mod List URL"
+msgid "Navigate right"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:466
 msgctxt "Preferences"
-msgid "Allow Unicode"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:467
-msgctxt "Preferences"
-msgid "Screenshot Format"
+msgid "Toggle extended palette"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:469
 msgctxt "Preferences"
-msgid "JPEG Quality"
+msgid "Scoreboard"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:470
+msgctxt "Preferences"
+msgid "Hold Large Map"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:471
 msgctxt "Preferences"
-msgid "Enable Startup Window"
+msgid "Minimap Scale"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:472
+msgctxt "Preferences"
+msgid "Toggle Map"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:473
 msgctxt "Preferences"
-msgid "Demo Recording"
+msgid "Flashlight"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:474
 msgctxt "Preferences"
-msgid "Start/Stop Recording"
+msgid "Global Chat"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:475
 msgctxt "Preferences"
-msgid "Auto Record"
+msgid "Team Chat"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:476
 msgctxt "Preferences"
-msgid "Auto Delete Old Demos"
+msgid "Chat Log"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:477
 msgctxt "Preferences"
-msgid "Max Stored Demos"
+msgid "Chat Zoom"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:478
+msgctxt "Preferences"
+msgid "Pie Menu"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:480
 msgctxt "Preferences"
-msgid "Demo Playback"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:481
-msgctxt "Preferences"
-msgid "Pause/Resume"
+msgid "Show Teammates"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:482
 msgctxt "Preferences"
-msgid "Speed Up"
-msgstr ""
-
-#: Sources/Gui/UI/Settings/PreferencePanels.cpp:483
-msgctxt "Preferences"
-msgid "Slow Down"
+msgid "Team Ping"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:484
 msgctxt "Preferences"
-msgid "Seek Forward"
+msgid "Limbo Menu"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:485
 msgctxt "Preferences"
-msgid "Seek Backward"
+msgid "Save Map"
 msgstr ""
 
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:486
 msgctxt "Preferences"
+msgid "Save Sceneshot"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:487
+msgctxt "Preferences"
+msgid "Save Screenshot"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:488
+msgctxt "Preferences"
+msgid "Master Volume Up"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:489
+msgctxt "Preferences"
+msgid "Master Volume Down"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:490
+msgctxt "Preferences"
+msgid "Network Graph"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:491
+msgctxt "Preferences"
+msgid "Force Spectator Mode"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:493
+msgctxt "Preferences"
+msgid ""
+"Toggles staff spectator mode. Lets you free-cam and follow players without "
+"leaving your team (intended for admins/staff)."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:509
+msgctxt "Preferences"
+msgid "FPS Limit"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:512
+msgctxt "Preferences"
+msgid "Console Scrollback Lines"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:514
+msgctxt "Preferences"
+msgid "Server List URL"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:515
+msgctxt "Preferences"
+msgid "Server List Alt. URL"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:517
+msgctxt "Preferences"
+msgid "Mod List URL"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:518
+msgctxt "Preferences"
+msgid "Allow Unicode"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:520
+msgctxt "Preferences"
+msgid ""
+"Lets you use other alphabets and symbols (such as Cyrillic or Japanese) in "
+"chat and in your name. When off, they are replaced by a placeholder."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:522
+msgctxt "Preferences"
+msgid "Screenshot Format"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:524
+msgctxt "Preferences"
+msgid "JPEG Quality"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:526
+msgctxt "Preferences"
+msgid "Enable Startup Window"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:527
+msgctxt "Preferences"
+msgid "Show Update Prompt"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:529
+msgctxt "Preferences"
+msgid ""
+"Shows the setup window every time you start the game. When off, goes "
+"straight to the main menu."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:531
+msgctxt "Preferences"
+msgid "Demo Recording"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:532
+msgctxt "Preferences"
+msgid "Start/Stop Recording"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:533
+msgctxt "Preferences"
+msgid "Auto Record"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:534
+msgctxt "Preferences"
+msgid "Auto Delete Old Demos"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:535
+msgctxt "Preferences"
+msgid "Max Stored Demos"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:538
+msgctxt "Preferences"
+msgid "Demo Playback"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:539
+msgctxt "Preferences"
+msgid "Pause/Resume"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:540
+msgctxt "Preferences"
+msgid "Speed Up"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:541
+msgctxt "Preferences"
+msgid "Slow Down"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:542
+msgctxt "Preferences"
+msgid "Seek Forward"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:543
+msgctxt "Preferences"
+msgid "Seek Backward"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:544
+msgctxt "Preferences"
 msgid "Toggle Demo HUD"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:108
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:112
 msgctxt "Preferences"
 msgid "Game Options"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:113
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:117
 msgctxt "Preferences"
 msgid "Interface"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:119
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:123
 msgctxt "Preferences"
 msgid "Graphics"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:123
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:127
 msgctxt "Preferences"
 msgid "Controls"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:131
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:137
 msgctxt "Preferences"
 msgid "Back"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewFramework.cpp:392
+#: Sources/Gui/UI/StartupScreen/ConfigViewFramework.cpp:393
 msgctxt "StartupScreen"
 msgid "Custom"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewFramework.cpp:519
+#: Sources/Gui/UI/StartupScreen/ConfigViewFramework.cpp:520
 msgctxt "StartupScreen"
 msgid "Close"
 msgstr ""
@@ -2863,46 +3044,46 @@ msgctxt "StartupScreen"
 msgid "Graphics Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:62
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:65
 msgctxt "StartupScreen"
 msgid "Resolution"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:73
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:76
 msgctxt "StartupScreen"
 msgid "Fullscreen Mode"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:79
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:82
 msgctxt "StartupScreen"
 msgid ""
 "By running in fullscreen mode OpenSpades occupies the screen, making it "
 "easier for you to concentrate on playing the game."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:87
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:90
 msgctxt "StartupScreen"
 msgid "Renderer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:90
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:93
 msgctxt "StartupScreen"
 msgid "OpenGL"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:96
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:99
 msgctxt "StartupScreen"
 msgid ""
 "OpenGL renderer uses your computer's graphics accelerator to generate the "
 "game screen."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:104
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:107
 msgctxt "StartupScreen"
 msgid "Software"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:110
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:113
 msgctxt "StartupScreen"
 msgid ""
 "Software renderer uses CPU to generate the game screen. Its quality and "
@@ -2910,7 +3091,7 @@ msgid ""
 "unsupported GPU."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:130
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:133
 msgctxt "StartupScreen"
 msgid ""
 "Antialiasing:Enables a technique to improve the appearance of high-contrast "
@@ -2923,25 +3104,25 @@ msgid ""
 "Off|MSAA 2x|4x|FXAA"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:144
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:290
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:147
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:293
 msgctxt "StartupScreen"
 msgid "Global Illumination"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:146
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:149
 msgctxt "StartupScreen"
 msgid ""
 "Enables a physically based simulation of light path for more realistic "
 "lighting."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:154
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:157
 msgctxt "StartupScreen"
 msgid "Linear HDR Rendering"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:156
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:159
 msgctxt "StartupScreen"
 msgid ""
 "Uses a number representation which allows wider dynamic range during "
@@ -2950,121 +3131,121 @@ msgid ""
 "blending can be achieved."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:169
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:172
 msgctxt "StartupScreen"
 msgid ""
 "Vertical Sync:Synchronizes screen updates to a monitor's refresh rate.|Off|"
 "On|Adaptive"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:183
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:186
 msgctxt "StartupScreen"
 msgid "Camera Blur"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:185
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:188
 msgctxt "StartupScreen"
 msgid "Blurs the screen when you turn quickly."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:191
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:194
 msgctxt "StartupScreen"
 msgid "Lens Scattering Filter"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:193
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:196
 msgctxt "StartupScreen"
 msgid "Simulates light being scattered by dust on the camera lens."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:200
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:203
 msgctxt "StartupScreen"
 msgid "Lens Flare"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:201
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:204
 msgctxt "StartupScreen"
 msgid "The Sun causes lens flare."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:208
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:211
 msgctxt "StartupScreen"
 msgid "Flares for Dynamic Lights."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:210
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:213
 msgctxt "StartupScreen"
 msgid "Enables lens flare for light sources other than the Sun."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:217
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:220
 msgctxt "StartupScreen"
 msgid "Color Correction"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:219
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:222
 msgctxt "StartupScreen"
 msgid "Applies cinematic color correction to make the image look better."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:226
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:229
 msgctxt "StartupScreen"
 msgid "Depth of Field"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:227
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:230
 msgctxt "StartupScreen"
 msgid "Blurs out-of-focus objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:234
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:237
 msgctxt "StartupScreen"
 msgid "Screen Space Ambient Occlusion"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:236
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:239
 msgctxt "StartupScreen"
 msgid "Simulates soft shadows that occur between nearby objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:241
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:326
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:363
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:244
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:329
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:366
 msgctxt "StartupScreen"
 msgid "Low"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:243
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:328
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:246
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:331
 msgctxt "StartupScreen"
 msgid "Medium"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:245
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:330
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:367
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:248
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:333
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:370
 msgctxt "StartupScreen"
 msgid "High"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:247
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:369
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:250
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:372
 msgctxt "StartupScreen"
 msgid "Ultra"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:250
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:253
 msgctxt "StartupScreen"
 msgid "Post-process"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:252
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:255
 msgctxt "StartupScreen"
 msgid ""
 "Post-process modifies the image to make it look better and more realistic."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:264
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:267
 msgctxt "StartupScreen"
 msgid ""
 "Particle Quality|Low:Artifact occurs when a particle intersects other "
@@ -3073,94 +3254,94 @@ msgid ""
 "particles."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:279
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:282
 msgctxt "StartupScreen"
 msgid "Volumetric Fog"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:280
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:283
 msgctxt "StartupScreen"
 msgid "None"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:281
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:284
 msgctxt "StartupScreen"
 msgid "Disables the volumetric fog effect."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:282
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:285
 msgctxt "StartupScreen"
 msgid "Level 1"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:283
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:286
 msgctxt "StartupScreen"
 msgid "Applies local illumination to the fog."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:284
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:287
 msgctxt "StartupScreen"
 msgid "Level 2"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:286
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:289
 msgctxt "StartupScreen"
 msgid "Applies both local illumination and global illumination to the fog."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:289
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:292
 #, c++-format
 msgctxt "StartupScreen"
-msgid "Warning: '{0}' must be enabled."
+msgid "Warning: `{0}` must be enabled."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:301
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:304
 msgctxt "StartupScreen"
 msgid "Dynamic Lights"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:303
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:306
 msgctxt "StartupScreen"
 msgid ""
 "Gives some objects an ability to emit light to give them an energy-emitting "
 "impression."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:311
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:314
 msgctxt "StartupScreen"
 msgid "Shadows"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:312
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:315
 msgctxt "StartupScreen"
 msgid "Non-static object casts a shadow."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:319
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:322
 msgctxt "StartupScreen"
 msgid "Physically Based Lighting"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:321
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:324
 msgctxt "StartupScreen"
 msgid ""
 "Uses more accurate approximation techniques to decide the brightness of "
 "objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:333
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:336
 msgctxt "StartupScreen"
 msgid "Direct Lights"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:335
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:338
 msgctxt "StartupScreen"
 msgid ""
 "Controls how light encounting a material and atmosphere directly affects its "
 "appearance."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:352
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:355
 msgctxt "StartupScreen"
 msgid ""
 "Water Shader|None:Water is rendered in the same way that normal blocks are "
@@ -3170,44 +3351,44 @@ msgid ""
 "techniques."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:365
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:368
 msgctxt "StartupScreen"
 msgid "Med"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:372
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:375
 msgctxt "StartupScreen"
 msgid "Shader Effects"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:373
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:376
 msgctxt "StartupScreen"
 msgid "Special effects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:394
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:397
 msgctxt "StartupScreen"
 msgid ""
 "Fast Mode:Reduces the image resolution to make the rendering faster.|Off|2x|"
 "4x"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:598
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:601
 msgctxt "StartupScreen"
 msgid "Audio Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:603
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:609
 msgctxt "StartupScreen"
 msgid "Backend"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:606
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:612
 msgctxt "StartupScreen"
 msgid "OpenAL"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:612
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:618
 msgctxt "StartupScreen"
 msgid ""
 "Uses an OpenAL-capable sound card to process sound. In most cases where "
@@ -3215,27 +3396,27 @@ msgid ""
 msgstr ""
 
 #. ! The name of audio driver that outputs no audio.
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:623
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:629
 msgctxt "StartupScreen"
 msgid "Null"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:628
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:634
 msgctxt "StartupScreen"
 msgid "Disables audio output."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:641
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:647
 msgctxt "StartupScreen"
 msgid "Volume"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:649
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:655
 msgctxt "StartupScreen"
 msgid "Polyphonics"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:651
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:657
 msgctxt "StartupScreen"
 msgid ""
 "Specifies how many sounds can be played simultaneously. Higher value needs "
@@ -3243,140 +3424,150 @@ msgid ""
 "(especially with a software emulation)."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:662
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:668
 msgctxt "StartupScreen"
 msgid "EAX"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:664
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:670
 msgctxt "StartupScreen"
 msgid ""
 "Enables extended features provided by the OpenAL driver to create more "
 "ambience."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:676
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:682
 msgctxt "StartupScreen"
 msgid "Output Device"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:748
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:750
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:762
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:978
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:992
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:754
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:756
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:768
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1002
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1016
 msgctxt "StartupScreen"
 msgid "System default"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:794
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:801
 msgctxt "StartupScreen"
 msgid "Language"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:807
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:814
 msgctxt "StartupScreen"
 msgid "Tools"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:810
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:817
 msgctxt "StartupScreen"
 msgid "Reset All Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:819
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:826
 msgctxt "StartupScreen"
 msgid "Open Config Folder in Explorer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:821
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:828
 msgctxt "StartupScreen"
 msgid "Reveal Config Folder in Finder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:823
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:830
 msgctxt "StartupScreen"
 msgid "Browse Config Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:830
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:837
 msgctxt "StartupScreen"
 msgid "Demo Recording"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:833
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:840
 msgctxt "StartupScreen"
 msgid "Automatically record every game"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:841
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:848
 msgctxt "StartupScreen"
 msgid "Delete oldest demos when limit is reached"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:848
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:855
 msgctxt "StartupScreen"
 msgid "Max stored demos"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:861
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:868
 msgctxt "StartupScreen"
 msgid "Demos Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:866
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:873
 msgctxt "StartupScreen"
 msgid "Open Demos Folder in Explorer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:868
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:875
 msgctxt "StartupScreen"
 msgid "Reveal Demos Folder in Finder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:870
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:877
 msgctxt "StartupScreen"
 msgid "Browse Demos Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:904
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:885
+msgctxt "StartupScreen"
+msgid "Updates"
+msgstr ""
+
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:889
+msgctxt "StartupScreen"
+msgid "Show a prompt when a new version is available"
+msgstr ""
+
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:928
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening the demos directory."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:914
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:938
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening the config directory."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:922
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:946
 msgctxt "StartupScreen"
 msgid ""
 "Are you sure to reset all settings? They include (but are not limited to):"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:923
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:947
 msgctxt "StartupScreen"
 msgid "All graphics/audio settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:924
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:948
 msgctxt "StartupScreen"
 msgid "All key bindings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:925
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:949
 msgctxt "StartupScreen"
 msgid "Your player name"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:929
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:127
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:953
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:125
 msgctxt "StartupScreen"
 msgid "Advanced"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:927
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:951
 #, c++-format
 msgctxt "StartupScreen"
 msgid ""
@@ -3384,23 +3575,23 @@ msgid ""
 "commands."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:976
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1000
 #, c++-format
 msgctxt "StartupScreen"
 msgid "Unknown ({0})"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1034
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1058
 msgctxt "StartupScreen"
 msgid "Copy to Clipboard"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1056
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1080
 msgctxt "StartupScreen"
 msgid "Advanced Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1064
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1091
 msgctxt "StartupScreen"
 msgid "Filter"
 msgstr ""
@@ -3415,43 +3606,48 @@ msgctxt "StartupScreen"
 msgid "Official Website"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:75
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:73
 msgctxt "StartupScreen"
 msgid "Skip this screen next time"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:123
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:121
 msgctxt "StartupScreen"
 msgid "Graphics"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:124
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:122
 msgctxt "StartupScreen"
 msgid "Audio"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:125
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:123
 msgctxt "StartupScreen"
 msgid "Generic"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:126
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:124
 msgctxt "StartupScreen"
 msgid "System Info"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:139
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:137
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening this url."
 msgstr ""
 
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:137
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:152
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:147
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:163
 msgctxt "MessageBox"
 msgid "OK"
 msgstr ""
 
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:152
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:163
 msgctxt "MessageBox"
 msgid "Cancel"
+msgstr ""
+
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:186
+msgctxt "MessageBox"
+msgid "Open this link in your browser?"
 msgstr ""
