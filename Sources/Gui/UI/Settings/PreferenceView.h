@@ -25,6 +25,7 @@
 
 #include <Gui/UI/Settings/PreferenceLayouter.h>
 #include <Gui/UI/Widgets/Button.h>
+#include <Gui/UI/Widgets/TextViewer.h>
 
 namespace spades {
 	namespace client {
@@ -92,6 +93,9 @@ namespace spades {
 
 			int selectedTabIndex = 0;
 
+			ui::TextViewer* helpView = nullptr; // weak; owned as a child
+			float helpTop = 0.0F;               // help box Y for tabs without nav buttons
+
 			ui::ListView* GetTabList(int idx);
 			void RestorePersistedState();
 			void SavePersistedState();
@@ -99,6 +103,7 @@ namespace spades {
 			            HeadingNavIndex* nav = nullptr);
 			void OnTabButtonActivated(ui::UIElement& sender);
 			void UpdateTabs();
+			void SetHelpText(const std::string& text);
 			void OnClosePressed(ui::UIElement& sender);
 			void OnEditHUDRequested(ui::UIElement& sender);
 			void OnHUDEditDone(ui::UIElement& sender);

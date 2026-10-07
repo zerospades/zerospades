@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,9 @@ namespace spades {
 			std::vector<HeadingNavEntry> entries;
 			ui::ListView* list = nullptr; // weak
 
+			/** Set by PreferenceView; called with the hovered row's help, or "" on leave. */
+			std::function<void(const std::string&)> helpHandler;
+
 			HeadingNavIndex() {}
 		};
 
@@ -84,6 +88,7 @@ namespace spades {
 			client::FontManager* fontManager; // weak
 
 			std::vector<HeadingNavEntry> headings;
+			std::vector<std::string> rowHelp; // help text per row; empty = row clears the help box
 
 			void OnKeyBound(ui::UIElement& sender);
 			ui::UIElement* CreateItem();
@@ -132,9 +137,12 @@ namespace spades {
 			void AddTargetPreview();
 			void AddScopePreview();
 
-			void MarkLastAsBadge(const std::string& text, const Vector4& textColor, const Vector4& outlineColor);
-			void MarkLastAsNew();
-			void MarkLastAsUpdated();
+			void AddBadge(const std::string& text, const Vector4& textColor, const Vector4& outlineColor);
+			void AddBadgeNew();
+			void AddBadgeUpdated();
+
+			/** Shows `text` in the sidebar help box while the mouse is over the last row. */
+			void AddHelp(const std::string& text);
 
 			void FinishLayout();
 		};

@@ -50,11 +50,26 @@ namespace spades {
 			                  _Tr("Preferences", "OFF")},
 			                 {2, 1, 0});
 			l.AddToggleField(_Tr("Preferences", "Full Aim Down Sight"), "cg_trueAimDownSight");
+			l.AddHelp(_Tr("Preferences",
+				"Lets the viewmodel reach full aiming. When off, ADS "
+				"stops halfway (partial / hip-style aim)."));
 			l.AddToggleField(_Tr("Preferences", "Classic Weapon Recoil"), "cg_classicWeaponRecoil");
+			l.AddHelp(_Tr("Preferences",
+				"Original `AoS 0.75` recoil (stronger while jumping/moving, especially with "
+				"the SMG). When off, uses the more controllable `OpenSpades 0.1.3` style."));
 			l.AddToggleField(_Tr("Preferences", "Classic Sprinting"), "cg_classicSprinting");
+			l.AddHelp(_Tr("Preferences",
+				"Sprint input stays active even while standing still. When "
+				"off, sprint cancels as soon as you stop moving."));
 			l.AddToggleField(_Tr("Preferences", "Classic Zoom"), "cg_classicZoom");
+			l.AddHelp(_Tr("Preferences",
+				"Uses the same zoom level for every weapon, `AoS 0.75` behavior. When off, each "
+				"weapon has its own zoom: rifle stronger, SMG moderate, shotgun weaker."));
 			l.AddToggleField(_Tr("Preferences", "Automatic Unscope"), "cg_autoUnscope");
-			l.MarkLastAsNew();
+			l.AddHelp(_Tr("Preferences",
+				"Automatically exits aim down sights after firing (except with the SMG). "
+				"Useful for faster follow-up shots with rifle and shotgun."));
+			l.AddBadgeNew();
 
 			l.AddHeading(_Tr("Preferences", "Effects"));
 			l.AddChoiceField(_Tr("Preferences", "Blood"), "cg_blood",
@@ -125,17 +140,33 @@ namespace spades {
 			l.AddSliderField(_Tr("Preferences", "Field of View"), "cg_fov", 45, 110, 1,
 			                 FOVFormatter());
 			l.AddToggleField(_Tr("Preferences", "Horizontal FOV"), "cg_horizontalFov");
+			l.AddHelp(_Tr("Preferences",
+				"Applies the FOV value to the horizontal axis instead of the vertical. "
+				"Useful on ultrawide monitors to keep a consistent horizontal view."));
 			l.AddToggleField(_Tr("Preferences", "Environmental Audio"), "cg_environmentalAudio");
-			l.AddToggleField(_Tr("Preferences", "Skip dead players (death cam)"),
-			                 "cg_skipDeadPlayersWhenDead");
+			l.AddHelp(_Tr("Preferences",
+				"Adds environmental reverb to weapon sounds based on the surroundings. "
+				"When off, gunshots sound more direct and consistent."));
+			l.AddToggleField(_Tr("Preferences", "Skip dead players (death cam)"), "cg_skipDeadPlayersWhenDead");
+			l.AddHelp(_Tr("Preferences",
+				"When dead, other dead players will be skipped when cycling through players. When "
+				"off, you can also follow dead players."));
 			l.AddToggleField(_Tr("Preferences", "Save Final Score Screenshot"), "cg_autoScreenshot");
+			l.AddHelp(_Tr("Preferences",
+				"Automatically takes a screenshot of the scoreboard when a team wins."));
 			l.AddToggleField(_Tr("Preferences", "Debug Hit Detection"), "cg_debugHitTest");
+			l.AddHelp(_Tr("Preferences",
+				"Shows a debug overlay of player hitboxes and bullet impact points "
+				"after each shot. Useful for diagnosing hit registration issues."));
 			l.AddSliderField(_Tr("Preferences", "Hit Debugger Size"), "cg_debugHitTestSize", 64, 256,
 			                 8, NumberFormatter(0, "px"));
 			l.AddControl(_Tr("Preferences", "Toggle Hit Debugger Zoom"), "cg_keyToggleHitTestZoom");
 			l.AddSliderField(_Tr("Preferences", "Hit Debugger Fade Time"), "cg_debugHitTestFadeTime",
 			                 1, 20, 1, NumberFormatter(0, "s"));
 			l.AddToggleField(_Tr("Preferences", "Debug Weapon Spread"), "cg_debugAim");
+			l.AddHelp(_Tr("Preferences",
+				"Draws a visual indicator of the current weapon's spread cone. "
+				"Useful for understanding accuracy while moving, jumping, or aiming."));
 			l.AddToggleField(_Tr("Preferences", "Debug Block Cursor"), "cg_debugBlockCursor");
 			l.AddToggleField(_Tr("Preferences", "Debug Players Hitbox"), "cg_debugPlayerHitboxes");
 			l.AddToggleField(_Tr("Preferences", "Debug Weapon Anchor Points"),
@@ -177,11 +208,10 @@ namespace spades {
 			l.AddChoiceField(_Tr("Preferences", "HUD Ammo Style"), "cg_hudAmmoStyle",
 			                 {_Tr("Preferences", "NORMAL"), _Tr("Preferences", "SIMPLE")}, {0, 1});
 			l.AddToggleField(_Tr("Preferences", "Show Tool Hotbar"), "cg_hudHotbar");
-			l.MarkLastAsUpdated();
 			// The compass also needs the server's permission, so turning this on does
 			// not put one on screen where the server does not allow it.
 			l.AddToggleField(_Tr("Preferences", "Show Compass Bar"), "cg_hudCompassBar");
-			l.MarkLastAsNew();
+			l.AddBadgeNew();
 			l.AddChoiceField(_Tr("Preferences", "Show Alive Player Count"), "cg_hudPlayerCount",
 			                 {_Tr("Preferences", "OFF"), _Tr("Preferences", "Top"),
 			                  _Tr("Preferences", "Bottom")},
@@ -332,13 +362,26 @@ namespace spades {
 			                 RenderScaleFormatter());
 			l.AddToggleField(_Tr("Preferences", "Rendering Statistics"), "r_debugTiming");
 			l.AddToggleField(_Tr("Preferences", "Allow CPU Rendering"), "r_allowSoftwareRendering");
+			l.AddHelp(_Tr("Preferences",
+				"Allows OpenGL to fall back to a software implementation if no "
+				"GPU is available. Very slow; mainly useful on Linux. Prefer the "
+				"dedicated Software renderer instead."));
 
 			l.AddHeading(_Tr("Preferences", "World"));
 			l.AddToggleField(_Tr("Preferences", "Dynamic Lights"), "r_dlights");
 			l.AddToggleField(_Tr("Preferences", "Tracers Lights"), "cg_tracerLights");
 			l.AddToggleField(_Tr("Preferences", "Depth Prepass"), "r_depthPrepass");
+			l.AddHelp(_Tr("Preferences",
+				"Fills the depth buffer before shading so hidden pixels can be "
+				"skipped. Usually improves performance. Forced on when SSAO is enabled."));
 			l.AddToggleField(_Tr("Preferences", "Occlusion Querying"), "r_occlusionQuery");
+			l.AddHelp(_Tr("Preferences",
+				"Uses GPU occlusion queries when rendering water to skip it when "
+				"fully hidden. Can improve FPS, but may crash some drivers."));
 			l.AddToggleField(_Tr("Preferences", "Object Outlines"), "r_outlines");
+			l.AddHelp(_Tr("Preferences",
+				"Draws cartoon-style outlines around players and map. "
+				"OpenGL renderer only."));
 
 			l.AddHeading(_Tr("Preferences", "Post-processing"));
 			l.AddToggleField(_Tr("Preferences", "Depth Of Field"), "r_depthOfField");
@@ -386,8 +429,15 @@ namespace spades {
 			l.AddSliderField(_Tr("Preferences", "ADS Mouse Sens. Scale"), "cg_zoomedMouseSensScale",
 			                 0.05F, 3, 0.05F, NumberFormatter(2, "x"));
 			l.AddToggleField(_Tr("Preferences", "Mouse Acceleration"), "cg_mouseAccel");
+			l.AddHelp(_Tr("Preferences",
+				"Scales mouse sensitivity by movement speed. Fast flicks turn more, "
+				"slow movements less. When off, response is linear."));
 			l.AddSliderField(_Tr("Preferences", "Exponential Power"), "cg_mouseExpPower", 0.5F, 1.5F,
-			                 0.02F, NumberFormatter(2, "", "^"));
+							 0.02F, NumberFormatter(2, "", "^"));
+			l.AddHelp(_Tr("Preferences",
+				"Curve strength. Above 1.0 dampens slow movements, "
+				"below 1.0 boosts them. Requires `{0}`.",
+				_Tr("Preferences", "Mouse Acceleration")));
 			l.AddToggleField(_Tr("Preferences", "Invert Y-axis Mouse Input"), "cg_invertMouseY");
 			l.AddControl(_Tr("Preferences", "Reload"), "cg_keyReloadWeapon");
 			l.AddControl(_Tr("Preferences", "Equip Spade"), "cg_keyToolSpade");
@@ -426,11 +476,11 @@ namespace spades {
 			l.AddControl(_Tr("Preferences", "Chat Log"), "cg_keyChatLog");
 			l.AddControl(_Tr("Preferences", "Chat Zoom"), "cg_keyZoomChatLog");
 			l.AddControl(_Tr("Preferences", "Pie Menu"), "cg_keyPieMenu");
-			l.MarkLastAsNew();
+			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Show Teammates"), "cg_keyTeamOverlay");
-			l.MarkLastAsNew();
+			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Team Ping"), "cg_keyTeamPing");
-			l.MarkLastAsNew();
+			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Limbo Menu"), "cg_keyLimbo");
 			l.AddControl(_Tr("Preferences", "Save Map"), "cg_keySaveMap");
 			l.AddControl(_Tr("Preferences", "Save Sceneshot"), "cg_keySceneshot");
@@ -439,7 +489,9 @@ namespace spades {
 			l.AddControl(_Tr("Preferences", "Master Volume Down"), "cg_keyVolumeDown");
 			l.AddControl(_Tr("Preferences", "Network Graph"), "cg_keyNetgraph");
 			l.AddControl(_Tr("Preferences", "Force Spectator Mode"), "cg_keyStaffSpectating");
-
+			l.AddHelp(_Tr("Preferences",
+				"Toggles staff spectator mode. Lets you free-cam and follow players "
+				"without leaving your team (intended for admins/staff)."));
 			l.FinishLayout();
 		}
 
@@ -464,13 +516,18 @@ namespace spades {
 			                true, true);
 			l.AddInputField(_Tr("Preferences", "Mod List URL"), "cl_modsIndexUrl", true, true);
 			l.AddToggleField(_Tr("Preferences", "Allow Unicode"), "cg_unicode");
+			l.AddHelp(_Tr("Preferences",
+				"Lets you use other alphabets and symbols (such as Cyrillic or Japanese) "
+				"in chat and in your name. When off, they are replaced by a placeholder."));
 			l.AddChoiceStringField(_Tr("Preferences", "Screenshot Format"), "cg_screenshotFormat",
 			                       {"PNG", "JPEG", "TGA"}, {"png", "jpeg", "tga"});
 			l.AddSliderField(_Tr("Preferences", "JPEG Quality"), "core_jpegQuality", 1, 100, 1,
 			                 NumberFormatter(0, "%"));
 			l.AddToggleField(_Tr("Preferences", "Enable Startup Window"), "cl_showStartupWindow");
 			l.AddToggleField(_Tr("Preferences", "Show Update Prompt"), "cl_zsUpdatePrompt");
-
+			l.AddHelp(_Tr("Preferences",
+				"Shows the setup window every time you start the game. When off, goes "
+				"straight to the main menu."));
 			l.AddHeading(_Tr("Preferences", "Demo Recording"));
 			l.AddControl(_Tr("Preferences", "Start/Stop Recording"), "cg_keyDemoRecord");
 			l.AddToggleField(_Tr("Preferences", "Auto Record"), "cg_demoAutoRecord");

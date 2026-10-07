@@ -18,8 +18,11 @@
 
  */
 
+#include <algorithm>
+
 #include "ConfigDesigners.h"
 #include "PreferenceView.h"
+#include <Client/Fonts.h>
 #include <Client/IRenderer.h>
 #include <Core/Strings.h>
 #include <Gui/UI/Framework/UIManager.h>
@@ -101,6 +104,7 @@ namespace spades {
 			Handle<HeadingNavIndex> hudNav = Handle<HeadingNavIndex>::New();
 			Handle<HeadingNavIndex> rendererNav = Handle<HeadingNavIndex>::New();
 			Handle<HeadingNavIndex> controlsNav = Handle<HeadingNavIndex>::New();
+			Handle<HeadingNavIndex> miscNav = Handle<HeadingNavIndex>::New();
 
 			AddTab(Handle<GameOptionsPanel>::New(manager, options, fontManager,
 			                                     gameNav.GetPointerOrNull())
@@ -121,8 +125,10 @@ namespace spades {
 			                                        controlsNav.GetPointerOrNull())
 			           .GetPointerOrNull(),
 			       _Tr("Preferences", "Controls"), controlsNav.GetPointerOrNull());
-			AddTab(Handle<MiscOptionsPanel>::New(manager, options, fontManager).GetPointerOrNull(),
-			       _Tr("Preferences", "Misc"));
+			AddTab(Handle<MiscOptionsPanel>::New(manager, options, fontManager,
+			                                     miscNav.GetPointerOrNull())
+			           .GetPointerOrNull(),
+			       _Tr("Preferences", "Misc"), miscNav.GetPointerOrNull());
 
 			float backButtonTop = tabTop + static_cast<float>(tabs.size()) * tabRowHeight + 5.0F;
 
@@ -170,6 +176,26 @@ namespace spades {
 
 					AddChild(container.GetPointerOrNull());
 					tab->navPanel = container.GetPointerOrNull();
+				}
+			}
+
+			// help box shown in the sidebar space left below the navigation buttons
+			helpTop = backButtonTop + tabRowHeight + 12.0F;
+			{
+				Handle<ui::TextViewer> e = Handle<ui::TextViewer>::New(manager);
+				e->SetFont(&fontManager->GetSmallFont());
+				e->rowHeight = 12.0F;
+				// read-only box: not hoverable, so it never shows the I-beam cursor
+				e->isMouseInteractive = false;
+				e->parseInlineCode = true;
+				e->SetBounds(AABB2(tabLeft, helpTop, tabWidth, panelBottom - 10.0F - helpTop));
+				AddChild(e.GetPointerOrNull());
+				helpView = e.GetPointerOrNull();
+
+				for (size_t i = 0; i < tabs.size(); i++) {
+					HeadingNavIndex* nav = tabs[i]->headingNav.GetPointerOrNull();
+					if (nav != nullptr)
+						nav->helpHandler = [this](const std::string& s) { SetHelpText(s); };
 				}
 			}
 
@@ -258,6 +284,31 @@ namespace spades {
 				if (tabs[i]->navPanel != nullptr)
 					tabs[i]->navPanel->visible = selected;
 			}
+
+			// switching tabs must not keep the previous tab's help text
+			SetHelpText(std::string());
+		}
+
+		void PreferenceView::SetHelpText(const std::string& text) {
+			if (helpView == nullptr || selectedTabIndex < 0 ||
+			    selectedTabIndex >= static_cast<int>(tabs.size()))
+				return;
+
+			if (text.empty()) {
+				helpView->SetText(text);
+				return;
+			}
+
+			// start right below this tab's nav buttons (or below Back when it has none)
+			float top = helpTop;
+			ui::UIElement* navPanel = tabs[selectedTabIndex]->navPanel;
+			if (navPanel != nullptr)
+				top = navPanel->GetBounds().max.y + 12.0F;
+
+			// use whatever sidebar height is left
+			float height = std::max(0.0F, panelBottom - 10.0F - top);
+			helpView->SetBounds(AABB2(tabLeft, top, tabWidth, height));
+			helpView->SetText(text);
 		}
 
 		void PreferenceView::OnClosePressed(UIElement&) { Close(); }

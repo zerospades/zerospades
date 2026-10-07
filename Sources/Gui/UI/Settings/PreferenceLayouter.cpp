@@ -19,6 +19,7 @@
  */
 
 #include <algorithm>
+#include <functional>
 
 #include "ConfigDesigners.h"
 #include "PreferenceLayouter.h"
@@ -320,7 +321,7 @@ namespace spades {
 			              [f](UIElement& s) { f->OnRandomizePressed(s); });
 		}
 
-		void StandardPreferenceLayouter::MarkLastAsBadge(const std::string& text,
+		void StandardPreferenceLayouter::AddBadge(const std::string& text,
                                                  const Vector4& textColor,
                                                  const Vector4& outlineColor)
 		{
@@ -358,16 +359,43 @@ namespace spades {
 			container->AddChild(badge.GetPointerOrNull());
 		}
 
-		void StandardPreferenceLayouter::MarkLastAsNew() {
-			MarkLastAsBadge(_Tr("Preferences", "NEW"),
+		void StandardPreferenceLayouter::AddBadgeNew() {
+			AddBadge(_Tr("Preferences", "NEW"),
 							MakeVector4(1.0F, 0.85F, 0.2F, 1.0F),
 							MakeVector4(0.25F, 0.2F, 0.05F, 1.0F));
 		}
 
-		void StandardPreferenceLayouter::MarkLastAsUpdated() {
-			MarkLastAsBadge(_Tr("Preferences", "MOD."),
+		void StandardPreferenceLayouter::AddBadgeUpdated() {
+			AddBadge(_Tr("Preferences", "MOD."),
 							MakeVector4(0.4F, 0.85F, 1.0F, 1.0F),
 							MakeVector4(0.1F, 0.25F, 0.35F, 1.0F));
+		}
+
+		// Chains an enter handler on `elm` and every descendant so the help text is
+		// shown when the mouse enters, keeping any handlers already installed. There is
+		// deliberately no leave handler: the text stays until another row is entered.
+		static void ChainHelpEvents(UIElement* elm,
+		                            const std::function<void(const std::string&)>& handler,
+		                            const std::string& text) {
+			EventHandler prevEnter = elm->mouseEntered;
+			elm->mouseEntered = [prevEnter, handler, text](UIElement& e) {
+				if (prevEnter)
+					prevEnter(e);
+				handler(text);
+			};
+
+			for (const Handle<UIElement>& child : elm->GetChildren())
+				ChainHelpEvents(child.GetPointerOrNull(), handler, text);
+		}
+
+		void StandardPreferenceLayouter::AddHelp(const std::string& text) {
+			if (items.empty())
+				return;
+
+			// the handlers are installed in FinishLayout, once every row is known
+			if (rowHelp.size() < items.size())
+				rowHelp.resize(items.size());
+			rowHelp[items.size() - 1] = text;
 		}
 
 		void StandardPreferenceLayouter::FinishLayout() {
@@ -383,6 +411,27 @@ namespace spades {
 			if (headingNav && headings.size() >= 2) {
 				headingNav->entries = headings;
 				headingNav->list = list.GetPointerOrNull();
+			}
+
+			// Hook every row, including those without help, so that entering a row
+			// without help clears the previous row's text.
+			if (headingNav) {
+				HeadingNavIndex* nav = headingNav.GetPointerOrNull();
+				std::function<void(const std::string&)> handler = [nav](const std::string& s) {
+					if (nav->helpHandler)
+						nav->helpHandler(s);
+				};
+
+				for (size_t i = 0; i < items.size(); i++) {
+					UIElement* row = items[i].GetPointerOrNull();
+
+					// Labels ignore the mouse, so make the whole row hoverable. Child controls
+					// are hit-tested first, so the row only catches the caption and empty space.
+					row->isMouseInteractive = true;
+
+					ChainHelpEvents(row, handler,
+					                i < rowHelp.size() ? rowHelp[i] : std::string());
+				}
 			}
 		}
 	} // namespace gui
