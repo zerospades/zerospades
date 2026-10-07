@@ -1195,7 +1195,8 @@ namespace spades {
 					}
 
 					// failed to connect.
-					Handle<AlertScreen> al = Handle<AlertScreen>::New(this, msg, 200.0F, true);
+					Handle<AlertScreen> al =
+					    Handle<AlertScreen>::New(this, msg, 200.0F, true, true);
 					al->Run();
 				}
 			}

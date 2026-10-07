@@ -38,7 +38,7 @@ namespace spades {
 
 		MessageBoxScreen::MessageBoxScreen(UIElement* owner, const std::string& text,
 		                                   const std::vector<std::string>& buttons, float height,
-		                                   bool showOverlay)
+		                                   bool showOverlay, bool allowLinks)
 		    : UIElement(&owner->GetManager()), owner(owner) {
 			SetFont(GetManager().GetRootElement().GetFont());
 			SetBounds(owner->GetBounds());
@@ -87,6 +87,15 @@ namespace spades {
 				AddChild(viewer.GetPointerOrNull());
 				viewer->SetBounds(
 				    AABB2(contentsLeft, contentsTop, contentsWidth, contentsHeight - 40.0F));
+				// Links must be set up before the text, since the model reads the flag in
+				// SetText. Every link goes through the confirmation dialog, owned by this
+				// dialog.
+				if (allowLinks) {
+					viewer->parseLinks = true;
+					viewer->linkActivated = [this](const std::string& url) {
+						ConfirmOpenLink(this, url);
+					};
+				}
 				viewer->SetText(text);
 			}
 		}
@@ -134,8 +143,9 @@ namespace spades {
 		// -- AlertScreen --
 
 		AlertScreen::AlertScreen(UIElement* owner, const std::string& text, float height,
-		                         bool showOverlay)
-		    : MessageBoxScreen(owner, text, {_Tr("MessageBox", "OK")}, height, showOverlay) {}
+		                         bool showOverlay, bool allowLinks)
+		    : MessageBoxScreen(owner, text, {_Tr("MessageBox", "OK")}, height, showOverlay,
+		                       allowLinks) {}
 
 		void AlertScreen::HotKey(const std::string& key) {
 			if (IsEnabled() && (key == "Enter" || key == "Escape")) {

@@ -42,9 +42,16 @@ namespace spades {
 			ui::EventHandler closed;
 			int resultIndex = -1;
 
+			/**
+			 * @param allowLinks When true, http(s) URLs in `text` are drawn as links and
+			 *                   a click on one asks for confirmation before opening it.
+			 *                   Leave it off for dialogs that display a URL themselves
+			 *                   (such as the link confirmation), or the URL would become a
+			 *                   link to another confirmation.
+			 */
 			MessageBoxScreen(ui::UIElement* owner, const std::string& text,
 			                 const std::vector<std::string>& buttons, float height = 200.0F,
-			                 bool showOverlay = false);
+			                 bool showOverlay = false, bool allowLinks = false);
 
 			void EndDialog(int result);
 			void Close();
@@ -56,7 +63,7 @@ namespace spades {
 		class AlertScreen : public MessageBoxScreen {
 		public:
 			AlertScreen(ui::UIElement* owner, const std::string& text, float height = 200.0F,
-			            bool showOverlay = false);
+			            bool showOverlay = false, bool allowLinks = false);
 			void HotKey(const std::string& key) override;
 		};
 
