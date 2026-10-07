@@ -295,6 +295,7 @@ namespace spades {
 			AddConfigLabel(*this, 0, 0, 24.0F, label);
 
 			Handle<Field> b = Handle<Field>::New(&GetManager());
+			b->textOrigin *= 0.5F;
 			b->changed = [this](UIElement& s) { StateChanged(s); };
 			field = b.GetPointerOrNull();
 			field->removeNewlines = true;
