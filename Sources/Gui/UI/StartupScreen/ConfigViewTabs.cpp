@@ -55,6 +55,9 @@ namespace spades {
 				e->SetBounds(AABB2(mainWidth + 10.0F, 0.0F, size.x - mainWidth - 10.0F, size.y));
 				e->SetFont(&ui->GetFontManager().GetGuiFont());
 				e->SetText(_Tr("StartupScreen", "Graphics Settings"));
+				// read-only box: not hoverable, so it never shows the I-beam cursor
+				e->isMouseInteractive = false;
+				e->parseInlineCode = true;
 				AddChild(e.GetPointerOrNull());
 				helpView = e.GetPointerOrNull();
 			}
@@ -286,7 +289,7 @@ namespace spades {
 				                "Applies both local illumination and global illumination to the "
 				                "fog.") +
 				            "\n\n" +
-				            _Tr("StartupScreen", "Warning: '{0}' must be enabled.",
+				            _Tr("StartupScreen", "Warning: `{0}` must be enabled.",
 				                _Tr("StartupScreen", "Global Illumination")))
 				        .Cast<UIElement>());
 
@@ -596,6 +599,9 @@ namespace spades {
 				e->SetBounds(AABB2(mainWidth + 10.0F, 0.0F, size.x - mainWidth - 10.0F, size.y));
 				e->SetFont(&ui->GetFontManager().GetGuiFont());
 				e->SetText(_Tr("StartupScreen", "Audio Settings"));
+				// read-only box: not hoverable, so it never shows the I-beam cursor
+				e->isMouseInteractive = false;
+				e->parseInlineCode = true;
 				AddChild(e.GetPointerOrNull());
 				helpView = e.GetPointerOrNull();
 			}
@@ -1073,6 +1079,9 @@ namespace spades {
 				e->SetFont(&ui->GetFontManager().GetGuiFont());
 				e->SetText(_Tr("StartupScreen", "Advanced Settings"));
 				e->visible = false;
+				// read-only box: not hoverable, so it never shows the I-beam cursor
+				e->isMouseInteractive = false;
+				e->parseInlineCode = true;
 				AddChild(e.GetPointerOrNull());
 				helpView = e.GetPointerOrNull();
 			}
