@@ -29,6 +29,7 @@
 #include <Gui/UI/Widgets/DrawUtils.h>
 #include <Gui/UI/Widgets/Label.h>
 #include <Gui/UI/Widgets/TextViewer.h>
+#include <Gui/UI/Widgets/MessageBox.h>
 
 SPADES_SETTING(cg_keyGlobalChat);
 SPADES_SETTING(cg_keyTeamChat);
@@ -119,6 +120,11 @@ namespace spades {
 				Handle<TextViewer> v = Handle<TextViewer>::New(manager);
 				AddChild(v.GetPointerOrNull());
 				v->SetBounds(AABB2(contentsLeft, contentsTop, contentsWidth, contentsHeight - 40.0F));
+				// every link goes through a confirmation dialog.
+				v->parseLinks = true;
+				v->linkActivated = [this](const std::string& url) {
+					gui::ConfirmOpenLink(this, url);
+				};
 				viewer = v.GetPointerOrNull();
 			}
 		}

@@ -70,5 +70,12 @@ namespace spades {
 
 			void HotKey(const std::string& key) override;
 		};
+
+		/**
+		 * Asks the user to confirm before opening `url` in the system browser.
+		 * Only http and https URLs are accepted. `owner` must be a full-screen
+		 * element that has a parent, since the dialog is attached next to it.
+		 */
+		void ConfirmOpenLink(ui::UIElement* owner, const std::string& url);
 	} // namespace gui
 } // namespace spades

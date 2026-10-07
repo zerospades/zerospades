@@ -24,6 +24,7 @@
 #include "MessageBox.h"
 #include "TextViewer.h"
 #include <Client/IRenderer.h>
+#include <Core/ShellApi.h>
 #include <Core/Strings.h>
 #include <Gui/UI/Framework/UIManager.h>
 
@@ -160,6 +161,29 @@ namespace spades {
 			} else {
 				UIElement::HotKey(key);
 			}
+		}
+
+		// -- ConfirmOpenLink --
+
+		void ConfirmOpenLink(UIElement* owner, const std::string& url) {
+			if (owner == nullptr || owner->GetParent() == nullptr)
+				return;
+
+			// only plain web links are ever opened
+			if (url.compare(0, 7, "http://") != 0 && url.compare(0, 8, "https://") != 0)
+				return;
+
+			std::string text = _Tr("MessageBox", "Open this link in your browser?") + "\n\n" + url;
+			// the overlay darkens the whole screen behind the dialog
+			Handle<ConfirmScreen> dlg = Handle<ConfirmScreen>::New(owner, text, 120.0F, true);
+
+			// the callback only reads the result, so it never keeps the dialog alive itself
+			dlg->closed = [url](UIElement& s) {
+				ConfirmScreen* screen = dynamic_cast<ConfirmScreen*>(&s);
+				if (screen != nullptr && screen->GetResult())
+					OpenURLInBrowser(url);
+			};
+			dlg->Run();
 		}
 	} // namespace gui
 } // namespace spades
