@@ -150,7 +150,7 @@ namespace spades {
 
 		void ChatLogWindow::OnChat(bool isTeam) {
 			if (sayWindow != nullptr) {
-				sayWindow->SetIsTeamChat(true);
+				sayWindow->SetIsTeamChat(isTeam);
 				return;
 			}
 
