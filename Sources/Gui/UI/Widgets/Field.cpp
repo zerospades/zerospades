@@ -32,6 +32,27 @@
 namespace spades {
 	namespace gui {
 		namespace ui {
+			namespace {
+				bool IsContinuationByte(char c) {
+					return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+				}
+
+				int NextChar(const std::string& s, int i) {
+					int len = static_cast<int>(s.size());
+					return std::min(len, GetByteIndexForString(s, 1, i));
+				}
+
+				int PrevChar(const std::string& s, int i) {
+					i = std::min(i, static_cast<int>(s.size()));
+					if (i <= 0)
+						return 0;
+					i--;
+					while (i > 0 && IsContinuationByte(s[i]))
+						i--;
+					return i;
+				}
+			} // namespace
+
 			FieldBase::FieldBase(UIManager* manager) : UIElement(manager) {
 				isMouseInteractive = true;
 				acceptsFocus = true;
@@ -50,6 +71,7 @@ namespace spades {
 
 			void FieldBase::SetText(const std::string& value) {
 				text = value;
+				scrollIndex = 0;
 				// Clamp the cursor/mark to the new text's length. Without this, a
 				// shorter (or empty) text leaves a stale position that later causes
 				// std::string::substr() to throw std::out_of_range on the next edit.
@@ -153,35 +175,33 @@ namespace spades {
 					return AABB2();
 				Vector2 textPos = textOrigin;
 				Vector2 siz = size;
-				float width = font->Measure(text.substr(0, cursorPosition)).x;
-				float fontHeight = font->Measure("A").y;
+				int scroll = std::min(scrollIndex, static_cast<int>(text.size()));
+				float width = leadingOffset + MeasureRange(text, scroll, cursorPosition);
+				float fontHeight = font->Measure("A").y * textScale;
 				return AABB2(textPos.x + width, textPos.y, siz.x - textPos.x - width, fontHeight);
 			}
 
 			int FieldBase::PointToCharIndex(float x) const {
-				x -= textOrigin.x;
-				if (x < 0.0F)
-					return 0;
-				x /= textScale;
-				int len = static_cast<int>(text.size());
-				float lastWidth = 0.0F;
 				client::IFont* font = GetFont();
 				if (!font)
 					return 0;
-				int idx = 0;
-				for (int i = 1; i <= len; i++) {
+				int len = static_cast<int>(text.size());
+				int scroll = std::min(scrollIndex, len);
+
+				// Positions are measured from the first visible character.
+				x -= textOrigin.x + leadingOffset;
+				if (x < 0.0F) // left of the visible text: step back so drags scroll
+					return PrevChar(text, scroll);
+
+				float lastWidth = 0.0F;
+				int idx = scroll;
+				while (idx < len) {
 					int lastIdx = idx;
-					idx = GetByteIndexForString(text, 1, idx);
-					float width = font->Measure(text.substr(0, idx)).x;
-					if (width > x) {
-						if (x < (lastWidth + width) * 0.5F)
-							return lastIdx;
-						else
-							return idx;
-					}
+					idx = NextChar(text, idx);
+					float width = MeasureRange(text, scroll, idx);
+					if (width > x)
+						return x < (lastWidth + width) * 0.5F ? lastIdx : idx;
 					lastWidth = width;
-					if (idx >= len)
-						return len;
 				}
 				return len;
 			}
@@ -234,8 +254,8 @@ namespace spades {
 				std::string oldText = GetSelectedText();
 				SetSelectedText(t);
 
-				// if text overflows, deny the insertion
-				if (!FitsInBox(text) || static_cast<int>(text.size()) > maxLength) {
+				// Text wider than the box scrolls; only the length is limited.
+				if (static_cast<int>(text.size()) > maxLength) {
 					SetSelectedText(oldText);
 					return;
 				}
@@ -348,6 +368,50 @@ namespace spades {
 				return font->Measure(t).x * textScale < size.x - textOrigin.x;
 			}
 
+			float FieldBase::MeasureRange(const std::string& s, int from, int to) const {
+				client::IFont* font = GetFont();
+				if (!font || to <= from)
+					return 0.0F;
+				return font->Measure(s.substr(from, to - from)).x * textScale;
+			}
+
+			float FieldBase::GetVisibleTextWidth() const {
+				return std::max(0.0F, size.x - textOrigin.x * 2.0F);
+			}
+
+			int FieldBase::UpdateScroll(const std::string& s, int caret) {
+				int len = static_cast<int>(s.size());
+				caret = Clamp(caret, 0, len);
+				float avail = GetVisibleTextWidth();
+
+				int scroll = Clamp(scrollIndex, 0, len);
+				while (scroll > 0 && scroll < len && IsContinuationByte(s[scroll]))
+					scroll--;
+
+				// Bring the caret into view...
+				if (caret < scroll)
+					scroll = caret;
+				while (scroll < caret && MeasureRange(s, scroll, caret) > avail)
+					scroll = NextChar(s, scroll);
+				// ...and don't leave room unused at the end (e.g. after deleting).
+				while (scroll > 0) {
+					int prev = PrevChar(s, scroll);
+					if (MeasureRange(s, prev, len) > avail)
+						break;
+					scroll = prev;
+				}
+				scrollIndex = scroll;
+
+				int end = scroll;
+				while (end < len) {
+					int next = NextChar(s, end);
+					if (MeasureRange(s, scroll, next) > avail)
+						break;
+					end = next;
+				}
+				return end;
+			}
+
 			void FieldBase::DrawHighlight(client::IRenderer& r, float x, float y, float w, float h) {
 				SetColorNP(r, highlightColor);
 				r.DrawImage(nullptr, AABB2(x, y, w, h));
@@ -365,21 +429,10 @@ namespace spades {
 			}
 
 			std::string FieldBase::TruncateToFit(const std::string& t) const {
-				if (FitsInBox(t))
+				client::IFont* font = GetFont();
+				if (!font)
 					return t;
-
-				std::string suffix = "..";
-				int charLen = GetCharIndexForString(t, static_cast<int>(t.size()));
-
-				while (charLen > 0) {
-					charLen--;
-					int byteIdx = GetByteIndexForString(t, charLen);
-					std::string candidate = t.substr(0, byteIdx) + suffix;
-					if (FitsInBox(candidate))
-						return candidate;
-				}
-
-				return suffix;
+				return ElideText(*font, t, size.x - textOrigin.x, textScale, TextElision::End);
 			}
 
 			void FieldBase::Render() {
@@ -391,6 +444,7 @@ namespace spades {
 				Vector2 pos = GetScreenPosition();
 				std::string displayText = text;
 				Vector2 textPos = textOrigin + pos;
+				Vector4 color = IsEnabled() ? textColor : disabledTextColor;
 
 				std::string composition = GetEditingText();
 				int editStart = GetTextEditingRangeStart();
@@ -408,36 +462,65 @@ namespace spades {
 				}
 
 				if (IsFocused()) {
-					float fontHeight = font->Measure("A").y;
+					leadingOffset = 0.0F;
+					int caret = composition.empty() ? cursorPosition : markEnd;
+					int visibleEnd = UpdateScroll(displayText, caret);
+					float fontHeight = font->Measure("A").y * textScale;
+
+					// Screen x of byte index `i`, clamped to the visible span.
+					auto xAt = [&](int i) {
+						i = Clamp(i, scrollIndex, visibleEnd);
+						return textPos.x + MeasureRange(displayText, scrollIndex, i);
+					};
 
 					// draw selection
-					int start = markStart;
-					int end = markEnd;
-					if (end == start) {
-						float x = font->Measure(displayText.substr(0, start)).x;
-						DrawBeam(r, x + textPos.x, textPos.y, fontHeight);
+					if (markStart == markEnd) {
+						if (markStart >= scrollIndex && markStart <= visibleEnd)
+							DrawBeam(r, xAt(markStart), textPos.y, fontHeight);
 					} else {
-						float x1 = font->Measure(displayText.substr(0, start)).x;
-						float x2 = font->Measure(displayText.substr(0, end)).x;
-						DrawHighlight(r, textPos.x + x1, textPos.y, x2 - x1, fontHeight);
+						float x1 = xAt(markStart);
+						float x2 = xAt(markEnd);
+						if (x2 > x1)
+							DrawHighlight(r, x1, textPos.y, x2 - x1, fontHeight);
 					}
 
 					// draw composition underline
 					if (composition.size() > 0) {
-						start = GetSelectionStart();
-						end = start + static_cast<int>(composition.size());
-						float x1 = font->Measure(displayText.substr(0, start)).x;
-						float x2 = font->Measure(displayText.substr(0, end)).x;
-						DrawEditingLine(r, textPos.x + x1, textPos.y, x2 - x1, fontHeight);
+						int start = GetSelectionStart();
+						int end = start + static_cast<int>(composition.size());
+						float x1 = xAt(start);
+						float x2 = xAt(end);
+						if (x2 > x1)
+							DrawEditingLine(r, x1, textPos.y, x2 - x1, fontHeight);
 					}
-				}
 
-				if (displayText.size() == 0) {
+					if (displayText.empty()) {
+						if (IsEnabled())
+							font->Draw(placeholder, textPos, textScale, placeholderColor);
+					} else {
+						font->Draw(displayText.substr(scrollIndex, visibleEnd - scrollIndex),
+						           textPos, textScale, color);
+					}
+				} else if (displayText.empty()) {
+					scrollIndex = 0;
+					leadingOffset = 0.0F;
 					if (IsEnabled())
 						font->Draw(placeholder, textPos, textScale, placeholderColor);
+				} else if (elision == FieldElision::Start && !FitsInBox(displayText)) {
+					// Keep the end visible: "..<tail>". `scrollIndex` marks where the
+					// tail starts so a click maps to the character under the cursor.
+					std::string prefix = "..";
+					int len = static_cast<int>(displayText.size());
+					int start = NextChar(displayText, 0);
+					while (start < len && !FitsInBox(prefix + displayText.substr(start)))
+						start = NextChar(displayText, start);
+					scrollIndex = start;
+					leadingOffset = font->Measure(prefix).x * textScale;
+					font->Draw(prefix + displayText.substr(start), textPos, textScale, color);
 				} else {
-					font->Draw(IsFocused() ? displayText : TruncateToFit(displayText), textPos,
-					           textScale, IsEnabled() ? textColor : disabledTextColor);
+					scrollIndex = 0;
+					leadingOffset = 0.0F;
+					font->Draw(TruncateToFit(displayText), textPos, textScale, color);
 				}
 
 				UIElement::Render();

@@ -413,8 +413,7 @@ namespace spades {
 			bool statsOnTop = statsMode == 2
 				|| (statsMode >= 3 && scoreboardVisible)
 				|| (statsMode == 1 && isDemoMode);
-			bool playerCountOnTop = playerCountMode > 0
-				&& playerCountMode < 2
+			bool playerCountOnTop = (playerCountMode > 0 && playerCountMode < 2)
 				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
 
 			// account for client stats height
@@ -2197,8 +2196,7 @@ namespace spades {
 			bool statsOnTop = statsMode == 2
 				|| (statsMode >= 3 && scoreboardVisible)
 				|| (statsMode == 1 && isDemoMode);
-			bool playerCountOnTop = playerCountMode > 0
-				&& playerCountMode < 2
+			bool playerCountOnTop = (playerCountMode > 0 && playerCountMode < 2)
 				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
 
 			// account for client stats height

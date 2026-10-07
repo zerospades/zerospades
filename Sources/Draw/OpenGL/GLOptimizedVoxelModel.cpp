@@ -682,6 +682,10 @@ namespace spades {
 			sunPos = sunPos.Normalize();
 			sunLightDirection.SetValue(sunPos.x, sunPos.y, sunPos.z);
 
+			static GLProgramUniform flatLighting("flatLighting");
+			flatLighting(program);
+			flatLighting.SetValue(renderer.GetSceneDef().flatModelLighting ? 1.0F : 0.0F);
+
 			static GLProgramUniform viewOriginVector("viewOriginVector");
 			viewOriginVector(program);
 			viewOriginVector.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);

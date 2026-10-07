@@ -19,8 +19,11 @@
  */
 
 #include "TextUtils.h"
+
 #include <algorithm>
 #include <cctype>
+
+#include <Client/IFont.h>
 
 namespace spades {
 	namespace gui {
@@ -82,6 +85,37 @@ namespace spades {
 				if (bytes < 1024 * 1024)
 					return std::to_string(bytes / 1024) + " KB";
 				return std::to_string(bytes / (1024 * 1024)) + " MB";
+			}
+
+			std::string ElideText(client::IFont& font, const std::string& text, float maxWidth,
+			                      float scale, TextElision elision) {
+				auto fits = [&](const std::string& s) { return font.Measure(s).x * scale <= maxWidth; };
+				if (fits(text))
+					return text;
+
+				const std::string dots = "..";
+				int len = static_cast<int>(text.size());
+				int chars = GetCharIndexForString(text, len);
+				// The candidate keeping `k` characters of the original text.
+				auto candidate = [&](int k) {
+					if (elision == TextElision::End)
+						return text.substr(0, std::min(len, GetByteIndexForString(text, k))) + dots;
+					int from = std::min(len, GetByteIndexForString(text, chars - k));
+					return dots + text.substr(from);
+				};
+
+				// Width grows with `k`, so binary-search the largest `k` that fits.
+				if (!fits(candidate(0)))
+					return std::string();
+				int lo = 0, hi = chars;
+				while (lo < hi) {
+					int mid = (lo + hi + 1) / 2;
+					if (fits(candidate(mid)))
+						lo = mid;
+					else
+						hi = mid - 1;
+				}
+				return candidate(lo);
 			}
 		} // namespace ui
 	} // namespace gui

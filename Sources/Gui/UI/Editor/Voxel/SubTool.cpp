@@ -1,0 +1,772 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ ZeroSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ ZeroSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#include "SubTool.h"
+#include "VoxelEditContext.h"
+
+#include <algorithm>
+#include <climits>
+#include <cmath>
+#include <string>
+
+namespace spades {
+	namespace gui {
+		namespace {
+			int Comp(const IntVector3& v, int a) { return a == 0 ? v.x : (a == 1 ? v.y : v.z); }
+			void SetComp(IntVector3& v, int a, int val) {
+				if (a == 0) v.x = val;
+				else if (a == 1) v.y = val;
+				else v.z = val;
+			}
+			Vector3 VecOf(const IntVector3& v) {
+				return MakeVector3(float(v.x), float(v.y), float(v.z));
+			}
+			Vector3 AxisUnit(int a) {
+				return MakeVector3(a == 0 ? 1.0F : 0.0F, a == 1 ? 1.0F : 0.0F, a == 2 ? 1.0F : 0.0F);
+			}
+			const Vector4 kHover = MakeVector4(0.3F, 0.8F, 1.0F, 0.95F);
+			const Vector4 kSelected = MakeVector4(1.0F, 0.3F, 0.3F, 0.95F);
+			const Vector4 kTarget = MakeVector4(1.0F, 0.9F, 0.3F, 0.9F);
+			constexpr float kQuarterTurn = kHalfPi;
+			const char* const kGizmoDragHint = "  |  [RMB] cancel a drag";
+
+			// How far, on each axis, a shape (a box, a cylinder) may reach from its
+			// first point. A KV6 is at most 64 voxels deep and its parts are
+			// rarely wider, while a point picked on a plane the view grazes can
+			// lie arbitrarily far away: the bound keeps a shape's preview and the
+			// cells it builds small wherever the cursor ray runs. It also keeps
+			// every squared distance a shape works out well within an int.
+			constexpr int kMaxShapeReach = 64;
+			// A cylinder's squared radius is at most twice the reach squared, and
+			// its loops square values one past its radius.
+			static_assert(2 * (kMaxShapeReach + 2) * (kMaxShapeReach + 2) < INT_MAX / 2,
+			              "shape distances must fit an int");
+
+			// `p` brought within kMaxShapeReach of `anchor` on every axis.
+			IntVector3 WithinReach(const IntVector3& p, const IntVector3& anchor) {
+				auto clamp = [](int v, int a) {
+					return std::max(a - kMaxShapeReach, std::min(a + kMaxShapeReach, v));
+				};
+				return IntVector3::Make(clamp(p.x, anchor.x), clamp(p.y, anchor.y),
+				                        clamp(p.z, anchor.z));
+			}
+
+			// Adds the colour region of voxel `h` to the selection, or removes it.
+			void ApplyColourRegion(IVoxelEditContext& ed, const IntVector3& h, bool remove) {
+				const std::vector<IntVector3> region = ed.LinkedColorRegion(h.x, h.y, h.z);
+				if (remove)
+					ed.DeselectCells(region);
+				else
+					ed.SelectCells(region);
+				ed.SetStatus(std::string(remove ? "Deselected " : "Selected ") +
+				             std::to_string(region.size()) + " linked voxels");
+			}
+
+			// A gizmo that only moves, in steps of `step`.
+			GizmoSnap TranslationSnap(float step) {
+				GizmoSnap snap;
+				snap.translation = step;
+				return snap;
+			}
+
+			// Whole voxels, and quarter turns about the world axes: the only turns
+			// that keep every voxel on a voxel. The view ring and the trackball turn
+			// about any axis, so Transform leaves them out.
+			GizmoSnap TransformSnap() {
+				GizmoSnap snap = TranslationSnap(1.0F);
+				snap.rotation = kQuarterTurn;
+				return snap;
+			}
+			GizmoHandleSet TransformHandles() {
+				return GizmoHandleSet::Translation() | GizmoHandleSet::Of(GizmoHandle::RotateX) |
+				       GizmoHandleSet::Of(GizmoHandle::RotateY) |
+				       GizmoHandleSet::Of(GizmoHandle::RotateZ);
+			}
+
+			// A gizmo translation snapped to whole voxels, as integers.
+			IntVector3 WholeVoxels(const Vector3& v) {
+				return IntVector3::Make(int(std::lround(v.x)), int(std::lround(v.y)),
+				                        int(std::lround(v.z)));
+			}
+
+			// A gizmo change in whole voxels and quarter turns. The Transform gizmo
+			// snaps to both and turns only about world axes, so a rotation there is
+			// (axis * sin(a / 2), cos(a / 2)) for a multiple a of a quarter turn;
+			// its largest imaginary part names the axis.
+			PlacementTransform WholeStep(const GizmoTransform& change) {
+				PlacementTransform t;
+				t.shift = WholeVoxels(change.translation);
+				const Vector4& q = change.rotation.v;
+				const float parts[3] = {q.x, q.y, q.z};
+				int axis = 0;
+				for (int a = 1; a < 3; a++) {
+					if (std::fabs(parts[a]) > std::fabs(parts[axis]))
+						axis = a;
+				}
+				const float angle = 2.0F * std::atan2(parts[axis], q.w);
+				t.axis = axis;
+				t.quarterTurns = int(std::lround(angle / kQuarterTurn));
+				return t;
+			}
+		} // namespace
+
+		// --- DrawVoxelSubTool (Draw single) ----------------------------------
+
+		std::string DrawVoxelSubTool::Hint(IVoxelEditContext&) {
+			return "[LMB] place  |  [RMB] delete";
+		}
+		void DrawVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			if (e.IsLeft())
+				ed.PlaceCube();
+			else if (e.IsRight())
+				ed.DeleteCube();
+		}
+		void DrawVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 p = ed.PickPlace(), h = ed.PickSolid();
+			ed.DrawCellOutlineMirrored(p.x, p.y, p.z, ed.ColorToVec(ed.CurrentColor()));
+			ed.DrawCellOutline(h.x, h.y, h.z, kTarget);
+		}
+
+		// --- PaintVoxelSubTool (Paint single) --------------------------------
+
+		std::string PaintVoxelSubTool::Hint(IVoxelEditContext&) {
+			return "[LMB] recolour, drag to keep going";
+		}
+		void PaintVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			// A press/drag/release of LMB is one stroke, which the editor keeps as
+			// one undo step however many voxels it recolours: recolour the hovered
+			// voxel, and keep doing so while the button is dragged.
+			if (!e.IsLeft() || !(e.IsDown() || e.IsDrag()))
+				return;
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			std::vector<IntVector3> cell(1, h);
+			ed.PaintCells(cell, ed.CurrentColor());
+		}
+		void PaintVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			ed.DrawCellOutlineMirrored(h.x, h.y, h.z, ed.ColorToVec(ed.CurrentColor()));
+		}
+
+		// --- SelectVoxelSubTool (Select single) ------------------------------
+
+		std::string SelectVoxelSubTool::Hint(IVoxelEditContext&) {
+			return "[LMB] select  |  [RMB] deselect  |  [LMB] on empty space selects nothing";
+		}
+		void SelectVoxelSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown() || !(e.IsLeft() || e.IsRight()))
+				return;
+			ed.DoPick();
+			if (!ed.HasPick()) {
+				if (e.IsLeft())
+					ed.ClearSelection();
+				return;
+			}
+			const std::vector<IntVector3> cell(1, ed.PickSolid());
+			if (e.IsLeft())
+				ed.SelectCells(cell);
+			else
+				ed.DeselectCells(cell);
+		}
+		void SelectVoxelSubTool::DrawScene(IVoxelEditContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			ed.DrawCellOutline(h.x, h.y, h.z, ed.IsSelected(h.x, h.y, h.z) ? kSelected : kHover);
+		}
+
+		// --- ByColourSubTool (Select flood-fill) -----------------------------
+
+		std::string ByColourSubTool::Hint(IVoxelEditContext&) {
+			return "[LMB] select a colour region  |  [RMB] deselect it  |  [L] select the one under "
+			       "the cursor";
+		}
+		void ByColourSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown() || !(e.IsLeft() || e.IsRight()))
+				return;
+			ed.DoPick();
+			if (ed.HasPick())
+				ApplyColourRegion(ed, ed.PickSolid(), e.IsRight());
+			else if (e.IsLeft())
+				ed.ClearSelection();
+		}
+		void ByColourSubTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
+			if (e.IsDown() && EqualsIgnoringCase(e.key, "L")) {
+				ed.DoPick();
+				if (ed.HasPick())
+					ApplyColourRegion(ed, ed.PickSolid(), false);
+			}
+		}
+		void ByColourSubTool::DrawScene(IVoxelEditContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return;
+			IntVector3 h = ed.PickSolid();
+			ed.DrawCellOutline(h.x, h.y, h.z, kHover);
+		}
+
+		// --- BoxSubTool (axis-aligned box) -----------------------------------
+
+		std::string BoxSubTool::Hint(IVoxelEditContext&) {
+			if (seq.Count() == 0)
+				return "click a corner on a voxel face";
+			if (seq.Count() == 1)
+				return "click the opposite corner";
+			std::string hint = std::string("click the depth: [LMB] ") + primary.verb;
+			if (secondary.apply)
+				hint += std::string("  |  [RMB] ") + secondary.verb;
+			return hint;
+		}
+
+		void BoxSubTool::OnActivate(IVoxelEditContext&) { seq.Reset(); }
+
+		bool BoxSubTool::StagePoint(IVoxelEditContext& ed, IntVector3& out) const {
+			const IntVector3& p0 = seq.Points()[0];
+			Vector3 pp = VecOf(p0);
+			// Opposite corner: free on the face plane. Depth: free along the normal
+			// (use only the normal-axis component of a view-facing plane pick).
+			// Either stays within reach of the first corner.
+			IntVector3 q;
+			if (seq.Count() == 1) {
+				if (!ed.RayPlaneCell(pp, AxisUnit(normalAxis), q))
+					return false;
+				out = WithinReach(q, p0);
+				return true;
+			}
+			if (!ed.RayPlaneCell(pp, ed.ViewDir(), q))
+				return false;
+			out = p0;
+			SetComp(out, normalAxis, Comp(q, normalAxis));
+			out = WithinReach(out, p0);
+			return true;
+		}
+
+		void BoxSubTool::BBoxOf(const std::vector<IntVector3>& pts, IntVector3& lo,
+		                         IntVector3& hi) const {
+			int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+			const IntVector3& p0 = pts[0];
+			const IntVector3& p1 = pts[1]; // opposite corner -> in-plane extent
+			SetComp(lo, u, std::min(Comp(p0, u), Comp(p1, u)));
+			SetComp(hi, u, std::max(Comp(p0, u), Comp(p1, u)));
+			SetComp(lo, v, std::min(Comp(p0, v), Comp(p1, v)));
+			SetComp(hi, v, std::max(Comp(p0, v), Comp(p1, v)));
+			if (pts.size() >= 3) { // depth point -> extent along the normal
+				SetComp(lo, na, std::min(Comp(p0, na), Comp(pts[2], na)));
+				SetComp(hi, na, std::max(Comp(p0, na), Comp(pts[2], na)));
+			} else { // single layer until the depth is picked
+				SetComp(lo, na, Comp(p0, na));
+				SetComp(hi, na, Comp(p0, na));
+			}
+		}
+
+		void BoxSubTool::CellsOf(const std::vector<IntVector3>& pts,
+		                          std::vector<IntVector3>& out) const {
+			IntVector3 lo, hi;
+			BBoxOf(pts, lo, hi);
+			out.clear();
+			for (int x = lo.x; x <= hi.x; x++)
+			for (int y = lo.y; y <= hi.y; y++)
+			for (int z = lo.z; z <= hi.z; z++)
+				out.push_back(MakeIntVector3(x, y, z));
+		}
+
+		void BoxSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			const bool rmb = e.IsRight();
+			if (!e.IsLeft() && !(rmb && secondary.apply))
+				return;
+
+			// First click: anchor a corner on a solid face and capture the normal.
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (!ed.HasPick())
+					return;
+				IntVector3 p0 = ed.PickSolid();
+				IntVector3 d = ed.PickPlace() - p0;
+				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
+				seq.BeginFixed(3);
+				seq.Add(p0);
+				return;
+			}
+
+			IntVector3 q;
+			if (!StagePoint(ed, q))
+				return;
+			if (!seq.Add(q))
+				return; // still collecting (just set the opposite corner)
+			// The final click's button decides the action. The box is finished
+			// whatever the action makes of it, so it is reset first.
+			std::vector<IntVector3> cells;
+			CellsOf(seq.Points(), cells);
+			seq.Reset();
+			(rmb ? secondary : primary).apply(ed, cells);
+		}
+
+		std::string BoxSubTool::EscapeLabel(IVoxelEditContext&) {
+			return seq.Active() ? "cancel the box" : std::string();
+		}
+
+		void BoxSubTool::OnEscape(IVoxelEditContext&) { seq.Reset(); }
+
+		void BoxSubTool::CancelInteraction(IVoxelEditContext&) { seq.Reset(); }
+		void BoxSubTool::OnDocumentChanged(IVoxelEditContext&) { seq.Reset(); }
+
+		void BoxSubTool::DrawScene(IVoxelEditContext& ed) {
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (ed.HasPick()) {
+					IntVector3 h = ed.PickSolid();
+					ed.DrawCellOutline(h.x, h.y, h.z, kHover);
+				}
+				return;
+			}
+			IntVector3 q;
+			if (!StagePoint(ed, q)) {
+				const IntVector3& p0 = seq.Points()[0];
+				ed.DrawCellOutline(p0.x, p0.y, p0.z, kHover);
+				return;
+			}
+			std::vector<IntVector3> pts = seq.Points();
+			pts.push_back(q); // include the in-progress point
+			IntVector3 lo, hi;
+			BBoxOf(pts, lo, hi);
+			if (mirrored)
+				ed.DrawBoxOutlineMirrored(lo, hi, kHover);
+			else
+				ed.DrawBoxOutline(lo, hi, kHover);
+		}
+
+		// --- CylinderSubTool (circular cylinder) ------------------------------
+
+		std::string CylinderSubTool::Hint(IVoxelEditContext&) {
+			if (seq.Count() == 0)
+				return "click the centre on a voxel face";
+			if (seq.Count() == 1)
+				return "click a point on the rim";
+			std::string hint = std::string("click the depth: [LMB] ") + primary.verb;
+			if (secondary.apply)
+				hint += std::string("  |  [RMB] ") + secondary.verb;
+			return hint;
+		}
+
+		void CylinderSubTool::OnActivate(IVoxelEditContext&) { seq.Reset(); }
+
+		bool CylinderSubTool::StagePoint(IVoxelEditContext& ed, IntVector3& out) const {
+			const IntVector3& centre = seq.Points()[0];
+			const Vector3 at = VecOf(centre);
+			// Rim: free on the face plane. Depth: free along the normal (only the
+			// normal-axis component of a view-facing plane pick is used). Either
+			// stays within reach of the centre.
+			IntVector3 q;
+			if (seq.Count() == 1) {
+				if (!ed.RayPlaneCell(at, AxisUnit(normalAxis), q))
+					return false;
+				out = WithinReach(q, centre);
+				return true;
+			}
+			if (!ed.RayPlaneCell(at, ed.ViewDir(), q))
+				return false;
+			out = centre;
+			SetComp(out, normalAxis, Comp(q, normalAxis));
+			out = WithinReach(out, centre);
+			return true;
+		}
+
+		int CylinderSubTool::RadiusSq(const IntVector3& rim) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int u = (normalAxis + 1) % 3, v = (normalAxis + 2) % 3;
+			const int du = Comp(rim, u) - Comp(centre, u);
+			const int dv = Comp(rim, v) - Comp(centre, v);
+			return du * du + dv * dv;
+		}
+
+		void CylinderSubTool::CellsOf(int radSq, const IntVector3& depth,
+		                              std::vector<IntVector3>& out) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+			const int nmin = std::min(Comp(centre, na), Comp(depth, na));
+			const int nmax = std::max(Comp(centre, na), Comp(depth, na));
+			int r = 0; // reaches past the disc on every side
+			while (r * r <= radSq)
+				r++;
+			out.clear();
+			for (int n = nmin; n <= nmax; n++) {
+				for (int du = -r; du <= r; du++) {
+					for (int dv = -r; dv <= r; dv++) {
+						if (du * du + dv * dv > radSq)
+							continue; // outside the disc
+						IntVector3 cell = centre;
+						SetComp(cell, na, n);
+						SetComp(cell, u, Comp(centre, u) + du);
+						SetComp(cell, v, Comp(centre, v) + dv);
+						out.push_back(cell);
+					}
+				}
+			}
+		}
+
+		void CylinderSubTool::DrawWire(IVoxelEditContext& ed, int radSq, int nmin,
+		                               int nmax) const {
+			const IntVector3& centre = seq.Points()[0];
+			const int na = normalAxis, u = (na + 1) % 3, v = (na + 2) % 3;
+			const float uc = float(Comp(centre, u)), vc = float(Comp(centre, v));
+			// The caps lie on the outer faces of the end layers: voxel n spans
+			// n - 0.5 to n + 0.5 along the normal.
+			const float nNear = float(nmin) - 0.5F, nFar = float(nmax) + 0.5F;
+			auto point = [&](float n, float pu, float pv) {
+				float c[3];
+				c[na] = n;
+				c[u] = pu;
+				c[v] = pv;
+				return MakeVector3(c[0], c[1], c[2]);
+			};
+			// One edge of the disc's outline, from (ua, va) to (ub, vb) in the face
+			// plane: on both caps, with the join between them at its start.
+			auto edge = [&](float ua, float va, float ub, float vb) {
+				const Vector3 a0 = point(nNear, ua, va), b0 = point(nNear, ub, vb);
+				const Vector3 a1 = point(nFar, ua, va), b1 = point(nFar, ub, vb);
+				ed.DrawLine3D(a0, b0, kHover);
+				ed.DrawLine3D(a1, b1, kHover);
+				ed.DrawLine3D(a0, a1, kHover);
+			};
+			int r = 0; // the disc's whole-voxel reach
+			while ((r + 1) * (r + 1) <= radSq)
+				r++;
+			auto inside = [&](int du, int dv) { return du * du + dv * dv <= radSq; };
+			// Every side of a disc cell with no disc cell beyond it is outline.
+			for (int du = -r; du <= r; du++) {
+				for (int dv = -r; dv <= r; dv++) {
+					if (!inside(du, dv))
+						continue;
+					const float fu = uc + float(du), fv = vc + float(dv);
+					if (!inside(du + 1, dv))
+						edge(fu + 0.5F, fv - 0.5F, fu + 0.5F, fv + 0.5F);
+					if (!inside(du - 1, dv))
+						edge(fu - 0.5F, fv - 0.5F, fu - 0.5F, fv + 0.5F);
+					if (!inside(du, dv + 1))
+						edge(fu - 0.5F, fv + 0.5F, fu + 0.5F, fv + 0.5F);
+					if (!inside(du, dv - 1))
+						edge(fu - 0.5F, fv - 0.5F, fu + 0.5F, fv - 0.5F);
+				}
+			}
+		}
+
+		void CylinderSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown())
+				return;
+			const bool rmb = e.IsRight();
+			if (!e.IsLeft() && !(rmb && secondary.apply))
+				return;
+
+			// First click: the centre, on a solid face, whose normal it keeps.
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (!ed.HasPick())
+					return;
+				const IntVector3 centre = ed.PickSolid();
+				const IntVector3 d = ed.PickPlace() - centre;
+				normalAxis = (d.x != 0) ? 0 : (d.y != 0) ? 1 : 2;
+				seq.BeginFixed(3);
+				seq.Add(centre);
+				return;
+			}
+
+			IntVector3 q;
+			if (!StagePoint(ed, q))
+				return;
+			if (!seq.Add(q))
+				return; // still collecting (just set the rim)
+			// The final click's button decides the action. The cylinder is
+			// finished whatever the action makes of it, so it is reset first.
+			std::vector<IntVector3> cells;
+			CellsOf(RadiusSq(seq.Points()[1]), seq.Points()[2], cells);
+			seq.Reset();
+			(rmb ? secondary : primary).apply(ed, cells);
+		}
+
+		std::string CylinderSubTool::EscapeLabel(IVoxelEditContext&) {
+			return seq.Active() ? "cancel the cylinder" : std::string();
+		}
+
+		void CylinderSubTool::OnEscape(IVoxelEditContext&) { seq.Reset(); }
+
+		void CylinderSubTool::CancelInteraction(IVoxelEditContext&) { seq.Reset(); }
+		void CylinderSubTool::OnDocumentChanged(IVoxelEditContext&) { seq.Reset(); }
+
+		void CylinderSubTool::DrawScene(IVoxelEditContext& ed) {
+			if (seq.Count() == 0) {
+				ed.DoPick();
+				if (ed.HasPick()) {
+					const IntVector3 h = ed.PickSolid();
+					ed.DrawCellOutline(h.x, h.y, h.z, kHover);
+				}
+				return;
+			}
+			const IntVector3& centre = seq.Points()[0];
+			IntVector3 q;
+			if (!StagePoint(ed, q)) {
+				ed.DrawCellOutline(centre.x, centre.y, centre.z, kHover);
+				return;
+			}
+			// While the rim is being placed the cylinder is one layer deep; then
+			// the rim is fixed and the depth follows the cursor.
+			const bool placingRim = seq.Count() == 1;
+			const int radSq = RadiusSq(placingRim ? q : seq.Points()[1]);
+			const int nA = Comp(centre, normalAxis);
+			const int nB = placingRim ? nA : Comp(q, normalAxis);
+			DrawWire(ed, radSq, std::min(nA, nB), std::max(nA, nB));
+		}
+
+		// --- GizmoSubTool (shared gizmo plumbing) ----------------------------
+
+		GizmoSubTool::GizmoSubTool(const GizmoSnap& snap, const GizmoHandleSet& handles) {
+			gizmo.SetSnap(snap);
+			gizmo.SetVisibleHandles(handles);
+			gizmo.SetEnabledHandles(handles);
+		}
+
+		bool GizmoSubTool::SyncPose(IVoxelEditContext& ed) {
+			GizmoPose pose;
+			if (!CurrentPose(ed, pose))
+				return false;
+			gizmo.SetPose(pose);
+			return true;
+		}
+
+		void GizmoSubTool::CancelDrag(IVoxelEditContext& ed) {
+			if (gizmo.IsDragging())
+				OnGizmoCancel(ed, gizmo.Cancel());
+		}
+
+		// Whatever happened while the tool was away, a drag never outlives it.
+		void GizmoSubTool::OnActivate(IVoxelEditContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDeactivate(IVoxelEditContext& ed) { CancelDrag(ed); }
+
+		void GizmoSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (e.IsRight() && e.IsDown()) {
+				CancelDrag(ed); // as in Blender: a right click abandons the drag
+				return;
+			}
+			if (!e.IsLeft())
+				return;
+			if (e.IsDown()) {
+				if (gizmo.IsDragging() || !SyncPose(ed))
+					return;
+				const GizmoView view = ed.GetGizmoView();
+				// Off the handles is away from the gizmo. A press on a handle that
+				// cannot be grabbed right now (an axis seen end-on) is not.
+				if (gizmo.HandleAt(view, e.pos) == GizmoHandle::None)
+					OnClickAway(ed);
+				else if (gizmo.Begin(view, e.pos))
+					OnGizmoBegin(ed);
+			} else if (e.IsDrag()) {
+				if (!gizmo.IsDragging())
+					return;
+				if (!SyncPose(ed)) {
+					CancelDrag(ed); // what was being handled is gone
+					return;
+				}
+				if (gizmo.Drag(ed.GetGizmoView(), e.pos))
+					OnGizmoDrag(ed);
+			} else if (e.IsUp()) {
+				if (gizmo.IsDragging())
+					OnGizmoEnd(ed, gizmo.End());
+			}
+		}
+
+		std::string GizmoSubTool::EscapeLabel(IVoxelEditContext&) {
+			return gizmo.IsDragging() ? "cancel the drag" : std::string();
+		}
+
+		void GizmoSubTool::OnEscape(IVoxelEditContext& ed) { CancelDrag(ed); }
+
+		void GizmoSubTool::SetTranslationSnap(float step, bool toGrid) {
+			GizmoSnap snap = gizmo.Snap();
+			snap.translation = step;
+			snap.translationToGrid = toGrid;
+			gizmo.SetSnap(snap);
+		}
+
+		void GizmoSubTool::CancelInteraction(IVoxelEditContext& ed) { CancelDrag(ed); }
+		void GizmoSubTool::OnDocumentChanged(IVoxelEditContext& ed) { CancelDrag(ed); }
+
+		void GizmoSubTool::DrawOverlay(IVoxelEditContext& ed) {
+			if (!SyncPose(ed))
+				return;
+			gizmo.Hover(ed.GetGizmoView(), ed.CursorPos());
+			ed.DrawGizmo(gizmo);
+		}
+
+		// --- TransformSubTool (move and turn voxels) -------------------------
+
+		TransformSubTool::TransformSubTool() : GizmoSubTool(TransformSnap(), TransformHandles()) {}
+
+		std::string TransformSubTool::Hint(IVoxelEditContext& ed) {
+			if (!ed.HasPlacement() && ed.SelectionCount() == 0)
+				return "select some voxels first, or paste some";
+			std::string hint = "drag an arrow to move, a ring to turn 90 degrees  |  [Arrows] "
+			                   "[PgUp/PgDn] nudge";
+			hint += kGizmoDragHint;
+			if (ed.HasPlacement())
+				hint += "  |  [LMB] away or [Enter] places them  |  [RMB] drops them";
+			return hint;
+		}
+
+		void TransformSubTool::OnDeactivate(IVoxelEditContext& ed) {
+			GizmoSubTool::OnDeactivate(ed);
+			// Leaving the tool places a waiting paste or import.
+			ed.ApplyPlacement();
+		}
+
+		void TransformSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			// The right button backs out of what is in hand, as in Blender: a
+			// drag first, then a paste or an import still waiting.
+			if (e.IsRight() && e.IsDown() && !gizmo.IsDragging() && ed.HasPlacement()) {
+				ed.CancelPlacement();
+				return;
+			}
+			GizmoSubTool::OnPointer(ed, e);
+		}
+
+		bool TransformSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
+			IntVector3 pivot;
+			if (!ed.TransformPivot(pivot))
+				return false;
+			// The placement itself stays put until release; the gizmo rides the
+			// previewed change, turned axes included.
+			const GizmoTransform& total = gizmo.Total();
+			pose.position = VecOf(pivot) + total.translation;
+			for (int a = 0; a < 3; a++)
+				pose.axes[a] = total.rotation.Apply(AxisUnit(a));
+			return true;
+		}
+
+		void TransformSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
+			ed.TransformPlacement(WholeStep(total)); // one undo step
+		}
+
+		void TransformSubTool::OnClickAway(IVoxelEditContext& ed) {
+			// A selection has moved already; only a paste or an import waits.
+			if (ed.HasPlacement())
+				ed.ApplyPlacement();
+		}
+
+		void TransformSubTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
+			if (e.phase != KeyPhase::Down)
+				return;
+			if (e.key == "Enter") {
+				ed.ApplyPlacement(); // nothing to do unless a paste or an import waits
+				return;
+			}
+			PlacementTransform t;
+			if (e.key == "Left") t.shift.x = -1;
+			else if (e.key == "Right") t.shift.x = 1;
+			else if (e.key == "Down") t.shift.y = -1;
+			else if (e.key == "Up") t.shift.y = 1;
+			else if (e.key == "PageDown") t.shift.z = -1;
+			else if (e.key == "PageUp") t.shift.z = 1;
+			else return;
+			ed.TransformPlacement(t);
+		}
+
+		void TransformSubTool::DrawScene(IVoxelEditContext& ed) {
+			const PlacementTransform t = WholeStep(gizmo.Total());
+			if (!t.IsIdentity())
+				ed.DrawPlacementTransformed(t, MakeVector4(0.4F, 1.0F, 0.5F, 0.9F));
+		}
+
+		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
+
+		// The Pivot tool sets the snap (GizmoTool).
+		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
+
+		std::string PivotGizmoSubTool::Hint(IVoxelEditContext&) {
+			return std::string("drag a handle to move the pivot") + kGizmoDragHint;
+		}
+
+		bool PivotGizmoSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
+			pose.position = ed.GetPivot(); // live during a drag (the preview moved it)
+			return true;
+		}
+
+		void PivotGizmoSubTool::OnGizmoBegin(IVoxelEditContext& ed) { startPivot = ed.GetPivot(); }
+
+		void PivotGizmoSubTool::OnGizmoDrag(IVoxelEditContext& ed) {
+			// A preview: the marker and the toolbar readout follow the drag, and
+			// the release commits it as one undo step.
+			ed.PreviewPivot(startPivot + gizmo.Total().translation);
+		}
+
+		void PivotGizmoSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
+			// One undo step from where the drag began; a drag that went nowhere
+			// commits nothing and its preview ends with the press.
+			if (!total.IsIdentity())
+				ed.SetPivot(startPivot + total.translation);
+		}
+
+		void PivotGizmoSubTool::OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform&) {
+			ed.PreviewPivot(startPivot); // show the original pivot again, commit nothing
+		}
+
+		// --- MirrorGizmoSubTool (drag the mirror planes) ---------------------
+
+		// The Mirror tool sets the snap (GizmoTool).
+		MirrorGizmoSubTool::MirrorGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
+
+		std::string MirrorGizmoSubTool::Hint(IVoxelEditContext&) {
+			return std::string("drag a handle to move the planes") + kGizmoDragHint;
+		}
+
+		bool MirrorGizmoSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
+			pose.position = ed.MirrorPlane();
+			return true;
+		}
+
+		void MirrorGizmoSubTool::OnGizmoBegin(IVoxelEditContext& ed) { startPlane = ed.MirrorPlane(); }
+
+		void MirrorGizmoSubTool::OnGizmoDrag(IVoxelEditContext& ed) {
+			// The planes follow the drag live, without journaling each step.
+			ed.PreviewMirrorPlane(startPlane + gizmo.Total().translation);
+		}
+
+		void MirrorGizmoSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
+			// One undo step from where the drag began; a drag that went nowhere
+			// commits nothing and its preview ends with the press.
+			if (!total.IsIdentity())
+				ed.SetMirrorPlane(startPlane + total.translation);
+		}
+
+		void MirrorGizmoSubTool::OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform&) {
+			ed.PreviewMirrorPlane(startPlane); // show the original planes again, commit nothing
+		}
+	} // namespace gui
+} // namespace spades

@@ -529,6 +529,13 @@ namespace spades {
 			return mainScreen->PlayDemo(filename);
 		}
 
+		std::string MainScreenHelper::OpenEditor(const std::string& path, bool isNew,
+		                                         SoftwareCursor* cursor) {
+			if (mainScreen == NULL)
+				return "mainScreen == NULL";
+			return mainScreen->OpenEditor(path, isNew, cursor);
+		}
+
 		bool MainScreenHelper::DeleteDemo(const std::string& filename) {
 			return FileManager::RemoveFile(filename.c_str());
 		}

@@ -31,7 +31,10 @@ namespace spades {
 		class SDLGLDevice : public draw::IGLDevice {
 			SDL_Window* window;
 			SDL_GLContext context;
-			int w, h;
+			int w, h;             // default framebuffer, in pixels
+			int windowW, windowH; // window, in the units of mouse events
+
+			void UpdateScreenSize();
 
 		protected:
 			~SDLGLDevice();
@@ -196,6 +199,8 @@ namespace spades {
 
 			Integer ScreenWidth() override;
 			Integer ScreenHeight() override;
+			Integer WindowWidth() override;
+			Integer WindowHeight() override;
 
 			void Swap() override;
 

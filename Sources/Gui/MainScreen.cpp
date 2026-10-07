@@ -18,6 +18,8 @@
 
  */
 
+#include "DocumentTypes.h"
+#include "UI/Editor/KV6/KV6EditorView.h"
 #include "MainScreen.h"
 #include "MainScreenHelper.h"
 #include <Client/Client.h>
@@ -36,10 +38,12 @@ namespace spades {
 	namespace gui {
 		MainScreen::MainScreen(Handle<client::IRenderer> _renderer,
 		                       Handle<client::IAudioDevice> _audioDevice,
-		                       Handle<client::FontManager> _fontManager)
+		                       Handle<client::FontManager> _fontManager,
+		                       const std::string& openDocumentPath)
 		    : renderer(std::move(_renderer)),
 		      audioDevice(std::move(_audioDevice)),
-		      fontManager(std::move(_fontManager)) {
+		      fontManager(std::move(_fontManager)),
+		      pendingDocumentPath(openDocumentPath) {
 			SPADES_MARK_FUNCTION();
 			if (!renderer)
 				SPInvalidArgument("renderer");
@@ -63,8 +67,37 @@ namespace spades {
 		// Restores renderer's state (game map, fog color)
 		// after returning from the game client.
 		void MainScreen::RestoreRenderer() {
-			if (ui)
+			if (ui) {
 				ui->SetupRenderer();
+				// A subview may have written files the visible tab lists (a saved
+				// model, a recorded demo), so the listing is re-read here.
+				ui->OnReturnedToMenu();
+			}
+		}
+
+		std::string MainScreen::OpenEditor(const std::string& path, bool isNew,
+		                                   SoftwareCursor* cursor) {
+			const DocumentType* type = FindDocumentType(path);
+			if (!type || !type->editable)
+				return UnsupportedDocumentMessage();
+			try {
+				switch (type->kind) {
+					case DocumentKind::Model:
+						subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice,
+						                                     &*fontManager, cursor, path, isNew)
+						            .Cast<View>();
+						return "";
+					case DocumentKind::Scene:
+					case DocumentKind::Map: break; // no editor for these yet
+				}
+			} catch (const std::exception& ex) {
+				SPLog("[!] Error while opening the editor: %s", ex.what());
+				return ex.what();
+			}
+			// A type marked editable with no editor behind it is a table mistake,
+			// said as one rather than as the player's.
+			SPLog("[!] No editor opens %s files", type->extension);
+			return UnsupportedDocumentMessage();
 		}
 
 		bool MainScreen::NeedsAbsoluteMouseCoordinate() {
@@ -208,6 +241,11 @@ namespace spades {
 				timeToStartInitialization -= dt;
 				if (timeToStartInitialization <= 0.0F) {
 					DoInit(); // do init
+					// Init may have gone straight to a subview (a model to open):
+					// this frame is that view's, not the menu's, and drawing the menu
+					// here would show it for a frame on the way past.
+					if (subview)
+						return;
 				} else {
 					return;
 				}
@@ -264,6 +302,25 @@ namespace spades {
 				// a hang.
 				SPLog("[!] Failed to initialize the main screen UI: %s", ex.what());
 				throw;
+			}
+
+			// Started to open a model: go straight to the editor, so opening one
+			// from a terminal or a file manager lands where the file belongs rather
+			// than in the menus.
+			if (!pendingDocumentPath.empty()) {
+				std::string path;
+				path.swap(pendingDocumentPath); // opened once, not on every return here
+				OpenDocumentFile(path);
+			}
+		}
+
+		void MainScreen::OpenDocumentFile(const std::string& path) {
+			SPADES_MARK_FUNCTION();
+			SPLog("Opening '%s' in its editor", path.c_str());
+			std::string msg = OpenEditor(path, false, nullptr);
+			if (!msg.empty()) {
+				SPLog("[!] Could not open the editor: %s", msg.c_str());
+				helper->errorMessage = msg;
 			}
 		}
 

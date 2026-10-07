@@ -24,8 +24,17 @@
 #include <string>
 
 namespace spades {
+	namespace client {
+		class IFont;
+	}
 	namespace gui {
 		namespace ui {
+			/** Which end of an over-long text is replaced by "..". */
+			enum class TextElision {
+				End,  // "/Users/name/Libr.."  (keeps the beginning)
+				Start // "..Resources/kv6/gun" (keeps the end, e.g. paths)
+			};
+
 			/**
 			 * Converts a UTF-8 code-point count into a byte offset.
 			 *
@@ -44,6 +53,15 @@ namespace spades {
 
 			size_t StringCommonPrefixLength(const std::string& a, const std::string& b);
 			std::string FormatFileSize(std::int64_t bytes);
+
+			/**
+			 * Returns `text` unchanged if it is at most `maxWidth` pixels wide when
+			 * drawn with `font` at `scale`; otherwise the longest version with one
+			 * end replaced by ".." that fits (never splitting a UTF-8 sequence).
+			 * Returns an empty string if not even ".." fits.
+			 */
+			std::string ElideText(client::IFont& font, const std::string& text, float maxWidth,
+			                      float scale = 1.0F, TextElision elision = TextElision::End);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

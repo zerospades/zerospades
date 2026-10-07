@@ -35,7 +35,7 @@ namespace spades {
 		} // namespace ui
 
 		/**
-		 * Shared UI management interface for game modes (Client gameplay, KV6 Editor).
+		 * Shared UI management interface for game modes (Client gameplay, the editors).
 		 * Implementations manage UI elements, input routing, and lifecycle for their respective modes.
 		 * Both ClientUI and EditorUI implement this contract.
 		 */
