@@ -211,12 +211,9 @@ namespace spades {
 				Vector2 pos = GetScreenPosition();
 				Vector2 sz = size;
 
-				Vector4 color = IsEnabled() ? textColor : disabledTextColor;
-
-				if (pressed && hover) {
-					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.08F));
-					r.DrawImage(nullptr, AABB2(pos.x, pos.y, sz.x, sz.y));
-				}
+				Vector4 color = hover 
+					? MakeVector4(0.5F, 0.75F, 1.0F, 1.0F) 
+					: MakeVector4(0.4F, 0.65F, 0.9F, 1.0F);
 
 				client::IFont* font = GetFont();
 				if (!font)
@@ -231,7 +228,7 @@ namespace spades {
 				font->DrawShadow(caption, txtPos, 1.0F, color,
 								 MakeVector4(0.0F, 0.0F, 0.0F, 0.35F * color.w));
 
-				if (hover && IsEnabled()) {
+				if (IsEnabled()) {
 					float underlineY = txtPos.y + txtSize.y - 2.0F;
 					SetColorNP(r, MakeVector4(color.x, color.y, color.z, 0.8F));
 					r.DrawFilledRect(txtPos.x, underlineY,

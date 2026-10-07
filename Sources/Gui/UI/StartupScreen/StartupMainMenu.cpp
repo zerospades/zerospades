@@ -65,8 +65,6 @@ namespace spades {
 					24.0F,
 					capSize + 20.0F, 24.0F
 				));
-				button->textColor = MakeVector4(0.3F, 0.75F, 1.0F, 1.0F);
-				button->disabledTextColor = MakeVector4(0.3F, 0.75F, 1.0F, 0.4F);
 				button->activated = [this](UIElement& s) { OnWebsitePressed(s); };
 				AddChild(button.GetPointerOrNull());
 			}
