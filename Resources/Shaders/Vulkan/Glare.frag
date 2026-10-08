@@ -25,6 +25,11 @@ layout(push_constant) uniform PushConstants {
 	vec3 color;
 	// Where in the scene's depth the first-person view's models end
 	float firstPersonDepthEnd;
+	vec2 sourceCoord;
+	vec2 sourceSpread;
+	float sourceDepth;
+	float zNear;
+	float zFar;
 	// 1 when the swapchain stores sRGB, which blends in linear light
 	float outputIsLinear;
 } pc;
@@ -34,6 +39,8 @@ layout(set = 0, binding = 1) uniform sampler2D depthTexture;
 
 layout(location = 0) in vec2 texCoord;
 layout(location = 1) in vec2 depthCoord;
+// How much of the lamp is in sight
+layout(location = 2) in float visibility;
 
 layout(location = 0) out vec4 outColor;
 
@@ -50,6 +57,6 @@ void main() {
 	// What GL adds onto its gamma-encoded frame. An sRGB swapchain blends in linear
 	// light, so the amount is decoded first: exact over black, the night it dazzles in.
 	vec4 image = texture(glareTexture, texCoord);
-	vec3 glare = pc.color * image.rgb * image.a;
+	vec3 glare = pc.color * image.rgb * (image.a * visibility);
 	outColor = vec4(pc.outputIsLinear > 0.5 ? SrgbToLinear(glare) : glare, 0.0);
 }
