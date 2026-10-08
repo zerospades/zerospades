@@ -47,8 +47,29 @@ namespace spades {
 			device->AttachShader(handle, shader);
 		}
 
+		IGLDevice::Integer GLProgram::GetUniformLocation(const std::string& name) {
+			auto it = uniformLocations.find(name);
+			if (it == uniformLocations.end())
+				it = uniformLocations
+				       .emplace(name, device->GetUniformLocation(handle, name.c_str()))
+				       .first;
+			return it->second;
+		}
+
+		IGLDevice::Integer GLProgram::GetAttributeLocation(const std::string& name) {
+			auto it = attributeLocations.find(name);
+			if (it == attributeLocations.end())
+				it = attributeLocations
+				       .emplace(name, device->GetAttribLocation(handle, name.c_str()))
+				       .first;
+			return it->second;
+		}
+
 		void GLProgram::Link() {
 			SPADES_MARK_FUNCTION();
+			// Linking assigns the locations anew.
+			uniformLocations.clear();
+			attributeLocations.clear();
 			device->LinkProgram(handle);
 
 			std::vector<char> errMsg;
