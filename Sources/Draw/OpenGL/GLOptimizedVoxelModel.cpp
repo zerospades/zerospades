@@ -866,7 +866,7 @@ namespace spades {
 					continue;
 
 				// Nothing to set up for a model no light reaches.
-				if (std::none_of(lights.begin(), lights.end(), [&](const GLDynamicLight& light) {
+				if (!dlightShader.Gather(lights, [&](const GLDynamicLight& light) {
 					    return light.SphereCull(modelOrigin, rad);
 				    }))
 					continue;
@@ -901,13 +901,10 @@ namespace spades {
 				if (param.depthHack)
 					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
-				dlightShader.Render(
-				  &renderer, dlightProgram, lights, 2,
-				  [&](const GLDynamicLight& light) { return light.SphereCull(modelOrigin, rad); },
-				  [&] {
-					  device.DrawElements(IGLDevice::Triangles, numIndices,
-					                      IGLDevice::UnsignedInt, (void*)0);
-				  });
+				dlightShader.Render(&renderer, dlightProgram, 2, [&] {
+					device.DrawElements(IGLDevice::Triangles, numIndices, IGLDevice::UnsignedInt,
+					                    (void*)0);
+				});
 
 				if (isMirrored)
 					device.FrontFace(mirror ? IGLDevice::CCW : IGLDevice::CW);

@@ -26,13 +26,6 @@
 namespace spades {
 	namespace draw {
 		namespace {
-			/**
-			 * How far past the edge of its image a spotlight still lights, as a
-			 * fraction of the image's half width: its cone fades out between `0.8`
-			 * and this (`smoothstep(1.1, 0.8, ...)` in `DynamicLight/Lights.fs`).
-			 */
-			constexpr float kSpotFadeEnd = 1.1F;
-
 			/** The squared distance from `point` to the nearest point of `box`. */
 			float SquaredDistance(const AABB3& box, const Vector3& point) {
 				const float dx = std::max(std::max(box.min.x - point.x, point.x - box.max.x), 0.0F);
@@ -62,7 +55,7 @@ namespace spades {
 
 				// Construct clipping planes which are oriented inside, around all the cone
 				// lights, its fade past the image's edge included.
-				t *= kSpotFadeEnd;
+				t *= SpotFadeEnd;
 
 				// To do that, first we calculate tangent vectors:
 				Vector3 planeTan[] = {
@@ -111,13 +104,15 @@ namespace spades {
 			return SquaredDistance(box, param.origin) < param.radius * param.radius;
 		}
 
+		float GLDynamicLight::GetSpotTangent() const { return std::tan(param.spotAngle * 0.5F); }
+
 		void GLDynamicLight::GetBoundingSphere(Vector3& center, float& radius) const {
 			const float reach = param.radius;
 
 			switch (param.type) {
 				case client::DynamicLightTypeSpotlight: {
 					// The spherical sector the cone lights out to its reach.
-					const float tanHalf = std::tan(param.spotAngle * 0.5F) * kSpotFadeEnd;
+					const float tanHalf = GetSpotTangent() * SpotFadeEnd;
 					const float cosHalf = 1.0F / std::sqrt(1.0F + tanHalf * tanHalf);
 					const float sinHalf = tanHalf * cosHalf;
 					const Vector3 axis = param.spotAxis[2].Normalize();

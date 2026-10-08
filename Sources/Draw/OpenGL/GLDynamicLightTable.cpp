@@ -21,6 +21,7 @@
 #include <algorithm>
 
 #include "GLDynamicLight.h"
+#include "GLDynamicLightOcclusionMaps.h"
 #include "GLDynamicLightTable.h"
 #include <Core/Debug.h>
 
@@ -47,11 +48,24 @@ namespace spades {
 
 		GLDynamicLightTable::~GLDynamicLightTable() { device.DeleteTexture(texture); }
 
-		void GLDynamicLightTable::Update(const std::vector<GLDynamicLight>& newLights) {
+		void GLDynamicLightTable::Update(const std::vector<GLDynamicLight>& newLights,
+		                                 bool withOcclusionMaps) {
 			SPADES_MARK_FUNCTION();
 
 			lights = newLights.data();
 			numLights = newLights.size();
+
+			tiles.assign(numLights, -1);
+			numTiles = 0;
+			if (withOcclusionMaps) {
+				for (std::size_t i = 0; i < numLights; i++) {
+					if (numTiles == GLDynamicLightOcclusionMaps::MaxTiles)
+						break;
+					if (GLDynamicLightOcclusionMaps::IsMappable(newLights[i]))
+						tiles[i] = numTiles++;
+				}
+			}
+
 			if (numLights == 0)
 				return; // nothing will look the table up
 
@@ -105,9 +119,12 @@ namespace spades {
 					row[27] = segment.GetLength();
 				}
 
-				// 7: whether it is a spotlight, and whether it is linear
+				// 7: whether it is a spotlight, whether it is linear, its occlusion map
+				// tile, or -1, and how much wider a texel of it gets per block
 				row[28] = spot ? 1.0F : 0.0F;
 				row[29] = linear ? 1.0F : 0.0F;
+				row[30] = (float)tiles[i];
+				row[31] = tiles[i] >= 0 ? GLDynamicLightOcclusionMaps::GetTexelSpread(light) : 0.0F;
 			}
 
 			device.TexSubImage2D(IGLDevice::Texture2D, 0, 0, 0, TexelsPerLight, (int)numLights,

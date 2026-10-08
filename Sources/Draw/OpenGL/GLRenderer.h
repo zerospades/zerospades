@@ -46,6 +46,7 @@ namespace spades {
 		class GLLongSpriteRenderer;
 		class GLGlareRenderer;
 		class GLDynamicLightTable;
+		class GLDynamicLightOcclusionMaps;
 		class GLFramebufferManager;
 		class GLMapShadowRenderer;
 		class GLModelRenderer;
@@ -108,6 +109,7 @@ namespace spades {
 			std::unique_ptr<GLWaterRenderer> waterRenderer;
 			std::unique_ptr<GLMapOccupancy> mapOccupancy;
 			std::unique_ptr<GLDynamicLightTable> dynamicLightTable;
+			std::unique_ptr<GLDynamicLightOcclusionMaps> dynamicLightOcclusionMaps;
 			GLAmbientShadowRenderer* ambientShadowRenderer;
 			GLRadiosityRenderer* radiosityRenderer;
 
@@ -143,6 +145,15 @@ namespace spades {
 			// The device strings never change, so they are read once.
 			bool rendererInfoCached = false;
 			client::RendererInfo rendererInfo;
+
+			/** Tells this renderer apart from every other one, even one made later at
+			 * the same address. */
+			static std::uint64_t NextInstanceId();
+			const std::uint64_t instanceId = NextInstanceId();
+
+			/** Counts the dynamic light passes, so that what binds textures for one
+			 * knows when a new one starts. */
+			std::uint32_t dynamicLightPass = 0;
 
 			bool duringSceneRendering;
 
@@ -265,8 +276,13 @@ namespace spades {
 			GLAmbientShadowRenderer* GetAmbientShadowRenderer() { return ambientShadowRenderer; }
 			GLMapShadowRenderer* GetMapShadowRenderer() { return mapShadowRenderer; }
 			GLMapOccupancy* GetMapOccupancy() { return mapOccupancy.get(); }
-			/** This frame's dynamic lights, as the lighting shaders look them up. */
+			/** This frame's dynamic lights, as the lighting shaders look them up. Made
+			 * for the first frame with dynamic lights on, as are the occlusion maps. */
 			GLDynamicLightTable& GetDynamicLightTable() { return *dynamicLightTable; }
+			/** Where the map stops this frame's spotlights. */
+			GLDynamicLightOcclusionMaps& GetDynamicLightOcclusionMaps() {
+				return *dynamicLightOcclusionMaps;
+			}
 			GLRadiosityRenderer* GetRadiosityRenderer() { return radiosityRenderer; }
 			GLModelRenderer* GetModelRenderer() { return modelRenderer; }
 
@@ -275,6 +291,9 @@ namespace spades {
 			const Matrix4& GetViewMatrix() const { return viewMatrix; }
 
 			std::uint32_t GetFrameNumber() const { return frameNumber; }
+			std::uint64_t GetInstanceId() const { return instanceId; }
+			/** The dynamic light pass under way, or the last one. */
+			std::uint32_t GetDynamicLightPass() const { return dynamicLightPass; }
 
 			bool IsRenderingMirror() const { return renderingMirror; }
 

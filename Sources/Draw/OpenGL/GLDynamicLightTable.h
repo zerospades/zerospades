@@ -54,6 +54,10 @@ namespace spades {
 
 			std::vector<float> texels;
 
+			/** Each light's tile of `GLDynamicLightOcclusionMaps`, or `-1`. */
+			std::vector<int> tiles;
+			int numTiles = 0;
+
 		public:
 			explicit GLDynamicLightTable(IGLDevice&);
 			~GLDynamicLightTable();
@@ -61,12 +65,19 @@ namespace spades {
 			GLDynamicLightTable(const GLDynamicLightTable&) = delete;
 			GLDynamicLightTable& operator=(const GLDynamicLightTable&) = delete;
 
-			/** Fills the table from this frame's lights, which must stay where they are
-			 * until the next call. */
-			void Update(const std::vector<GLDynamicLight>&);
+			/**
+			 * Fills the table from this frame's lights, which must stay where they are
+			 * until the next call. With `withOcclusionMaps`, the first lights that can
+			 * have an occlusion map get its tiles.
+			 */
+			void Update(const std::vector<GLDynamicLight>&, bool withOcclusionMaps);
 
 			/** The row of `light`, one of the lights the table was last filled from. */
 			int GetRow(const GLDynamicLight& light) const;
+
+			/** The occlusion map tile of the light in `row`, or `-1` for none. */
+			int GetTile(std::size_t row) const { return tiles[row]; }
+			int GetNumTiles() const { return numTiles; }
 
 			IGLDevice::UInteger GetTexture() const { return texture; }
 

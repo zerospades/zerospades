@@ -24,6 +24,10 @@
 // The most lights one draw takes: `GLDynamicLightShader::MaxLightsPerDraw`.
 #define DYNAMIC_LIGHT_MAX 8
 
+// How far past the edge of its image a spotlight still lights, as a fraction of
+// the image's half width: `GLDynamicLight::SpotFadeEnd`.
+#define DYNAMIC_LIGHT_SPOT_FADE_END 1.1
+
 // How many lights the draw takes, and their rows in `dynamicLightTable`, four to a
 // vector
 uniform int dynamicLightCount;
@@ -34,7 +38,9 @@ uniform vec4 dynamicLightRows[2];
 //   2 to 5: the matrix projecting onto the light's image, by column (a point or
 //           linear light's maps everything to its centre, so it can still be
 //           sampled);
-//   6: a linear light's direction and length;  7: is it a spotlight, is it linear
+//   6: a linear light's direction and length;
+//   7: is it a spotlight, is it linear, its occlusion map tile or -1, and how much
+//      wider a texel of that tile gets per block away from the light
 uniform sampler2D dynamicLightTable;
 // 1 / the rows the table has
 uniform float dynamicLightTableRowsInversed;
@@ -68,6 +74,92 @@ float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition);
 // wherever they really are, even half inside a wall.
 uniform bool dynamicLightOccludedFromEye;
 uniform vec3 dynamicLightEye;
+
+// `GLDynamicLightOcclusionMaps`: tiles of `DYNAMIC_LIGHT_OCCLUSION_TILE` texels
+// each, `DYNAMIC_LIGHT_OCCLUSION_ATLAS` texels across, each texel holding how far
+// from its light the ray through it gets before it enters a solid block.
+uniform sampler2D dynamicLightOcclusionMaps;
+#define DYNAMIC_LIGHT_OCCLUSION_TILE 128.0
+#define DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW 8.0
+#define DYNAMIC_LIGHT_OCCLUSION_ATLAS 1024.0
+
+// The widest a texel may be at a point for its tile to decide whether the point is
+// lit, in blocks: below `1 / sqrt(2)`, no block can stand in the way of the point
+// without crossing one of the four rays around it.
+#define DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH 0.7
+// How far short of where it meets the point's surface a ray may stop and still
+// count as reaching it, in blocks: the rays' reaches are half floats.
+#define DYNAMIC_LIGHT_OCCLUSION_TOLERANCE 0.1
+
+/** How far from the light the ray through texel `texel` of tile `tileOrigin` gets. */
+float DynamicLightOcclusionReach(vec2 tileOrigin, vec2 texel) {
+	return texture2D(dynamicLightOcclusionMaps,
+	                 (tileOrigin + texel + 0.5) * (1.0 / DYNAMIC_LIGHT_OCCLUSION_ATLAS))
+	  .x;
+}
+
+/**
+ * Whether the rays of the four texels around `position`, on a surface facing
+ * `normal`, all get to that surface (`1`), all stop short of it (`0`), or disagree
+ * (`-1`), as the occlusion map `tile` of a spotlight at `lightPosition` has them.
+ * Each ray is held to where it meets the plane of the surface, which a ray grazing
+ * a floor meets well before or after the point. They don't decide (`-1`) where the
+ * texels are too wide to be sure either. `spotMatrix` projects onto the light's
+ * image, and `texelSpread` is how much wider a texel gets per block from the light.
+ */
+float DynamicLightOcclusionMapClassify(float tile, mat4 spotMatrix, float texelSpread,
+                                       vec3 position, vec3 normal, vec3 lightPosition) {
+	vec3 toPoint = position - lightPosition;
+	float distance = length(toPoint);
+	if (distance * texelSpread > DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH)
+		return -1.0;
+
+	// The light's axes, out of the matrix: its last row is the beam's axis, and its
+	// first two are the image's axes over twice the cone's tangent, offset by half
+	// the beam's axis (`GLDynamicLight`).
+	float spread = texelSpread * DYNAMIC_LIGHT_OCCLUSION_TILE;
+	float twiceTangent = spread * (1.0 / DYNAMIC_LIGHT_SPOT_FADE_END);
+	vec3 axisZ = vec3(spotMatrix[0][3], spotMatrix[1][3], spotMatrix[2][3]);
+	vec3 axisX =
+	  (vec3(spotMatrix[0][0], spotMatrix[1][0], spotMatrix[2][0]) - 0.5 * axisZ) * twiceTangent;
+	vec3 axisY =
+	  (vec3(spotMatrix[0][1], spotMatrix[1][1], spotMatrix[2][1]) - 0.5 * axisZ) * twiceTangent;
+
+	vec3 coord = (spotMatrix * vec4(position, 1.0)).xyw;
+	vec2 onTile =
+	  (coord.xy / max(coord.z, 1.0e-6) - 0.5) * (1.0 / DYNAMIC_LIGHT_SPOT_FADE_END) + 0.5;
+	vec2 base = floor(onTile * DYNAMIC_LIGHT_OCCLUSION_TILE - 0.5);
+
+	vec2 tileOrigin =
+	  vec2(mod(tile, DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW),
+	       floor(tile / DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW)) * DYNAMIC_LIGHT_OCCLUSION_TILE;
+	float surfaceOffset = dot(normal, toPoint);
+
+	float reaching = 0.0;
+	for (int k = 0; k < 4; k++) {
+		vec2 texel = clamp(base + vec2(float(k - (k / 2) * 2), float(k / 2)), vec2(0.0),
+		                   vec2(DYNAMIC_LIGHT_OCCLUSION_TILE - 1.0));
+
+		// The ray through the texel's centre, as the tile was traced
+		vec2 slope = ((texel + 0.5) * (1.0 / DYNAMIC_LIGHT_OCCLUSION_TILE) - 0.5) * spread;
+		vec3 direction = normalize(axisZ + axisX * slope.x + axisY * slope.y);
+
+		// Where it meets the surface's plane, but no farther than the point: past
+		// it, the ray has passed whatever stands before the point.
+		float facing = dot(normal, direction);
+		float target = facing < -1.0e-4 ? min(surfaceOffset / facing, distance) : distance;
+
+		if (DynamicLightOcclusionReach(tileOrigin, texel) >=
+		    target - DYNAMIC_LIGHT_OCCLUSION_TOLERANCE)
+			reaching += 1.0;
+	}
+
+	if (reaching > 3.5)
+		return 1.0;
+	if (reaching < 0.5)
+		return 0.0;
+	return -1.0;
+}
 
 /**
  * The light that light `i` brings to `position`, on a surface facing `normal`,
@@ -110,9 +202,10 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 
 	vec3 texValue = vec3(1.0);
 	float coneFalloff = 1.0;
+	mat4 spotMatrix = mat4(1.0);
 	if (kind.x > 0.5) {
-		mat4 spotMatrix = mat4(DynamicLightTexel(row, 2.0), DynamicLightTexel(row, 3.0),
-		                       DynamicLightTexel(row, 4.0), DynamicLightTexel(row, 5.0));
+		spotMatrix = mat4(DynamicLightTexel(row, 2.0), DynamicLightTexel(row, 3.0),
+		                  DynamicLightTexel(row, 4.0), DynamicLightTexel(row, 5.0));
 		vec3 lightTexCoord = (spotMatrix * vec4(position, 1.0)).xyw;
 
 		// Nothing behind the light source
@@ -125,7 +218,7 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 		vec2 coneCoord = lightTexCoord.xy / lightTexCoord.z - vec2(0.5);
 		float coneDistance = length(coneCoord) * 2.0;
 		// Smooth falloff at cone edge (0.8 to 1.1 normalized)
-		coneFalloff = smoothstep(1.1, 0.8, coneDistance);
+		coneFalloff = smoothstep(DYNAMIC_LIGHT_SPOT_FADE_END, 0.8, coneDistance);
 		if (coneFalloff <= 0.0)
 			return vec3(0.0);
 
@@ -136,9 +229,18 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 	float reachLeft = max(1.0 - distance * colorReachInversed.w, 0.0);
 	float attenuation = reachLeft * reachLeft;
 
-	vec3 occlusionOrigin = dynamicLightOccludedFromEye ? dynamicLightEye : position;
-	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue *
-	       DynamicLightMapVisibility(occlusionOrigin, normal, lightPosition);
+	// The first-person view's models are lit as if at the eye, which no tile
+	// looks from; any light without a tile walks the map itself, and so does one
+	// whose tile leaves the point undecided, at the edge of a shadow.
+	float visibility = -1.0;
+	if (kind.z >= 0.0 && !dynamicLightOccludedFromEye)
+		visibility = DynamicLightOcclusionMapClassify(kind.z, spotMatrix, kind.w, position,
+		                                              normal, lightPosition);
+	if (visibility < 0.0)
+		visibility = DynamicLightMapVisibility(
+		  dynamicLightOccludedFromEye ? dynamicLightEye : position, normal, lightPosition);
+
+	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue * visibility;
 }
 
 vec3 EvaluateDynamicLight(int i, vec3 position, vec3 normal) {

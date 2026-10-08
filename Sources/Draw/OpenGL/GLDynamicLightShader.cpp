@@ -22,6 +22,7 @@
 
 #include <algorithm>
 
+#include "GLDynamicLightOcclusionMaps.h"
 #include "GLDynamicLightTable.h"
 #include "GLImage.h"
 #include "GLMapOccupancy.h"
@@ -39,6 +40,7 @@ namespace spades {
 		      eye("dynamicLightEye"),
 		      table("dynamicLightTable"),
 		      tableRowsInversed("dynamicLightTableRowsInversed"),
+		      occlusionMaps("dynamicLightOcclusionMaps"),
 		      count("dynamicLightCount"),
 		      rowsLow("dynamicLightRows[0]"),
 		      rowsHigh("dynamicLightRows[1]") {}
@@ -89,38 +91,53 @@ namespace spades {
 
 		void GLDynamicLightShader::SetUp(GLRenderer* renderer, GLProgram* program, GLImage* image,
 		                                 int texStage) {
-			// TODO: Raw pointers are not unique!
-			if (lastRenderer != renderer) {
+			// A new renderer has its own images and programs, none of them set up.
+			if (lastRenderer != renderer->GetInstanceId()) {
 				whiteImage = renderer->RegisterWhiteImage().Cast<GLImage>();
-				lastRenderer = renderer;
-				// Its programs hold nothing uploaded yet.
+				lastRenderer = renderer->GetInstanceId();
+				// Its programs hold nothing uploaded yet, and it binds nothing yet.
 				uploadedProgram = nullptr;
+				boundPass = 0;
 			}
 
-			// Bound for every draw: other passes use the same texture stage.
 			IGLDevice& device = renderer->GetGLDevice();
-			device.ActiveTexture(texStage);
-			if (image) {
-				image->Bind(IGLDevice::Texture2D);
-				// The image must not repeat past the cone's edge, and it is sampled
-				// where only some fragments of a quad reach the light, where a mipmap
-				// level cannot be chosen.
-				image->SetWrap(IGLDevice::ClampToEdge);
-				image->SetMinFilter(IGLDevice::Linear);
-			} else {
-				whiteImage->Bind(IGLDevice::Texture2D);
+			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
+			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
+
+			// Once a pass, the textures every batch shares
+			const std::uint32_t pass = renderer->GetDynamicLightPass();
+			if (pass != boundPass) {
+				boundPass = pass;
+				boundImage = nullptr;
+
+				// The map hides the lights from what is behind it, once it is loaded.
+				device.ActiveTexture(texStage + 1);
+				device.BindTexture(IGLDevice::Texture3D, occupancy ? occupancy->GetTexture() : 0);
+
+				// The lights the batch names rows of
+				device.ActiveTexture(texStage + 2);
+				device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
+
+				// Where the map stops the spotlights that have a map
+				device.ActiveTexture(texStage + 3);
+				device.BindTexture(IGLDevice::Texture2D,
+				                   renderer->GetDynamicLightOcclusionMaps().GetTexture());
 			}
 
-			// The map hides the lights from what is behind it, once it is loaded.
-			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
-			device.ActiveTexture(texStage + 1);
-			device.BindTexture(IGLDevice::Texture3D, occupancy ? occupancy->GetTexture() : 0);
-
-			// The lights the batch names rows of
-			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
-			device.ActiveTexture(texStage + 2);
-			device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
+			// The batch's image, when it is another one than the last batch's
 			device.ActiveTexture(texStage);
+			GLImage* batchImage = image ? image : whiteImage.GetPointerOrNull();
+			if (batchImage != boundImage) {
+				boundImage = batchImage;
+				batchImage->Bind(IGLDevice::Texture2D);
+				if (image) {
+					// The image must not repeat past the cone's edge, and it is
+					// sampled where only some fragments of a quad reach the light,
+					// where a mipmap level cannot be chosen.
+					image->SetWrap(IGLDevice::ClampToEdge);
+					image->SetMinFilter(IGLDevice::Linear);
+				}
+			}
 
 			const std::uint32_t frame = renderer->GetFrameNumber();
 			if (program != uploadedProgram || frame != uploadedFrame) {
@@ -148,6 +165,8 @@ namespace spades {
 				table.SetValue(texStage + 2);
 				tableRowsInversed(program);
 				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
+				occlusionMaps(program);
+				occlusionMaps.SetValue(texStage + 3);
 			}
 
 			if (batch == uploadedBatch)

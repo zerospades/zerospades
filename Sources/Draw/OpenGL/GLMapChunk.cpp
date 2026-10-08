@@ -471,8 +471,9 @@ namespace spades {
 				return;
 
 			// Nothing to set up for a chunk no light reaches.
-			if (std::none_of(lights.begin(), lights.end(),
-			                 [&bx](const GLDynamicLight& light) { return light.Cull(bx); }))
+			static GLDynamicLightShader lightShader;
+			if (!lightShader.Gather(lights,
+			                        [&bx](const GLDynamicLight& light) { return light.Cull(bx); }))
 				return;
 
 			GLProgram* program = renderer.dlightProgram;
@@ -503,15 +504,11 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, iBuffer);
-			static GLDynamicLightShader lightShader;
-			lightShader.Render(
-			  &renderer.renderer, program, lights, 1,
-			  [&bx](const GLDynamicLight& light) { return light.Cull(bx); },
-			  [&] {
-				  device.DrawElements(IGLDevice::Triangles,
-				                      static_cast<IGLDevice::Sizei>(indices.size()),
-				                      IGLDevice::UnsignedShort, NULL);
-			  });
+			lightShader.Render(&renderer.renderer, program, 1, [&] {
+				device.DrawElements(IGLDevice::Triangles,
+				                    static_cast<IGLDevice::Sizei>(indices.size()),
+				                    IGLDevice::UnsignedShort, NULL);
+			});
 
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, 0);
 		}

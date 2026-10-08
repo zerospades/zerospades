@@ -18,6 +18,7 @@
 
  */
 
+#include <atomic>
 #include <cstdarg>
 #include <cstdlib>
 
@@ -31,6 +32,7 @@
 #include "GLFogFilter.h"
 #include "GLFogFilter2.h"
 #include "GLFramebufferManager.h"
+#include "GLDynamicLightOcclusionMaps.h"
 #include "GLDynamicLightTable.h"
 #include "GLGlareRenderer.h"
 #include "GLImage.h"
@@ -89,6 +91,11 @@ namespace spades {
 			 */
 			constexpr int kStencilBitWorld = 1 << 0;
 		} // namespace
+
+		std::uint64_t GLRenderer::NextInstanceId() {
+			static std::atomic<std::uint64_t> next{1};
+			return next++;
+		}
 
 		GLRenderer::GLRenderer(Handle<IGLDevice> _device)
 			: device(std::move(_device)),
@@ -188,7 +195,6 @@ namespace spades {
 				spriteRenderer = new GLSpriteRenderer(*this);
 			longSpriteRenderer = new GLLongSpriteRenderer(*this);
 			glareRenderer.reset(new GLGlareRenderer(*this));
-			dynamicLightTable.reset(new GLDynamicLightTable(*device));
 			modelRenderer = new GLModelRenderer(*this);
 
 			// preload
@@ -258,6 +264,7 @@ namespace spades {
 			delete longSpriteRenderer;
 			longSpriteRenderer = NULL;
 			glareRenderer.reset();
+			dynamicLightOcclusionMaps.reset();
 			dynamicLightTable.reset();
 			delete modelRenderer;
 			modelRenderer = NULL;
@@ -754,6 +761,8 @@ namespace spades {
 				GLProfiler::Context p(*profiler, "Dynamic Light Pass [%d light(s)]",
 									  (int)lights.size());
 
+				++dynamicLightPass;
+
 				device->DepthFunc(IGLDevice::Equal);
 				// Only the surfaces already in the depth buffer are lit, so it is not
 				// written: the GPU can then reject hidden fragments before shading them.
@@ -889,7 +898,15 @@ namespace spades {
 					ambientShadowRenderer->Update();
 				if (mapOccupancy)
 					mapOccupancy->Update();
-				dynamicLightTable->Update(lights);
+				if (settings.r_dlights) {
+					// Made on first use: they need float textures, which nothing else
+					// asks for unless HDR is on.
+					if (!dynamicLightTable)
+						dynamicLightTable.reset(new GLDynamicLightTable(*device));
+					if (!dynamicLightOcclusionMaps)
+						dynamicLightOcclusionMaps.reset(new GLDynamicLightOcclusionMaps(*this));
+					dynamicLightTable->Update(lights, mapOccupancy != nullptr);
+				}
 				if (radiosityRenderer)
 					radiosityRenderer->Update();
 				if (mapRenderer)
@@ -898,6 +915,12 @@ namespace spades {
 
 			if (settings.r_srgb)
 				device->Enable(IGLDevice::FramebufferSRGB, false);
+
+			{
+				GLProfiler::Context p(*profiler, "Dynamic Light Occlusion Maps");
+				if (settings.r_dlights)
+					dynamicLightOcclusionMaps->Render(lights, *dynamicLightTable);
+			}
 
 			// build shadowmap
 			{

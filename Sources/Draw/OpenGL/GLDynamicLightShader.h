@@ -48,7 +48,14 @@ namespace spades {
 			static constexpr std::size_t MaxLightsPerDraw = 8;
 
 		private:
-			GLRenderer* lastRenderer = nullptr;
+			/** `GLRenderer::GetInstanceId` of the renderer last set up for, or `0`. */
+			std::uint64_t lastRenderer = 0;
+
+			// What is bound for the pass under way: the textures every batch shares,
+			// for `GLRenderer::GetDynamicLightPass`, and the last batch's image. The
+			// passes in between use the same texture stages for something else.
+			std::uint32_t boundPass = 0;
+			GLImage* boundImage = nullptr;
 			Handle<GLImage> whiteImage;
 
 			// Set once a frame
@@ -59,6 +66,7 @@ namespace spades {
 			GLProgramUniform eye;
 			GLProgramUniform table;
 			GLProgramUniform tableRowsInversed;
+			GLProgramUniform occlusionMaps;
 
 			// Set for each batch: how many lights it has, and their rows in the table,
 			// four to a vector
@@ -85,8 +93,8 @@ namespace spades {
 			 */
 			GLImage* TakeBatch();
 
-			/** Binds `image`, the map's occupancy and the light table, and sets the
-			 * program up for `batch`. */
+			/** Binds `image`, the map's occupancy, the light table and the occlusion
+			 * maps, and sets the program up for `batch`. */
 			void SetUp(GLRenderer*, GLProgram*, GLImage* image, int texStage);
 
 		public:
@@ -96,21 +104,27 @@ namespace spades {
 			static std::vector<GLShader*> RegisterShader(GLProgramManager*);
 
 			/**
-			 * Lights a draw with every light of `lights`, the renderer's for this frame,
-			 * that `reaches` accepts: calls `draw` once per batch, with `program` set up
-			 * for it, the batch's image on `texStage`, the map's occupancy on the next
-			 * stage and the light table on the one after. `texStage` is left the active
-			 * texture stage.
+			 * Picks the lights of `lights`, the renderer's for this frame, that
+			 * `reaches` accepts, for the next `Render`. Returns whether there are any,
+			 * so that a draw no light reaches is not set up at all.
 			 */
-			template <class Reaches, class Draw>
-			void Render(GLRenderer* renderer, GLProgram* program,
-			            const std::vector<GLDynamicLight>& lights, int texStage,
-			            Reaches&& reaches, Draw&& draw) {
+			template <class Reaches>
+			bool Gather(const std::vector<GLDynamicLight>& lights, Reaches&& reaches) {
 				pending.clear();
 				for (const GLDynamicLight& light : lights)
 					if (reaches(light))
 						pending.push_back(&light);
+				return !pending.empty();
+			}
 
+			/**
+			 * Lights a draw with the lights `Gather` picked: calls `draw` once per
+			 * batch, with `program` set up for it, the batch's image on `texStage`,
+			 * then on the stages after it the map's occupancy, the light table and the
+			 * lights' occlusion maps. `texStage` is left the active texture stage.
+			 */
+			template <class Draw>
+			void Render(GLRenderer* renderer, GLProgram* program, int texStage, Draw&& draw) {
 				while (!pending.empty()) {
 					GLImage* image = TakeBatch();
 					SetUp(renderer, program, image, texStage);

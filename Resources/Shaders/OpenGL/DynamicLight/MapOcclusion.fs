@@ -32,72 +32,74 @@ uniform vec3 dynamicLightMapSizeInversed;
 uniform float dynamicLightMapOcclusion;
 
 // The most steps a walk takes, each to the next block or out of a clear cube: more
-// than a light's reach needs. A light farther than that along the walk is taken as
-// seen.
+// than a light's reach needs. A walk that has not got through by then stops where it
+// got to, so that it errs on the side of darkness rather than lighting what a wall
+// may hide.
 #define DYNAMIC_LIGHT_MAP_MAX_STEPS 256
 
 /**
- * 1 if `lightPosition` is seen from `position`, on a surface facing `normal`, and 0
- * if a solid block is in the way. The walk starts in the block in front of the
- * surface, so the block the surface belongs to doesn't hide its own light, and
- * stops at the light's block. It crosses open air a clear cube at a time.
+ * How far along the segment from `from` to `to` it enters the first solid block,
+ * from 0 at `from` to 1 at `to`, or 2 if it enters none. A walk out of steps
+ * stops where it got to. The block `from` lies in is
+ * not looked at; with `stopAtTarget`, neither is the one `to` lies in. The walk
+ * crosses open air a clear cube at a time.
  */
-float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) {
-	if (dynamicLightMapOcclusion < 0.5)
-		return 1.0;
+float DynamicLightMapWalk(vec3 from, vec3 to, bool stopAtTarget) {
+	vec3 delta = to - from;
 
-	vec3 origin = position + normal * 0.01;
-	vec3 delta = lightPosition - origin;
-
-	vec3 cell = floor(origin);
-	vec3 target = floor(lightPosition);
+	vec3 cell = floor(from);
+	vec3 target = floor(to);
 	vec3 stepDirection = sign(delta);
 	vec3 moving = abs(stepDirection);
 
-	// The walk's progress, from 0 at `origin` to 1 at the light: `tMax` where it
-	// crosses the next boundary on each axis, `tDelta` between two of them. An
-	// axis it doesn't move along is never crossed.
+	// The walk's progress, from 0 at `from` to 1 at `to`: `tMax` where it crosses
+	// the next boundary on each axis, `tDelta` between two of them. An axis it
+	// doesn't move along is never crossed.
 	vec3 tDelta = 1.0 / max(abs(delta), vec3(1.0e-6));
-	vec3 tMax = (stepDirection * (cell - origin) + max(stepDirection, vec3(0.0))) * tDelta;
+	vec3 tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
 	tMax = mix(vec3(2.0), tMax, moving);
 
-	// The first block is the one the walk starts in, which is not looked at.
+	// Where the walk entered `cell`. The first block is the one it starts in, which
+	// is not looked at.
+	float tEnter = 0.0;
 	bool advance = true;
 
 	for (int i = 0; i < DYNAMIC_LIGHT_MAP_MAX_STEPS; i++) {
 		if (advance) {
 			if (tMax.x < tMax.y && tMax.x < tMax.z) {
-				if (tMax.x > 1.0)
-					return 1.0;
+				tEnter = tMax.x;
 				cell.x += stepDirection.x;
 				tMax.x += tDelta.x;
 			} else if (tMax.y < tMax.z) {
-				if (tMax.y > 1.0)
-					return 1.0;
+				tEnter = tMax.y;
 				cell.y += stepDirection.y;
 				tMax.y += tDelta.y;
 			} else {
-				if (tMax.z > 1.0)
-					return 1.0;
+				tEnter = tMax.z;
 				cell.z += stepDirection.z;
 				tMax.z += tDelta.z;
 			}
+			if (tEnter > 1.0)
+				return 2.0;
 		}
 		advance = true;
 
-		if (all(equal(cell, target)))
-			return 1.0;
+		if (stopAtTarget && all(equal(cell, target)))
+			return 2.0;
 
-		// Above the map is open sky; the texture would repeat its top layer there.
+		// Above the map is open sky, and below it solid ground, as `GameMap` has it;
+		// the texture would repeat its top and bottom layers there.
 		if (cell.z < 0.0)
 			continue;
+		if (cell.z * dynamicLightMapSizeInversed.z >= 1.0)
+			return tEnter;
 
 		float clearance = floor(
 		  texture3D(dynamicLightMapOccupancy, (cell + 0.5) * dynamicLightMapSizeInversed).x *
 		    255.0 +
 		  0.5);
 		if (clearance < 0.5)
-			return 0.0;
+			return tEnter;
 		if (clearance < 1.5)
 			continue;
 
@@ -106,20 +108,33 @@ float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) 
 		vec3 low = cell - (clearance - 1.0);
 		vec3 high = cell + clearance;
 		vec3 exitFace = mix(low, high, max(stepDirection, vec3(0.0)));
-		vec3 tExits = mix(vec3(2.0), abs(exitFace - origin) * tDelta, moving);
+		vec3 tExits = mix(vec3(2.0), abs(exitFace - from) * tDelta, moving);
 		float tExit = min(tExits.x, min(tExits.y, tExits.z));
 
-		// The light is inside the cube, so nothing is in the way.
+		// The segment ends inside the cube, so nothing is in the way.
 		if (tExit >= 1.0)
-			return 1.0;
+			return 2.0;
 
 		// Into the block past that face, which is looked at next.
 		vec3 exits = step(tExits, vec3(tExit)) * moving;
-		vec3 inside = clamp(floor(origin + delta * tExit), low, high - 1.0);
+		vec3 inside = clamp(floor(from + delta * tExit), low, high - 1.0);
 		cell = mix(inside, exitFace + min(stepDirection, vec3(0.0)), exits);
-		tMax = (stepDirection * (cell - origin) + max(stepDirection, vec3(0.0))) * tDelta;
+		tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
 		tMax = mix(vec3(2.0), tMax, moving);
+		tEnter = tExit;
 		advance = false;
 	}
-	return 1.0;
+	return tEnter;
+}
+
+/**
+ * 1 if `lightPosition` is seen from `position`, on a surface facing `normal`, and 0
+ * if a solid block is in the way. The walk starts in the block in front of the
+ * surface, so the block the surface belongs to doesn't hide its own light, and
+ * stops at the light's block.
+ */
+float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) {
+	if (dynamicLightMapOcclusion < 0.5)
+		return 1.0;
+	return DynamicLightMapWalk(position + normal * 0.01, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
