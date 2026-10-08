@@ -44,12 +44,16 @@ namespace spades {
 		class GLFlatMapRenderer;
 		class IGLSpriteRenderer;
 		class GLLongSpriteRenderer;
+		class GLGlareRenderer;
+		class GLDynamicLightTable;
+		class GLDynamicLightOcclusionMaps;
 		class GLFramebufferManager;
 		class GLMapShadowRenderer;
 		class GLModelRenderer;
 		class IGLShadowMapRenderer;
 		class GLWaterRenderer;
 		class GLAmbientShadowRenderer;
+		class GLMapOccupancy;
 		class GLRadiosityRenderer;
 		class GLLensDustFilter;
 		class GLSoftLitSpriteRenderer;
@@ -101,7 +105,11 @@ namespace spades {
 			GLModelRenderer* modelRenderer;
 			IGLSpriteRenderer* spriteRenderer;
 			GLLongSpriteRenderer* longSpriteRenderer;
+			std::unique_ptr<GLGlareRenderer> glareRenderer;
 			std::unique_ptr<GLWaterRenderer> waterRenderer;
+			std::unique_ptr<GLMapOccupancy> mapOccupancy;
+			std::unique_ptr<GLDynamicLightTable> dynamicLightTable;
+			std::unique_ptr<GLDynamicLightOcclusionMaps> dynamicLightOcclusionMaps;
 			GLAmbientShadowRenderer* ambientShadowRenderer;
 			GLRadiosityRenderer* radiosityRenderer;
 
@@ -134,6 +142,15 @@ namespace spades {
 			unsigned int lastTime;
 			std::uint32_t frameNumber = 0;
 
+			/** Tells this renderer apart from every other one, even one made later at
+			 * the same address. */
+			static std::uint64_t NextInstanceId();
+			const std::uint64_t instanceId = NextInstanceId();
+
+			/** Counts the dynamic light passes, so that what binds textures for one
+			 * knows when a new one starts. */
+			std::uint32_t dynamicLightPass = 0;
+
 			bool duringSceneRendering;
 
 			void BuildProjectionMatrix();
@@ -162,6 +179,13 @@ namespace spades {
 			~GLRenderer();
 
 		public:
+			/**
+			 * The front of the depth range the first-person view's models are drawn
+			 * into (`ModelRenderParam::depthHack`), so that they stay in front of the
+			 * world. The world only reaches it within a hair of the near plane.
+			 */
+			static constexpr float kFirstPersonDepthEnd = 0.1F;
+
 			GLRenderer(Handle<IGLDevice> glDevice);
 
 			void Init() override;
@@ -182,9 +206,29 @@ namespace spades {
 			void SetFogColor(Vector3 v) override;
 			void SetFogDistance(float f) override { fogDistance = f; }
 
-			Vector3 GetFogColor() { return fogColor; }
+			/** The factor the world's lighting but the sun's, the fog and the sky are
+			 * drawn with, in `[0, 1]`. */
+			float GetDaylight() { return sceneDef.daylight; }
+
+			/** The Fog Colour as set: the colour of the fog and the sky in full daylight. */
+			Vector3 GetFullDaylightFogColor() { return fogColor; }
+
+			/** The colour the fog and the sky are drawn in: the Fog Colour times the
+			 * daylight. */
+			Vector3 GetFogColor() { return fogColor * GetDaylight(); }
 			float GetFogDistance() { return fogDistance; }
+
+			/** The colour solid geometry fades to with distance: none when a fog filter
+			 * draws the fog over it afterwards. */
 			Vector3 GetFogColorForSolidPass();
+
+			/** `GetFogColorForSolidPass` in full daylight: the sky's light, which the
+			 * lighting shaders scale by the daylight themselves. */
+			Vector3 GetFullDaylightFogColorForSolidPass();
+
+			/** The factor the sun's light is drawn with. At `0` the sun casts no light
+			 * and no shadow. */
+			float GetSunlight() { return sceneDef.sunlight; }
 
 			void StartScene(const client::SceneDefinition&) override;
 
@@ -196,6 +240,7 @@ namespace spades {
 
 			void AddSprite(client::IImage&, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage&, Vector3 p1, Vector3 p2, float radius) override;
+			void AddGlare(client::IImage&, const client::GlareParam&) override;
 
 			void EndScene() override;
 
@@ -244,6 +289,14 @@ namespace spades {
 			IGLShadowMapRenderer* GetShadowMapRenderer() { return shadowMapRenderer.get(); }
 			GLAmbientShadowRenderer* GetAmbientShadowRenderer() { return ambientShadowRenderer; }
 			GLMapShadowRenderer* GetMapShadowRenderer() { return mapShadowRenderer; }
+			GLMapOccupancy* GetMapOccupancy() { return mapOccupancy.get(); }
+			/** This frame's dynamic lights, as the lighting shaders look them up. Made
+			 * for the first frame with dynamic lights on, as are the occlusion maps. */
+			GLDynamicLightTable* GetDynamicLightTable() { return dynamicLightTable.get(); }
+			/** Where the map stops this frame's spotlights. */
+			GLDynamicLightOcclusionMaps* GetDynamicLightOcclusionMaps() {
+				return dynamicLightOcclusionMaps.get();
+			}
 			GLRadiosityRenderer* GetRadiosityRenderer() { return radiosityRenderer; }
 			GLModelRenderer* GetModelRenderer() { return modelRenderer; }
 
@@ -252,6 +305,9 @@ namespace spades {
 			const Matrix4& GetViewMatrix() const { return viewMatrix; }
 
 			std::uint32_t GetFrameNumber() const { return frameNumber; }
+			std::uint64_t GetInstanceId() const { return instanceId; }
+			/** The dynamic light pass under way, or the last one. */
+			std::uint32_t GetDynamicLightPass() const { return dynamicLightPass; }
 
 			bool IsRenderingMirror() const { return renderingMirror; }
 

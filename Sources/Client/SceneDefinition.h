@@ -51,6 +51,16 @@ namespace spades {
 			float saturation;
 			float radialBlur;
 
+			/** The factor the sun's light is drawn with, in `[0, 1]`. At `0` the sun
+			 * casts no light and no shadow. */
+			float sunlight;
+
+			/**
+			 * The factor the rest of the world's lighting, the fog and the sky are drawn
+			 * with, in `[0, 1]`. Dynamic lights are not affected. `1` is full daylight.
+			 */
+			float daylight;
+
 			SceneDefinition() {
 				viewportLeft = viewportTop = 0;
 				viewportWidth = viewportHeight = 0;
@@ -71,6 +81,8 @@ namespace spades {
 				globalBlur = 0.0F;
 				saturation = 1.0F;
 				radialBlur = 0.0F;
+				sunlight = 1.0F;
+				daylight = 1.0F;
 			}
 
 			Matrix4 ToOpenGLProjectionMatrix() const;

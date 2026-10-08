@@ -459,6 +459,30 @@ namespace spades {
 					AddReport("	 r_hdr is disabled.", col);
 				}
 
+				// The dynamic lights are uploaded as a float texture, and where the map
+				// stops each beam is drawn into one.
+				for (const char* ex : {"GL_ARB_texture_float", "GL_ARB_color_buffer_float"}) {
+					if (extensions.find(ex) != std::string::npos)
+						continue;
+					if (r_dlights) {
+						r_dlights = 0;
+						SPLog("Disabling r_dlights: no %s", ex);
+					}
+					const std::string name = ex;
+					incapableConfigs.insert(
+					  std::make_pair("r_dlights", [name](std::string value) -> std::string {
+						  if (std::stoi(value)) {
+							  return "Dynamic lights are disabled because your video card "
+									 "doesn't support " + name + ".";
+						  } else {
+							  return std::string();
+						  }
+					  }));
+
+					AddReport(name + " is NOT SUPPORTED", yellow);
+					AddReport("	 r_dlights is disabled.", col);
+				}
+
 				if (extensions.find("GL_EXT_texture_array") == std::string::npos) {
 					if ((int)r_water >= 2) {
 						r_water = 1;

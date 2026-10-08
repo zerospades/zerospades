@@ -31,6 +31,7 @@ namespace spades {
 	}
 	namespace draw {
 		class GLRenderer;
+		class GLDynamicLight;
 		class IGLDevice;
 		class GLProgram;
 		class GLSettings;
@@ -78,7 +79,8 @@ namespace spades {
 
 			static void PreloadShaders(GLRenderer &);
 
-			void Render();
+			/** Draws the water, lit by the sun, the sky and `lights` as well. */
+			void Render(const std::vector<GLDynamicLight>& lights);
 
 			void Update(float dt);
 

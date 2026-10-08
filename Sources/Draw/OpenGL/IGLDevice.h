@@ -189,6 +189,7 @@ namespace spades {
 				RGB10A2,
 				RGB16F,
 				RGBA16F,
+				RGBA32F,
 				R16F,
 				RGB5,
 				RGB5A1,

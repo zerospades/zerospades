@@ -80,6 +80,8 @@ namespace spades {
 			bool alive;
 			bool airborne;
 			bool wade;
+			bool flashlightOn;
+			float flashlightOnTime;
 			ToolType tool;
 
 			WeaponType weaponType;
@@ -192,6 +194,19 @@ namespace spades {
 			bool IsToolBlock() { return tool == ToolBlock; }
 			bool IsToolWeapon() { return tool == ToolWeapon; }
 			bool IsToolGrenade() { return tool == ToolGrenade; }
+
+			/**
+			 * Whether this player's flashlight is lit.
+			 *
+			 * With the *Flashlight* extension the server switches it for every player;
+			 * without it, only the local player switches its own. It starts off with
+			 * each new player object and goes off on Kill Action.
+			 */
+			bool IsFlashlightOn() { return flashlightOn; }
+			void SetFlashlightOn(bool on);
+
+			/** World time at which the flashlight last changed state, for the fade-in. */
+			float GetFlashlightOnTime() { return flashlightOnTime; }
 
 			bool IsZoomed() { return tool == ToolWeapon && weapInput.secondary; }
 			bool IsWalking() { return input.moveForward || input.moveBackward || input.moveLeft || input.moveRight; }

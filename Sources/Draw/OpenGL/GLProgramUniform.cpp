@@ -36,7 +36,7 @@ namespace spades {
 			if (last != p) {
 				last = p;
 				last->Use();
-				loc = p->GetDevice()->GetUniformLocation(p->GetHandle(), name.c_str());
+				loc = p->GetUniformLocation(name);
 				if (loc == -1)
 					fprintf(stderr, "WARNING: uniform '%s' not found\n", name.c_str());
 			}

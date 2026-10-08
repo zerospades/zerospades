@@ -23,6 +23,8 @@
 
 #include <kiss_fft130/kiss_fft.h>
 
+#include "GLDynamicLight.h"
+#include "GLDynamicLightShader.h"
 #include "GLFramebufferManager.h"
 #include "GLImage.h"
 #include "GLProfiler.h"
@@ -617,7 +619,14 @@ namespace spades {
 			device.DeleteTexture(waveTexture);
 		}
 
-		void GLWaterRenderer::Render() {
+		namespace {
+			// The most the waves move the surface off its plane (`DisplaceWater` in
+			// Water2.vs and Water3.vs): sideways, and up or down.
+			constexpr float maxWaveDisplacementHorizontal = 16.0F;
+			constexpr float maxWaveDisplacementVertical = 2.5F;
+		} // namespace
+
+		void GLWaterRenderer::Render(const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Render");
@@ -741,12 +750,15 @@ namespace spades {
 
 				static GLShadowShader shadowShader;
 
+				// The first texture stage the shadows leave free.
+				int texStage = 0;
+
 				if (waveTanks.size() == 1) {
 					device.ActiveTexture(3);
 					device.BindTexture(IGLDevice::Texture2D, waveTexture);
 					waveTextureUnif.SetValue(3);
 
-					shadowShader(&renderer, prg, 4);
+					texStage = shadowShader(&renderer, prg, 4);
 				} else if (waveTanks.size() == 3) {
 					device.ActiveTexture(3);
 					device.BindTexture(IGLDevice::Texture2DArray, waveTexture);
@@ -769,12 +781,37 @@ namespace spades {
 						  renderer.GetFramebufferManager()->GetMirrorDepthTexture());
 						mirrorDepthTexture.SetValue(5);
 
-						shadowShader(&renderer, prg, 6);
+						texStage = shadowShader(&renderer, prg, 6);
 					} else {
-						shadowShader(&renderer, prg, 5);
+						texStage = shadowShader(&renderer, prg, 5);
 					}
 				} else {
 					SPAssert(false);
+				}
+
+				// The water's colour replaces the scene under it, so the dynamic lights
+				// fall on it in this same draw, not in an added pass as on the map.
+				{
+					static GLDynamicLightShader dlightShader;
+
+					const Vector3 waterMin =
+					  MakeVector3(def.viewOrigin.x - waterRange - maxWaveDisplacementHorizontal,
+					              def.viewOrigin.y - waterRange - maxWaveDisplacementHorizontal,
+					              waterLevel - maxWaveDisplacementVertical);
+					const Vector3 waterMax =
+					  MakeVector3(def.viewOrigin.x + waterRange + maxWaveDisplacementHorizontal,
+					              def.viewOrigin.y + waterRange + maxWaveDisplacementHorizontal,
+					              waterLevel + maxWaveDisplacementVertical);
+					const AABB3 waterBox(waterMin, waterMax);
+
+					dlightShader.SetUpSingleDraw(
+					  &renderer, prg, lights, texStage, def.viewOrigin,
+					  [&waterBox](const GLDynamicLight& light) { return light.Cull(waterBox); });
+
+					// The water is lit where it really is.
+					static GLProgramUniform occludedFromEye("dynamicLightOccludedFromEye");
+					occludedFromEye(prg);
+					occludedFromEye.SetValue(0);
 				}
 
 				static GLProgramAttribute positionAttribute("positionAttribute");

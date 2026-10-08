@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <set>
 
 #include "CellToTriangle.h"
@@ -529,14 +530,14 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::Prerender(
-			std::vector<client::ModelRenderParam> params, bool ghostPass) {
+			const std::vector<client::ModelRenderParam>& params, bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
 			RenderSunlightPass(params, ghostPass);
 		}
 
 		void GLOptimizedVoxelModel::RenderShadowMapPass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			device.Enable(IGLDevice::CullFace, true);
@@ -612,7 +613,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderSunlightPass(
-			std::vector<client::ModelRenderParam> params, bool ghostPass) {
+			const std::vector<client::ModelRenderParam>& params, bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -751,7 +752,7 @@ namespace spades {
 					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);
@@ -776,7 +777,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderDynamicLightPass(
-			std::vector<client::ModelRenderParam> params, std::vector<GLDynamicLight> lights) {
+			const std::vector<client::ModelRenderParam>& params, const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -864,9 +865,22 @@ namespace spades {
 				if (!renderer.SphereFrustrumCull(modelOrigin, rad))
 					continue;
 
+				// Nothing to set up for a model no light reaches.
+				if (!dlightShader.Gather(lights, [&](const GLDynamicLight& light) {
+					    return light.SphereCull(modelOrigin, rad);
+				    }))
+					continue;
+
 				static GLProgramUniform customColor("customColor");
 				customColor(dlightProgram);
 				customColor.SetValue(param.customColor.x, param.customColor.y, param.customColor.z);
+
+				// The first-person view's models are where the eye is, as far as the
+				// map hiding a light from them goes: they are drawn in front of the
+				// world, even when they really reach into a wall.
+				static GLProgramUniform occludedFromEye("dynamicLightOccludedFromEye");
+				occludedFromEye(dlightProgram);
+				occludedFromEye.SetValue(param.depthHack ? 1 : 0);
 
 				static GLProgramUniform projectionViewModelMatrix("projectionViewModelMatrix");
 				projectionViewModelMatrix(dlightProgram);
@@ -885,16 +899,12 @@ namespace spades {
 					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
-				for (const auto& light : lights) {
-					if (!light.SphereCull(modelOrigin, rad))
-						continue;
-
-					dlightShader(&renderer, dlightProgram, light, 2);
-					device.DrawElements(IGLDevice::Triangles,
-						numIndices, IGLDevice::UnsignedInt, (void*)0);
-				}
+				dlightShader.Render(&renderer, dlightProgram, 2, [&] {
+					device.DrawElements(IGLDevice::Triangles, numIndices, IGLDevice::UnsignedInt,
+					                    (void*)0);
+				});
 
 				if (isMirrored)
 					device.FrontFace(mirror ? IGLDevice::CCW : IGLDevice::CW);
@@ -913,7 +923,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderOutlinePass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -999,7 +1009,7 @@ namespace spades {
 					device.FrontFace(IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);
@@ -1017,7 +1027,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderXRayPass(
-			std::vector<client::ModelRenderParam> params) {
+			const std::vector<client::ModelRenderParam>& params) {
 			SPADES_MARK_FUNCTION();
 
 			// The pass runs for every model type in the scene, but only a handful of
@@ -1141,7 +1151,7 @@ namespace spades {
 					device.FrontFace(IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);

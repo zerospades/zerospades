@@ -57,6 +57,9 @@ namespace spades {
 
 			Handle<Bitmap> fb;
 			std::vector<float> depthBuffer;
+			/** The world's own colours, kept while the daylight dims the frame so that
+			 * dynamic lights still light them. Empty in full daylight. */
+			std::vector<uint32_t> albedoBuffer;
 
 			std::shared_ptr<SWImageManager> imageManager;
 			std::shared_ptr<SWModelManager> modelManager;
@@ -85,6 +88,12 @@ namespace spades {
 				Vector4 color;
 			};
 			std::vector<LongSprite> longSprites;
+
+			struct Glare {
+				Handle<SWImage> img;
+				client::GlareParam param;
+			};
+			std::vector<Glare> glares;
 
 			struct Model {
 				Handle<SWModel> model;
@@ -142,6 +151,14 @@ namespace spades {
 
 			template <SWFeatureLevel> void ApplyDynamicLight(const DynamicLight &);
 
+			/** Draws the scene's glares over the finished frame. This renderer can't
+			 * tell the first-person view's models apart, so they go under the glares. */
+			void DrawGlares();
+
+			/** Dims what is drawn so far, the world and the sky, by the daylight, keeping
+			 * their colours in `albedoBuffer`. */
+			void ApplyDaylight();
+
 		protected:
 			~SWRenderer();
 
@@ -165,7 +182,9 @@ namespace spades {
 			void SetFogColor(Vector3 v) override;
 			void SetFogDistance(float f) override { fogDistance = f; }
 
-			Vector3 GetFogColor() { return fogColor; }
+			/** The colour the fog and the sky are drawn in: the Fog Colour times the
+			 * daylight. */
+			Vector3 GetFogColor() { return fogColor * sceneDef.daylight; }
 			float GetFogDistance() { return fogDistance; }
 
 			void StartScene(const client::SceneDefinition &) override;
@@ -178,6 +197,7 @@ namespace spades {
 
 			void AddSprite(client::IImage &, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage &, Vector3 p1, Vector3 p2, float radius) override;
+			void AddGlare(client::IImage &, const client::GlareParam &) override;
 
 			void EndScene() override;
 

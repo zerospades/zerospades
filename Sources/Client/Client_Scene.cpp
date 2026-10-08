@@ -28,6 +28,7 @@
 #include "BloodMarks.h"
 #include "Corpse.h"
 #include "CTFGameMode.h"
+#include "DaytimeWeather.h"
 #include "GameProperties.h"
 #include "IGameMode.h"
 #include "Player.h"
@@ -197,6 +198,12 @@ namespace spades {
 			if (world) {
 				IntVector3 fogColor = world->GetFogColor();
 				renderer->SetFogColor(ConvertColorRGB(fogColor));
+
+				// Without a time of day the scene keeps its default, full daylight.
+				if (stmp::optional<TimeOfDay> timeOfDay = activeNet->GetTimeOfDay()) {
+					def.sunlight = GetSunlight(*timeOfDay);
+					def.daylight = GetDaylight(*timeOfDay);
+				}
 
 				int shakeLevel = cg_shake;
 
@@ -669,10 +676,15 @@ namespace spades {
 			if (world) {
 				stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 
+				// How lit the world around the lamps is: dynamic lights aside, all of it
+				// is drawn with the scene's daylight.
+				const float ambient = lastSceneDef.daylight;
+
 				for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
 					if (world->GetPlayer(static_cast<unsigned int>(i))) {
 						SPAssert(clientPlayers[i]);
 						clientPlayers[i]->AddToScene();
+						clientPlayers[i]->AddFlashlightGlareToScene(ambient);
 					}
 				}
 

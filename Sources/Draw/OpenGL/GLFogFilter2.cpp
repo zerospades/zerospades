@@ -121,6 +121,7 @@ namespace spades {
 			static GLProgramUniform sunlightScale("sunlightScale");
 			static GLProgramUniform ambientScale("ambientScale");
 			static GLProgramUniform radiosityScale("radiosityScale");
+			static GLProgramUniform sunlight("sunlight");
 			static GLProgramUniform fogDistance("fogDistance");
 			static GLProgramUniform ditherTexture("ditherTexture");
 			static GLProgramUniform ditherOffset("ditherOffset");
@@ -134,6 +135,7 @@ namespace spades {
 			lensDepthTexture(lens);
 			lensViewOrigin(lens);
 			sunlightScale(lens);
+			sunlight(lens);
 			ambientScale(lens);
 			radiosityScale(lens);
 			fogDistance(lens);
@@ -149,10 +151,16 @@ namespace spades {
 			lensViewOrigin.SetValue(def.viewOrigin.x, def.viewOrigin.y, def.viewOrigin.z);
 			viewProjectionMatrixInv.SetValue(viewProjectionMatrix.Inversed());
 
-			Vector3 fogCol = renderer.GetFogColor();
+			// Derived in full daylight, then scaled by the daylight below, so the fog
+			// looks like the Fog Colour times the daylight.
+			Vector3 fogCol = renderer.GetFullDaylightFogColor();
 			fogCol *= fogCol; // linearize
+			const float daylight = renderer.GetDaylight();
+			sunlight.SetValue(renderer.GetSunlight());
 
-			float sunlightBrightness = 0.6F; // Sun -> Fog -> Eye
+			// Without the sun, the sky alone gives the fog its colour.
+			const bool sunUp = renderer.GetSunlight() > 0.0F;
+			float sunlightBrightness = sunUp ? 0.6F : 0.0F; // Sun -> Fog -> Eye
 			float ambientBrightness = 1.0F;  // Sun -> Fog -> Fog -> Eye
 			float radiosityBrightness = 1.0F;
 			float radiosityOffset = 0.2F;
@@ -175,7 +183,12 @@ namespace spades {
 			//
 			// We add some value (`radiosityOffset`) to `radiosityScale` for
 			// artistic reasons. We want the fog to reflect some light.
+			//
+			// Without the sun this reduces to `1 / ambientBrightness`, which is taken
+			// as is: a black channel of the Fog Colour would make it `0 / 0`.
 			auto fogTransmission1 = [=](float fogColor) {
+				if (!sunUp)
+					return 1.0F / ambientBrightness;
 				return fogColor / (sunlightBrightness + ambientBrightness * fogColor);
 			};
 			Vector3 fogTransmission{
@@ -183,15 +196,14 @@ namespace spades {
 			  fogTransmission1(fogCol.y),
 			  fogTransmission1(fogCol.z),
 			};
-			sunlightScale.SetValue(fogTransmission.x * sunlightBrightness,
-			                       fogTransmission.y * sunlightBrightness,
-			                       fogTransmission.z * sunlightBrightness);
-			ambientScale.SetValue(fogTransmission.x * fogCol.x * ambientBrightness,
-			                      fogTransmission.y * fogCol.y * ambientBrightness,
-			                      fogTransmission.z * fogCol.z * ambientBrightness);
-			radiosityScale.SetValue(fogTransmission.x * radiosityBrightness + radiosityOffset,
-			                        fogTransmission.y * radiosityBrightness + radiosityOffset,
-			                        fogTransmission.z * radiosityBrightness + radiosityOffset);
+			// The radiosity is the sun's light the map bounces.
+			Vector3 sunScale = fogTransmission * sunlightBrightness * renderer.GetSunlight();
+			Vector3 ambient = fogTransmission * fogCol * ambientBrightness * daylight;
+			Vector3 radiosity = (fogTransmission * radiosityBrightness + radiosityOffset) *
+			                    renderer.GetSunlight();
+			sunlightScale.SetValue(sunScale.x, sunScale.y, sunScale.z);
+			ambientScale.SetValue(ambient.x, ambient.y, ambient.z);
+			radiosityScale.SetValue(radiosity.x, radiosity.y, radiosity.z);
 
 			fogDistance.SetValue(renderer.GetFogDistance());
 

@@ -118,6 +118,23 @@ namespace spades {
 			bool useLensFlare = false;
 		};
 
+		/**
+		 * The dazzle of a light the camera looks into: an image added onto the
+		 * finished frame, centred where the light projects. How much of it shows is
+		 * up to the caller; the renderer only keeps it under the first-person view's
+		 * models (`ModelRenderParam::depthHack`) where it can tell them apart.
+		 */
+		struct GlareParam {
+			/** Where the light is. */
+			Vector3 origin;
+
+			/** Half the image's width and height, in the renderer's 2D units. */
+			float radius = 0.0F;
+
+			/** Added onto the frame, scaled by the image's alpha. */
+			Vector3 color;
+		};
+
 		class IRenderer : public RefCountedObject {
 		protected:
 			virtual ~IRenderer() {}
@@ -156,6 +173,9 @@ namespace spades {
 
 			virtual void AddSprite(IImage&, Vector3 center, float radius, float rotation) = 0;
 			virtual void AddLongSprite(IImage&, Vector3 p1, Vector3 p2, float radius) = 0;
+
+			/** Adds a glare, drawn over the finished frame once the scene ends. */
+			virtual void AddGlare(IImage&, const GlareParam&) = 0;
 
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;

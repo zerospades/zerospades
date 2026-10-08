@@ -56,7 +56,7 @@ namespace spades {
 
 			void Prerender(bool ghostPass);
 			void RenderSunlightPass(bool ghostPass);
-			void RenderDynamicLightPass(std::vector<GLDynamicLight> lights);
+			void RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights);
 			void RenderOutlinePass();
 			void RenderXRayPass();
 

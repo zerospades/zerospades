@@ -38,6 +38,8 @@ namespace spades {
 			preprocess =
 			  renderer.RegisterProgram("Shaders/OpenGL/PostFilters/AutoExposurePreprocess.program");
 			computeGain = renderer.RegisterProgram("Shaders/OpenGL/PostFilters/AutoExposure.program");
+			exposureGamma =
+			  renderer.RegisterProgram("Shaders/OpenGL/PostFilters/ExposureGamma.program");
 
 			IGLDevice &dev = renderer.GetGLDevice();
 
@@ -198,24 +200,43 @@ namespace spades {
 			qr.Draw();
 			dev.BindTexture(IGLDevice::Texture2D, 0);
 
-			// apply exposure adjustment
-			thru->Use();
-			thruColor.SetValue(1.f, 1.f, 1.f, 1.f);
-			thruTexCoordRange.SetValue(0.f, 0.f, 1.f, 1.f);
-			thruTexture.SetValue(0);
-			dev.Enable(IGLDevice::Blend, true);
-			dev.BlendFunc(IGLDevice::DestColor, IGLDevice::Zero); // multiply
-			qr.SetCoordAttributeIndex(thruPosition());
+			// Apply the exposure and the gamma in one pass, each would read and write
+			// the whole scene otherwise.
+			static GLProgramAttribute exposureGammaPosition("positionAttribute");
+			static GLProgramUniform exposureGammaTexture("mainTexture");
+			static GLProgramUniform exposureGammaExposure("exposureTexture");
+			static GLProgramUniform exposureGammaGamma("gamma");
+			exposureGammaPosition(exposureGamma);
+			exposureGammaTexture(exposureGamma);
+			exposureGammaExposure(exposureGamma);
+			exposureGammaGamma(exposureGamma);
+
+			exposureGamma->Use();
+			exposureGammaTexture.SetValue(0);
+			exposureGammaExposure.SetValue(1);
+			exposureGammaGamma.SetValue(1.0F / (float)settings.r_hdrGamma);
+
+			GLColorBuffer output = input.GetManager()->CreateBufferHandle();
+
+			dev.Enable(IGLDevice::Blend, false);
+			qr.SetCoordAttributeIndex(exposureGammaPosition());
+			dev.ActiveTexture(1);
 			dev.BindTexture(IGLDevice::Texture2D, exposureTexture);
-			dev.BindFramebuffer(IGLDevice::Framebuffer, input.GetFramebuffer());
-			dev.Viewport(0, 0, input.GetWidth(), input.GetHeight());
+			dev.ActiveTexture(0);
+			dev.BindTexture(IGLDevice::Texture2D, input.GetTexture());
+			dev.BindFramebuffer(IGLDevice::Framebuffer, output.GetFramebuffer());
+			dev.Viewport(0, 0, output.GetWidth(), output.GetHeight());
 
 			qr.Draw();
+
+			dev.ActiveTexture(1);
+			dev.BindTexture(IGLDevice::Texture2D, 0);
+			dev.ActiveTexture(0);
 			dev.BindTexture(IGLDevice::Texture2D, 0);
 
 			dev.BlendFunc(IGLDevice::SrcAlpha, IGLDevice::OneMinusSrcAlpha);
 
-			return input;
+			return output;
 		}
 	} // namespace draw
 } // namespace spades
