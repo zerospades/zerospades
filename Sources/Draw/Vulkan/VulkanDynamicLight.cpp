@@ -18,11 +18,24 @@
 
  */
 
+#include <algorithm>
+#include <cmath>
+
 #include "VulkanDynamicLight.h"
 #include <Core/Debug.h>
 
 namespace spades {
 	namespace draw {
+		namespace {
+			/** The squared distance from `point` to the nearest point of `box`. */
+			float SquaredDistance(const AABB3& box, const Vector3& point) {
+				const float dx = std::max(std::max(box.min.x - point.x, point.x - box.max.x), 0.0F);
+				const float dy = std::max(std::max(box.min.y - point.y, point.y - box.max.y), 0.0F);
+				const float dz = std::max(std::max(box.min.z - point.z, point.z - box.max.z), 0.0F);
+				return dx * dx + dy * dy + dz * dz;
+			}
+		} // namespace
+
 		VulkanDynamicLight::VulkanDynamicLight(const client::DynamicLightParam& param) : param(param) {
 			SPADES_MARK_FUNCTION();
 
@@ -42,6 +55,10 @@ namespace spades {
 				m.m[8] += 0.5f;
 				m.m[9] += 0.5f;
 				projMatrix = m * projMatrix;
+
+				// Clip planes oriented inside, around all the cone lights, its fade
+				// past the image's edge included
+				t *= SpotFadeEnd;
 
 				Vector3 planeTan[] = {
 				  param.spotAxis[2] + param.spotAxis[0] * t,
@@ -75,16 +92,53 @@ namespace spades {
 				}
 			}
 
-			AABB3 inflatedBox = box.Inflate(param.radius);
-
 			if (param.type == client::DynamicLightTypeLinear) {
+				AABB3 inflatedBox = box.Inflate(param.radius);
 				Vector3 intersection;
 				if (!OBB3(inflatedBox).RayCast(param.origin, param.point2 - param.origin, &intersection))
 					return false;
 				return (intersection - param.origin).GetSquaredLength() <= poweredLength;
 			}
 
-			return inflatedBox && param.origin;
+			return SquaredDistance(box, param.origin) < param.radius * param.radius;
+		}
+
+		float VulkanDynamicLight::GetSpotTangent() const {
+			return std::tan(param.spotAngle * 0.5F);
+		}
+
+		void VulkanDynamicLight::GetBoundingSphere(Vector3& center, float& radius) const {
+			const float reach = param.radius;
+
+			switch (param.type) {
+				case client::DynamicLightTypeSpotlight: {
+					// The spherical sector the cone lights out to its reach.
+					const float tanHalf = GetSpotTangent() * SpotFadeEnd;
+					const float cosHalf = 1.0F / std::sqrt(1.0F + tanHalf * tanHalf);
+					const float sinHalf = tanHalf * cosHalf;
+					const Vector3 axis = param.spotAxis[2].Normalize();
+
+					if (cosHalf < std::sqrt(0.5F)) {
+						// Wide: the sphere through the rim of the cone's base holds the
+						// apex and the far end of the reach too.
+						center = param.origin + axis * (reach * cosHalf);
+						radius = reach * sinHalf;
+					} else {
+						// Narrow: the sphere through the apex and the rim.
+						radius = reach / (2.0F * cosHalf);
+						center = param.origin + axis * radius;
+					}
+				} break;
+				case client::DynamicLightTypeLinear: {
+					const Vector3 half = (param.point2 - param.origin) * 0.5F;
+					center = param.origin + half;
+					radius = reach + half.GetLength();
+				} break;
+				default:
+					center = param.origin;
+					radius = reach;
+					break;
+			}
 		}
 
 		bool VulkanDynamicLight::SphereCull(const Vector3& center, float radius) const {

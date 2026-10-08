@@ -31,6 +31,8 @@
 #include <Client/SceneDefinition.h>
 #include <Core/Math.h>
 
+#include "VulkanDynamicLight.h"
+
 namespace spades {
 	namespace gui {
 		class SDLVulkanDevice;
@@ -97,7 +99,7 @@ namespace spades {
 			client::SceneDefinition sceneDef;
 
 			std::vector<DebugLine> debugLines;
-			std::vector<client::DynamicLightParam> lights;
+			std::vector<VulkanDynamicLight> lights;
 
 			// Vulkan rendering resources
 			std::vector<VkCommandBuffer> commandBuffers;
@@ -312,7 +314,7 @@ namespace spades {
 			float GetFogDistance() { return fogDistance; }
 
 			const client::SceneDefinition& GetSceneDef() const { return sceneDef; }
-			const std::vector<client::DynamicLightParam>& GetDynamicLights() const { return lights; }
+			const std::vector<VulkanDynamicLight>& GetDynamicLights() const { return lights; }
 
 			// Canonical sun direction (points TOWARD the sun), matching the lens
 			// flare, water and lit shaders. Single source of truth so the shadow

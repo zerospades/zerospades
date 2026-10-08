@@ -34,6 +34,7 @@ namespace spades {
 	namespace draw {
 		class VulkanMapRenderer;
 		class VulkanBuffer;
+		class VulkanDynamicLight;
 
 		class VulkanMapChunk {
 			struct Vertex {
@@ -95,7 +96,7 @@ namespace spades {
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
 			void RenderDepthPass(VkCommandBuffer commandBuffer);
 			void RenderShadowMapPass(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
-			void RenderDynamicLightPass(VkCommandBuffer commandBuffer, const client::DynamicLightParam& light);
+			void RenderDynamicLightPass(VkCommandBuffer commandBuffer, const VulkanDynamicLight& light);
 
 			uint32_t GetIndexCount() const { return (uint32_t)indices.size(); }
 			bool IsRealized() const { return realized; }

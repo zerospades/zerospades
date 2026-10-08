@@ -683,7 +683,8 @@ namespace spades {
 			// dynamic lights (r_lensFlareDynamic); culls copied from
 			// GLRenderer's dynamic-flare loop
 			if ((int)r_lensFlareDynamic) {
-				for (const auto& param : renderer.GetDynamicLights()) {
+				for (const VulkanDynamicLight& light : renderer.GetDynamicLights()) {
+					const client::DynamicLightParam& param = light.GetParam();
 					if (requests.size() >= kMaxFlares)
 						break;
 					if (!param.useLensFlare)
