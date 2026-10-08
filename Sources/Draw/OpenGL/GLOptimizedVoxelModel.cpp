@@ -776,7 +776,7 @@ namespace spades {
 		}
 
 		void GLOptimizedVoxelModel::RenderDynamicLightPass(
-			std::vector<client::ModelRenderParam> params, std::vector<GLDynamicLight> lights) {
+			const std::vector<client::ModelRenderParam>& params, const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			bool mirror = renderer.IsRenderingMirror();

@@ -293,7 +293,7 @@ namespace spades {
 			device.BindTexture(IGLDevice::Texture2D, 0);
 		}
 
-		void GLMapRenderer::RenderDynamicLightPass(std::vector<GLDynamicLight> lights) {
+		void GLMapRenderer::RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Map");

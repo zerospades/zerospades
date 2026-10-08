@@ -433,7 +433,7 @@ namespace spades {
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, 0);
 		}
 
-		void GLMapChunk::RenderDynamicLightPass(std::vector<GLDynamicLight> lights) {
+		void GLMapChunk::RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			const auto& eye = renderer.renderer.GetSceneDef().viewOrigin;

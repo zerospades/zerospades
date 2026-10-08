@@ -48,8 +48,8 @@ namespace spades {
 			                                bool ghostPass) = 0;
 
 			/** Adds dynamic light */
-			virtual void RenderDynamicLightPass(std::vector<client::ModelRenderParam> params,
-			                                    std::vector<GLDynamicLight> lights) = 0;
+			virtual void RenderDynamicLightPass(const std::vector<client::ModelRenderParam>& params,
+			                                    const std::vector<GLDynamicLight>& lights) = 0;
 
 			virtual void RenderOutlinePass(std::vector<client::ModelRenderParam> params) = 0;
 
