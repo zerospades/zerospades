@@ -40,13 +40,15 @@ namespace spades {
 		 */
 		struct FlashlightBeam {
 			std::uint8_t reach = 60; // blocks at which the light reaches zero
-			std::uint8_t cone = 90;  // full angle, in degrees
+			std::uint8_t cone = 128; // full angle, in π/256: always below a half space
 			std::uint8_t red = 255;  // linear, `255` is `1.0`
 			std::uint8_t green = 179;
 			std::uint8_t blue = 128;
+			std::uint8_t flicker = 0; // dark about `flicker / 512` of the time
 
 			float GetReach() const { return reach; }
-			float GetConeAngle() const { return DEG2RAD(cone); }
+			float GetConeAngle() const { return cone * (kPi / 256.0F); }
+			float GetFlickerDarkness() const { return flicker / 512.0F; }
 			Vector3 GetColor() const { return MakeVector3(red, green, blue) / 255.0F; }
 
 			/** Whether the beam lights anything at all. */

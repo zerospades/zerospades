@@ -131,7 +131,8 @@ namespace spades {
 		/** The length of each fixed-size Flashlight sub packet, counted from just after
 		 * the sub packet id. Light State runs to the end of the packet. */
 		constexpr std::size_t kFlashlightLightBytes = 1 + 1;          // player, state
-		constexpr std::size_t kFlashlightConfigBytes = 1 + 1 + 1 + 3; // player, reach, cone, rgb
+		constexpr std::size_t kFlashlightConfigBytes =
+		  1 + 1 + 1 + 3 + 1; // player, reach, cone, rgb, flicker
 
 		/** The player id that stands for the server: Player Limit reserves it, so no
 		 * player ever has it. */

@@ -106,6 +106,7 @@ namespace spades {
 					beam.red = r.ReadByte();
 					beam.green = r.ReadByte();
 					beam.blue = r.ReadByte();
+					beam.flicker = r.ReadByte();
 
 					if (playerId == kServerPlayerId)
 						beams.SetDefault(beam);
@@ -142,7 +143,7 @@ namespace spades {
 		std::vector<char> EncodeFlashlightLightConfig(int playerId, const FlashlightBeam& beam) {
 			std::vector<char> data = StartPacket(FlashlightSubLightConfig);
 			for (std::uint8_t field : {static_cast<std::uint8_t>(playerId), beam.reach, beam.cone,
-			                           beam.red, beam.green, beam.blue})
+			                           beam.red, beam.green, beam.blue, beam.flicker})
 				data.push_back(static_cast<char>(field));
 			return data;
 		}

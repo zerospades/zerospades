@@ -75,9 +75,6 @@ namespace spades {
 	namespace client {
 
 		namespace {
-			/** The widest cone the Flashlight extension allows, in radians. */
-			const float kMaxFlashlightConeAngle = DEG2RAD(179.0F);
-
 			/**
 			 * How far the glare sits ahead of the headlamp model's front face, in the
 			 * model's voxels, so the voxels don't swallow it.
@@ -805,7 +802,7 @@ namespace spades {
 			light.origin = lightOrigin;
 			light.radius = beam.GetReach();
 			light.color = beam.GetColor() * (GetFlashlightFadeIn() * (r_hdr ? 3.0F : 1.5F));
-			light.spotAngle = std::min(beam.GetConeAngle(), kMaxFlashlightConeAngle);
+			light.spotAngle = beam.GetConeAngle();
 			light.spotAxis = GetFlashlightAxes();
 			Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
 			light.image = img.GetPointerOrNull();
@@ -840,7 +837,7 @@ namespace spades {
 			lamp.position = lampPosition;
 			lamp.radius = GetHeadlampLensRadius();
 			lamp.direction = flashlightOrientation;
-			lamp.coneAngle = std::min(beam.GetConeAngle(), kMaxFlashlightConeAngle);
+			lamp.coneAngle = beam.GetConeAngle();
 			lamp.reach = beam.GetReach();
 			lamp.color = beam.GetColor();
 			lamp.brightness = GetFlashlightFadeIn();
