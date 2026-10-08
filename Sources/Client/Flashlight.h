@@ -55,6 +55,28 @@ namespace spades {
 			bool Emits() const { return reach > 0 && cone > 0 && (red | green | blue) != 0; }
 		};
 
+		/**
+		 * The dropouts of a flickering beam: short, irregular bursts of darkness,
+		 * dark about `FlashlightBeam::GetFlickerDarkness` of the time. Each burst and
+		 * each lit spell between two of them lasts a random, exponentially distributed
+		 * time, so that they never fall into a rhythm.
+		 */
+		class FlashlightFlicker {
+			bool dark = false;
+			float remaining = 0.0F; // seconds left of the current burst or lit spell
+			float darkness = 0.0F;  // what `remaining` was drawn for
+
+			/** A random length for a burst, or for a lit spell, at `darkness`. */
+			float SampleSpell(bool dark) const;
+
+		public:
+			/** Advances by `dt` seconds, for a beam dark `darkness` of the time. */
+			void Update(float dt, float darkness);
+
+			/** Whether the beam is out right now. */
+			bool IsDark() const { return dark; }
+		};
+
 		/** The beams the server configured: its default for every player without one of
 		 * their own, and each player's. They belong to the connection, not to a world or
 		 * a player object, so they last through death, respawn and map changes. */

@@ -22,6 +22,7 @@
 
 #include <array>
 
+#include "Flashlight.h"
 #include "FlashlightGlare.h"
 #include "Player.h"
 #include <Core/Math.h>
@@ -65,6 +66,13 @@ namespace spades {
 
 			/** This player's lamp as the camera sees it, this frame. */
 			FlashlightGlare flashlightGlare;
+
+			/** The dropouts of this player's beam, if its Light Config flickers. */
+			FlashlightFlicker flashlightFlicker;
+
+			/** Whether this player's beam is lit right now: switched on, giving light,
+			 * and not in a flicker's dropout. */
+			bool IsFlashlightLit();
 
 			asIScriptObject* spadeSkin;
 			asIScriptObject* blockSkin;

@@ -20,6 +20,8 @@
 
 #include "Flashlight.h"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 
 #include <Core/Debug.h>
@@ -35,7 +37,50 @@ namespace spades {
 			std::vector<char> StartPacket(FlashlightSubPacketType sub) {
 				return {static_cast<char>(PacketTypeFlashlight), static_cast<char>(sub)};
 			}
+
+			/** How long a flicker's burst of darkness lasts on average, in seconds. */
+			constexpr float kFlickerBurstSeconds = 0.07F;
+
+			/** The shortest burst or lit spell, in seconds: enough to be seen, and with
+			 * `kFlickerMaxStepSeconds` a bound on how many of them one update goes
+			 * through. */
+			constexpr float kFlickerMinSpellSeconds = 0.02F;
+
+			/** The most time one update plays out: after a stall the pattern carries on
+			 * rather than replaying every burst it missed. */
+			constexpr float kFlickerMaxStepSeconds = 1.0F;
 		} // namespace
+
+		float FlashlightFlicker::SampleSpell(bool dark) const {
+			// Dark `darkness` of the time on average: the lit spells are longer than the
+			// bursts by the ratio of light to dark.
+			const float mean =
+			  dark ? kFlickerBurstSeconds : kFlickerBurstSeconds * (1.0F - darkness) / darkness;
+			const float length = -mean * std::log(1.0F - SampleRandomFloat());
+			return std::max(length, kFlickerMinSpellSeconds);
+		}
+
+		void FlashlightFlicker::Update(float dt, float newDarkness) {
+			if (newDarkness <= 0.0F) {
+				// Steady
+				dark = false;
+				remaining = 0.0F;
+				darkness = 0.0F;
+				return;
+			}
+
+			// A new flicker takes over from the spell under way.
+			if (newDarkness != darkness) {
+				darkness = newDarkness;
+				remaining = SampleSpell(dark);
+			}
+
+			remaining -= std::min(dt, kFlickerMaxStepSeconds);
+			while (remaining <= 0.0F) {
+				dark = !dark;
+				remaining += SampleSpell(dark);
+			}
+		}
 
 		const FlashlightBeam& FlashlightBeams::Resolve(int playerId) const {
 			static const FlashlightBeam builtIn;

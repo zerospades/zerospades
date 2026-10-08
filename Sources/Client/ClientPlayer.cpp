@@ -422,6 +422,13 @@ namespace spades {
 		void ClientPlayer::Update(float dt) {
 			time += dt;
 
+			{
+				const FlashlightBeam& beam =
+				  client.activeNet->GetFlashlightBeams().Resolve(player.GetId());
+				flashlightFlicker.Update(dt,
+				                         player.IsFlashlightOn() ? beam.GetFlickerDarkness() : 0.0F);
+			}
+
 			bool isLocalPlayer = player.IsLocalPlayer();
 			bool isThirdPerson = ShouldRenderInThirdPersonView();
 
@@ -760,16 +767,20 @@ namespace spades {
 			return halfFace * voxelSize;
 		}
 
+		bool ClientPlayer::IsFlashlightLit() {
+			if (!player.IsFlashlightOn() || flashlightFlicker.IsDark())
+				return false;
+			return client.activeNet->GetFlashlightBeams().Resolve(player.GetId()).Emits();
+		}
+
 		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
 			Player& p = player;
 			IRenderer& renderer = client.GetRenderer();
 
-			if (!p.IsFlashlightOn())
+			if (!IsFlashlightLit())
 				return;
 
 			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
-			if (!beam.Emits())
-				return;
 
 			DynamicLightParam light;
 			light.type = DynamicLightTypeSpotlight;
@@ -792,12 +803,11 @@ namespace spades {
 		void ClientPlayer::UpdateFlashlightGlare(const Vector3& lampPosition) {
 			Player& p = player;
 
-			if (!p.IsFlashlightOn())
+			// The glare drops out with the beam.
+			if (!IsFlashlightLit())
 				return;
 
 			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
-			if (!beam.Emits())
-				return;
 
 			World* world = client.GetWorld();
 			if (!world)
