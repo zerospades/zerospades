@@ -34,9 +34,12 @@ namespace spades {
 		class GLRenderer;
 
 		/**
-		 * Which blocks of the map are solid, as a 3D texture for shaders to walk rays
-		 * through: one texel per block, `1` where solid. It wraps horizontally like
-		 * the map, and is kept in step with it as blocks are built and destroyed.
+		 * How clear of solid blocks each block of the map is, as a 3D texture for
+		 * shaders to walk rays through: one texel per block, holding the block's
+		 * clearance `c` out of 255. A solid block has none; around a block with a
+		 * clearance `c`, every block within `c - 1` of it is clear, so a ray can cross
+		 * all of them in one go. It wraps horizontally like the map, and is kept in
+		 * step with it as blocks are built and destroyed.
 		 */
 		class GLMapOccupancy {
 			IGLDevice& device;
@@ -52,11 +55,19 @@ namespace spades {
 			std::vector<bool> isRegionDirty;
 
 			int RegionIndex(const IntVector3& region) const;
+			void MarkRegionDirty(const IntVector3& region);
 
-			/** Fills `texels` with the blocks from `origin` on, `size` of them, running
-			 * along x, then y, then z, as the texture's do. */
-			void ReadBlocks(const IntVector3& origin, const IntVector3& size,
-			                std::vector<std::uint8_t>& texels) const;
+			/** Fills `texels` with the clearance of the blocks of the `width` by
+			 * `height` columns from `x0`, `y0` on, the whole map deep, running along x,
+			 * then y, then z, as the texture's do. */
+			void ComputeClearance(int x0, int y0, int width, int height,
+			                      std::vector<std::uint8_t>& texels) const;
+
+			// Kept from call to call, not to allocate them again for every region
+			mutable std::vector<std::uint64_t> grown;
+			mutable std::vector<std::uint64_t> next;
+			mutable std::vector<std::uint64_t> reached;
+			std::vector<std::uint8_t> columnTexels;
 
 		public:
 			GLMapOccupancy(GLRenderer&, const client::GameMap&);
