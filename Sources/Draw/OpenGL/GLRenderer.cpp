@@ -31,6 +31,7 @@
 #include "GLFogFilter.h"
 #include "GLFogFilter2.h"
 #include "GLFramebufferManager.h"
+#include "GLDynamicLightTable.h"
 #include "GLGlareRenderer.h"
 #include "GLImage.h"
 #include "GLImageManager.h"
@@ -187,6 +188,7 @@ namespace spades {
 				spriteRenderer = new GLSpriteRenderer(*this);
 			longSpriteRenderer = new GLLongSpriteRenderer(*this);
 			glareRenderer.reset(new GLGlareRenderer(*this));
+			dynamicLightTable.reset(new GLDynamicLightTable(*device));
 			modelRenderer = new GLModelRenderer(*this);
 
 			// preload
@@ -256,6 +258,7 @@ namespace spades {
 			delete longSpriteRenderer;
 			longSpriteRenderer = NULL;
 			glareRenderer.reset();
+			dynamicLightTable.reset();
 			delete modelRenderer;
 			modelRenderer = NULL;
 			delete spriteRenderer;
@@ -536,6 +539,8 @@ namespace spades {
 			EnsureInitialized();
 			EnsureSceneStarted();
 
+			// The table lists this frame's lights in the order they were added.
+			glLight.SetTableRow(lights.size());
 			lights.push_back(std::move(glLight));
 		}
 
@@ -884,6 +889,7 @@ namespace spades {
 					ambientShadowRenderer->Update();
 				if (mapOccupancy)
 					mapOccupancy->Update();
+				dynamicLightTable->Update(lights);
 				if (radiosityRenderer)
 					radiosityRenderer->Update();
 				if (mapRenderer)

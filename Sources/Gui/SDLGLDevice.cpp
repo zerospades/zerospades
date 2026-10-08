@@ -893,6 +893,7 @@ namespace spades {
 				case RGB10A2: return GL_RGB10_A2;
 				case RGB16F: return GL_RGB16F;
 				case RGBA16F: return GL_RGBA16F;
+				case RGBA32F: return GL_RGBA32F;
 				case R16F: return GL_R16F;
 				case RGB5: return GL_RGB5;
 				case RGB5A1: return GL_RGB5_A1;

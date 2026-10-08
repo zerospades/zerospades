@@ -45,6 +45,7 @@ namespace spades {
 		class IGLSpriteRenderer;
 		class GLLongSpriteRenderer;
 		class GLGlareRenderer;
+		class GLDynamicLightTable;
 		class GLFramebufferManager;
 		class GLMapShadowRenderer;
 		class GLModelRenderer;
@@ -106,6 +107,7 @@ namespace spades {
 			std::unique_ptr<GLGlareRenderer> glareRenderer;
 			std::unique_ptr<GLWaterRenderer> waterRenderer;
 			std::unique_ptr<GLMapOccupancy> mapOccupancy;
+			std::unique_ptr<GLDynamicLightTable> dynamicLightTable;
 			GLAmbientShadowRenderer* ambientShadowRenderer;
 			GLRadiosityRenderer* radiosityRenderer;
 
@@ -263,6 +265,8 @@ namespace spades {
 			GLAmbientShadowRenderer* GetAmbientShadowRenderer() { return ambientShadowRenderer; }
 			GLMapShadowRenderer* GetMapShadowRenderer() { return mapShadowRenderer; }
 			GLMapOccupancy* GetMapOccupancy() { return mapOccupancy.get(); }
+			/** This frame's dynamic lights, as the lighting shaders look them up. */
+			GLDynamicLightTable& GetDynamicLightTable() { return *dynamicLightTable; }
 			GLRadiosityRenderer* GetRadiosityRenderer() { return radiosityRenderer; }
 			GLModelRenderer* GetModelRenderer() { return modelRenderer; }
 

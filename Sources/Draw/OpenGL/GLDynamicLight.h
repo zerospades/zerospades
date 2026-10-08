@@ -23,12 +23,16 @@
 #include <Client/IRenderer.h>
 #include <Core/Math.h>
 #include <array>
+#include <cstddef>
 
 namespace spades {
 	namespace draw {
 		class GLDynamicLight {
 			client::DynamicLightParam param;
 			Matrix4 projMatrix;
+
+			/** Its row in the renderer's `GLDynamicLightTable` this frame. */
+			std::size_t tableRow = 0;
 
 			/** World-space clip planes (spotlight only) */
 			std::array<Plane3, 4> clipPlanes;
@@ -41,6 +45,9 @@ namespace spades {
 			const client::DynamicLightParam &GetParam() const { return param; }
 
 			const Matrix4 &GetProjectionMatrix() const { return projMatrix; }
+
+			std::size_t GetTableRow() const { return tableRow; }
+			void SetTableRow(std::size_t row) { tableRow = row; }
 
 			bool Cull(const AABB3 &) const;
 

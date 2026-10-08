@@ -24,19 +24,39 @@
 // The most lights one draw takes: `GLDynamicLightShader::MaxLightsPerDraw`.
 #define DYNAMIC_LIGHT_MAX 8
 
+// How many lights the draw takes, and their rows in `dynamicLightTable`, four to a
+// vector
 uniform int dynamicLightCount;
-uniform vec3 dynamicLightOrigin[DYNAMIC_LIGHT_MAX];
-uniform vec3 dynamicLightColor[DYNAMIC_LIGHT_MAX];
-uniform float dynamicLightRadius[DYNAMIC_LIGHT_MAX];
-uniform float dynamicLightRadiusInversed[DYNAMIC_LIGHT_MAX];
-// Projects onto the light's image; a point or linear light's maps everything to
-// its centre, so it can still be sampled
-uniform mat4 dynamicLightSpotMatrix[DYNAMIC_LIGHT_MAX];
-// `1` for a spotlight, whose cone and image shape the light, `0` otherwise
-uniform float dynamicLightIsSpot[DYNAMIC_LIGHT_MAX];
-uniform float dynamicLightIsLinear[DYNAMIC_LIGHT_MAX];
-uniform vec3 dynamicLightLinearDirection[DYNAMIC_LIGHT_MAX];
-uniform float dynamicLightLinearLength[DYNAMIC_LIGHT_MAX];
+uniform vec4 dynamicLightRows[2];
+
+// `GLDynamicLightTable`: a row of texels per light of the frame,
+//   0: origin, reach;  1: colour, 1 / reach;
+//   2 to 5: the matrix projecting onto the light's image, by column (a point or
+//           linear light's maps everything to its centre, so it can still be
+//           sampled);
+//   6: a linear light's direction and length;  7: is it a spotlight, is it linear
+uniform sampler2D dynamicLightTable;
+// 1 / the rows the table has
+uniform float dynamicLightTableRowsInversed;
+
+vec4 DynamicLightTexel(float row, float column) {
+	return texture2D(dynamicLightTable,
+	                 vec2((column + 0.5) * (1.0 / 8.0), (row + 0.5) * dynamicLightTableRowsInversed));
+}
+
+/** The row in the table of the draw's light `i`. */
+float DynamicLightRow(int i) {
+	vec4 rows = i < 4 ? dynamicLightRows[0] : dynamicLightRows[1];
+	int lane = i < 4 ? i : i - 4;
+	if (lane == 0)
+		return rows.x;
+	if (lane == 1)
+		return rows.y;
+	if (lane == 2)
+		return rows.z;
+	return rows.w;
+}
+
 // Shared by every spotlight of the draw
 uniform sampler2D dynamicLightProjectionTexture;
 
@@ -56,18 +76,27 @@ uniform vec3 dynamicLightEye;
  * light.
  */
 vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction) {
+	float row = DynamicLightRow(i);
+	vec4 originReach = DynamicLightTexel(row, 0.0);
+	vec4 colorReachInversed = DynamicLightTexel(row, 1.0);
+	mat4 spotMatrix = mat4(DynamicLightTexel(row, 2.0), DynamicLightTexel(row, 3.0),
+	                       DynamicLightTexel(row, 4.0), DynamicLightTexel(row, 5.0));
+	vec4 linear = DynamicLightTexel(row, 6.0);
+	vec4 kind = DynamicLightTexel(row, 7.0);
+	float isSpot = kind.x;
+
 	// The image is sampled before anything below can return: a texture's mipmap level
 	// is undefined inside control flow that differs between fragments.
-	vec3 lightTexCoord = (dynamicLightSpotMatrix[i] * vec4(position, 1.0)).xyw;
+	vec3 lightTexCoord = (spotMatrix * vec4(position, 1.0)).xyw;
 	vec3 texValue = texture2DProj(dynamicLightProjectionTexture, lightTexCoord).xyz;
-	texValue = mix(vec3(1.0), texValue, dynamicLightIsSpot[i]);
+	texValue = mix(vec3(1.0), texValue, isSpot);
 
-	vec3 lightPosition = dynamicLightOrigin[i];
-	if (dynamicLightIsLinear[i] > 0.5) {
+	vec3 lightPosition = originReach.xyz;
+	if (kind.y > 0.5) {
 		// Linear light approximation - choose the closest point on the light
 		// geometry as the representative light source
-		float d = dot(position - lightPosition, dynamicLightLinearDirection[i]);
-		lightPosition += dynamicLightLinearDirection[i] * clamp(d, 0.0, dynamicLightLinearLength[i]);
+		float d = dot(position - lightPosition, linear.xyz);
+		lightPosition += linear.xyz * clamp(d, 0.0, linear.w);
 	}
 
 	vec3 lightPos = lightPosition - position;
@@ -78,7 +107,7 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 		return vec3(0.0);
 
 	float coneFalloff = 1.0;
-	if (dynamicLightIsSpot[i] > 0.5) {
+	if (isSpot > 0.5) {
 		// Nothing behind the light source
 		if (lightTexCoord.z <= 0.0)
 			return vec3(0.0);
@@ -96,13 +125,13 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 
 	// attenuation
 	float distance = length(lightPos);
-	if (distance >= dynamicLightRadius[i])
+	if (distance >= originReach.w)
 		return vec3(0.0);
-	distance = max(1.0 - distance * dynamicLightRadiusInversed[i], 0.0);
+	distance = max(1.0 - distance * colorReachInversed.w, 0.0);
 	float attenuation = distance * distance;
 
 	vec3 occlusionOrigin = dynamicLightOccludedFromEye ? dynamicLightEye : position;
-	return dynamicLightColor[i] * (attenuation * coneFalloff) * texValue *
+	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue *
 	       DynamicLightMapVisibility(occlusionOrigin, normal, lightPosition);
 }
 

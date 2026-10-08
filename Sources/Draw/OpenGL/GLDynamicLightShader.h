@@ -39,8 +39,8 @@ namespace spades {
 		 *
 		 * The lights that reach a draw are split into batches of up to
 		 * `MaxLightsPerDraw` that share one spotlight image, and each batch takes a
-		 * single draw. A program keeps its uniforms, so a batch it already holds this
-		 * frame is not uploaded again.
+		 * single draw. The lights themselves are uploaded once a frame, in the
+		 * renderer's `GLDynamicLightTable`: a draw only names the rows of its batch.
 		 */
 		class GLDynamicLightShader {
 		public:
@@ -48,38 +48,30 @@ namespace spades {
 			static constexpr std::size_t MaxLightsPerDraw = 8;
 
 		private:
-			/** The uniforms of one light of a batch: `name[index]` in the shaders. */
-			struct LightUniforms {
-				GLProgramUniform origin;
-				GLProgramUniform color;
-				GLProgramUniform radius;
-				GLProgramUniform radiusInversed;
-				GLProgramUniform spotMatrix;
-				GLProgramUniform isSpot;
-				GLProgramUniform isLinear;
-				GLProgramUniform linearDirection;
-				GLProgramUniform linearLength;
-
-				explicit LightUniforms(std::size_t index);
-			};
-
 			GLRenderer* lastRenderer = nullptr;
 			Handle<GLImage> whiteImage;
 
-			GLProgramUniform count;
+			// Set once a frame
 			GLProgramUniform projectionTexture;
 			GLProgramUniform mapOccupancy;
 			GLProgramUniform mapSizeInversed;
 			GLProgramUniform mapOcclusion;
 			GLProgramUniform eye;
-			std::vector<LightUniforms> lightUniforms;
+			GLProgramUniform table;
+			GLProgramUniform tableRowsInversed;
+
+			// Set for each batch: how many lights it has, and their rows in the table,
+			// four to a vector
+			GLProgramUniform count;
+			GLProgramUniform rowsLow;
+			GLProgramUniform rowsHigh;
 
 			// Batching scratch, kept from draw to draw.
 			std::vector<const GLDynamicLight*> pending;
 			std::vector<const GLDynamicLight*> deferred;
 			std::vector<const GLDynamicLight*> batch;
 
-			// The batch the last program set up holds.
+			// The frame the last program was set up for, and the batch it holds.
 			GLProgram* uploadedProgram = nullptr;
 			std::uint32_t uploadedFrame = 0;
 			std::vector<const GLDynamicLight*> uploadedBatch;
@@ -93,8 +85,8 @@ namespace spades {
 			 */
 			GLImage* TakeBatch();
 
-			/** Binds `image` and the map's occupancy, and sets the program up for
-			 * `batch`. */
+			/** Binds `image`, the map's occupancy and the light table, and sets the
+			 * program up for `batch`. */
 			void SetUp(GLRenderer*, GLProgram*, GLImage* image, int texStage);
 
 		public:
@@ -104,10 +96,11 @@ namespace spades {
 			static std::vector<GLShader*> RegisterShader(GLProgramManager*);
 
 			/**
-			 * Lights a draw with every light of `lights` that `reaches` accepts: calls
-			 * `draw` once per batch, with `program` set up for it, the batch's image on
-			 * `texStage` and the map's occupancy on the next stage. `texStage` is left
-			 * the active texture stage.
+			 * Lights a draw with every light of `lights`, the renderer's for this frame,
+			 * that `reaches` accepts: calls `draw` once per batch, with `program` set up
+			 * for it, the batch's image on `texStage`, the map's occupancy on the next
+			 * stage and the light table on the one after. `texStage` is left the active
+			 * texture stage.
 			 */
 			template <class Reaches, class Draw>
 			void Render(GLRenderer* renderer, GLProgram* program,

@@ -20,8 +20,9 @@
 
 #include "GLDynamicLightShader.h"
 
-#include <string>
+#include <algorithm>
 
+#include "GLDynamicLightTable.h"
 #include "GLImage.h"
 #include "GLMapOccupancy.h"
 #include "GLProgramManager.h"
@@ -30,34 +31,17 @@
 
 namespace spades {
 	namespace draw {
-		namespace {
-			std::string Element(const char* name, std::size_t index) {
-				return std::string(name) + "[" + std::to_string(index) + "]";
-			}
-		} // namespace
-
-		GLDynamicLightShader::LightUniforms::LightUniforms(std::size_t index)
-		    : origin(Element("dynamicLightOrigin", index)),
-		      color(Element("dynamicLightColor", index)),
-		      radius(Element("dynamicLightRadius", index)),
-		      radiusInversed(Element("dynamicLightRadiusInversed", index)),
-		      spotMatrix(Element("dynamicLightSpotMatrix", index)),
-		      isSpot(Element("dynamicLightIsSpot", index)),
-		      isLinear(Element("dynamicLightIsLinear", index)),
-		      linearDirection(Element("dynamicLightLinearDirection", index)),
-		      linearLength(Element("dynamicLightLinearLength", index)) {}
-
 		GLDynamicLightShader::GLDynamicLightShader()
-		    : count("dynamicLightCount"),
-		      projectionTexture("dynamicLightProjectionTexture"),
+		    : projectionTexture("dynamicLightProjectionTexture"),
 		      mapOccupancy("dynamicLightMapOccupancy"),
 		      mapSizeInversed("dynamicLightMapSizeInversed"),
 		      mapOcclusion("dynamicLightMapOcclusion"),
-		      eye("dynamicLightEye") {
-			lightUniforms.reserve(MaxLightsPerDraw);
-			for (std::size_t i = 0; i < MaxLightsPerDraw; i++)
-				lightUniforms.emplace_back(i);
-		}
+		      eye("dynamicLightEye"),
+		      table("dynamicLightTable"),
+		      tableRowsInversed("dynamicLightTableRowsInversed"),
+		      count("dynamicLightCount"),
+		      rowsLow("dynamicLightRows[0]"),
+		      rowsHigh("dynamicLightRows[1]") {}
 
 		GLDynamicLightShader::~GLDynamicLightShader() {}
 
@@ -128,83 +112,56 @@ namespace spades {
 			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
 			device.ActiveTexture(texStage + 1);
 			device.BindTexture(IGLDevice::Texture3D, occupancy ? occupancy->GetTexture() : 0);
+
+			// The lights the batch names rows of
+			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
+			device.ActiveTexture(texStage + 2);
+			device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
 			device.ActiveTexture(texStage);
 
 			const std::uint32_t frame = renderer->GetFrameNumber();
-			if (program == uploadedProgram && frame == uploadedFrame && batch == uploadedBatch)
+			if (program != uploadedProgram || frame != uploadedFrame) {
+				uploadedProgram = program;
+				uploadedFrame = frame;
+				uploadedBatch.clear();
+
+				projectionTexture(program);
+				projectionTexture.SetValue(texStage);
+				mapOccupancy(program);
+				mapOccupancy.SetValue(texStage + 1);
+				mapOcclusion(program);
+				mapOcclusion.SetValue(occupancy ? 1.F : 0.F);
+				if (occupancy) {
+					const Vector3 size = occupancy->GetSize();
+					mapSizeInversed(program);
+					mapSizeInversed.SetValue(1.F / size.x, 1.F / size.y, 1.F / size.z);
+				}
+				// Where the first-person view's models are lit from, as far as the map
+				// hiding a light from them goes
+				const Vector3& viewOrigin = renderer->GetSceneDef().viewOrigin;
+				eye(program);
+				eye.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
+				table(program);
+				table.SetValue(texStage + 2);
+				tableRowsInversed(program);
+				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
+			}
+
+			if (batch == uploadedBatch)
 				return;
-			uploadedProgram = program;
-			uploadedFrame = frame;
 			uploadedBatch = batch;
 
-			projectionTexture(program);
-			projectionTexture.SetValue(texStage);
-			mapOccupancy(program);
-			mapOccupancy.SetValue(texStage + 1);
-			mapOcclusion(program);
-			mapOcclusion.SetValue(occupancy ? 1.F : 0.F);
-			if (occupancy) {
-				const Vector3 size = occupancy->GetSize();
-				mapSizeInversed(program);
-				mapSizeInversed.SetValue(1.F / size.x, 1.F / size.y, 1.F / size.z);
-			}
-			// Where the first-person view's models are lit from, as far as the map
-			// hiding a light from them goes
-			const Vector3& viewOrigin = renderer->GetSceneDef().viewOrigin;
-			eye(program);
-			eye.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
+			float rows[MaxLightsPerDraw] = {};
+			for (std::size_t i = 0; i < batch.size(); i++)
+				rows[i] = (float)lightTable.GetRow(*batch[i]);
+
+			static_assert(MaxLightsPerDraw == 8, "the rows are sent as two vec4s");
 			count(program);
 			count.SetValue(static_cast<IGLDevice::Integer>(batch.size()));
-
-			for (std::size_t i = 0; i < batch.size(); i++) {
-				const GLDynamicLight& light = *batch[i];
-				const client::DynamicLightParam& param = light.GetParam();
-				LightUniforms& u = lightUniforms[i];
-
-				u.origin(program);
-				u.color(program);
-				u.radius(program);
-				u.radiusInversed(program);
-				u.spotMatrix(program);
-				u.isSpot(program);
-				u.isLinear(program);
-
-				u.origin.SetValue(param.origin.x, param.origin.y, param.origin.z);
-				u.color.SetValue(param.color.x, param.color.y, param.color.z);
-				u.radius.SetValue(param.radius);
-				u.radiusInversed.SetValue(1.F / param.radius);
-
-				if (param.type == client::DynamicLightTypeSpotlight) {
-					u.spotMatrix.SetValue(light.GetProjectionMatrix());
-					u.isSpot.SetValue(1.F);
-					u.isLinear.SetValue(0.F);
-				} else if (param.type == client::DynamicLightTypePoint ||
-				           param.type == client::DynamicLightTypeLinear) {
-					// Maps everything to the image's centre, so the shader can sample it.
-					u.spotMatrix.SetValue(Matrix4::Translate(0.5F, 0.5F, 0.0F) *
-					                      Matrix4::Scale(0.0F));
-					u.isSpot.SetValue(0.F);
-
-					if (param.type == client::DynamicLightTypeLinear) {
-						// Convert two endpoints to one endpoint + direction + length.
-						// `Vector3::Normalize` is no-op when the length is zero,
-						// therefore the zero-length case is handled.
-						Vector3 direction = param.point2 - param.origin;
-						float length = direction.GetLength();
-						direction = direction.Normalize();
-
-						u.linearDirection(program);
-						u.linearLength(program);
-						u.linearDirection.SetValue(direction.x, direction.y, direction.z);
-						u.linearLength.SetValue(length);
-						u.isLinear.SetValue(1.F);
-					} else {
-						u.isLinear.SetValue(0.F);
-					}
-				} else {
-					SPUnreachable();
-				}
-			}
+			rowsLow(program);
+			rowsLow.SetValue(rows[0], rows[1], rows[2], rows[3]);
+			rowsHigh(program);
+			rowsHigh.SetValue(rows[4], rows[5], rows[6], rows[7]);
 		}
 	} // namespace draw
 } // namespace spades
