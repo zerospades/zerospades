@@ -36,7 +36,6 @@ namespace spades {
 		class VulkanMapChunk;
 		class VulkanBuffer;
 		class VulkanImage;
-		class VulkanDynamicLight;
 
 		// Push-constant blocks for the map pipelines, shared between the pipeline
 		// layout (range size) and VulkanMapChunk (the actual push) so the two are
@@ -58,17 +57,6 @@ namespace spades {
 			Vector3 fogColor;      float _pad2;
 			Vector3 sunDirection;
 		};
-		struct MapDlightPushConstants { // dynamic light pass (224 bytes)
-			Matrix4 projectionViewMatrix;
-			Vector3 modelOrigin;           float fogDistance;
-			Vector3 viewOrigin;            float lightRadius;
-			Vector3 fogColor;              float lightRadiusInversed;
-			Vector3 lightOrigin;           float lightTypeVal;
-			Vector3 lightColor;            float lightLinearLength;
-			Vector3 lightLinearDirection;  float _pad;
-			Matrix4 lightSpotMatrix;
-		};
-
 		class VulkanMapRenderer {
 
 			friend class VulkanMapChunk;
@@ -85,11 +73,9 @@ namespace spades {
 			// Reversed-winding sibling of basicPipeline for the water reflection
 			// (mirror) pass, whose negative-Z scale flips triangle winding.
 			VkPipeline basicMirrorPipeline;
-			VkPipeline dlightPipeline;
 			VkPipeline backfacePipeline;
 
 			VkPipelineLayout pipelineLayout;
-			VkPipelineLayout dlightPipelineLayout;
 			VkDescriptorSetLayout descriptorSetLayout;
 			VkDescriptorPool descriptorPool;
 			VkDescriptorSet textureDescriptorSet;
@@ -122,8 +108,6 @@ namespace spades {
 
 			void DrawColumnDepth(VkCommandBuffer commandBuffer, int cx, int cy, int cz, Vector3 eye);
 			void DrawColumnSunlight(VkCommandBuffer commandBuffer, int cx, int cy, int cz, Vector3 eye);
-			void DrawColumnDynamicLight(VkCommandBuffer commandBuffer, int cx, int cy, int cz, Vector3 eye,
-			                            const VulkanDynamicLight& light);
 
 			void RenderBackface(VkCommandBuffer commandBuffer);
 
@@ -143,8 +127,6 @@ namespace spades {
 			void Realize();
 			void Prerender();
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
-			void RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-			                            const std::vector<VulkanDynamicLight>& lights);
 			void RenderDepthPass(VkCommandBuffer commandBuffer);
 			void RenderShadowMapPass(VkCommandBuffer commandBuffer, VkPipelineLayout shadowPipelineLayout);
 

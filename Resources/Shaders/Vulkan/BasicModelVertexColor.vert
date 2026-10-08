@@ -59,10 +59,12 @@ layout(location = 12) out vec3 modelShadowCoord1;
 layout(location = 13) out vec3 modelShadowCoord2;
 // Camera-axis depth for cascade selection; see BasicMap.vert.
 layout(location = 14) out float shadowViewDepth;
+// World-space position, where the fragment shader evaluates the dynamic lights
+layout(location = 15) out vec3 worldPosition;
 
-// Keep gl_Position bit-identical with ModelDynamicLit.vert so the additive
-// dynamic-light pass (depth test EQUAL) matches this opaque pass's depth and
-// the weapon model doesn't flicker.
+// Keep gl_Position bit-identical across the pipelines drawing a model with this
+// shader: the ghost pass tests its colour against its own depth prepass with
+// EQUAL.
 invariant gl_Position;
 
 void main() {
@@ -125,4 +127,5 @@ void main() {
 	// Reflection-pass water clip: negative for fragments below the water plane.
 	// In the normal scene mirrorClipZ is +inf, so this stays positive (no clip).
 	waterClip = pushConstants.mirrorClipZ - worldPos.z;
+	worldPosition = worldPos;
 }

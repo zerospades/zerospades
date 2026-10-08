@@ -1,0 +1,77 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ ZeroSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ ZeroSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+// Bins the frame's dynamic lights into the clusters of the view: each invocation
+// marks, in its cluster's mask, the lights whose sphere reaches into the box the
+// cluster spans.
+
+#define DYNAMIC_LIGHT_SET 0
+#define DYNAMIC_LIGHT_CLUSTER_ACCESS writeonly
+#include "Table.glsl"
+
+// `VulkanDynamicLightClusters::ClusterGroupSize`
+layout(local_size_x = 64) in;
+
+// Where the last slice ends: it runs on past the far plane, so as to hold
+// whatever lies beyond it.
+const float kUnbounded = 1.0e6;
+
+void main() {
+	uvec3 counts = dynamicLightFrame.counts.xyz;
+	uint cluster = gl_GlobalInvocationID.x;
+	if (cluster >= counts.x * counts.y * counts.z)
+		return;
+
+	uvec3 cell = uvec3(cluster % counts.x, (cluster / counts.x) % counts.y,
+	                   cluster / (counts.x * counts.y));
+
+	// The box around the cluster, in the view's axes: the rays through the corners
+	// of its tile, between the depths its slice spans
+	float nearDepth = DynamicLightSliceStart(float(cell.z));
+	float farDepth =
+	  cell.z + 1u == counts.z ? kUnbounded : DynamicLightSliceStart(float(cell.z + 1u));
+	vec2 slopeLow = (vec2(cell.xy) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents.xy;
+	vec2 slopeHigh =
+	  (vec2(cell.xy + 1u) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents.xy;
+	vec2 sideLow = min(min(slopeLow * nearDepth, slopeLow * farDepth),
+	                   min(slopeHigh * nearDepth, slopeHigh * farDepth));
+	vec2 sideHigh = max(max(slopeLow * nearDepth, slopeLow * farDepth),
+	                    max(slopeHigh * nearDepth, slopeHigh * farDepth));
+	vec3 boxLow = vec3(sideLow, nearDepth);
+	vec3 boxHigh = vec3(sideHigh, farDepth);
+
+	uint lightCount = dynamicLightFrame.counts.w;
+	uint base = cluster * DYNAMIC_LIGHT_MASK_WORDS;
+	for (uint word = 0u; word < DYNAMIC_LIGHT_MASK_WORDS; word++) {
+		uint mask = 0u;
+		uint first = word * 32u;
+		uint end = min(first + 32u, lightCount);
+		for (uint i = first; i < end; i++) {
+			vec4 sphere = dynamicLights[i].viewSphere;
+			vec3 offset = sphere.xyz - clamp(sphere.xyz, boxLow, boxHigh);
+			if (dot(offset, offset) <= sphere.w * sphere.w)
+				mask |= 1u << (i - first);
+		}
+		dynamicLightClusterMasks[base + word] = mask;
+	}
+}
