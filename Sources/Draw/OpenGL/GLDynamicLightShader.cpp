@@ -90,17 +90,14 @@ namespace spades {
 
 			if (param.type == client::DynamicLightTypeSpotlight) {
 				device.ActiveTexture(texStage);
-				static_cast<GLImage*>(param.image)->Bind(IGLDevice::Texture2D);
+				GLImage* image = static_cast<GLImage*>(param.image);
+				image->Bind(IGLDevice::Texture2D);
+				// The image must not repeat past the cone's edge.
+				image->SetWrap(IGLDevice::ClampToEdge);
 				dynamicLightProjectionTexture.SetValue(texStage);
 				texStage++;
 
 				dynamicLightSpotMatrix.SetValue(light.GetProjectionMatrix());
-
-				// bad hack to make texture clamped to edge
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS,
-				                    IGLDevice::ClampToEdge);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT,
-				                    IGLDevice::ClampToEdge);
 
 				dynamicLightIsLinear.SetValue(0);
 			} else if (param.type == client::DynamicLightTypePoint ||

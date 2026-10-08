@@ -65,7 +65,18 @@ namespace spades {
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::Repeat);
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, IGLDevice::Repeat);
 			dev->GenerateMipmap(IGLDevice::Texture2D);
-			return Handle<GLImage>::New(tex, dev, (float)bmp.GetWidth(), (float)bmp.GetHeight());
+			Handle<GLImage> image =
+			  Handle<GLImage>::New(tex, dev, (float)bmp.GetWidth(), (float)bmp.GetHeight());
+			image->wrap = IGLDevice::Repeat;
+			return image;
+		}
+
+		void GLImage::SetWrap(IGLDevice::Enum wrapMode) {
+			if (wrap == wrapMode)
+				return;
+			device->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, wrapMode);
+			device->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, wrapMode);
+			wrap = wrapMode;
 		}
 
 		void GLImage::SubImage(spades::Bitmap* bmp, int x, int y) {
