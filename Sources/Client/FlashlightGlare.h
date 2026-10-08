@@ -35,9 +35,10 @@ namespace spades {
 		 * white-hot core in a glow with a long, edgeless tail, which widens as the
 		 * camera turns down the beam and as the scene gets darker. It is drawn over
 		 * the finished frame, as it happens in the eye and not in the world, and
-		 * only what stands between the camera and the lamp hides it: the map, which
-		 * `Update` eases it out behind, on screen or off, and on screen anything the
-		 * renderer drew in front of it, down to the camera's own hands and weapon.
+		 * only the map standing between the camera and the lamp hides it: players
+		 * and models don't, so that every client gives a lit player away alike. It
+		 * is drawn under the camera's own hands and weapon, like the rest of the
+		 * screen in front of the eye.
 		 *
 		 * `Update` and then `AddToScene` run while the scene is built.
 		 */
@@ -46,7 +47,6 @@ namespace spades {
 			/** A lit lamp, as it is this frame. */
 			struct Lamp {
 				Vector3 position;
-				float radius;      // blocks, the lens's
 				Vector3 direction; // the beam's axis, normalized
 				float coneAngle;   // full angle, in radians
 				float reach;       // blocks
@@ -74,7 +74,6 @@ namespace spades {
 		private:
 			struct Frame {
 				Vector3 position;
-				float radius;
 				Vector3 color;
 				float reception; // 0 to 1: how much of the light reaches the camera
 				float beam;      // 1 on the beam's axis, 0 at its edge and outside it

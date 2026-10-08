@@ -170,6 +170,13 @@ namespace spades {
 			~GLRenderer();
 
 		public:
+			/**
+			 * The front of the depth range the first-person view's models are drawn
+			 * into (`ModelRenderParam::depthHack`), so that they stay in front of the
+			 * world. The world only reaches it within a hair of the near plane.
+			 */
+			static constexpr float kFirstPersonDepthEnd = 0.1F;
+
 			GLRenderer(Handle<IGLDevice> glDevice);
 
 			void Init() override;

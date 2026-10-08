@@ -751,7 +751,7 @@ namespace spades {
 					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);
@@ -885,7 +885,7 @@ namespace spades {
 					device.FrontFace(mirror ? IGLDevice::CW : IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				for (const auto& light : lights) {
 					if (!light.SphereCull(modelOrigin, rad))
@@ -999,7 +999,7 @@ namespace spades {
 					device.FrontFace(IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);
@@ -1141,7 +1141,7 @@ namespace spades {
 					device.FrontFace(IGLDevice::CCW);
 
 				if (param.depthHack)
-					device.DepthRange(0.0F, 0.1F);
+					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
 				device.DrawElements(IGLDevice::Triangles,
 					numIndices, IGLDevice::UnsignedInt, (void*)0);

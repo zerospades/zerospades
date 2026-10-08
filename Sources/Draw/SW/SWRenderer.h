@@ -148,8 +148,8 @@ namespace spades {
 
 			template <SWFeatureLevel> void ApplyDynamicLight(const DynamicLight &);
 
-			/** How much of `glare`'s light the scene just drawn leaves in sight. */
-			float GetGlareVisibility(const client::GlareParam &glare, const Vector4 &clip);
+			/** Draws the scene's glares over the finished frame. This renderer draws
+			 * first-person models like any other, so they stay under the glares. */
 			void DrawGlares();
 
 		protected:

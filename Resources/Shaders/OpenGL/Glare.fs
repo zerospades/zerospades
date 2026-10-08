@@ -21,11 +21,20 @@
 uniform sampler2D glareTexture;
 uniform vec3 glareColor;
 
+// The scene's depth, and where in it the first-person view's models end
+uniform sampler2D depthTexture;
+uniform float firstPersonDepthEnd;
+
 varying vec2 texCoord;
-varying float visibility;
+varying vec2 depthCoord;
 
 void main() {
+	// Under the first-person view's hands and weapon, which are drawn over the
+	// glare like the rest of the screen in front of the eye.
+	if (texture2D(depthTexture, depthCoord).x < firstPersonDepthEnd)
+		discard;
+
 	// Alpha premultiplied as the 2D drawing does it, and added onto the frame
 	vec4 image = texture2D(glareTexture, texCoord);
-	gl_FragColor = vec4(glareColor * image.xyz * (image.w * visibility), 0.0);
+	gl_FragColor = vec4(glareColor * image.xyz * image.w, 0.0);
 }

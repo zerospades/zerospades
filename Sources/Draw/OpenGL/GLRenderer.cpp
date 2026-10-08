@@ -1280,7 +1280,7 @@ namespace spades {
 			Prepare2DRendering(true);
 
 			// The glares go onto the finished frame like the 2D drawing that follows,
-			// with the scene's depth still there to hide them.
+			// with the scene's depth still there to keep the first-person view on top.
 			{
 				GLProfiler::Context p(*profiler, "Glare");
 				glareRenderer->Render();

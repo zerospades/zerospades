@@ -220,8 +220,7 @@ namespace spades {
 					base->AddLongSprite(image, p1, p2, radius);
 			}
 			void AddGlare(IImage& image, const GlareParam& param) {
-				Vector3 rad(param.sourceRadius, param.sourceRadius, param.sourceRadius);
-				if (CheckVisibility(AABB3(param.origin - rad, param.origin + rad)))
+				if (CheckVisibility(AABB3(param.origin, param.origin)))
 					base->AddGlare(image, param);
 			}
 
@@ -758,15 +757,6 @@ namespace spades {
 			return model->GetBoundingBox();
 		}
 
-		float ClientPlayer::GetHeadlampLensRadius() {
-			// The model's front face spans its x and z, at the size the head wears it
-			AABB3 const bounds = GetHeadlampBounds();
-			float const halfFace =
-				std::min(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z) * 0.5F;
-			float const voxelSize = (HeadlampModelMatrix() * MakeVector4(1, 0, 0, 0)).GetXYZ().GetLength();
-			return halfFace * voxelSize;
-		}
-
 		bool ClientPlayer::IsFlashlightLit() {
 			if (!player.IsFlashlightOn() || flashlightFlicker.IsDark())
 				return false;
@@ -819,7 +809,6 @@ namespace spades {
 
 			FlashlightGlare::Lamp lamp;
 			lamp.position = lampPosition;
-			lamp.radius = GetHeadlampLensRadius();
 			lamp.direction = GetFlashlightDirection();
 			lamp.coneAngle = beam.GetConeAngle();
 			lamp.reach = beam.GetReach();

@@ -18,8 +18,6 @@
 
  */
 
-#include <algorithm>
-
 #include "GLFramebufferManager.h"
 #include "GLGlareRenderer.h"
 #include "GLImage.h"
@@ -54,13 +52,7 @@ namespace spades {
 				return;
 
 			const client::SceneDefinition& def = renderer.GetSceneDef();
-			const Matrix4& projection = renderer.GetProjectionMatrix();
 			const Matrix4& projectionView = renderer.GetProjectionViewMatrix();
-
-			// One texel of the depth texture, in its coordinates: the least of a light
-			// to look at, however far and small it is.
-			const float texelWidth = 1.0F / (float)renderer.GetRenderWidth();
-			const float texelHeight = 1.0F / (float)renderer.GetRenderHeight();
 
 			// From the 2D units the glares are sized in to normalized device ones
 			const float ndcPerUnitX = 2.0F / renderer.ScreenWidth();
@@ -71,10 +63,7 @@ namespace spades {
 			static GLProgramUniform glareTexture("glareTexture");
 			static GLProgramUniform glareColor("glareColor");
 			static GLProgramUniform depthTexture("depthTexture");
-			static GLProgramUniform zNearFar("zNearFar");
-			static GLProgramUniform sourceCoord("sourceCoord");
-			static GLProgramUniform sourceSpread("sourceSpread");
-			static GLProgramUniform sourceDepth("sourceDepth");
+			static GLProgramUniform firstPersonDepthEnd("firstPersonDepthEnd");
 
 			program->Use();
 			positionAttribute(program);
@@ -82,10 +71,7 @@ namespace spades {
 			glareTexture(program);
 			glareColor(program);
 			depthTexture(program);
-			zNearFar(program);
-			sourceCoord(program);
-			sourceSpread(program);
-			sourceDepth(program);
+			firstPersonDepthEnd(program);
 
 			device.ActiveTexture(1);
 			device.BindTexture(IGLDevice::Texture2D,
@@ -94,7 +80,7 @@ namespace spades {
 			device.ActiveTexture(0);
 			glareTexture.SetValue(0);
 
-			zNearFar.SetValue(def.zNear, def.zFar);
+			firstPersonDepthEnd.SetValue(GLRenderer::kFirstPersonDepthEnd);
 
 			// Added onto the frame: what is underneath stays.
 			device.Enable(IGLDevice::Blend, true);
@@ -117,12 +103,6 @@ namespace spades {
 				const float halfHeight = param.radius * ndcPerUnitY;
 				drawRange.SetValue(centreX - halfWidth, centreY - halfHeight, centreX + halfWidth,
 				                   centreY + halfHeight);
-
-				sourceCoord.SetValue(centreX * 0.5F + 0.5F, centreY * 0.5F + 0.5F);
-				sourceSpread.SetValue(
-				  std::max(param.sourceRadius * projection.m[0] * 0.5F / clip.w, texelWidth),
-				  std::max(param.sourceRadius * projection.m[5] * 0.5F / clip.w, texelHeight));
-				sourceDepth.SetValue(clip.w - param.sourceRadius);
 
 				glareColor.SetValue(param.color.x, param.color.y, param.color.z);
 				glare.image->Bind(IGLDevice::Texture2D);

@@ -130,7 +130,6 @@ namespace spades {
 
 			Frame f;
 			f.position = lamp.position;
-			f.radius = lamp.radius;
 			f.color = lamp.color;
 			f.reception = lamp.brightness * visibility * fog * falloff;
 			f.beam = 1.0F - SmoothStep(std::min(std::acos(cosAngle) / (lamp.coneAngle * 0.5F), 1.0F));
@@ -159,7 +158,6 @@ namespace spades {
 
 				GlareParam glare;
 				glare.origin = frame->position;
-				glare.sourceRadius = frame->radius;
 				glare.radius = layer.radius * spread * renderer.ScreenHeight();
 				glare.color =
 				  Mix(frame->color, MakeVector3(1, 1, 1), layer.whiteness) * std::min(spread, 1.0F);

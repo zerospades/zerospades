@@ -33,12 +33,9 @@ namespace spades {
 		class GLProgram;
 
 		/**
-		 * Draws the scene's glares (`client::GlareParam`) over the finished frame.
-		 *
-		 * Each one is hidden by what the scene's depth buffer holds in front of its
-		 * light, the first-person view's models included, which only the renderer
-		 * knows about. That is sampled once per corner of the glare's quad, not per
-		 * pixel: the answer is the same everywhere on it.
+		 * Draws the scene's glares (`client::GlareParam`) over the finished frame,
+		 * and under the first-person view's models, which the scene's depth buffer
+		 * tells apart.
 		 */
 		class GLGlareRenderer {
 			struct Glare {

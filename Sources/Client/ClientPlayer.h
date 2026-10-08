@@ -112,9 +112,6 @@ namespace spades {
 			/** The headlamp model's bounds, in its own voxels. */
 			AABB3 GetHeadlampBounds();
 
-			/** The size of the headlamp's lens as the head wears it, in blocks. */
-			float GetHeadlampLensRadius();
-
 			/**
 			 * Emit this player's flashlight from `lightOrigin`, if it should be lit
 			 * at all. Shared by the first- and third-person paths, which differ only
