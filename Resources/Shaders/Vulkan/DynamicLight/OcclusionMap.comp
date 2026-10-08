@@ -1,0 +1,60 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ ZeroSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ ZeroSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+// Traces the frame's spotlights' occlusion maps: an invocation per texel of a tile,
+// a layer of workgroups per tile, each storing how far from its light the ray
+// through its texel gets before it enters a solid block, up to the light's reach.
+
+#define DYNAMIC_LIGHT_SET 0
+#define DYNAMIC_LIGHT_CLUSTER_ACCESS readonly
+#include "Table.glsl"
+#include "MapWalk.glsl"
+
+layout(set = DYNAMIC_LIGHT_SET, binding = 5, r32f) uniform writeonly image2D
+  dynamicLightOcclusionMaps;
+
+// `VulkanDynamicLightClusters::OcclusionGroupSize`
+layout(local_size_x = 8, local_size_y = 8) in;
+
+void main() {
+	uint tile = gl_WorkGroupID.z;
+	uint light = dynamicLightFrame.occlusionTileLights[tile / 4u][tile % 4u];
+	vec4 originReach = dynamicLights[light].originReach;
+	vec4 right = dynamicLights[light].traceRight;
+	vec3 up = dynamicLights[light].traceUp.xyz;
+	vec3 forward = dynamicLights[light].traceForward.xyz;
+
+	// The ray through the texel's centre
+	uvec2 texel = gl_GlobalInvocationID.xy;
+	float spread = right.w * float(DYNAMIC_LIGHT_OCCLUSION_TILE);
+	vec2 slope = ((vec2(texel) + 0.5) / float(DYNAMIC_LIGHT_OCCLUSION_TILE) - 0.5) * spread;
+	vec3 direction = normalize(forward + right.xyz * slope.x + up * slope.y);
+
+	float reach = originReach.w;
+	float t = DynamicLightMapWalk(originReach.xyz, originReach.xyz + direction * reach, false);
+
+	uvec2 tileOrigin = uvec2(tile % uint(DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW),
+	                         tile / uint(DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW)) *
+	                   uint(DYNAMIC_LIGHT_OCCLUSION_TILE);
+	imageStore(dynamicLightOcclusionMaps, ivec2(tileOrigin + texel), vec4(min(t, 1.0) * reach));
+}

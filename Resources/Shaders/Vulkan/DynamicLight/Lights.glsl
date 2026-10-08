@@ -35,119 +35,102 @@
 layout(set = DYNAMIC_LIGHT_SET, binding = 3) uniform sampler2D
   dynamicLightImages[DYNAMIC_LIGHT_IMAGES];
 
-// `VulkanMapOccupancy`: each block's clearance, 0 for a solid block; every block
-// within `c - 1` of one with a clearance `c` is clear.
-layout(set = DYNAMIC_LIGHT_SET, binding = 4) uniform usampler3D dynamicLightMapOccupancy;
+#include "MapWalk.glsl"
 
-// The most steps a walk takes, each to the next block or out of a clear cube: more
-// than a light's reach needs. A walk that has not got through by then stops where it
-// got to, so that it errs on the side of darkness rather than lighting what a wall
-// may hide.
-#define DYNAMIC_LIGHT_MAP_MAX_STEPS 256
+// The spotlights' occlusion maps, traced this frame by `DynamicLight/OcclusionMap.comp`
+layout(set = DYNAMIC_LIGHT_SET, binding = 5, r32f) uniform readonly image2D
+  dynamicLightOcclusionMaps;
+
+// The widest a texel may be at a point for its tile to prove the point lit, in
+// blocks: below `1 / sqrt(2)`, no block can stand in the way of the point without
+// crossing one of the four rays around it.
+#define DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH 0.7
+// How far short of where it meets the point's surface a ray may stop and still
+// count as reaching it, in blocks
+#define DYNAMIC_LIGHT_OCCLUSION_TOLERANCE 0.1
 
 /**
- * How far along the segment from `from` to `to` it enters the first solid block,
- * from 0 at `from` to 1 at `to`, or 2 if it enters none. The block `from` lies in
- * is not looked at, and neither is the one `to` lies in. The walk crosses open air
- * a clear cube at a time.
+ * Whether this fragment belongs to the first-person view's models, which are drawn
+ * in front of the world wherever they really are, even half inside a wall: the map
+ * hides the lights from them as it does from the eye.
  */
-float DynamicLightMapWalk(vec3 from, vec3 to) {
-	ivec3 mapSize = textureSize(dynamicLightMapOccupancy, 0);
-	vec3 delta = to - from;
-
-	vec3 cell = floor(from);
-	vec3 target = floor(to);
-	vec3 stepDirection = sign(delta);
-	vec3 moving = abs(stepDirection);
-
-	// The walk's progress, from 0 at `from` to 1 at `to`: `tMax` where it crosses
-	// the next boundary on each axis, `tDelta` between two of them. An axis it
-	// doesn't move along is never crossed.
-	vec3 tDelta = 1.0 / max(abs(delta), vec3(1.0e-6));
-	vec3 tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
-	tMax = mix(vec3(2.0), tMax, moving);
-
-	// Where the walk entered `cell`. The first block is the one it starts in, which
-	// is not looked at.
-	float tEnter = 0.0;
-	bool advance = true;
-
-	for (int i = 0; i < DYNAMIC_LIGHT_MAP_MAX_STEPS; i++) {
-		if (advance) {
-			if (tMax.x < tMax.y && tMax.x < tMax.z) {
-				tEnter = tMax.x;
-				cell.x += stepDirection.x;
-				tMax.x += tDelta.x;
-			} else if (tMax.y < tMax.z) {
-				tEnter = tMax.y;
-				cell.y += stepDirection.y;
-				tMax.y += tDelta.y;
-			} else {
-				tEnter = tMax.z;
-				cell.z += stepDirection.z;
-				tMax.z += tDelta.z;
-			}
-			if (tEnter > 1.0)
-				return 2.0;
-		}
-		advance = true;
-
-		if (all(equal(cell, target)))
-			return 2.0;
-
-		// Above the map is open sky, and below it solid ground, as `GameMap` has it.
-		if (cell.z < 0.0)
-			continue;
-		if (cell.z >= float(mapSize.z))
-			return tEnter;
-
-		// The map wraps around horizontally.
-		ivec3 texel = ivec3(cell);
-		texel.xy = ((texel.xy % mapSize.xy) + mapSize.xy) % mapSize.xy;
-		float clearance = float(texelFetch(dynamicLightMapOccupancy, texel, 0).r);
-		if (clearance < 0.5)
-			return tEnter;
-		if (clearance < 1.5)
-			continue;
-
-		// Every block of the cube within `clearance - 1` of this one is clear: leave
-		// it in one go, through the face the walk reaches first.
-		vec3 low = cell - (clearance - 1.0);
-		vec3 high = cell + clearance;
-		vec3 exitFace = mix(low, high, max(stepDirection, vec3(0.0)));
-		vec3 tExits = mix(vec3(2.0), abs(exitFace - from) * tDelta, moving);
-		float tExit = min(tExits.x, min(tExits.y, tExits.z));
-
-		// The segment ends inside the cube, so nothing is in the way.
-		if (tExit >= 1.0)
-			return 2.0;
-
-		// Into the block past that face, which is looked at next.
-		vec3 exits = step(tExits, vec3(tExit)) * moving;
-		vec3 inside = clamp(floor(from + delta * tExit), low, high - 1.0);
-		cell = mix(inside, exitFace + min(stepDirection, vec3(0.0)), exits);
-		tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
-		tMax = mix(vec3(2.0), tMax, moving);
-		tEnter = tExit;
-		advance = false;
-	}
-	return tEnter;
+bool DynamicLightIsFirstPerson() {
+	return gl_FragCoord.z < dynamicLightFrame.firstPersonDepthEnd;
 }
 
 /**
- * 1 if `lightPosition` is seen from `position`, on a surface facing `normal`, and 0
- * if the map is in the way. The first-person view's models are drawn in front of
- * the world wherever they really are, even half inside a wall, so for them it is
- * seen from the eye instead. The walk starts in the block in front of the surface,
- * so the block the surface belongs to doesn't hide its own light.
+ * Whether spotlight `i`, at `lightPosition`, certainly reaches `position`, on a
+ * surface facing `normal`: the rays of the four texels around it in its occlusion
+ * map `tile` all get to that surface. Each ray is held to where it meets the plane
+ * of the surface, which a ray grazing a floor meets well before or after the point.
+ * Where the texels are too wide to be sure, it isn't certain.
+ *
+ * Rays that all stop short don't prove the point dark: it may be seen through a gap
+ * that, taken at a slant, is narrower than the rays are apart.
  */
-float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) {
+bool DynamicLightOcclusionMapReaches(uint i, int tile, vec3 position, vec3 normal,
+                                     vec3 lightPosition) {
+	vec4 right = dynamicLights[i].traceRight;
+	vec3 up = dynamicLights[i].traceUp.xyz;
+	vec3 forward = dynamicLights[i].traceForward.xyz;
+
+	vec3 toPoint = position - lightPosition;
+	float distance = length(toPoint);
+	float ahead = dot(toPoint, forward);
+	if (ahead <= 1.0e-6 || distance * right.w > DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH)
+		return false;
+
+	// Where the point is on the tile, as it was traced
+	float tileSize = float(DYNAMIC_LIGHT_OCCLUSION_TILE);
+	float spread = right.w * tileSize;
+	vec2 onTile = vec2(dot(toPoint, right.xyz), dot(toPoint, up)) / (ahead * spread) + 0.5;
+	vec2 base = floor(onTile * tileSize - 0.5);
+
+	ivec2 tileOrigin = ivec2(tile % DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW,
+	                         tile / DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW) *
+	                   DYNAMIC_LIGHT_OCCLUSION_TILE;
+	float surfaceOffset = dot(normal, toPoint);
+
+	for (int k = 0; k < 4; k++) {
+		vec2 texel = clamp(base + vec2(float(k & 1), float(k >> 1)), vec2(0.0),
+		                   vec2(tileSize - 1.0));
+
+		// The ray through the texel's centre, as the tile was traced
+		vec2 slope = ((texel + 0.5) / tileSize - 0.5) * spread;
+		vec3 direction = normalize(forward + right.xyz * slope.x + up * slope.y);
+
+		// Where it meets the surface's plane, but no farther than the point: past
+		// it, the ray has passed whatever stands before the point.
+		float facing = dot(normal, direction);
+		float target = facing < -1.0e-4 ? min(surfaceOffset / facing, distance) : distance;
+
+		float reach = imageLoad(dynamicLightOcclusionMaps, tileOrigin + ivec2(texel)).x;
+		if (reach < target - DYNAMIC_LIGHT_OCCLUSION_TOLERANCE)
+			return false;
+	}
+	return true;
+}
+
+/**
+ * 1 if light `i`, at `lightPosition`, is seen from `position`, on a surface facing
+ * `normal`, and 0 if the map is in the way. A spotlight's occlusion map proves most
+ * points lit at the cost of four reads; the rest, and the first-person view's
+ * models, which are seen from the eye, walk the map. The walk starts in the block
+ * in front of the surface, so the block the surface belongs to doesn't hide its
+ * own light.
+ */
+float DynamicLightMapVisibility(uint i, vec3 position, vec3 normal, vec3 lightPosition) {
 	if (dynamicLightFrame.mapOcclusion < 0.5)
 		return 1.0;
-	vec3 from = gl_FragCoord.z < dynamicLightFrame.firstPersonDepthEnd
-	              ? dynamicLightFrame.eyeNear.xyz
-	              : position + normal * 0.01;
-	return DynamicLightMapWalk(from, lightPosition) > 1.0 ? 1.0 : 0.0;
+
+	bool firstPerson = DynamicLightIsFirstPerson();
+	int tile = int(dynamicLights[i].kind.z);
+	if (tile >= 0 && !firstPerson &&
+	    DynamicLightOcclusionMapReaches(i, tile, position, normal, lightPosition))
+		return 1.0;
+
+	vec3 from = firstPerson ? dynamicLightFrame.eyeNear.xyz : position + normal * 0.01;
+	return DynamicLightMapWalk(from, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
 
 /**
@@ -221,7 +204,7 @@ vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 directio
 	float attenuation = reachLeft * reachLeft;
 
 	// Last, as it is the dearest part
-	float visibility = DynamicLightMapVisibility(position, normal, lightPosition);
+	float visibility = DynamicLightMapVisibility(i, position, normal, lightPosition);
 
 	return colorReachInversed.xyz * (attenuation * coneFalloff * visibility) * image;
 }
