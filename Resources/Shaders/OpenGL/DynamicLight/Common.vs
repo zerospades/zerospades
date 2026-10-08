@@ -21,6 +21,12 @@
 uniform vec3 dynamicLightOrigin;
 uniform mat4 dynamicLightSpotMatrix;
 
+// Whether the map is to occlude the light from the eye rather than from the lit
+// point: set for the first-person view's models, which are drawn in front of the
+// world wherever they really are, even half inside a wall.
+uniform bool dynamicLightOccludedFromEye;
+uniform vec3 viewOriginVector;
+
 uniform bool dynamicLightIsLinear;
 uniform vec3 dynamicLightLinearDirection;
 uniform float dynamicLightLinearLength;
@@ -30,8 +36,9 @@ void PrepareForMapShadow(vec3 vertexCoord);
 varying vec3 lightPos;
 varying vec3 lightNormal;
 varying vec3 lightTexCoord;
-// Where the lit point is, for the map to occlude the light from it
+// Where the lit point is, and where the map occludes the light from
 varying vec3 lightSurfacePos;
+varying vec3 lightOcclusionOrigin;
 
 void PrepareForDynamicLightNoBump(vec3 vertexCoord, vec3 normal) {
 	PrepareForMapShadow(vertexCoord);
@@ -48,6 +55,7 @@ void PrepareForDynamicLightNoBump(vec3 vertexCoord, vec3 normal) {
 	lightPos = lightPosition - vertexCoord;
 	lightNormal = normal;
 	lightSurfacePos = vertexCoord;
+	lightOcclusionOrigin = dynamicLightOccludedFromEye ? viewOriginVector : vertexCoord;
 
 	// projection
 	lightTexCoord = (dynamicLightSpotMatrix * vec4(vertexCoord, 1.0)).xyw;

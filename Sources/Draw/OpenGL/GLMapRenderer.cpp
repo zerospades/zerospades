@@ -341,6 +341,11 @@ namespace spades {
 			viewOriginVector(dlightProgram);
 			viewOriginVector.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
 
+			// The map is lit where it really is.
+			static GLProgramUniform occludedFromEye("dynamicLightOccludedFromEye");
+			occludedFromEye(dlightProgram);
+			occludedFromEye.SetValue(0);
+
 			// RealizeChunks(eye); // should already be realized from the prepass
 
 			// draw from nearest to farthest

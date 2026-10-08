@@ -868,6 +868,13 @@ namespace spades {
 				customColor(dlightProgram);
 				customColor.SetValue(param.customColor.x, param.customColor.y, param.customColor.z);
 
+				// The first-person view's models are where the eye is, as far as the
+				// map hiding a light from them goes: they are drawn in front of the
+				// world, even when they really reach into a wall.
+				static GLProgramUniform occludedFromEye("dynamicLightOccludedFromEye");
+				occludedFromEye(dlightProgram);
+				occludedFromEye.SetValue(param.depthHack ? 1 : 0);
+
 				static GLProgramUniform projectionViewModelMatrix("projectionViewModelMatrix");
 				projectionViewModelMatrix(dlightProgram);
 				projectionViewModelMatrix.SetValue(pvMat * modelMatrix);

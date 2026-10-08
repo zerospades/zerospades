@@ -34,10 +34,11 @@ float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition);
 varying vec3 lightPos;
 varying vec3 lightNormal;
 varying vec3 lightSurfacePos;
+varying vec3 lightOcclusionOrigin;
 
 float EvaluateDynamicLightShadow() {
 	return VisibilityOfLight() *
-	       DynamicLightMapVisibility(lightSurfacePos, normalize(lightNormal),
+	       DynamicLightMapVisibility(lightOcclusionOrigin, normalize(lightNormal),
 	                                 lightSurfacePos + lightPos);
 }
 
