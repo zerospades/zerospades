@@ -45,6 +45,9 @@ namespace spades {
 			bool Cull(const AABB3 &) const;
 
 			bool SphereCull(const Vector3 &center, float radius) const;
+
+			/** A sphere holding everything the light reaches. */
+			void GetBoundingSphere(Vector3 &center, float &radius) const;
 		};
 	} // namespace draw
 } // namespace spades

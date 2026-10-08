@@ -18,10 +18,30 @@
 
  */
 
+#include <algorithm>
+#include <cmath>
+
 #include "GLDynamicLight.h"
 
 namespace spades {
 	namespace draw {
+		namespace {
+			/**
+			 * How far past the edge of its image a spotlight still lights, as a
+			 * fraction of the image's half width: its cone fades out between `0.8`
+			 * and this (`smoothstep(1.1, 0.8, ...)` in `DynamicLight/Lights.fs`).
+			 */
+			constexpr float kSpotFadeEnd = 1.1F;
+
+			/** The squared distance from `point` to the nearest point of `box`. */
+			float SquaredDistance(const AABB3& box, const Vector3& point) {
+				const float dx = std::max(std::max(box.min.x - point.x, point.x - box.max.x), 0.0F);
+				const float dy = std::max(std::max(box.min.y - point.y, point.y - box.max.y), 0.0F);
+				const float dz = std::max(std::max(box.min.z - point.z, point.z - box.max.z), 0.0F);
+				return dx * dx + dy * dy + dz * dz;
+			}
+		} // namespace
+
 		GLDynamicLight::GLDynamicLight(const client::DynamicLightParam& param) : param(param) {
 			if (param.type == client::DynamicLightTypeSpotlight) {
 				float t = tanf(param.spotAngle * 0.5F);
@@ -40,7 +60,10 @@ namespace spades {
 				m.m[9] += 0.5F;
 				projMatrix = m * projMatrix;
 
-				// Construct clipping planes which are oriented inside.
+				// Construct clipping planes which are oriented inside, around all the cone
+				// lights, its fade past the image's edge included.
+				t *= kSpotFadeEnd;
+
 				// To do that, first we calculate tangent vectors:
 				Vector3 planeTan[] = {
 				  param.spotAxis[2] + param.spotAxis[0] * t,
@@ -76,9 +99,8 @@ namespace spades {
 				}
 			}
 
-			AABB3 inflatedBox = box.Inflate(param.radius);
-
 			if (param.type == client::DynamicLightTypeLinear) {
+				AABB3 inflatedBox = box.Inflate(param.radius);
 				Vector3 intersection;
 				// TODO: using `OBB3` here is overkill, but `AABB3` doesn't have `RayCast`
 				if (!OBB3(inflatedBox).RayCast(param.origin, param.point2 - param.origin, &intersection))
@@ -86,7 +108,41 @@ namespace spades {
 				return (intersection - param.origin).GetSquaredLength() <= poweredLength;
 			}
 
-			return inflatedBox && param.origin;
+			return SquaredDistance(box, param.origin) < param.radius * param.radius;
+		}
+
+		void GLDynamicLight::GetBoundingSphere(Vector3& center, float& radius) const {
+			const float reach = param.radius;
+
+			switch (param.type) {
+				case client::DynamicLightTypeSpotlight: {
+					// The spherical sector the cone lights out to its reach.
+					const float tanHalf = std::tan(param.spotAngle * 0.5F) * kSpotFadeEnd;
+					const float cosHalf = 1.0F / std::sqrt(1.0F + tanHalf * tanHalf);
+					const float sinHalf = tanHalf * cosHalf;
+					const Vector3 axis = param.spotAxis[2].Normalize();
+
+					if (cosHalf < std::sqrt(0.5F)) {
+						// Wide: the sphere through the rim of the cone's base holds the
+						// apex and the far end of the reach too.
+						center = param.origin + axis * (reach * cosHalf);
+						radius = reach * sinHalf;
+					} else {
+						// Narrow: the sphere through the apex and the rim.
+						radius = reach / (2.0F * cosHalf);
+						center = param.origin + axis * radius;
+					}
+				} break;
+				case client::DynamicLightTypeLinear: {
+					const Vector3 half = (param.point2 - param.origin) * 0.5F;
+					center = param.origin + half;
+					radius = reach + half.GetLength();
+				} break;
+				default:
+					center = param.origin;
+					radius = reach;
+					break;
+			}
 		}
 
 		bool GLDynamicLight::SphereCull(const spades::Vector3& center, float radius) const {

@@ -523,13 +523,20 @@ namespace spades {
 		void GLRenderer::AddLight(const client::DynamicLightParam& light) {
 			if (!settings.r_dlights)
 				return;
-			if (!SphereFrustrumCull(light.origin, light.radius))
+
+			GLDynamicLight glLight(light);
+
+			// A spotlight pointing away from the view lights nothing in it.
+			Vector3 center;
+			float radius;
+			glLight.GetBoundingSphere(center, radius);
+			if (!SphereFrustrumCull(center, radius))
 				return;
 
 			EnsureInitialized();
 			EnsureSceneStarted();
 
-			lights.push_back(GLDynamicLight(light));
+			lights.push_back(std::move(glLight));
 		}
 
 		void GLRenderer::AddDebugLine(spades::Vector3 a, spades::Vector3 b, spades::Vector4 color) {
