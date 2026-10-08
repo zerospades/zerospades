@@ -83,9 +83,9 @@ uniform sampler2D dynamicLightOcclusionMaps;
 #define DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW 8.0
 #define DYNAMIC_LIGHT_OCCLUSION_ATLAS 1024.0
 
-// The widest a texel may be at a point for its tile to decide whether the point is
-// lit, in blocks: below `1 / sqrt(2)`, no block can stand in the way of the point
-// without crossing one of the four rays around it.
+// The widest a texel may be at a point for its tile to prove the point lit, in
+// blocks: below `1 / sqrt(2)`, no block can stand in the way of the point without
+// crossing one of the four rays around it.
 #define DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH 0.7
 // How far short of where it meets the point's surface a ray may stop and still
 // count as reaching it, in blocks: the rays' reaches are half floats.
@@ -99,20 +99,23 @@ float DynamicLightOcclusionReach(vec2 tileOrigin, vec2 texel) {
 }
 
 /**
- * Whether the rays of the four texels around `position`, on a surface facing
- * `normal`, all get to that surface (`1`), all stop short of it (`0`), or disagree
- * (`-1`), as the occlusion map `tile` of a spotlight at `lightPosition` has them.
- * Each ray is held to where it meets the plane of the surface, which a ray grazing
- * a floor meets well before or after the point. They don't decide (`-1`) where the
- * texels are too wide to be sure either. `spotMatrix` projects onto the light's
- * image, and `texelSpread` is how much wider a texel gets per block from the light.
+ * Whether the light certainly reaches `position`, on a surface facing `normal`: the
+ * rays of the four texels around it, in the occlusion map `tile` of a spotlight at
+ * `lightPosition`, all get to that surface. Each ray is held to where it meets the
+ * plane of the surface, which a ray grazing a floor meets well before or after the
+ * point. Where the texels are too wide to be sure, it isn't certain.
+ *
+ * Rays that all stop short don't prove the point dark: it may be seen through a
+ * gap that, taken at a slant, is narrower than the rays are apart, such as the
+ * edge of a block just past a wall. `spotMatrix` projects onto the light's image,
+ * and `texelSpread` is how much wider a texel gets per block from the light.
  */
-float DynamicLightOcclusionMapClassify(float tile, mat4 spotMatrix, float texelSpread,
+bool DynamicLightOcclusionMapReaches(float tile, mat4 spotMatrix, float texelSpread,
                                        vec3 position, vec3 normal, vec3 lightPosition) {
 	vec3 toPoint = position - lightPosition;
 	float distance = length(toPoint);
 	if (distance * texelSpread > DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH)
-		return -1.0;
+		return false;
 
 	// The light's axes, out of the matrix: its last row is the beam's axis, and its
 	// first two are the image's axes over twice the cone's tangent, offset by half
@@ -135,7 +138,6 @@ float DynamicLightOcclusionMapClassify(float tile, mat4 spotMatrix, float texelS
 	       floor(tile / DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW)) * DYNAMIC_LIGHT_OCCLUSION_TILE;
 	float surfaceOffset = dot(normal, toPoint);
 
-	float reaching = 0.0;
 	for (int k = 0; k < 4; k++) {
 		vec2 texel = clamp(base + vec2(float(k - (k / 2) * 2), float(k / 2)), vec2(0.0),
 		                   vec2(DYNAMIC_LIGHT_OCCLUSION_TILE - 1.0));
@@ -149,16 +151,11 @@ float DynamicLightOcclusionMapClassify(float tile, mat4 spotMatrix, float texelS
 		float facing = dot(normal, direction);
 		float target = facing < -1.0e-4 ? min(surfaceOffset / facing, distance) : distance;
 
-		if (DynamicLightOcclusionReach(tileOrigin, texel) >=
+		if (DynamicLightOcclusionReach(tileOrigin, texel) <
 		    target - DYNAMIC_LIGHT_OCCLUSION_TOLERANCE)
-			reaching += 1.0;
+			return false;
 	}
-
-	if (reaching > 3.5)
-		return 1.0;
-	if (reaching < 0.5)
-		return 0.0;
-	return -1.0;
+	return true;
 }
 
 /**
@@ -231,12 +228,11 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 
 	// The first-person view's models are lit as if at the eye, which no tile
 	// looks from; any light without a tile walks the map itself, and so does one
-	// whose tile leaves the point undecided, at the edge of a shadow.
-	float visibility = -1.0;
-	if (kind.z >= 0.0 && !dynamicLightOccludedFromEye)
-		visibility = DynamicLightOcclusionMapClassify(kind.z, spotMatrix, kind.w, position,
-		                                              normal, lightPosition);
-	if (visibility < 0.0)
+	// whose tile can't prove the point lit, in and around a shadow.
+	float visibility = 1.0;
+	if (kind.z < 0.0 || dynamicLightOccludedFromEye ||
+	    !DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position, normal,
+	                                     lightPosition))
 		visibility = DynamicLightMapVisibility(
 		  dynamicLightOccludedFromEye ? dynamicLightEye : position, normal, lightPosition);
 
