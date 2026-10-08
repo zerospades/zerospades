@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <set>
 
 #include "CellToTriangle.h"
@@ -864,6 +865,12 @@ namespace spades {
 				if (!renderer.SphereFrustrumCull(modelOrigin, rad))
 					continue;
 
+				// Nothing to set up for a model no light reaches.
+				if (std::none_of(lights.begin(), lights.end(), [&](const GLDynamicLight& light) {
+					    return light.SphereCull(modelOrigin, rad);
+				    }))
+					continue;
+
 				static GLProgramUniform customColor("customColor");
 				customColor(dlightProgram);
 				customColor.SetValue(param.customColor.x, param.customColor.y, param.customColor.z);
@@ -894,14 +901,13 @@ namespace spades {
 				if (param.depthHack)
 					device.DepthRange(0.0F, GLRenderer::kFirstPersonDepthEnd);
 
-				for (const auto& light : lights) {
-					if (!light.SphereCull(modelOrigin, rad))
-						continue;
-
-					dlightShader(&renderer, dlightProgram, light, 2);
-					device.DrawElements(IGLDevice::Triangles,
-						numIndices, IGLDevice::UnsignedInt, (void*)0);
-				}
+				dlightShader.Render(
+				  &renderer, dlightProgram, lights, 2,
+				  [&](const GLDynamicLight& light) { return light.SphereCull(modelOrigin, rad); },
+				  [&] {
+					  device.DrawElements(IGLDevice::Triangles, numIndices,
+					                      IGLDevice::UnsignedInt, (void*)0);
+				  });
 
 				if (isMirrored)
 					device.FrontFace(mirror ? IGLDevice::CCW : IGLDevice::CW);
