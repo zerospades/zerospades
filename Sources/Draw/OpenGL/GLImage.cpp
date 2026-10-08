@@ -68,6 +68,7 @@ namespace spades {
 			Handle<GLImage> image =
 			  Handle<GLImage>::New(tex, dev, (float)bmp.GetWidth(), (float)bmp.GetHeight());
 			image->wrap = IGLDevice::Repeat;
+			image->minFilter = IGLDevice::LinearMipmapNearest;
 			return image;
 		}
 
@@ -77,6 +78,13 @@ namespace spades {
 			device->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, wrapMode);
 			device->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, wrapMode);
 			wrap = wrapMode;
+		}
+
+		void GLImage::SetMinFilter(IGLDevice::Enum filter) {
+			if (minFilter == filter)
+				return;
+			device->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter, filter);
+			minFilter = filter;
 		}
 
 		void GLImage::SubImage(spades::Bitmap* bmp, int x, int y) {

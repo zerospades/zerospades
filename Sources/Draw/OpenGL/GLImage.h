@@ -36,6 +36,8 @@ namespace spades {
 			bool valid;
 			/** The wrap mode last set through this image, or `0` when unknown. */
 			IGLDevice::Enum wrap = static_cast<IGLDevice::Enum>(0);
+			/** The minification filter last set through this image, or `0` when unknown. */
+			IGLDevice::Enum minFilter = static_cast<IGLDevice::Enum>(0);
 			void MakeSureValid();
 
 		protected:
@@ -53,6 +55,9 @@ namespace spades {
 			 * parameters makes it validate the texture again.
 			 */
 			void SetWrap(IGLDevice::Enum wrapMode);
+
+			/** Sets the image's minification filter, the same way as `SetWrap`. */
+			void SetMinFilter(IGLDevice::Enum filter);
 
 			float GetWidth() override { return width; }
 			float GetHeight() override { return height; }

@@ -102,8 +102,11 @@ namespace spades {
 			device.ActiveTexture(texStage);
 			if (image) {
 				image->Bind(IGLDevice::Texture2D);
-				// The image must not repeat past the cone's edge.
+				// The image must not repeat past the cone's edge, and it is sampled
+				// where only some fragments of a quad reach the light, where a mipmap
+				// level cannot be chosen.
 				image->SetWrap(IGLDevice::ClampToEdge);
+				image->SetMinFilter(IGLDevice::Linear);
 			} else {
 				whiteImage->Bind(IGLDevice::Texture2D);
 			}

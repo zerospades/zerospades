@@ -74,40 +74,47 @@ uniform vec3 dynamicLightEye;
  * shaped by its cone, its image and its reach, and hidden by the map, but not by
  * how the surface faces it; `direction` is set to the unit vector towards the
  * light.
+ *
+ * Most fragments of a draw lie outside the reach or the cone of most of its lights,
+ * so the light is read from the table a part at a time, and each test leaves
+ * before the next part is read. The spotlight image has no mipmaps for the same
+ * reason: it is sampled where only some fragments of a quad got that far.
  */
 vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction) {
+	direction = vec3(0.0, 0.0, 1.0);
+
 	float row = DynamicLightRow(i);
 	vec4 originReach = DynamicLightTexel(row, 0.0);
-	vec4 colorReachInversed = DynamicLightTexel(row, 1.0);
-	mat4 spotMatrix = mat4(DynamicLightTexel(row, 2.0), DynamicLightTexel(row, 3.0),
-	                       DynamicLightTexel(row, 4.0), DynamicLightTexel(row, 5.0));
-	vec4 linear = DynamicLightTexel(row, 6.0);
 	vec4 kind = DynamicLightTexel(row, 7.0);
-	float isSpot = kind.x;
-
-	// The image is sampled before anything below can return: a texture's mipmap level
-	// is undefined inside control flow that differs between fragments.
-	vec3 lightTexCoord = (spotMatrix * vec4(position, 1.0)).xyw;
-	vec3 texValue = texture2DProj(dynamicLightProjectionTexture, lightTexCoord).xyz;
-	texValue = mix(vec3(1.0), texValue, isSpot);
 
 	vec3 lightPosition = originReach.xyz;
 	if (kind.y > 0.5) {
 		// Linear light approximation - choose the closest point on the light
 		// geometry as the representative light source
+		vec4 linear = DynamicLightTexel(row, 6.0);
 		float d = dot(position - lightPosition, linear.xyz);
 		lightPosition += linear.xyz * clamp(d, 0.0, linear.w);
 	}
 
+	// attenuation
 	vec3 lightPos = lightPosition - position;
-	direction = normalize(lightPos);
+	float distance = length(lightPos);
+	if (distance >= originReach.w)
+		return vec3(0.0);
+
+	direction = lightPos / max(distance, 1.0e-6);
 
 	// A surface facing away gets nothing: no need to walk the map for it.
 	if (dot(direction, normal) <= 0.0)
 		return vec3(0.0);
 
+	vec3 texValue = vec3(1.0);
 	float coneFalloff = 1.0;
-	if (isSpot > 0.5) {
+	if (kind.x > 0.5) {
+		mat4 spotMatrix = mat4(DynamicLightTexel(row, 2.0), DynamicLightTexel(row, 3.0),
+		                       DynamicLightTexel(row, 4.0), DynamicLightTexel(row, 5.0));
+		vec3 lightTexCoord = (spotMatrix * vec4(position, 1.0)).xyw;
+
 		// Nothing behind the light source
 		if (lightTexCoord.z <= 0.0)
 			return vec3(0.0);
@@ -121,14 +128,13 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 		coneFalloff = smoothstep(1.1, 0.8, coneDistance);
 		if (coneFalloff <= 0.0)
 			return vec3(0.0);
+
+		texValue = texture2DProj(dynamicLightProjectionTexture, lightTexCoord).xyz;
 	}
 
-	// attenuation
-	float distance = length(lightPos);
-	if (distance >= originReach.w)
-		return vec3(0.0);
-	distance = max(1.0 - distance * colorReachInversed.w, 0.0);
-	float attenuation = distance * distance;
+	vec4 colorReachInversed = DynamicLightTexel(row, 1.0);
+	float reachLeft = max(1.0 - distance * colorReachInversed.w, 0.0);
+	float attenuation = reachLeft * reachLeft;
 
 	vec3 occlusionOrigin = dynamicLightOccludedFromEye ? dynamicLightEye : position;
 	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue *
