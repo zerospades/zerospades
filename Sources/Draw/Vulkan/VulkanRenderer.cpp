@@ -806,25 +806,16 @@ namespace spades {
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), false);
 
-				// Upload bitmap data to the image
-				// Flip the bitmap vertically for Vulkan (bitmap is in OpenGL bottom-left format)
+				// Upload the bitmap as is: its first row is the picture's top, and the
+				// image's first row is where `v = 0` samples, as in GL.
 				VkDeviceSize imageSize = width * height * 4;
-				std::vector<uint8_t> flippedData(imageSize);
-				const uint8_t* srcPixels = reinterpret_cast<const uint8_t*>(bitmap.GetPixels());
-				uint32_t rowSize = width * 4;
-
-				for (uint32_t y = 0; y < height; y++) {
-					const uint8_t* srcRow = srcPixels + y * rowSize;
-					uint8_t* dstRow = flippedData.data() + (height - 1 - y) * rowSize;
-					std::memcpy(dstRow, srcRow, rowSize);
-				}
 
 				Handle<VulkanBuffer> stagingBuffer(new VulkanBuffer(
 					device, imageSize,
 					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT), false);
 
-				stagingBuffer->UpdateData(flippedData.data(), imageSize);
+				stagingBuffer->UpdateData(bitmap.GetPixels(), imageSize);
 
 				// Create temporary command buffer for upload
 				VkCommandBufferAllocateInfo allocInfo{};

@@ -24,7 +24,6 @@
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Bitmap.h>
 #include <Core/Debug.h>
-#include <cstring>
 
 namespace spades {
 	namespace draw {
@@ -53,25 +52,14 @@ namespace spades {
 			uint32_t updateHeight = bmp.GetHeight();
 			VkDeviceSize imageSize = updateWidth * updateHeight * 4;
 
-			// Flip the bitmap vertically for Vulkan (matching full image upload behavior)
-			std::vector<uint8_t> flippedData(imageSize);
-			const uint8_t* srcPixels = reinterpret_cast<const uint8_t*>(bmp.GetPixels());
-			uint32_t rowSize = updateWidth * 4;
-
-			for (uint32_t y = 0; y < updateHeight; y++) {
-				const uint8_t* srcRow = srcPixels + y * rowSize;
-				uint8_t* dstRow = flippedData.data() + (updateHeight - 1 - y) * rowSize;
-				std::memcpy(dstRow, srcRow, rowSize);
-			}
-
 			// Create staging buffer
 			Handle<VulkanBuffer> stagingBuffer(new VulkanBuffer(
 				device, imageSize,
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT), false);
 
-			// Copy flipped bitmap data to staging buffer
-			stagingBuffer->UpdateData(flippedData.data(), imageSize);
+			// Rows in the bitmap's order, as the whole image was uploaded
+			stagingBuffer->UpdateData(bmp.GetPixels(), imageSize);
 
 			// Create temporary command buffer
 			VkCommandBufferAllocateInfo allocInfo{};
@@ -106,10 +94,7 @@ namespace spades {
 			region.imageSubresource.mipLevel = 0;
 			region.imageSubresource.baseArrayLayer = 0;
 			region.imageSubresource.layerCount = 1;
-			// Note: The atlas image was created with vertically flipped data (OpenGL->Vulkan conversion)
-			// So we need to flip the Y coordinate: bottom-left origin (y) -> top-left origin
-			int flippedY = static_cast<int>(height) - y - static_cast<int>(updateHeight);
-			region.imageOffset = {x, flippedY, 0};
+			region.imageOffset = {x, y, 0};
 			region.imageExtent = {updateWidth, updateHeight, 1};
 
 			vkCmdCopyBufferToImage(commandBuffer, stagingBuffer->GetBuffer(),

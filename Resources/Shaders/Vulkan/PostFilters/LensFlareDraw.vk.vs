@@ -50,5 +50,6 @@ void main() {
 
     gl_Position = vec4(mix(pc.drawRange.xy, pc.drawRange.zw, p), 0.5, 1.0);
     texCoord = p;
-    modulationTexCoord = gl_Position.xy * 0.5 + 0.5;
+    // As GL has it, the mask's first row at the bottom of the screen
+    modulationTexCoord = vec2(0.5 + gl_Position.x * 0.5, 0.5 - gl_Position.y * 0.5);
 }

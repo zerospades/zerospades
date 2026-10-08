@@ -46,7 +46,9 @@ layout(location = 0) out vec4 outColor;
 void main() {
     float vis = texture(visibilityTexture, texCoord).x;
     vec3 rgb = pc.color.rgb * vis;
-    rgb *= texture(flareTexture, texCoord).xyz;
+    // The quad runs from the top down here and up in GL, whose sprite's first
+    // row lands at the bottom: keep it there.
+    rgb *= texture(flareTexture, vec2(texCoord.x, 1.0 - texCoord.y)).xyz;
     rgb *= texture(modulationTexture, modulationTexCoord).xyz;
     outColor = vec4(rgb, 1.0);
 }

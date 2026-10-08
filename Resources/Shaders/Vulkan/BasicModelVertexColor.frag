@@ -141,9 +141,7 @@ void main() {
 		// Blend in the per-vertex detail AO from the 2D atlas, as GL does via
 		// EvaluateAmbientLight(ao) -> EvaluateRadiosity. Without it the sqrt()
 		// lift is missing and ambient-lit faces come out darker than GL.
-		// See the no-radiosity branch below for the v-flip rationale.
-		vec2 aoAtlasUV = vec2(ambientOcclusionCoord.x, 1.0 - ambientOcclusionCoord.y);
-		float detailAO = texture(ambientOcclusionAtlas, aoAtlasUV).x;
+		float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float amb = mix(sqrt(aoFactor * detailAO), min(aoFactor, detailAO), 0.5);
 
 		float aoTerm = amb * (0.8 - nrm.z * 0.2);
@@ -155,10 +153,8 @@ void main() {
 	} else {
 		// MapRadiosityNull.fs + GL OptimizedVoxelModel.fs path — per-face AO
 		// from the 2D atlas (baked per-vertex aoID), modulating
-		// mix(fog, white, 0.5) ambient.  See BasicMap.frag for the v-flip
-		// rationale (VulkanImageManager y-flips images on upload).
-		vec2 aoUV = vec2(ambientOcclusionCoord.x, 1.0 - ambientOcclusionCoord.y);
-		float ao = texture(ambientOcclusionAtlas, aoUV).x;
+		// mix(fog, white, 0.5) ambient.
+		float ao = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float hemisphere = 1.0 - nrm.z * 0.2;
 		vec3 ambientColor = mix(inFogColor, vec3(1.0), 0.5);
 		diffuse = ambientColor * (0.5 * ao * hemisphere) + sun;
