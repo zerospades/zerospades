@@ -743,6 +743,9 @@ namespace spades {
 									  (int)lights.size());
 
 				device->DepthFunc(IGLDevice::Equal);
+				// Only the surfaces already in the depth buffer are lit, so it is not
+				// written: the GPU can then reject hidden fragments before shading them.
+				device->DepthMask(false);
 				device->Enable(IGLDevice::Blend, true);
 				device->BlendFunc(IGLDevice::SrcAlpha, IGLDevice::One, IGLDevice::Zero,
 								  IGLDevice::One);
@@ -752,6 +755,7 @@ namespace spades {
 				modelRenderer->RenderDynamicLightPass(lights);
 
 				device->Enable(IGLDevice::Blend, false);
+				device->DepthMask(true);
 			}
 
 			if (settings.r_outlines && !mirror) {
