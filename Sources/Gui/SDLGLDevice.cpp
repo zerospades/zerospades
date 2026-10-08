@@ -371,6 +371,8 @@ namespace spades {
 				case Version: return (const char*)glGetString(GL_VERSION);
 				case ShadingLanguageVersion:
 					return (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+				// The whole list at once, as the compatibility contexts this runs on have it
+				case Extensions: return (const char*)glGetString(GL_EXTENSIONS);
 				default: SPInvalidEnum("type", type);
 			}
 		}
