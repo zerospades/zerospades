@@ -148,8 +148,8 @@ namespace spades {
 
 			template <SWFeatureLevel> void ApplyDynamicLight(const DynamicLight &);
 
-			/** Draws the scene's glares over the finished frame. This renderer draws
-			 * first-person models like any other, so they stay under the glares. */
+			/** Draws the scene's glares over the finished frame. This renderer can't
+			 * tell the first-person view's models apart, so they go under the glares. */
 			void DrawGlares();
 
 		protected:
