@@ -21,6 +21,7 @@
 #include "VulkanGlareRenderer.h"
 
 #include <array>
+#include <cmath>
 
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
@@ -38,8 +39,23 @@ namespace spades {
 				float drawRange[4];
 				float color[3];
 				float firstPersonDepthEnd;
+				float sourceCoord[2];
+				float sourceSpread[2];
+				float sourceDepth;
+				float zNear;
+				float zFar;
 				float outputIsLinear;
 			};
+			static_assert(sizeof(GlarePushConstants) <= 128,
+			              "push constants past 128 bytes are not portable");
+
+			/** The radius of a glaring lamp's lens, in blocks: how much of the scene
+			 * around it is looked at to tell whether it is in sight. */
+			constexpr float kSourceRadius = 0.1F;
+
+			/** How far nearer than the lamp something has to be drawn to hide it, in
+			 * blocks: the headlamp it shines from is drawn about as far as it. */
+			constexpr float kSourceOcclusionMargin = 0.25F;
 
 			/** The most glares a frame draws; a pool holds a set for each. */
 			constexpr std::uint32_t kMaxGlaresPerFrame = 256;
@@ -72,7 +88,8 @@ namespace spades {
 		    : renderer(renderer), device(renderer.GetDevice()->GetDevice()) {
 			SPADES_MARK_FUNCTION();
 
-			// The glare's image and the scene's depth
+			// The glare's image, and the scene's depth, which the vertex shader reads
+			// around the lamp too
 			std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
 			for (std::uint32_t i = 0; i < bindings.size(); i++) {
 				bindings[i].binding = i;
@@ -80,6 +97,7 @@ namespace spades {
 				bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			}
+			bindings[1].stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			layoutInfo.bindingCount = static_cast<std::uint32_t>(bindings.size());
@@ -248,8 +266,13 @@ namespace spades {
 			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+			const float tanHalfX = std::tan(def.fovX * 0.5F);
+			const float tanHalfY = std::tan(def.fovY * 0.5F);
+
 			GlarePushConstants push{};
 			push.firstPersonDepthEnd = VulkanRenderer::kFirstPersonDepthEnd;
+			push.zNear = def.zNear;
+			push.zFar = def.zFar;
 			push.outputIsLinear =
 			  IsSrgbFormat(renderer.GetDevice()->GetSwapchainImageFormat()) ? 1.0F : 0.0F;
 
@@ -304,6 +327,14 @@ namespace spades {
 				push.color[0] = param.color.x;
 				push.color[1] = param.color.y;
 				push.color[2] = param.color.z;
+
+				// The lamp in the scene's depth, which runs from the top down, and how
+				// far its lens spreads over it
+				push.sourceCoord[0] = 0.5F + centreX * 0.5F;
+				push.sourceCoord[1] = 0.5F - centreY * 0.5F;
+				push.sourceSpread[0] = kSourceRadius / (clip.w * tanHalfX) * 0.5F;
+				push.sourceSpread[1] = kSourceRadius / (clip.w * tanHalfY) * 0.5F;
+				push.sourceDepth = clip.w - kSourceOcclusionMargin;
 
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        pipelineLayout, 0, 1, &set, 0, nullptr);
