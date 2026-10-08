@@ -45,6 +45,7 @@ namespace spades {
 		class VulkanLongSpriteRenderer;
 		class VulkanGlareRenderer;
 		class VulkanDynamicLightClusters;
+		class VulkanMapOccupancy;
 		class VulkanImageRenderer;
 		class VulkanWaterRenderer;
 		class VulkanFlatMapRenderer;
@@ -167,6 +168,8 @@ namespace spades {
 			std::unique_ptr<VulkanShadowMapRenderer> shadowMapRenderer;
 			std::unique_ptr<VulkanMapShadowRenderer> mapShadowRenderer;
 			std::unique_ptr<VulkanAmbientShadowRenderer> ambientShadowRenderer;
+			// The map's clearance, which hides the dynamic lights behind it
+			std::unique_ptr<VulkanMapOccupancy> mapOccupancy;
 			std::unique_ptr<VulkanRadiosityRenderer> radiosityRenderer;
 			std::unique_ptr<VulkanFramebufferManager> framebufferManager;
 			Handle<VulkanProgramManager> programManager;

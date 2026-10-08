@@ -35,6 +35,121 @@
 layout(set = DYNAMIC_LIGHT_SET, binding = 3) uniform sampler2D
   dynamicLightImages[DYNAMIC_LIGHT_IMAGES];
 
+// `VulkanMapOccupancy`: each block's clearance, 0 for a solid block; every block
+// within `c - 1` of one with a clearance `c` is clear.
+layout(set = DYNAMIC_LIGHT_SET, binding = 4) uniform usampler3D dynamicLightMapOccupancy;
+
+// The most steps a walk takes, each to the next block or out of a clear cube: more
+// than a light's reach needs. A walk that has not got through by then stops where it
+// got to, so that it errs on the side of darkness rather than lighting what a wall
+// may hide.
+#define DYNAMIC_LIGHT_MAP_MAX_STEPS 256
+
+/**
+ * How far along the segment from `from` to `to` it enters the first solid block,
+ * from 0 at `from` to 1 at `to`, or 2 if it enters none. The block `from` lies in
+ * is not looked at, and neither is the one `to` lies in. The walk crosses open air
+ * a clear cube at a time.
+ */
+float DynamicLightMapWalk(vec3 from, vec3 to) {
+	ivec3 mapSize = textureSize(dynamicLightMapOccupancy, 0);
+	vec3 delta = to - from;
+
+	vec3 cell = floor(from);
+	vec3 target = floor(to);
+	vec3 stepDirection = sign(delta);
+	vec3 moving = abs(stepDirection);
+
+	// The walk's progress, from 0 at `from` to 1 at `to`: `tMax` where it crosses
+	// the next boundary on each axis, `tDelta` between two of them. An axis it
+	// doesn't move along is never crossed.
+	vec3 tDelta = 1.0 / max(abs(delta), vec3(1.0e-6));
+	vec3 tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
+	tMax = mix(vec3(2.0), tMax, moving);
+
+	// Where the walk entered `cell`. The first block is the one it starts in, which
+	// is not looked at.
+	float tEnter = 0.0;
+	bool advance = true;
+
+	for (int i = 0; i < DYNAMIC_LIGHT_MAP_MAX_STEPS; i++) {
+		if (advance) {
+			if (tMax.x < tMax.y && tMax.x < tMax.z) {
+				tEnter = tMax.x;
+				cell.x += stepDirection.x;
+				tMax.x += tDelta.x;
+			} else if (tMax.y < tMax.z) {
+				tEnter = tMax.y;
+				cell.y += stepDirection.y;
+				tMax.y += tDelta.y;
+			} else {
+				tEnter = tMax.z;
+				cell.z += stepDirection.z;
+				tMax.z += tDelta.z;
+			}
+			if (tEnter > 1.0)
+				return 2.0;
+		}
+		advance = true;
+
+		if (all(equal(cell, target)))
+			return 2.0;
+
+		// Above the map is open sky, and below it solid ground, as `GameMap` has it.
+		if (cell.z < 0.0)
+			continue;
+		if (cell.z >= float(mapSize.z))
+			return tEnter;
+
+		// The map wraps around horizontally.
+		ivec3 texel = ivec3(cell);
+		texel.xy = ((texel.xy % mapSize.xy) + mapSize.xy) % mapSize.xy;
+		float clearance = float(texelFetch(dynamicLightMapOccupancy, texel, 0).r);
+		if (clearance < 0.5)
+			return tEnter;
+		if (clearance < 1.5)
+			continue;
+
+		// Every block of the cube within `clearance - 1` of this one is clear: leave
+		// it in one go, through the face the walk reaches first.
+		vec3 low = cell - (clearance - 1.0);
+		vec3 high = cell + clearance;
+		vec3 exitFace = mix(low, high, max(stepDirection, vec3(0.0)));
+		vec3 tExits = mix(vec3(2.0), abs(exitFace - from) * tDelta, moving);
+		float tExit = min(tExits.x, min(tExits.y, tExits.z));
+
+		// The segment ends inside the cube, so nothing is in the way.
+		if (tExit >= 1.0)
+			return 2.0;
+
+		// Into the block past that face, which is looked at next.
+		vec3 exits = step(tExits, vec3(tExit)) * moving;
+		vec3 inside = clamp(floor(from + delta * tExit), low, high - 1.0);
+		cell = mix(inside, exitFace + min(stepDirection, vec3(0.0)), exits);
+		tMax = (stepDirection * (cell - from) + max(stepDirection, vec3(0.0))) * tDelta;
+		tMax = mix(vec3(2.0), tMax, moving);
+		tEnter = tExit;
+		advance = false;
+	}
+	return tEnter;
+}
+
+/**
+ * 1 if `lightPosition` is seen from `position`, on a surface facing `normal`, and 0
+ * if the map is in the way. The first-person view's models are drawn in front of
+ * the world wherever they really are, even half inside a wall, so for them it is
+ * seen from the eye instead. The walk starts in the block in front of the surface,
+ * so the block the surface belongs to doesn't hide its own light.
+ */
+float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) {
+	if (dynamicLightFrame.mapOcclusion < 0.5)
+		return 1.0;
+	vec3 from = gl_FragCoord.z < dynamicLightFrame.firstPersonDepthEnd
+	              ? dynamicLightFrame.eyeNear.xyz
+	              : position + normal * 0.01;
+	return DynamicLightMapWalk(from, lightPosition) > 1.0 ? 1.0 : 0.0;
+}
+
 /**
  * Image `image` at `coord`, of the most detailed level: it is read where only some
  * fragments of a quad got that far, which leaves no derivatives to pick one with.
@@ -53,8 +168,8 @@ vec3 DynamicLightImage(int image, vec2 coord) {
 
 /**
  * The light that light `i` brings to `position`, on a surface facing `normal`,
- * shaped by its cone, its image and its reach, but not by how the surface faces
- * it; `direction` is set to the unit vector towards the light.
+ * shaped by its cone, its image and its reach, and hidden by the map, but not
+ * by how the surface faces it; `direction` is set to the unit vector towards the light.
  */
 vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 direction) {
 	direction = vec3(0.0, 0.0, 1.0);
@@ -105,7 +220,10 @@ vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 directio
 	float reachLeft = max(1.0 - distance * colorReachInversed.w, 0.0);
 	float attenuation = reachLeft * reachLeft;
 
-	return colorReachInversed.xyz * (attenuation * coneFalloff) * image;
+	// Last, as it is the dearest part
+	float visibility = DynamicLightMapVisibility(position, normal, lightPosition);
+
+	return colorReachInversed.xyz * (attenuation * coneFalloff * visibility) * image;
 }
 
 vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal) {
@@ -115,7 +233,7 @@ vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal) {
 }
 
 /** The light every dynamic light of the frame casts on `position`, facing `normal`
- * (unit length), unshadowed. */
+ * (unit length), where the map doesn't hide it. */
 vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
 	uvec4 counts = dynamicLightFrame.counts;
 	if (counts.w == 0u)

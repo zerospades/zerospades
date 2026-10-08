@@ -33,6 +33,7 @@
 #include "VulkanFramebufferManager.h"
 #include "VulkanGlareRenderer.h"
 #include "VulkanDynamicLightClusters.h"
+#include "VulkanMapOccupancy.h"
 #include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanImageManager.h"
@@ -250,6 +251,7 @@ namespace spades {
 			ambientShadowRenderer.reset();
 			radiosityRenderer.reset();
 			mapShadowRenderer.reset();
+			mapOccupancy.reset();
 			lensFlareFilter.reset();
 			colorCorrectionFilter.reset();
 			cavityOutlineFilter.reset();
@@ -809,10 +811,15 @@ namespace spades {
 				mapShadowRenderer = stmp::make_unique<VulkanMapShadowRenderer>(*this, map);
 				ambientShadowRenderer = stmp::make_unique<VulkanAmbientShadowRenderer>(*this, *map);
 				radiosityRenderer = stmp::make_unique<VulkanRadiosityRenderer>(*this, *map);
+				// The previous map's goes first: they're both large.
+				mapOccupancy.reset();
+				mapOccupancy = stmp::make_unique<VulkanMapOccupancy>(
+				  *this, *map, device->GetMaxFramesInFlight());
 			} else {
 				mapShadowRenderer.reset();
 				ambientShadowRenderer.reset();
 				radiosityRenderer.reset();
+				mapOccupancy.reset();
 			}
 
 			// Initialize shadow map renderer first: the map/model sunlight pipeline
@@ -1642,6 +1649,8 @@ namespace spades {
 				mapShadowRenderer->GameMapChanged(x, y, z, map);
 			if (ambientShadowRenderer)
 				ambientShadowRenderer->GameMapChanged(x, y, z, map);
+			if (mapOccupancy)
+				mapOccupancy->GameMapChanged(x, y, z);
 			if (radiosityRenderer)
 				radiosityRenderer->GameMapChanged(x, y, z, map);
 			if (flatMapRenderer)
@@ -1830,7 +1839,10 @@ namespace spades {
 		// Bin the frame's dynamic lights into the view's clusters, for every lit
 		// pass that follows to read, the mirror's included.
 		if (sceneUsedInThisFrame) {
-			dynamicLightClusters->Update(commandBuffer, currentFrameSlot, lights, sceneDef);
+			if (mapOccupancy)
+				mapOccupancy->Update(commandBuffer, currentFrameSlot);
+			dynamicLightClusters->Update(commandBuffer, currentFrameSlot, lights, sceneDef,
+			                             mapOccupancy.get());
 		}
 
 		// Render mirror pass for water reflections (r_water >= 2)
