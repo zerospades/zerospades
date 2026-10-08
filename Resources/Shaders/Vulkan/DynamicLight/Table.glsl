@@ -32,6 +32,14 @@
 // the image's half width: `VulkanDynamicLight::SpotFadeEnd`.
 #define DYNAMIC_LIGHT_SPOT_FADE_END 1.1
 
+// `VulkanDynamicLightClusters`' occlusion maps: tiles of
+// `DYNAMIC_LIGHT_OCCLUSION_TILE` texels each, `DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW`
+// to a row of the atlas, each texel holding how far from its light the ray through
+// it gets before it enters a solid block.
+#define DYNAMIC_LIGHT_OCCLUSION_TILE 128
+#define DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW 8
+#define DYNAMIC_LIGHT_OCCLUSION_MAX_TILES 64
+
 #define DYNAMIC_LIGHT_POINT 0.0
 #define DYNAMIC_LIGHT_LINEAR 1.0
 #define DYNAMIC_LIGHT_SPOT 2.0
@@ -47,11 +55,18 @@ struct DynamicLight {
 	// xyz: a linear light's direction, w: its length
 	vec4 linearDirectionLength;
 	// x: `DYNAMIC_LIGHT_POINT`, `_LINEAR` or `_SPOT`; y: its image in
-	// `dynamicLightImages`, or -1 for none
+	// `dynamicLightImages`, or -1 for none; z: its occlusion map tile, or -1 for
+	// none
 	vec4 kind;
 	// The sphere holding everything it lights, in the view's axes: x right, y up,
 	// z ahead of the eye
 	vec4 viewSphere;
+	// A spotlight's occlusion map is traced along these unit axes, its beam's
+	// (`forward`) and its image's: xyz. `right.w` is how much wider a texel of the
+	// tile gets per block away from the light.
+	vec4 traceRight;
+	vec4 traceUp;
+	vec4 traceForward;
 };
 
 layout(set = DYNAMIC_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
@@ -72,6 +87,8 @@ layout(set = DYNAMIC_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
 	float firstPersonDepthEnd;
 	// xyz: the clusters across, up and deep; w: the lights
 	uvec4 counts;
+	// The light each occlusion map tile is traced for, four to an element
+	uvec4 occlusionTileLights[DYNAMIC_LIGHT_OCCLUSION_MAX_TILES / 4];
 } dynamicLightFrame;
 
 layout(set = DYNAMIC_LIGHT_SET, binding = 1, std430) readonly buffer DynamicLightList {

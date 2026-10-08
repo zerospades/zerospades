@@ -28,6 +28,7 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/RefCountedObject.h>
+#include <Draw/Vulkan/vk_mem_alloc.h>
 
 namespace spades {
 	namespace client {
@@ -47,6 +48,12 @@ namespace spades {
 		 * own: a table of the lights, and the view cut into clusters, each marking
 		 * the lights that reach into it, which a compute pass works out every frame.
 		 * A fragment reads only its cluster's lights (`DynamicLight/Lights.glsl`).
+		 *
+		 * The map hides the lights, and each spotlight whose beam it can afford gets
+		 * a tile of an occlusion map, traced by another compute pass every frame:
+		 * every texel holds how far the ray through it gets from the light before it
+		 * enters a solid block. Four reads of it prove most lit points lit, where they
+		 * would otherwise walk the map themselves, light by light.
 		 *
 		 * Every frame in flight has its own table, clusters and descriptor set, so a
 		 * frame's are written only once the GPU is done with them.
@@ -72,6 +79,29 @@ namespace spades {
 
 			/** `local_size_x` of `DynamicLight/Cluster.comp` */
 			static constexpr std::uint32_t ClusterGroupSize = 64;
+
+			/** The texels along an occlusion map tile's edge
+			 * (`DYNAMIC_LIGHT_OCCLUSION_TILE`) */
+			static constexpr std::uint32_t OcclusionTileSize = 128;
+			/** The tiles along the atlas's edge (`DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW`) */
+			static constexpr std::uint32_t OcclusionTilesPerRow = 8;
+			/** `DYNAMIC_LIGHT_OCCLUSION_MAX_TILES`; any further spotlight walks the map. */
+			static constexpr std::uint32_t MaxOcclusionTiles =
+			  OcclusionTilesPerRow * OcclusionTilesPerRow;
+			static constexpr std::uint32_t OcclusionAtlasSize =
+			  OcclusionTileSize * OcclusionTilesPerRow;
+			/** `local_size_x` and `local_size_y` of `DynamicLight/OcclusionMap.comp` */
+			static constexpr std::uint32_t OcclusionGroupSize = 8;
+
+			/**
+			 * How much wider a texel of a light's occlusion map gets per block away
+			 * from it: the tile spans the light's image out to where its cone fades.
+			 */
+			static float GetOcclusionTexelSpread(const VulkanDynamicLight&);
+
+			/** Whether a light can have an occlusion map: a spotlight whose texels stay
+			 * small enough over its whole reach. */
+			static bool IsOcclusionMappable(const VulkanDynamicLight&);
 
 			VulkanDynamicLightClusters(VulkanRenderer&, std::size_t framesInFlight);
 			~VulkanDynamicLightClusters();
@@ -111,6 +141,12 @@ namespace spades {
 				/** The images bound as `dynamicLightImages`, kept alive while the
 				 * frame that reads them may be in flight */
 				std::array<Handle<VulkanImage>, MaxImages> images;
+
+				/** The occlusion maps' atlas, in `VK_IMAGE_LAYOUT_GENERAL` once used */
+				VkImage occlusionAtlas = VK_NULL_HANDLE;
+				VmaAllocation occlusionAtlasAllocation = VK_NULL_HANDLE;
+				VkImageView occlusionAtlasView = VK_NULL_HANDLE;
+				bool occlusionAtlasInitialized = false;
 			};
 
 			VulkanRenderer& renderer;
@@ -120,7 +156,10 @@ namespace spades {
 			VkDescriptorSetLayout emptySetLayout = VK_NULL_HANDLE;
 			VkDescriptorPool pool = VK_NULL_HANDLE;
 			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+			/** Bins the lights into the clusters */
 			VkPipeline pipeline = VK_NULL_HANDLE;
+			/** Traces the occlusion maps */
+			VkPipeline occlusionPipeline = VK_NULL_HANDLE;
 
 			std::vector<Slot> slots;
 
@@ -128,7 +167,9 @@ namespace spades {
 			std::unique_ptr<VulkanMapOccupancy> noOccupancy;
 
 			void CreateSlot(Slot&);
-			void CreatePipeline();
+			void CreatePipelines();
+			VkPipeline CreateComputePipeline(const char* shaderPath);
+			void CreateOcclusionAtlas(Slot&);
 
 			/** Binds `images` as the slot's spotlight images, the white image in
 			 * place of any missing, updating only those that changed. */

@@ -47,8 +47,11 @@ namespace spades {
 				float linearDirectionLength[4];
 				float kind[4];
 				float viewSphere[4];
+				float traceRight[4];
+				float traceUp[4];
+				float traceForward[4];
 			};
-			static_assert(sizeof(GpuLight) == 144, "GpuLight must match DynamicLight");
+			static_assert(sizeof(GpuLight) == 192, "GpuLight must match DynamicLight");
 
 			/** `DynamicLightFrame` of `DynamicLight/Table.glsl`, std140 */
 			struct GpuFrame {
@@ -60,8 +63,16 @@ namespace spades {
 				float mapOcclusion;
 				float firstPersonDepthEnd;
 				std::uint32_t counts[4];
+				std::uint32_t occlusionTileLights[VulkanDynamicLightClusters::MaxOcclusionTiles];
 			};
-			static_assert(sizeof(GpuFrame) == 96, "GpuFrame must match DynamicLightFrame");
+			static_assert(sizeof(GpuFrame) == 96 + 4 * VulkanDynamicLightClusters::MaxOcclusionTiles,
+			              "GpuFrame must match DynamicLightFrame");
+
+			/**
+			 * The widest a texel of a light's occlusion map may get at its reach, in
+			 * blocks: its width is how far off an edge of the beam's shadow can land.
+			 */
+			constexpr float kMaxOcclusionTexelWidth = 1.5F;
 
 			/** `kind.x` of a light, `DYNAMIC_LIGHT_POINT`, `_LINEAR` or `_SPOT` */
 			float KindOf(client::DynamicLightType type) {
@@ -93,13 +104,14 @@ namespace spades {
 
 			const VkShaderStageFlags stages =
 			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
+			std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
 			bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr};
 			bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[3] = {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxImages,
 			               VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
 			bindings[4] = {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, nullptr};
+			bindings[5] = {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr};
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -115,10 +127,11 @@ namespace spades {
 				SPRaise("Failed to create the empty descriptor set layout");
 
 			const std::uint32_t slotCount = static_cast<std::uint32_t>(framesInFlight);
-			std::array<VkDescriptorPoolSize, 3> poolSizes{{
+			std::array<VkDescriptorPoolSize, 4> poolSizes{{
 			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slotCount},
 			  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slotCount * 2},
 			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, slotCount * (MaxImages + 1)},
+			  {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, slotCount},
 			}};
 			VkDescriptorPoolCreateInfo poolInfo{};
 			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -134,12 +147,21 @@ namespace spades {
 			for (Slot& slot : slots)
 				CreateSlot(slot);
 
-			CreatePipeline();
+			CreatePipelines();
 		}
 
 		VulkanDynamicLightClusters::~VulkanDynamicLightClusters() {
 			SPADES_MARK_FUNCTION();
 
+			for (Slot& slot : slots) {
+				if (slot.occlusionAtlasView != VK_NULL_HANDLE)
+					vkDestroyImageView(device, slot.occlusionAtlasView, nullptr);
+				if (slot.occlusionAtlas != VK_NULL_HANDLE)
+					vmaDestroyImage(renderer.GetDevice()->GetAllocator(), slot.occlusionAtlas,
+					                slot.occlusionAtlasAllocation);
+			}
+			if (occlusionPipeline != VK_NULL_HANDLE)
+				vkDestroyPipeline(device, occlusionPipeline, nullptr);
 			if (pipeline != VK_NULL_HANDLE)
 				vkDestroyPipeline(device, pipeline, nullptr);
 			if (pipelineLayout != VK_NULL_HANDLE)
@@ -198,29 +220,35 @@ namespace spades {
 			// one without a map a valid occupancy.
 			BindImages(slot, {});
 			BindOccupancy(slot, *noOccupancy);
+			CreateOcclusionAtlas(slot);
 
 			// Nothing is lit until the first update says otherwise.
 			const GpuFrame empty{};
 			std::memcpy(slot.frame->Map(), &empty, sizeof(empty));
 		}
 
-		void VulkanDynamicLightClusters::CreatePipeline() {
+		void VulkanDynamicLightClusters::CreatePipelines() {
 			VkPipelineLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			layoutInfo.setLayoutCount = 1;
 			layoutInfo.pSetLayouts = &setLayout;
 			if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
-				SPRaise("Failed to create the dynamic light cluster pipeline layout");
+				SPRaise("Failed to create the dynamic light compute pipeline layout");
 
-			const std::vector<std::uint32_t> code =
-			  SpirvCache::Load("Shaders/Vulkan/DynamicLight/Cluster.comp.spv");
+			pipeline = CreateComputePipeline("Shaders/Vulkan/DynamicLight/Cluster.comp.spv");
+			occlusionPipeline =
+			  CreateComputePipeline("Shaders/Vulkan/DynamicLight/OcclusionMap.comp.spv");
+		}
+
+		VkPipeline VulkanDynamicLightClusters::CreateComputePipeline(const char* shaderPath) {
+			const std::vector<std::uint32_t> code = SpirvCache::Load(shaderPath);
 			VkShaderModuleCreateInfo moduleInfo{};
 			moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 			moduleInfo.codeSize = code.size() * sizeof(std::uint32_t);
 			moduleInfo.pCode = code.data();
 			VkShaderModule module;
 			if (vkCreateShaderModule(device, &moduleInfo, nullptr, &module) != VK_SUCCESS)
-				SPRaise("Failed to create the dynamic light cluster shader module");
+				SPRaise("Failed to create the shader module %s", shaderPath);
 
 			VkComputePipelineCreateInfo pipelineInfo{};
 			pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -229,12 +257,70 @@ namespace spades {
 			pipelineInfo.stage.module = module;
 			pipelineInfo.stage.pName = "main";
 			pipelineInfo.layout = pipelineLayout;
+			VkPipeline created = VK_NULL_HANDLE;
 			const VkResult result = vkCreateComputePipelines(device, renderer.GetPipelineCache(), 1,
-			                                                 &pipelineInfo, nullptr, &pipeline);
+			                                                 &pipelineInfo, nullptr, &created);
 			vkDestroyShaderModule(device, module, nullptr);
 			if (result != VK_SUCCESS)
-				SPRaise("Failed to create the dynamic light cluster pipeline (error code: %d)",
+				SPRaise("Failed to create the compute pipeline of %s (error code: %d)", shaderPath,
 				        result);
+			return created;
+		}
+
+		void VulkanDynamicLightClusters::CreateOcclusionAtlas(Slot& slot) {
+			VkImageCreateInfo imageInfo{};
+			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			imageInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageInfo.format = VK_FORMAT_R32_SFLOAT;
+			imageInfo.extent = {OcclusionAtlasSize, OcclusionAtlasSize, 1};
+			imageInfo.mipLevels = 1;
+			imageInfo.arrayLayers = 1;
+			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+			// Written by the tracing pass and read by the lit fragments, as storage
+			imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			VmaAllocationCreateInfo allocInfo{};
+			allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+			if (vmaCreateImage(renderer.GetDevice()->GetAllocator(), &imageInfo, &allocInfo,
+			                   &slot.occlusionAtlas, &slot.occlusionAtlasAllocation,
+			                   nullptr) != VK_SUCCESS)
+				SPRaise("Failed to create a dynamic light occlusion atlas");
+
+			VkImageViewCreateInfo viewInfo{};
+			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			viewInfo.image = slot.occlusionAtlas;
+			viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			viewInfo.format = VK_FORMAT_R32_SFLOAT;
+			viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+			if (vkCreateImageView(device, &viewInfo, nullptr, &slot.occlusionAtlasView) !=
+			    VK_SUCCESS)
+				SPRaise("Failed to create a dynamic light occlusion atlas view");
+
+			const VkDescriptorImageInfo info{VK_NULL_HANDLE, slot.occlusionAtlasView,
+			                                 VK_IMAGE_LAYOUT_GENERAL};
+			VkWriteDescriptorSet write{};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = slot.set;
+			write.dstBinding = 5;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			write.pImageInfo = &info;
+			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+		}
+
+		float VulkanDynamicLightClusters::GetOcclusionTexelSpread(const VulkanDynamicLight& light) {
+			return 2.0F * light.GetSpotTangent() * VulkanDynamicLight::SpotFadeEnd /
+			       (float)OcclusionTileSize;
+		}
+
+		bool VulkanDynamicLightClusters::IsOcclusionMappable(const VulkanDynamicLight& light) {
+			const client::DynamicLightParam& param = light.GetParam();
+			if (param.type != client::DynamicLightTypeSpotlight)
+				return false;
+			return param.radius * GetOcclusionTexelSpread(light) <= kMaxOcclusionTexelWidth;
 		}
 
 		VkDescriptorSet VulkanDynamicLightClusters::GetDescriptorSet(std::size_t frameSlot) const {
@@ -299,7 +385,31 @@ namespace spades {
 			const std::uint32_t count =
 			  static_cast<std::uint32_t>(std::min<std::size_t>(lights.size(), MaxLights));
 
-			// The table, and the images its spotlights project
+			// The atlas is laid out once for the passes to write and read it as they
+			// like; a frame only reads the tiles it traced itself.
+			if (!slot.occlusionAtlasInitialized) {
+				VkImageMemoryBarrier layout{};
+				layout.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				layout.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				layout.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+				layout.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				layout.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				layout.image = slot.occlusionAtlas;
+				layout.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+				layout.srcAccessMask = 0;
+				layout.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+				vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+				                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				                     0, 0, nullptr, 0, nullptr, 1, &layout);
+				slot.occlusionAtlasInitialized = true;
+			}
+
+			GpuFrame frame{};
+
+			// The table, the images its spotlights project, and the tiles of the
+			// occlusion maps, which only a map has
+			std::uint32_t tileCount = 0;
 			std::array<VulkanImage*, MaxImages> images{};
 			std::uint32_t imageCount = 0;
 			auto* table = static_cast<GpuLight*>(slot.lights->Map());
@@ -340,8 +450,24 @@ namespace spades {
 				}
 				out.kind[0] = KindOf(param.type);
 				out.kind[1] = image;
-				out.kind[2] = 0.0F;
+				out.kind[2] = -1.0F;
 				out.kind[3] = 0.0F;
+
+				if (param.type == client::DynamicLightTypeSpotlight) {
+					const float spread = GetOcclusionTexelSpread(light);
+					Store(out.traceRight, param.spotAxis[0].Normalize(), spread);
+					Store(out.traceUp, param.spotAxis[1].Normalize(), 0.0F);
+					Store(out.traceForward, param.spotAxis[2].Normalize(), 0.0F);
+					if (occupancy && tileCount < MaxOcclusionTiles && IsOcclusionMappable(light)) {
+						out.kind[2] = static_cast<float>(tileCount);
+						frame.occlusionTileLights[tileCount++] = i;
+					}
+				} else {
+					const Vector3 none = MakeVector3(0.0F, 0.0F, 0.0F);
+					Store(out.traceRight, none, 0.0F);
+					Store(out.traceUp, none, 0.0F);
+					Store(out.traceForward, none, 0.0F);
+				}
 
 				Vector3 center;
 				float radius;
@@ -363,7 +489,6 @@ namespace spades {
 			const float tanX = std::tan(view.fovX * 0.5F);
 			const float tanY = std::tan(view.fovY * 0.5F);
 			const float far = std::max(view.zFar, ClusterNear * 2.0F);
-			GpuFrame frame{};
 			Store(frame.eyeNear, view.viewOrigin, ClusterNear);
 			Store(frame.right, view.viewAxis[0], 1.0F / tanX);
 			Store(frame.up, view.viewAxis[1], 1.0F / tanY);
@@ -382,24 +507,27 @@ namespace spades {
 			if (count == 0)
 				return;
 
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
 			                        0, 1, &slot.set, 0, nullptr);
+
+			// Neither pass reads what the other writes, so they run side by side.
+			if (tileCount > 0) {
+				vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, occlusionPipeline);
+				vkCmdDispatch(commandBuffer, OcclusionTileSize / OcclusionGroupSize,
+				              OcclusionTileSize / OcclusionGroupSize, tileCount);
+			}
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 			vkCmdDispatch(commandBuffer, (kClusterCount + ClusterGroupSize - 1) / ClusterGroupSize,
 			              1, 1);
 
-			// The masks are read by the lit fragments of the passes that follow.
-			VkBufferMemoryBarrier barrier{};
-			barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			// The masks and the occlusion maps are read by the lit fragments of the
+			// passes that follow.
+			VkMemoryBarrier barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.buffer = slot.clusters->GetBuffer();
-			barrier.offset = 0;
-			barrier.size = VK_WHOLE_SIZE;
 			vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 1, &barrier,
+			                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 1, &barrier, 0, nullptr,
 			                     0, nullptr);
 		}
 	} // namespace draw
