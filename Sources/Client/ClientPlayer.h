@@ -61,7 +61,6 @@ namespace spades {
 
 			Vector3 viewWeaponOffset;
 			Vector3 lastFront;
-			Vector3 flashlightOrientation;
 			Vector3 classicViewWeaponOrigin;
 
 			/** This player's lamp as the camera sees it, this frame. */
@@ -81,6 +80,8 @@ namespace spades {
 
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
+			/** Where this player's flashlight points. */
+			Vector3 GetFlashlightDirection();
 			std::array<Vector3, 3> GetFlashlightAxes();
 
 			/**
@@ -96,12 +97,6 @@ namespace spades {
 			 * camera isn't standing at.
 			 */
 			bool IsLampBuried(const Vector3& lightOrigin);
-
-			/**
-			 * Where the flashlight emits from for a view whose eye is at `eye`: above
-			 * it at the height of the headlamp model as the third-person head wears it.
-			 */
-			Vector3 GetFlashlightOrigin(const Vector3& eye);
 
 			/** Where the glare shows: on the front of the headlamp worn by `head`. */
 			Vector3 GetHeadlampLens(const Matrix4& head);

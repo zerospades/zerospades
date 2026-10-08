@@ -332,7 +332,6 @@ namespace spades {
 			wasAimingDownSight = false;
 			viewWeaponOffset = MakeVector3(0, 0, 0);
 			lastFront = MakeVector3(0, 0, 0);
-			flashlightOrientation = p.GetFront();
 			classicViewWeaponOrigin = MakeVector3(0, 0, 0);
 
 			ScriptContextHandle ctx;
@@ -591,16 +590,6 @@ namespace spades {
 				}
 			}
 
-			// Smooth the flashlight's movement, following the interpolated orientation
-			// the head is rendered from so a remote player's cone doesn't lead it.
-			Vector3 lightFront = player.GetFront(cg_orientationSmoothing);
-			Vector3 diff = lightFront - flashlightOrientation;
-			float dist = diff.GetLength();
-			if (dist > 0.1F)
-				flashlightOrientation += diff.Normalize() * (dist - 0.1F);
-			flashlightOrientation = Mix(flashlightOrientation, lightFront, 1.0F - powf(1.0E-6F, dt));
-			flashlightOrientation = flashlightOrientation.Normalize();
-
 			// FIXME: should do for non-active skins?
 			asIScriptObject* curSkin = GetCurrentSkin(!isThirdPerson);
 			{
@@ -705,13 +694,19 @@ namespace spades {
 			}
 		}
 
+		Vector3 ClientPlayer::GetFlashlightDirection() {
+			// The orientation the player's model is rendered with, and nothing more, so
+			// that every client points the beam alike.
+			return player.GetFront(cg_orientationSmoothing);
+		}
+
 		std::array<Vector3, 3> ClientPlayer::GetFlashlightAxes() {
 			// Roll the cone around its own direction: the player's up vector snaps with
 			// network updates and is undefined when looking straight up or down.
 			static const Vector3 worldUp = MakeVector3(0, 0, -1);
 
 			std::array<Vector3, 3> axes;
-			axes[2] = flashlightOrientation;
+			axes[2] = GetFlashlightDirection();
 			axes[0] = Vector3::Cross(axes[2], worldUp);
 			if (axes[0].GetSquaredLength() < 1.0E-6F) // pointing straight up or down
 				axes[0] = Vector3::Cross(axes[2], MakeVector3(0, 1, 0));
@@ -740,27 +735,6 @@ namespace spades {
 
 			IntVector3 block = lightOrigin.Floor();
 			return map->IsSolidWrapped(block.x, block.y, block.z);
-		}
-
-		Vector3 ClientPlayer::GetFlashlightOrigin(const Vector3& eye) {
-			Player& p = player;
-			bool const crouch = p.GetInput().crouch;
-
-			Vector3 o = p.GetFront(cg_orientationSmoothing);
-			float yaw = atan2f(o.y, o.x) + kHalfPi;
-			float pitch = -atan2f(o.z, o.GetLength2D());
-
-			// The head as the third-person body poses it
-			Matrix4 const head = Matrix4::Translate(p.GetOrigin())
-				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw)
-				* Matrix4::Translate(0.0F, 0.0F, -(TorsoHeight(crouch) + HeadDrop(crouch)))
-				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
-
-			AABB3 const bounds = GetHeadlampBounds();
-			Vector3 const centre = (bounds.min + bounds.max) * 0.5F;
-			float const lampZ = (head * HeadlampModelMatrix() * centre).z;
-
-			return MakeVector3(eye.x, eye.y, eye.z + (lampZ - p.GetEye().z));
 		}
 
 		Vector3 ClientPlayer::GetHeadlampLens(const Matrix4& head) {
@@ -836,7 +810,7 @@ namespace spades {
 			FlashlightGlare::Lamp lamp;
 			lamp.position = lampPosition;
 			lamp.radius = GetHeadlampLensRadius();
-			lamp.direction = flashlightOrientation;
+			lamp.direction = GetFlashlightDirection();
 			lamp.coneAngle = beam.GetConeAngle();
 			lamp.reach = beam.GetReach();
 			lamp.color = beam.GetColor();
@@ -872,7 +846,7 @@ namespace spades {
 			sandboxedRenderer->SetPlayerXRay(false, MakeVector3(1, 1, 1));
 
 			// This path also runs for a remote player the camera is following.
-			AddFlashlightToScene(GetFlashlightOrigin(eyeMatrix.GetOrigin()));
+			AddFlashlightToScene(eyeMatrix.GetOrigin());
 
 			Vector3 leftHand, rightHand;
 			leftHand = MakeVector3(0, 0, 0);
@@ -1455,9 +1429,9 @@ namespace spades {
 				}
 			}
 
-			// Emit at the headlamp's height above the eye, as the first-person view
-			// does, so the beam doesn't shift when the observer changes camera mode.
-			Vector3 const lightOrigin = GetFlashlightOrigin(p.GetEye());
+			// Emit at the eye, as the first-person view does, so the beam doesn't
+			// shift when the observer changes camera mode.
+			Vector3 const lightOrigin = p.GetEye();
 			if (!IsLampBuried(lightOrigin))
 				AddFlashlightToScene(lightOrigin);
 
