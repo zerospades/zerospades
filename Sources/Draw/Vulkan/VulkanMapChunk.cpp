@@ -26,7 +26,6 @@
 #include "VulkanMapRenderer.h"
 #include "VulkanRenderer.h"
 #include "VulkanBuffer.h"
-#include "VulkanDynamicLight.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Client/GameMap.h>
 #include <Core/Debug.h>
@@ -502,108 +501,6 @@ namespace spades {
 			);
 			vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
 			                   0, sizeof(Vector3), &modelOrigin);
-
-			// Bind vertex buffer
-			VkBuffer vb = vertexBuffer->GetBuffer();
-			VkDeviceSize offsets[] = {0};
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
-
-			// Bind index buffer
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
-
-			// Draw
-			vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
-		}
-
-		void VulkanMapChunk::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                            const VulkanDynamicLight& vkLight) {
-			SPADES_MARK_FUNCTION_DEBUG();
-
-			if (indices.empty() || !vertexBuffer || !indexBuffer)
-				return;
-
-			const auto& eye = renderer.renderer.GetSceneDef().viewOrigin;
-			Vector3 diff = eye - centerPos;
-			float sx = 0.0F, sy = 0.0F;
-
-			{
-				const float mw = (float)map->Width();
-				const float mh = (float)map->Height();
-				if (diff.x >  (mw * 0.5F)) sx += mw;
-				if (diff.y >  (mh * 0.5F)) sy += mh;
-				if (diff.x < -(mw * 0.5F)) sx -= mw;
-				if (diff.y < -(mh * 0.5F)) sy -= mh;
-			}
-
-			// Frustum cull
-			{
-				AABB3 bx = aabb;
-				bx.min.x += sx; bx.max.x += sx;
-				bx.min.y += sy; bx.max.y += sy;
-				if (!renderer.renderer.BoxFrustrumCull(bx))
-					return;
-
-				// Nothing to draw for a chunk the light doesn't reach.
-				if (!vkLight.Cull(bx))
-					return;
-			}
-
-			const client::DynamicLightParam& light = vkLight.GetParam();
-
-			Vector3 fogCol = renderer.renderer.GetFogColor();
-			fogCol *= fogCol; // linearize
-
-			// Build spot matrix for spotlights. GetProjectionMatrix() already maps
-			// world space to [0,1] cookie UVs (its projMatrix bakes in the +0.5
-			// bias), so use it directly — matches GL GLDynamicLightShader, which
-			// sets dynamicLightSpotMatrix = light.GetProjectionMatrix() verbatim.
-			// (Applying an extra Scale(0.5)*Translate(1,1,1) here double-biased the
-			// projection and pushed the cone into a corner.)
-			Matrix4 spotMatrix = Matrix4::Identity();
-			if (light.type == client::DynamicLightTypeSpotlight)
-				spotMatrix = vkLight.GetProjectionMatrix();
-
-			// Determine light type for shader
-			float lightType = 0.0f; // point
-			if (light.type == client::DynamicLightTypeLinear)
-				lightType = 1.0f;
-			else if (light.type == client::DynamicLightTypeSpotlight)
-				lightType = 2.0f;
-
-			// Linear light direction and length
-			Vector3 linearDir = MakeVector3(0, 0, 0);
-			float linearLength = 0.0f;
-			if (light.type == client::DynamicLightTypeLinear) {
-				Vector3 dir = light.point2 - light.origin;
-				linearLength = dir.GetLength();
-				if (linearLength > 0.0001f)
-					linearDir = dir / linearLength;
-			}
-
-			MapDlightPushConstants pushConstants;
-
-			pushConstants.projectionViewMatrix = renderer.renderer.GetProjectionViewMatrix();
-			pushConstants.modelOrigin = MakeVector3(
-				(float)(chunkX << SizeBits) + sx,
-				(float)(chunkY << SizeBits) + sy,
-				(float)(chunkZ << SizeBits)
-			);
-			pushConstants.fogDistance = renderer.renderer.GetFogDistance();
-			pushConstants.viewOrigin = eye;
-			pushConstants.lightRadius = light.radius;
-			pushConstants.fogColor = fogCol;
-			pushConstants.lightRadiusInversed = 1.0f / light.radius;
-			pushConstants.lightOrigin = light.origin;
-			pushConstants.lightTypeVal = lightType;
-			pushConstants.lightColor = light.color;
-			pushConstants.lightLinearLength = linearLength;
-			pushConstants.lightLinearDirection = linearDir;
-			pushConstants._pad = 0.0f;
-			pushConstants.lightSpotMatrix = spotMatrix;
-
-			vkCmdPushConstants(commandBuffer, renderer.dlightPipelineLayout,
-			                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(pushConstants), &pushConstants);
 
 			// Bind vertex buffer
 			VkBuffer vb = vertexBuffer->GetBuffer();

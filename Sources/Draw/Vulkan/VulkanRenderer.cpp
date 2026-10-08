@@ -32,6 +32,7 @@
 #include "VulkanMapShadowRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanGlareRenderer.h"
+#include "VulkanDynamicLightClusters.h"
 #include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanImageManager.h"
@@ -133,9 +134,7 @@ namespace spades {
 		multiplyColorPipeline(VK_NULL_HANDLE),
 		multiplyColorPipelineLayout(VK_NULL_HANDLE),
 		debugLinePipeline(VK_NULL_HANDLE),
-		debugLinePipelineLayout(VK_NULL_HANDLE),
-		dlightCookieSetLayout(VK_NULL_HANDLE),
-		dlightCookiePool(VK_NULL_HANDLE) {
+		debugLinePipelineLayout(VK_NULL_HANDLE) {
 		renderWidth = device->ScreenWidth();
 		renderHeight = device->ScreenHeight();
 
@@ -183,6 +182,11 @@ namespace spades {
 					whiteImage = Handle<VulkanImage>(dynamic_cast<VulkanImage*>(std::move(imgHandle).Unmanage()));
 				}
 			}
+
+			// Binds the white image in place of missing spotlight images, so it
+			// comes after it.
+			dynamicLightClusters = stmp::make_unique<VulkanDynamicLightClusters>(
+			  *this, device->GetMaxFramesInFlight());
 
 			// Preload shaders
 			VulkanMapRenderer::PreloadShaders(*this);
@@ -494,12 +498,11 @@ namespace spades {
 			}
 			swapchainFramebuffers.clear();
 
-			DestroyDlightCookieResources();
-
 			DestroySkyPipeline();
 		DestroyMultiplyColorPipeline();
 		DestroyDebugLinePipeline();
 		glareRenderer.reset();
+		dynamicLightClusters.reset();
 
 			if (renderPass != VK_NULL_HANDLE && vkDevice != VK_NULL_HANDLE) {
 				vkDestroyRenderPass(vkDevice, renderPass, nullptr);
@@ -671,115 +674,6 @@ namespace spades {
 			}
 
 			return imageManager->RegisterImage(filename);
-		}
-
-		void VulkanRenderer::EnsureDlightCookieResources() {
-			if (dlightCookieSetLayout != VK_NULL_HANDLE)
-				return;
-
-			VkDevice vkDevice = device->GetDevice();
-
-			VkDescriptorSetLayoutBinding binding{};
-			binding.binding = 0;
-			binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			binding.descriptorCount = 1;
-			binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			VkDescriptorSetLayoutCreateInfo layoutInfo{};
-			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			layoutInfo.bindingCount = 1;
-			layoutInfo.pBindings = &binding;
-			if (vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr,
-			                                &dlightCookieSetLayout) != VK_SUCCESS) {
-				SPLog("Warning: failed to create dlight cookie descriptor set layout");
-				dlightCookieSetLayout = VK_NULL_HANDLE;
-				return;
-			}
-
-			VkDescriptorPoolSize poolSize{};
-			poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			poolSize.descriptorCount = 16;
-
-			VkDescriptorPoolCreateInfo poolInfo{};
-			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			poolInfo.poolSizeCount = 1;
-			poolInfo.pPoolSizes = &poolSize;
-			poolInfo.maxSets = 16;
-			if (vkCreateDescriptorPool(vkDevice, &poolInfo, nullptr,
-			                           &dlightCookiePool) != VK_SUCCESS) {
-				SPLog("Warning: failed to create dlight cookie descriptor pool");
-				vkDestroyDescriptorSetLayout(vkDevice, dlightCookieSetLayout, nullptr);
-				dlightCookieSetLayout = VK_NULL_HANDLE;
-				dlightCookiePool = VK_NULL_HANDLE;
-			}
-		}
-
-		void VulkanRenderer::DestroyDlightCookieResources() {
-			VkDevice vkDevice = device->GetDevice();
-			// Sets are freed implicitly when the pool is destroyed.
-			dlightCookieCache.clear();
-			if (dlightCookiePool != VK_NULL_HANDLE && vkDevice != VK_NULL_HANDLE) {
-				vkDestroyDescriptorPool(vkDevice, dlightCookiePool, nullptr);
-				dlightCookiePool = VK_NULL_HANDLE;
-			}
-			if (dlightCookieSetLayout != VK_NULL_HANDLE && vkDevice != VK_NULL_HANDLE) {
-				vkDestroyDescriptorSetLayout(vkDevice, dlightCookieSetLayout, nullptr);
-				dlightCookieSetLayout = VK_NULL_HANDLE;
-			}
-		}
-
-		VkDescriptorSetLayout VulkanRenderer::GetDlightCookieSetLayout() {
-			EnsureDlightCookieResources();
-			return dlightCookieSetLayout;
-		}
-
-		VkDescriptorSet VulkanRenderer::GetDlightCookieDescriptorSet(VulkanImage* cookieImage) {
-			EnsureDlightCookieResources();
-			if (dlightCookieSetLayout == VK_NULL_HANDLE || dlightCookiePool == VK_NULL_HANDLE)
-				return VK_NULL_HANDLE;
-
-			// Point/linear lights have no projection image — fall back to the 1x1
-			// white texture so the sampler is valid (the shader ignores it for
-			// non-spotlights anyway).
-			if (!cookieImage)
-				cookieImage = GetWhiteImage();
-			if (!cookieImage)
-				return VK_NULL_HANDLE;
-
-			auto it = dlightCookieCache.find(cookieImage);
-			if (it != dlightCookieCache.end())
-				return it->second;
-
-			VkDevice vkDevice = device->GetDevice();
-
-			VkDescriptorSetAllocateInfo allocInfo{};
-			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = dlightCookiePool;
-			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &dlightCookieSetLayout;
-
-			VkDescriptorSet set = VK_NULL_HANDLE;
-			if (vkAllocateDescriptorSets(vkDevice, &allocInfo, &set) != VK_SUCCESS) {
-				SPLog("Warning: failed to allocate dlight cookie descriptor set");
-				return VK_NULL_HANDLE;
-			}
-
-			VkDescriptorImageInfo imageInfo{};
-			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo.imageView = cookieImage->GetImageView();
-			imageInfo.sampler = cookieImage->GetSampler();
-
-			VkWriteDescriptorSet write{};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = set;
-			write.dstBinding = 0;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.pImageInfo = &imageInfo;
-			vkUpdateDescriptorSets(vkDevice, 1, &write, 0, nullptr);
-
-			dlightCookieCache[cookieImage] = set;
-			return set;
 		}
 
 		Handle<client::IModel> VulkanRenderer::RegisterModel(const char* filename) {
@@ -1933,6 +1827,12 @@ namespace spades {
 			shadowMapRenderer->SetSamplingDisabled();
 		}
 
+		// Bin the frame's dynamic lights into the view's clusters, for every lit
+		// pass that follows to read, the mirror's included.
+		if (sceneUsedInThisFrame) {
+			dynamicLightClusters->Update(commandBuffer, currentFrameSlot, lights, sceneDef);
+		}
+
 		// Render mirror pass for water reflections (r_water >= 2)
 		if (sceneUsedInThisFrame && framebufferManager && waterRenderer && (int)r_water >= 2) {
 			renderingMirror = true;
@@ -2133,16 +2033,6 @@ namespace spades {
 			// Render models
 			if (modelRenderer) {
 				modelRenderer->RenderSunlightPass(commandBuffer, false);
-			}
-
-			// Render dynamic lights (muzzle flash, flashlight, etc.)
-			if (!lights.empty()) {
-				if (!sceneDef.skipWorld && mapRenderer) {
-					mapRenderer->RenderDynamicLightPass(commandBuffer, lights);
-				}
-				if (modelRenderer) {
-					modelRenderer->RenderDynamicLightPass(commandBuffer, lights);
-				}
 			}
 
 			// Outlines are rendered later as a screen-space cavity post-process

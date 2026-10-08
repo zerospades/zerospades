@@ -27,7 +27,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
 #include "VulkanImageWrapper.h"
-#include "VulkanDynamicLight.h"
+#include "VulkanDynamicLightClusters.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Bitmap.h>
 #include <Core/BitmapAtlasGenerator.h>
@@ -60,9 +60,7 @@ namespace spades {
 				                     "Shaders/Vulkan/BasicModelVertexColor.frag.spv",
 				                     "Shaders/Vulkan/BasicModelVertexColorGhost.frag.spv"});
 			}
-			SpirvCache::Preload({"Shaders/Vulkan/ModelDynamicLit.vert.spv",
-			                     "Shaders/Vulkan/ModelDynamicLit.frag.spv",
-			                     "Shaders/Vulkan/ModelShadowMap.vert.spv",
+			SpirvCache::Preload({"Shaders/Vulkan/ModelShadowMap.vert.spv",
 			                     "Shaders/Vulkan/ShadowMap.frag.spv",
 			                     "Shaders/Vulkan/ModelXRay.vert.spv",
 			                     "Shaders/Vulkan/ModelXRay.frag.spv"});
@@ -84,14 +82,6 @@ namespace spades {
 			if (sharedPipeline.mirroredPipeline != VK_NULL_HANDLE) {
 				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredPipeline, nullptr);
 				sharedPipeline.mirroredPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.dlightPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.dlightPipeline, nullptr);
-				sharedPipeline.dlightPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.mirroredDlightPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredDlightPipeline, nullptr);
-				sharedPipeline.mirroredDlightPipeline = VK_NULL_HANDLE;
 			}
 			if (sharedPipeline.shadowMapPipeline != VK_NULL_HANDLE) {
 				vkDestroyPipeline(vkDevice, sharedPipeline.shadowMapPipeline, nullptr);
@@ -133,10 +123,6 @@ namespace spades {
 			if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
 				vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
 				sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.dlightPipelineLayout != VK_NULL_HANDLE) {
-				vkDestroyPipelineLayout(vkDevice, sharedPipeline.dlightPipelineLayout, nullptr);
-				sharedPipeline.dlightPipelineLayout = VK_NULL_HANDLE;
 			}
 			if (sharedPipeline.descriptorSetLayout != VK_NULL_HANDLE) {
 				vkDestroyDescriptorSetLayout(vkDevice, sharedPipeline.descriptorSetLayout, nullptr);
@@ -228,10 +214,6 @@ namespace spades {
 					vkDestroyPipeline(vkDevice, sharedPipeline.pipeline, nullptr);
 					sharedPipeline.pipeline = VK_NULL_HANDLE;
 				}
-				if (sharedPipeline.dlightPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.dlightPipeline, nullptr);
-					sharedPipeline.dlightPipeline = VK_NULL_HANDLE;
-				}
 				if (sharedPipeline.shadowMapPipeline != VK_NULL_HANDLE) {
 					vkDestroyPipeline(vkDevice, sharedPipeline.shadowMapPipeline, nullptr);
 					sharedPipeline.shadowMapPipeline = VK_NULL_HANDLE;
@@ -259,10 +241,6 @@ namespace spades {
 				if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
 					vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
 					sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.dlightPipelineLayout != VK_NULL_HANDLE) {
-					vkDestroyPipelineLayout(vkDevice, sharedPipeline.dlightPipelineLayout, nullptr);
-					sharedPipeline.dlightPipelineLayout = VK_NULL_HANDLE;
 				}
 				if (sharedPipeline.descriptorSetLayout != VK_NULL_HANDLE) {
 					vkDestroyDescriptorSetLayout(vkDevice, sharedPipeline.descriptorSetLayout, nullptr);
@@ -507,6 +485,13 @@ namespace spades {
 					                        sharedPipeline.pipelineLayout, 1, 1,
 					                        &samplingSet, 0, nullptr);
 				}
+			}
+			{
+				// The frame's dynamic lights (set 2), lit in this pass
+				VkDescriptorSet lightSet = renderer.GetDynamicLightClusters().GetDescriptorSet(
+				  renderer.GetCurrentFrameIndex());
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
 			}
 
 			// Bind vertex buffer
@@ -860,6 +845,13 @@ namespace spades {
 					                        &samplingSet, 0, nullptr);
 				}
 			}
+			{
+				// The frame's dynamic lights (set 2), lit in this pass
+				VkDescriptorSet lightSet = renderer.GetDynamicLightClusters().GetDescriptorSet(
+				  renderer.GetCurrentFrameIndex());
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
+			}
 
 			// Bind vertex buffer
 			VkBuffer vb = vertexBuffer->GetBuffer();
@@ -959,156 +951,6 @@ namespace spades {
 				if (param.depthHack) {
 					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, 1.0f};
 					vkCmdSetViewport(commandBuffer, 0, 1, &vp);
-				}
-			}
-		}
-
-		void VulkanOptimizedVoxelModel::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                                       const std::vector<client::ModelRenderParam>& params,
-		                                                       const std::vector<VulkanDynamicLight>& lights) {
-			SPADES_MARK_FUNCTION();
-
-			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
-				return;
-
-			if (params.empty() || lights.empty())
-				return;
-
-			VkRenderPass renderPass = renderer.GetOffscreenRenderPass();
-			if (sharedPipeline.dlightPipeline == VK_NULL_HANDLE || sharedPipeline.renderPass != renderPass) {
-				CreatePipeline(renderPass);
-			}
-
-			if (sharedPipeline.dlightPipeline == VK_NULL_HANDLE)
-				return;
-
-			VkPipeline boundDlightPipeline = VK_NULL_HANDLE;
-			auto bindDlightPipeline = [&](VkPipeline p) {
-				if (p != boundDlightPipeline) {
-					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, p);
-					boundDlightPipeline = p;
-				}
-			};
-			bindDlightPipeline(sharedPipeline.dlightPipeline);
-
-			// Bind vertex buffer
-			VkBuffer vb = vertexBuffer->GetBuffer();
-			VkDeviceSize offsets[] = {0};
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
-
-			// Bind index buffer
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-			const Matrix4& projectionViewMatrix = renderer.GetProjectionViewMatrix();
-			const auto& eye = renderer.GetSceneDef().viewOrigin;
-			float fogDist = renderer.GetFogDistance();
-			bool mirror = renderer.IsRenderingMirror();
-			int rw = renderer.GetRenderWidth();
-			int rh = renderer.GetRenderHeight();
-
-			for (const VulkanDynamicLight& vkLight : lights) {
-				const client::DynamicLightParam* light = &vkLight.GetParam();
-
-				// Light type
-				float lightType = 0.0f; // point
-				if (light->type == client::DynamicLightTypeLinear)
-					lightType = 1.0f;
-				else if (light->type == client::DynamicLightTypeSpotlight)
-					lightType = 2.0f;
-
-				// Linear light direction and length
-				Vector3 linearDir = MakeVector3(0, 0, 0);
-				float linearLength = 0.0f;
-				if (light->type == client::DynamicLightTypeLinear) {
-					Vector3 dir = light->point2 - light->origin;
-					linearLength = dir.GetLength();
-					if (linearLength > 0.0001f)
-						linearDir = dir / linearLength;
-				}
-
-				// Spotlight projection matrix (matches VulkanMapChunk dlight path).
-				// GetProjectionMatrix() already maps world space to [0,1] cookie
-				// UVs, so use it directly — same as GL.
-				Matrix4 spotMatrix = Matrix4::Identity();
-				if (light->type == client::DynamicLightTypeSpotlight)
-					spotMatrix = vkLight.GetProjectionMatrix();
-
-				// Bind this light's spotlight cookie (set 0). Point/linear lights
-				// have no image and fall back to the 1x1 white texture.
-				VulkanImage* cookieImage = nullptr;
-				if (light->image)
-					cookieImage = static_cast<VulkanImageWrapper*>(light->image)->GetVulkanImage();
-				VkDescriptorSet cookieSet = renderer.GetDlightCookieDescriptorSet(cookieImage);
-				if (cookieSet != VK_NULL_HANDLE) {
-					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					                        sharedPipeline.dlightPipelineLayout, 0, 1,
-					                        &cookieSet, 0, nullptr);
-				}
-
-				for (const auto& param : params) {
-					if (mirror && param.depthHack)
-						continue;
-					if (param.ghost)
-						continue;
-
-					// Nothing to draw for a model off screen or out of the light's reach.
-					{
-						const Vector3 modelOrigin = param.matrix.GetOrigin();
-						const float rad = radius * param.matrix.GetAxis(0).GetLength();
-						if (!renderer.SphereFrustrumCull(modelOrigin, rad) ||
-						    !vkLight.SphereCull(modelOrigin, rad))
-							continue;
-					}
-
-					// Switch to mirrored pipeline when the model matrix has a negative determinant
-					{
-						const auto& ax = param.matrix.GetAxis(0);
-						const auto& ay = param.matrix.GetAxis(1);
-						const auto& az = param.matrix.GetAxis(2);
-						bool isMirrored = Vector3::Dot(Vector3::Cross(ax, ay), az) < 0.0F;
-						bindDlightPipeline(isMirrored ? sharedPipeline.mirroredDlightPipeline : sharedPipeline.dlightPipeline);
-					}
-
-					Matrix4 mvpMatrix = projectionViewMatrix * param.matrix;
-
-					// Compute fog density from model's world position
-					Vector4 modelWorldPos4 = param.matrix * MakeVector4(origin.x, origin.y, origin.z, 1.0f);
-					float dx = modelWorldPos4.x - eye.x;
-					float dy = modelWorldPos4.y - eye.y;
-					float horzDistSq = dx * dx + dy * dy;
-					float fogDensity = std::min(horzDistSq / (fogDist * fogDist), 1.0f);
-
-					ModelDlightPushConstants pushConstants;
-
-					pushConstants.projectionViewModelMatrix = mvpMatrix;
-					pushConstants.modelMatrix = param.matrix;
-					pushConstants.modelOrigin = origin;
-					pushConstants.fogDensityVal = fogDensity;
-					pushConstants.customColor = param.customColor;
-					pushConstants.lightRadius = light->radius;
-					pushConstants.lightOrigin = light->origin;
-					pushConstants.lightTypeVal = lightType;
-					pushConstants.lightColor = light->color;
-					pushConstants.lightRadiusInversed = 1.0f / light->radius;
-					pushConstants.lightLinearDirection = linearDir;
-					pushConstants.lightLinearLength = linearLength;
-					pushConstants.lightSpotMatrix = spotMatrix;
-
-					if (param.depthHack) {
-						VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, VulkanRenderer::kFirstPersonDepthEnd};
-						vkCmdSetViewport(commandBuffer, 0, 1, &vp);
-					}
-
-					vkCmdPushConstants(commandBuffer, sharedPipeline.dlightPipelineLayout,
-					                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-					                   0, sizeof(pushConstants), &pushConstants);
-
-					vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
-
-					if (param.depthHack) {
-						VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, 1.0f};
-						vkCmdSetViewport(commandBuffer, 0, 1, &vp);
-					}
 				}
 			}
 		}
@@ -1490,18 +1332,20 @@ namespace spades {
 			}
 
 			// Set 1 = model-shadow cascade sampling (owned by the shadow map
-			// renderer, same set the map lit pipeline binds). The Phys/ghost
-			// fragment shaders that don't declare it are still compatible with
-			// the wider layout.
+			// renderer, same set the map lit pipeline binds), or a set without
+			// bindings when there is no map to have one. The Phys/ghost fragment
+			// shaders that don't declare it are still compatible with the wider
+			// layout. Set 2 = the frame's dynamic lights.
 			VulkanShadowMapRenderer* smrLayout = renderer.GetShadowMapRenderer();
-			VkDescriptorSetLayout modelSetLayouts[2] = {
+			VulkanDynamicLightClusters& lightClusters = renderer.GetDynamicLightClusters();
+			VkDescriptorSetLayout modelSetLayouts[3] = {
 			    sharedPipeline.descriptorSetLayout,
-			    smrLayout ? smrLayout->GetSamplingSetLayout() : VK_NULL_HANDLE};
+			    smrLayout ? smrLayout->GetSamplingSetLayout() : lightClusters.GetEmptySetLayout(),
+			    lightClusters.GetSetLayout()};
 
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount =
-			    (modelSetLayouts[1] != VK_NULL_HANDLE) ? 2 : 1;
+			pipelineLayoutInfo.setLayoutCount = 3;
 			pipelineLayoutInfo.pSetLayouts = modelSetLayouts;
 			pipelineLayoutInfo.pushConstantRangeCount = 1;
 			pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -1550,132 +1394,6 @@ namespace spades {
 			}
 
 			SPLog("Created shared model rendering pipeline (vertex colors)");
-
-			// --- Create dynamic light pipeline ---
-			{
-				std::vector<uint32_t> dlVertCode = LoadSPIRVFile("Shaders/Vulkan/ModelDynamicLit.vert.spv");
-				std::vector<uint32_t> dlFragCode = LoadSPIRVFile("Shaders/Vulkan/ModelDynamicLit.frag.spv");
-
-				VkShaderModuleCreateInfo dlVertInfo{};
-				dlVertInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-				dlVertInfo.codeSize = dlVertCode.size() * sizeof(uint32_t);
-				dlVertInfo.pCode = dlVertCode.data();
-				VkShaderModule dlVertModule;
-				result = vkCreateShaderModule(vkDevice, &dlVertInfo, nullptr, &dlVertModule);
-				if (result != VK_SUCCESS) {
-					SPLog("Warning: Failed to create model dlight vertex shader module");
-					return;
-				}
-
-				VkShaderModuleCreateInfo dlFragInfo{};
-				dlFragInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-				dlFragInfo.codeSize = dlFragCode.size() * sizeof(uint32_t);
-				dlFragInfo.pCode = dlFragCode.data();
-				VkShaderModule dlFragModule;
-				result = vkCreateShaderModule(vkDevice, &dlFragInfo, nullptr, &dlFragModule);
-				if (result != VK_SUCCESS) {
-					vkDestroyShaderModule(vkDevice, dlVertModule, nullptr);
-					SPLog("Warning: Failed to create model dlight fragment shader module");
-					return;
-				}
-
-				VkPipelineShaderStageCreateInfo dlStages[2]{};
-				dlStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-				dlStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-				dlStages[0].module = dlVertModule;
-				dlStages[0].pName = "main";
-				dlStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-				dlStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-				dlStages[1].module = dlFragModule;
-				dlStages[1].pName = "main";
-
-				// Dlight pipeline layout
-				VkPushConstantRange dlPushRange{};
-				dlPushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-				dlPushRange.offset = 0;
-				dlPushRange.size = sizeof(ModelDlightPushConstants);
-
-				// Set 0: spotlight projection cookie (combined image sampler).
-				VkDescriptorSetLayout dlCookieLayout = renderer.GetDlightCookieSetLayout();
-
-				VkPipelineLayoutCreateInfo dlLayoutInfo{};
-				dlLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-				dlLayoutInfo.setLayoutCount = (dlCookieLayout != VK_NULL_HANDLE) ? 1 : 0;
-				dlLayoutInfo.pSetLayouts = (dlCookieLayout != VK_NULL_HANDLE) ? &dlCookieLayout : nullptr;
-				dlLayoutInfo.pushConstantRangeCount = 1;
-				dlLayoutInfo.pPushConstantRanges = &dlPushRange;
-
-				result = vkCreatePipelineLayout(vkDevice, &dlLayoutInfo, nullptr, &sharedPipeline.dlightPipelineLayout);
-				if (result != VK_SUCCESS) {
-					vkDestroyShaderModule(vkDevice, dlVertModule, nullptr);
-					vkDestroyShaderModule(vkDevice, dlFragModule, nullptr);
-					SPLog("Warning: Failed to create model dlight pipeline layout");
-					return;
-				}
-
-				// Depth: test EQUAL, no write (additive pass on existing geometry)
-				VkPipelineDepthStencilStateCreateInfo dlDepth{};
-				dlDepth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-				dlDepth.depthTestEnable = VK_TRUE;
-				dlDepth.depthWriteEnable = VK_FALSE;
-				dlDepth.depthCompareOp = VK_COMPARE_OP_EQUAL;
-				dlDepth.depthBoundsTestEnable = VK_FALSE;
-				dlDepth.stencilTestEnable = VK_FALSE;
-
-				// Additive blending
-				VkPipelineColorBlendAttachmentState dlBlend{};
-				dlBlend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-				                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-				dlBlend.blendEnable = VK_TRUE;
-				dlBlend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-				dlBlend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-				dlBlend.colorBlendOp = VK_BLEND_OP_ADD;
-				dlBlend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-				dlBlend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-				dlBlend.alphaBlendOp = VK_BLEND_OP_ADD;
-
-				VkPipelineColorBlendStateCreateInfo dlColorBlending{};
-				dlColorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-				dlColorBlending.logicOpEnable = VK_FALSE;
-				dlColorBlending.attachmentCount = 1;
-				dlColorBlending.pAttachments = &dlBlend;
-
-				VkGraphicsPipelineCreateInfo dlPipelineInfo{};
-				dlPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-				dlPipelineInfo.stageCount = 2;
-				dlPipelineInfo.pStages = dlStages;
-				dlPipelineInfo.pVertexInputState = &vertexInputInfo;
-				dlPipelineInfo.pInputAssemblyState = &inputAssembly;
-				dlPipelineInfo.pViewportState = &viewportState;
-				dlPipelineInfo.pRasterizationState = &rasterizer;
-				dlPipelineInfo.pMultisampleState = &multisampling;
-				dlPipelineInfo.pDepthStencilState = &dlDepth;
-				dlPipelineInfo.pColorBlendState = &dlColorBlending;
-				dlPipelineInfo.pDynamicState = &dynamicState;
-				dlPipelineInfo.layout = sharedPipeline.dlightPipelineLayout;
-				dlPipelineInfo.renderPass = renderPass;
-				dlPipelineInfo.subpass = 0;
-
-				result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1, &dlPipelineInfo, nullptr, &sharedPipeline.dlightPipeline);
-
-				// Mirrored dlight variant
-				if (result == VK_SUCCESS) {
-					VkPipelineRasterizationStateCreateInfo dlMirroredRasterizer = rasterizer;
-					dlMirroredRasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
-					dlPipelineInfo.pRasterizationState = &dlMirroredRasterizer;
-					vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1, &dlPipelineInfo, nullptr, &sharedPipeline.mirroredDlightPipeline);
-				}
-
-				vkDestroyShaderModule(vkDevice, dlVertModule, nullptr);
-				vkDestroyShaderModule(vkDevice, dlFragModule, nullptr);
-
-				if (result != VK_SUCCESS) {
-					SPLog("Warning: Failed to create model dlight pipeline (error code: %d)", result);
-					sharedPipeline.dlightPipeline = VK_NULL_HANDLE;
-				} else {
-					SPLog("Created shared model dynamic light pipeline");
-				}
-			}
 
 			// (Outlines are produced by the screen-space cavity post-process
 			// pass — see VulkanCavityOutlineFilter — so the model renderer no
