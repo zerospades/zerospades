@@ -516,7 +516,7 @@ namespace spades {
 		}
 
 		void VulkanMapChunk::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                            const client::DynamicLightParam& light) {
+		                                            const VulkanDynamicLight& vkLight) {
 			SPADES_MARK_FUNCTION_DEBUG();
 
 			if (indices.empty() || !vertexBuffer || !indexBuffer)
@@ -542,7 +542,13 @@ namespace spades {
 				bx.min.y += sy; bx.max.y += sy;
 				if (!renderer.renderer.BoxFrustrumCull(bx))
 					return;
+
+				// Nothing to draw for a chunk the light doesn't reach.
+				if (!vkLight.Cull(bx))
+					return;
 			}
+
+			const client::DynamicLightParam& light = vkLight.GetParam();
 
 			Vector3 fogCol = renderer.renderer.GetFogColor();
 			fogCol *= fogCol; // linearize
@@ -553,7 +559,6 @@ namespace spades {
 			// sets dynamicLightSpotMatrix = light.GetProjectionMatrix() verbatim.
 			// (Applying an extra Scale(0.5)*Translate(1,1,1) here double-biased the
 			// projection and pushed the cone into a corner.)
-			VulkanDynamicLight vkLight(light);
 			Matrix4 spotMatrix = Matrix4::Identity();
 			if (light.type == client::DynamicLightTypeSpotlight)
 				spotMatrix = vkLight.GetProjectionMatrix();

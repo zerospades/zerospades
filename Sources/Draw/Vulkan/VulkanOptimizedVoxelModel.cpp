@@ -964,8 +964,8 @@ namespace spades {
 		}
 
 		void VulkanOptimizedVoxelModel::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                                       std::vector<client::ModelRenderParam> params,
-		                                                       std::vector<void*> lights) {
+		                                                       const std::vector<client::ModelRenderParam>& params,
+		                                                       const std::vector<VulkanDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
@@ -1006,9 +1006,8 @@ namespace spades {
 			int rw = renderer.GetRenderWidth();
 			int rh = renderer.GetRenderHeight();
 
-			for (void* lightPtr : lights) {
-				const client::DynamicLightParam* light =
-				    static_cast<const client::DynamicLightParam*>(lightPtr);
+			for (const VulkanDynamicLight& vkLight : lights) {
+				const client::DynamicLightParam* light = &vkLight.GetParam();
 
 				// Light type
 				float lightType = 0.0f; // point
@@ -1031,10 +1030,8 @@ namespace spades {
 				// GetProjectionMatrix() already maps world space to [0,1] cookie
 				// UVs, so use it directly — same as GL.
 				Matrix4 spotMatrix = Matrix4::Identity();
-				if (light->type == client::DynamicLightTypeSpotlight) {
-					VulkanDynamicLight vkLight(*light);
+				if (light->type == client::DynamicLightTypeSpotlight)
 					spotMatrix = vkLight.GetProjectionMatrix();
-				}
 
 				// Bind this light's spotlight cookie (set 0). Point/linear lights
 				// have no image and fall back to the 1x1 white texture.
@@ -1053,6 +1050,15 @@ namespace spades {
 						continue;
 					if (param.ghost)
 						continue;
+
+					// Nothing to draw for a model off screen or out of the light's reach.
+					{
+						const Vector3 modelOrigin = param.matrix.GetOrigin();
+						const float rad = radius * param.matrix.GetAxis(0).GetLength();
+						if (!renderer.SphereFrustrumCull(modelOrigin, rad) ||
+						    !vkLight.SphereCull(modelOrigin, rad))
+							continue;
+					}
 
 					// Switch to mirrored pipeline when the model matrix has a negative determinant
 					{

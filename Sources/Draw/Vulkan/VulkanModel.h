@@ -28,6 +28,7 @@
 namespace spades {
 	namespace draw {
 		class VulkanModelRenderer;
+		class VulkanDynamicLight;
 
 		class VulkanModel : public client::IModel {
 			friend class VulkanModelRenderer;
@@ -55,8 +56,8 @@ namespace spades {
 
 			/** Adds dynamic light */
 			virtual void RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-			                                    std::vector<client::ModelRenderParam> params,
-			                                    std::vector<void*> lights) = 0;
+			                                    const std::vector<client::ModelRenderParam>& params,
+			                                    const std::vector<VulkanDynamicLight>& lights) = 0;
 
 			/** Renders the instances flagged `xray` again in their x-ray colour. The
 			 * pipeline keeps only the fragments the world hides; see
