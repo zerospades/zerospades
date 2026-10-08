@@ -584,10 +584,6 @@ namespace spades {
 			void Draw2DWithoutWorld();
 			void Draw2DWithWorld();
 
-			/** Draws the glare of every lamp the scene shows the camera onto the
-			 * finished scene, before anything 2D. */
-			void DrawFlashlightGlares();
-
 			Vector4 GetHUDColor(Player&);
 
 			/** Called when the local player is alive. */

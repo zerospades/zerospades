@@ -139,6 +139,29 @@ namespace spades {
 			int renderHeight = 0;
 		};
 
+		/**
+		 * The dazzle of a light the camera looks into: an image added onto the
+		 * finished frame, centred where the light projects, and hidden as far as
+		 * the scene covers the light from the camera.
+		 */
+		struct GlareParam {
+			/** Where the light is. */
+			Vector3 origin;
+
+			/**
+			 * How large the light is, in blocks. The glare shows the fraction of
+			 * it the scene leaves in sight, and what is nearer to the light than
+			 * this, its own housing, doesn't hide it.
+			 */
+			float sourceRadius = 0.0F;
+
+			/** Half the image's width and height, in the renderer's 2D units. */
+			float radius = 0.0F;
+
+			/** Added onto the frame, scaled by the image's alpha. */
+			Vector3 color;
+		};
+
 		class IRenderer : public RefCountedObject {
 		protected:
 			virtual ~IRenderer() {}
@@ -186,6 +209,9 @@ namespace spades {
 
 			virtual void AddSprite(IImage&, Vector3 center, float radius, float rotation) = 0;
 			virtual void AddLongSprite(IImage&, Vector3 p1, Vector3 p2, float radius) = 0;
+
+			/** Adds a glare, drawn over the finished frame once the scene ends. */
+			virtual void AddGlare(IImage&, const GlareParam&) = 0;
 
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;

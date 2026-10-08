@@ -222,6 +222,11 @@ namespace spades {
 				if (CheckVisibility(bounds1))
 					base->AddLongSprite(image, p1, p2, radius);
 			}
+			void AddGlare(IImage& image, const GlareParam& param) {
+				Vector3 rad(param.sourceRadius, param.sourceRadius, param.sourceRadius);
+				if (CheckVisibility(AABB3(param.origin - rad, param.origin + rad)))
+					base->AddGlare(image, param);
+			}
 
 			void EndScene() { OnProhibitedAction(); }
 
@@ -775,6 +780,15 @@ namespace spades {
 			return model->GetBoundingBox();
 		}
 
+		float ClientPlayer::GetHeadlampLensRadius() {
+			// The model's front face spans its x and z, at the size the head wears it
+			AABB3 const bounds = GetHeadlampBounds();
+			float const halfFace =
+				std::min(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z) * 0.5F;
+			float const voxelSize = (HeadlampModelMatrix() * MakeVector4(1, 0, 0, 0)).GetXYZ().GetLength();
+			return halfFace * voxelSize;
+		}
+
 		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
 			Player& p = player;
 			IRenderer& renderer = client.GetRenderer();
@@ -824,6 +838,7 @@ namespace spades {
 
 			FlashlightGlare::Lamp lamp;
 			lamp.position = lampPosition;
+			lamp.radius = GetHeadlampLensRadius();
 			lamp.direction = flashlightOrientation;
 			lamp.coneAngle = std::min(beam.GetConeAngle(), kMaxFlashlightConeAngle);
 			lamp.reach = beam.GetReach();
@@ -832,11 +847,8 @@ namespace spades {
 			flashlightGlare.Update(lamp, client.GetLastSceneDef().viewOrigin, *map, time);
 		}
 
-		void ClientPlayer::DrawFlashlightGlare(float ambient) {
-			stmp::optional<Vector3> position = flashlightGlare.GetPosition();
-			Vector2 screenPos;
-			if (position && client.Project(*position, screenPos))
-				flashlightGlare.Draw(client.GetRenderer(), screenPos, ambient);
+		void ClientPlayer::AddFlashlightGlareToScene(float ambient) {
+			flashlightGlare.AddToScene(client.GetRenderer(), ambient);
 		}
 
 		void ClientPlayer::AddToSceneFirstPersonView() {

@@ -130,6 +130,7 @@ namespace spades {
 
 			Frame f;
 			f.position = lamp.position;
+			f.radius = lamp.radius;
 			f.color = lamp.color;
 			f.reception = lamp.brightness * visibility * fog * falloff;
 			f.beam = 1.0F - SmoothStep(std::min(std::acos(cosAngle) / (lamp.coneAngle * 0.5F), 1.0F));
@@ -138,14 +139,7 @@ namespace spades {
 				frame = f;
 		}
 
-		stmp::optional<Vector3> FlashlightGlare::GetPosition() const {
-			if (!frame)
-				return {};
-			return frame->position;
-		}
-
-		void FlashlightGlare::Draw(IRenderer& renderer, const Vector2& screenPos,
-		                           float ambient) const {
+		void FlashlightGlare::AddToScene(IRenderer& renderer, float ambient) const {
 			if (!frame)
 				return;
 
@@ -162,14 +156,14 @@ namespace spades {
 				// shape widens with it, and only brightens up to the tone mapped peak
 				// baked into the texture, beyond which it would clip into a rim.
 				const float spread = std::sqrt(amount);
-				const float halfSize = layer.radius * spread * renderer.ScreenHeight();
-				const Vector3 tint =
-				  Mix(frame->color, MakeVector3(1, 1, 1), layer.whiteness) * std::min(spread, 1.0F);
 
-				// Added onto the frame: a zero alpha keeps what is underneath.
-				renderer.SetColorAlphaPremultiplied(MakeVector4(tint.x, tint.y, tint.z, 0.0F));
-				renderer.DrawImage(*image, AABB2(screenPos.x - halfSize, screenPos.y - halfSize,
-				                                 halfSize * 2.0F, halfSize * 2.0F));
+				GlareParam glare;
+				glare.origin = frame->position;
+				glare.sourceRadius = frame->radius;
+				glare.radius = layer.radius * spread * renderer.ScreenHeight();
+				glare.color =
+				  Mix(frame->color, MakeVector3(1, 1, 1), layer.whiteness) * std::min(spread, 1.0F);
+				renderer.AddGlare(*image, glare);
 			}
 		}
 	} // namespace client

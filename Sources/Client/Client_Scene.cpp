@@ -669,10 +669,14 @@ namespace spades {
 			if (world) {
 				stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 
+				// How lit the world around the lamps is: always full daylight.
+				const float ambient = 1.0F;
+
 				for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
 					if (world->GetPlayer(static_cast<unsigned int>(i))) {
 						SPAssert(clientPlayers[i]);
 						clientPlayers[i]->AddToScene();
+						clientPlayers[i]->AddFlashlightGlareToScene(ambient);
 					}
 				}
 
@@ -850,11 +854,6 @@ namespace spades {
 			flashDlightsOld.swap(flashDlights);
 
 			renderer->EndScene();
-
-			// The glare of the lamps is seen by the camera like the rest of the scene,
-			// so it goes onto the frame with it, whatever is drawn over it afterwards.
-			if (world)
-				DrawFlashlightGlares();
 		}
 
 		void Client::UpdateMatrices() {

@@ -31,6 +31,7 @@
 #include "GLFogFilter.h"
 #include "GLFogFilter2.h"
 #include "GLFramebufferManager.h"
+#include "GLGlareRenderer.h"
 #include "GLImage.h"
 #include "GLImageManager.h"
 #include "GLImageRenderer.h"
@@ -185,6 +186,7 @@ namespace spades {
 			else
 				spriteRenderer = new GLSpriteRenderer(*this);
 			longSpriteRenderer = new GLLongSpriteRenderer(*this);
+			glareRenderer.reset(new GLGlareRenderer(*this));
 			modelRenderer = new GLModelRenderer(*this);
 
 			// preload
@@ -253,6 +255,7 @@ namespace spades {
 			cameraBlur = NULL;
 			delete longSpriteRenderer;
 			longSpriteRenderer = NULL;
+			glareRenderer.reset();
 			delete modelRenderer;
 			modelRenderer = NULL;
 			delete spriteRenderer;
@@ -486,6 +489,7 @@ namespace spades {
 			debugLines.clear();
 			spriteRenderer->Clear();
 			longSpriteRenderer->Clear();
+			glareRenderer->Clear();
 			modelRenderer->Clear();
 			lights.clear();
 
@@ -562,6 +566,17 @@ namespace spades {
 			EnsureSceneStarted();
 
 			longSpriteRenderer->Add(&glImage, p1, p2, radius, drawColorAlphaPremultiplied);
+		}
+
+		void GLRenderer::AddGlare(client::IImage& img, const client::GlareParam& param) {
+			SPADES_MARK_FUNCTION_DEBUG();
+
+			GLImage& glImage = dynamic_cast<GLImage&>(img);
+
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			glareRenderer->Add(glImage, param);
 		}
 
 #pragma mark - Scene Finalizer
@@ -1263,6 +1278,13 @@ namespace spades {
 
 			// prepare for 2d drawing
 			Prepare2DRendering(true);
+
+			// The glares go onto the finished frame like the 2D drawing that follows,
+			// with the scene's depth still there to hide them.
+			{
+				GLProfiler::Context p(*profiler, "Glare");
+				glareRenderer->Render();
+			}
 		}
 
 		void GLRenderer::MultiplyScreenColor(spades::Vector3 color) {

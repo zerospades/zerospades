@@ -34,18 +34,19 @@ namespace spades {
 		 * It is the light the eye scatters around a source too bright for it: a
 		 * white-hot core in a glow with a long, edgeless tail, which widens as the
 		 * camera turns down the beam and as the scene gets darker. It is drawn over
-		 * the finished frame, as it happens in the eye and not in the world, so the
-		 * only thing that hides it is the map standing between the camera and the
-		 * lamp.
+		 * the finished frame, as it happens in the eye and not in the world, and
+		 * only what stands between the camera and the lamp hides it: the map, which
+		 * `Update` eases it out behind, on screen or off, and on screen anything the
+		 * renderer drew in front of it, down to the camera's own hands and weapon.
 		 *
-		 * `Update` runs while the scene is built, where the lamp is known, and `Draw`
-		 * in the 2D pass, once the lamp can be projected onto the screen.
+		 * `Update` and then `AddToScene` run while the scene is built.
 		 */
 		class FlashlightGlare {
 		public:
 			/** A lit lamp, as it is this frame. */
 			struct Lamp {
 				Vector3 position;
+				float radius;      // blocks, the lens's
 				Vector3 direction; // the beam's axis, normalized
 				float coneAngle;   // full angle, in radians
 				float reach;       // blocks
@@ -63,19 +64,17 @@ namespace spades {
 			/** Drops this frame's glare, for a lamp that is off or not drawn. */
 			void Clear() { frame.reset(); }
 
-			/** Where in the world the glare is centred, if there is one to draw. */
-			stmp::optional<Vector3> GetPosition() const;
-
 			/**
-			 * Draws the glare centred on `screenPos`, in the renderer's 2D units.
-			 * `ambient` is how bright the scene around it is, from `0` for total
-			 * darkness, where the glare is at its widest, to `1` for full daylight.
+			 * Adds this frame's glare to the scene being built. `ambient` is how
+			 * bright the scene around it is, from `0` for total darkness, where the
+			 * glare is at its widest, to `1` for full daylight.
 			 */
-			void Draw(IRenderer&, const Vector2& screenPos, float ambient) const;
+			void AddToScene(IRenderer&, float ambient) const;
 
 		private:
 			struct Frame {
 				Vector3 position;
+				float radius;
 				Vector3 color;
 				float reception; // 0 to 1: how much of the light reaches the camera
 				float beam;      // 1 on the beam's axis, 0 at its edge and outside it

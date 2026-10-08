@@ -44,6 +44,7 @@ namespace spades {
 		class GLFlatMapRenderer;
 		class IGLSpriteRenderer;
 		class GLLongSpriteRenderer;
+		class GLGlareRenderer;
 		class GLFramebufferManager;
 		class GLMapShadowRenderer;
 		class GLModelRenderer;
@@ -102,6 +103,7 @@ namespace spades {
 			GLModelRenderer* modelRenderer;
 			IGLSpriteRenderer* spriteRenderer;
 			GLLongSpriteRenderer* longSpriteRenderer;
+			std::unique_ptr<GLGlareRenderer> glareRenderer;
 			std::unique_ptr<GLWaterRenderer> waterRenderer;
 			std::unique_ptr<GLMapOccupancy> mapOccupancy;
 			GLAmbientShadowRenderer* ambientShadowRenderer;
@@ -202,6 +204,7 @@ namespace spades {
 
 			void AddSprite(client::IImage&, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage&, Vector3 p1, Vector3 p2, float radius) override;
+			void AddGlare(client::IImage&, const client::GlareParam&) override;
 
 			void EndScene() override;
 

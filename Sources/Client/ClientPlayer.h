@@ -109,6 +109,9 @@ namespace spades {
 			/** The headlamp model's bounds, in its own voxels. */
 			AABB3 GetHeadlampBounds();
 
+			/** The size of the headlamp's lens as the head wears it, in blocks. */
+			float GetHeadlampLensRadius();
+
 			/**
 			 * Emit this player's flashlight from `lightOrigin`, if it should be lit
 			 * at all. Shared by the first- and third-person paths, which differ only
@@ -150,10 +153,10 @@ namespace spades {
 			void AddToScene();
 			void Draw2D();
 
-			/** Draws the glare of this player's lamp worked out by `AddToScene`, over
-			 * the finished frame, in a scene as bright as `ambient` (see
-			 * `FlashlightGlare::Draw`). */
-			void DrawFlashlightGlare(float ambient);
+			/** Adds the glare of this player's lamp worked out by `AddToScene` to the
+			 * scene, in a scene as bright as `ambient` (see
+			 * `FlashlightGlare::AddToScene`). */
+			void AddFlashlightGlareToScene(float ambient);
 
 			bool IsChangingTool();
 			void FiredWeapon();
