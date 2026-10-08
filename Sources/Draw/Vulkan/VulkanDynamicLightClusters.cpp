@@ -28,6 +28,7 @@
 #include "VulkanDynamicLight.h"
 #include "VulkanImage.h"
 #include "VulkanImageWrapper.h"
+#include "VulkanMapOccupancy.h"
 #include "VulkanRenderer.h"
 #include "VulkanSpirvCache.h"
 #include <Client/SceneDefinition.h>
@@ -55,7 +56,9 @@ namespace spades {
 				float right[4];
 				float up[4];
 				float forward[4];
-				float tangents[4];
+				float tangents[2];
+				float mapOcclusion;
+				float firstPersonDepthEnd;
 				std::uint32_t counts[4];
 			};
 			static_assert(sizeof(GpuFrame) == 96, "GpuFrame must match DynamicLightFrame");
@@ -90,12 +93,13 @@ namespace spades {
 
 			const VkShaderStageFlags stages =
 			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
+			std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
 			bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr};
 			bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[3] = {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxImages,
 			               VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+			bindings[4] = {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, nullptr};
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -114,7 +118,7 @@ namespace spades {
 			std::array<VkDescriptorPoolSize, 3> poolSizes{{
 			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slotCount},
 			  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slotCount * 2},
-			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, slotCount * MaxImages},
+			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, slotCount * (MaxImages + 1)},
 			}};
 			VkDescriptorPoolCreateInfo poolInfo{};
 			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -123,6 +127,8 @@ namespace spades {
 			poolInfo.pPoolSizes = poolSizes.data();
 			if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS)
 				SPRaise("Failed to create the dynamic light descriptor pool");
+
+			noOccupancy.reset(new VulkanMapOccupancy(renderer));
 
 			slots.resize(framesInFlight);
 			for (Slot& slot : slots)
@@ -188,8 +194,10 @@ namespace spades {
 			vkUpdateDescriptorSets(device, static_cast<std::uint32_t>(writes.size()),
 			                       writes.data(), 0, nullptr);
 
-			// A frame without spotlights still reads a valid image in each place.
+			// A frame without spotlights still reads a valid image in each place, and
+			// one without a map a valid occupancy.
 			BindImages(slot, {});
+			BindOccupancy(slot, *noOccupancy);
 
 			// Nothing is lit until the first update says otherwise.
 			const GpuFrame empty{};
@@ -265,10 +273,25 @@ namespace spades {
 			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 		}
 
+		void VulkanDynamicLightClusters::BindOccupancy(Slot& slot,
+		                                               const VulkanMapOccupancy& occupancy) {
+			const VkDescriptorImageInfo info{occupancy.GetSampler(), occupancy.GetImageView(),
+			                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+			VkWriteDescriptorSet write{};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = slot.set;
+			write.dstBinding = 4;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write.pImageInfo = &info;
+			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+		}
+
 		void VulkanDynamicLightClusters::Update(VkCommandBuffer commandBuffer,
 		                                        std::size_t frameSlot,
 		                                        const std::vector<VulkanDynamicLight>& lights,
-		                                        const client::SceneDefinition& view) {
+		                                        const client::SceneDefinition& view,
+		                                        const VulkanMapOccupancy* occupancy) {
 			SPADES_MARK_FUNCTION();
 			SPAssert(frameSlot < slots.size());
 			Slot& slot = slots[frameSlot];
@@ -332,6 +355,10 @@ namespace spades {
 			}
 			BindImages(slot, images);
 
+			// The map's occupancy, written anew every frame: a new map's image may
+			// come with the handles its predecessor's had.
+			BindOccupancy(slot, occupancy ? *occupancy : *noOccupancy);
+
 			// How the clusters cut the view up
 			const float tanX = std::tan(view.fovX * 0.5F);
 			const float tanY = std::tan(view.fovY * 0.5F);
@@ -344,6 +371,8 @@ namespace spades {
 			      static_cast<float>(ClustersZ) / std::log(far / ClusterNear));
 			frame.tangents[0] = tanX;
 			frame.tangents[1] = tanY;
+			frame.mapOcclusion = occupancy ? 1.0F : 0.0F;
+			frame.firstPersonDepthEnd = VulkanRenderer::kFirstPersonDepthEnd;
 			frame.counts[0] = ClustersX;
 			frame.counts[1] = ClustersY;
 			frame.counts[2] = ClustersZ;

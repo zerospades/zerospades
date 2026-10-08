@@ -23,6 +23,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -37,6 +38,7 @@ namespace spades {
 		class VulkanBuffer;
 		class VulkanDynamicLight;
 		class VulkanImage;
+		class VulkanMapOccupancy;
 		class VulkanRenderer;
 
 		/**
@@ -92,11 +94,12 @@ namespace spades {
 			 * Writes the frame's lights as `view` sees them into frame slot
 			 * `frameSlot`'s table and records the pass binning them into its
 			 * clusters, which the fragment shaders of `commandBuffer`'s render passes
-			 * that follow can read. Records outside of a render pass.
+			 * that follow can read. The map hides the lights by `occupancy`, or
+			 * nothing does without one. Records outside of a render pass.
 			 */
 			void Update(VkCommandBuffer commandBuffer, std::size_t frameSlot,
 			            const std::vector<VulkanDynamicLight>& lights,
-			            const client::SceneDefinition& view);
+			            const client::SceneDefinition& view, const VulkanMapOccupancy* occupancy);
 
 		private:
 			struct Slot {
@@ -121,12 +124,18 @@ namespace spades {
 
 			std::vector<Slot> slots;
 
+			/** Bound in place of the map's occupancy without a map */
+			std::unique_ptr<VulkanMapOccupancy> noOccupancy;
+
 			void CreateSlot(Slot&);
 			void CreatePipeline();
 
 			/** Binds `images` as the slot's spotlight images, the white image in
 			 * place of any missing, updating only those that changed. */
 			void BindImages(Slot&, const std::array<VulkanImage*, MaxImages>& images);
+
+			/** Binds `occupancy` as the slot's map to walk. */
+			void BindOccupancy(Slot&, const VulkanMapOccupancy& occupancy);
 		};
 	} // namespace draw
 } // namespace spades

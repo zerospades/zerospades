@@ -63,8 +63,13 @@ layout(set = DYNAMIC_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
 	vec4 up;
 	// xyz: the view's forward axis, w: slices per unit of the depth's logarithm
 	vec4 forward;
-	// x, y: the tangents of half the view's width and height
-	vec4 tangents;
+	// The tangents of half the view's width and height
+	vec2 tangents;
+	// 1 when the map hides the lights, 0 without a map to walk
+	float mapOcclusion;
+	// The depth the first-person view's models are drawn in front of, nearer than
+	// anything of the world
+	float firstPersonDepthEnd;
 	// xyz: the clusters across, up and deep; w: the lights
 	uvec4 counts;
 } dynamicLightFrame;

@@ -50,9 +50,9 @@ void main() {
 	float nearDepth = DynamicLightSliceStart(float(cell.z));
 	float farDepth =
 	  cell.z + 1u == counts.z ? kUnbounded : DynamicLightSliceStart(float(cell.z + 1u));
-	vec2 slopeLow = (vec2(cell.xy) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents.xy;
+	vec2 slopeLow = (vec2(cell.xy) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents;
 	vec2 slopeHigh =
-	  (vec2(cell.xy + 1u) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents.xy;
+	  (vec2(cell.xy + 1u) / vec2(counts.xy) * 2.0 - 1.0) * dynamicLightFrame.tangents;
 	vec2 sideLow = min(min(slopeLow * nearDepth, slopeLow * farDepth),
 	                   min(slopeHigh * nearDepth, slopeHigh * farDepth));
 	vec2 sideHigh = max(max(slopeLow * nearDepth, slopeLow * farDepth),
