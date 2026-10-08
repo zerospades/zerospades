@@ -1105,11 +1105,19 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			if (!r_dlights)
 				return;
-			if (!SphereFrustrumCull(light.origin, light.radius))
+
+			VulkanDynamicLight vkLight(light);
+
+			// A spotlight pointing away from the view lights nothing in it.
+			Vector3 center;
+			float radius;
+			vkLight.GetBoundingSphere(center, radius);
+			if (!SphereFrustrumCull(center, radius))
 				return;
+
 			EnsureInitialized();
 			EnsureSceneStarted();
-			lights.push_back(light);
+			lights.push_back(std::move(vkLight));
 		}
 
 		void VulkanRenderer::RenderModel(client::IModel& model, const client::ModelRenderParam& param) {
@@ -2138,16 +2146,11 @@ namespace spades {
 
 			// Render dynamic lights (muzzle flash, flashlight, etc.)
 			if (!lights.empty()) {
-				std::vector<void*> lightPtrs;
-				lightPtrs.reserve(lights.size());
-				for (auto& l : lights) {
-					lightPtrs.push_back(&l);
-				}
 				if (!sceneDef.skipWorld && mapRenderer) {
-					mapRenderer->RenderDynamicLightPass(commandBuffer, lightPtrs);
+					mapRenderer->RenderDynamicLightPass(commandBuffer, lights);
 				}
 				if (modelRenderer) {
-					modelRenderer->RenderDynamicLightPass(commandBuffer, lightPtrs);
+					modelRenderer->RenderDynamicLightPass(commandBuffer, lights);
 				}
 			}
 

@@ -276,7 +276,7 @@ namespace spades {
 		}
 
 		void VulkanMapRenderer::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                               std::vector<void*> lights) {
+		                                               const std::vector<VulkanDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			if (lights.empty())
@@ -295,15 +295,15 @@ namespace spades {
 			c.z >>= VulkanMapChunk::SizeBits;
 
 			// For each light, render all visible chunks
-			for (void* lightPtr : lights) {
-				const client::DynamicLightParam* light =
-				    static_cast<const client::DynamicLightParam*>(lightPtr);
+			for (const VulkanDynamicLight& vkLight : lights) {
+				const VulkanDynamicLight* light = &vkLight;
+				const client::DynamicLightParam& param = light->GetParam();
 
 				// Bind this light's spotlight cookie (set 0). Point/linear lights
 				// have no image and fall back to the 1x1 white texture.
 				VulkanImage* cookieImage = nullptr;
-				if (light->image)
-					cookieImage = static_cast<VulkanImageWrapper*>(light->image)->GetVulkanImage();
+				if (param.image)
+					cookieImage = static_cast<VulkanImageWrapper*>(param.image)->GetVulkanImage();
 				VkDescriptorSet cookieSet = renderer.GetDlightCookieDescriptorSet(cookieImage);
 				if (cookieSet != VK_NULL_HANDLE) {
 					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -413,7 +413,7 @@ namespace spades {
 
 		void VulkanMapRenderer::DrawColumnDynamicLight(VkCommandBuffer commandBuffer, int cx, int cy,
 		                                               int cz, Vector3 eye,
-		                                               const client::DynamicLightParam& light) {
+		                                               const VulkanDynamicLight& light) {
 			SPADES_MARK_FUNCTION();
 
 			cx &= numChunkWidth - 1;

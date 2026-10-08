@@ -82,7 +82,7 @@ namespace spades {
 		}
 
 		void VulkanModelRenderer::RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-		                                                 std::vector<void*> lights) {
+		                                                 const std::vector<VulkanDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			if (lights.empty())

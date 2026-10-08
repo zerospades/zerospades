@@ -179,8 +179,8 @@ namespace spades {
 			                        std::vector<client::ModelRenderParam> params,
 			                        bool ghostPass) override;
 			void RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-			                            std::vector<client::ModelRenderParam> params,
-			                            std::vector<void*> lights) override;
+			                            const std::vector<client::ModelRenderParam>& params,
+			                            const std::vector<VulkanDynamicLight>& lights) override;
 			void RenderXRayPass(VkCommandBuffer commandBuffer,
 			                    std::vector<client::ModelRenderParam> params) override;
 
