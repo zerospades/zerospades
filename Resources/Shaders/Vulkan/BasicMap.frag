@@ -151,9 +151,7 @@ void main() {
 		// the coarse term alone is markedly darker than GL wherever a surface
 		// is shadowed but not itself creased -- e.g. the flat underside of an
 		// overhang, which is the worst-matching region against GL.
-		// The v flip matches the no-radiosity branch below; see the note there.
-		vec2 aoAtlasUV = vec2(ambientOcclusionCoord.x, 1.0 - ambientOcclusionCoord.y);
-		float detailAO = texture(ambientOcclusionAtlas, aoAtlasUV).x;
+		float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float amb = mix(sqrt(aoFactor * detailAO), min(aoFactor, detailAO), 0.5);
 
 		// Ambient color matches GL GLShadowShader: fog * 0.5 with a min-luminance
@@ -170,14 +168,7 @@ void main() {
 		// AO is sampled from the 2D AmbientOcclusion atlas (per-vertex tile coord),
 		// matching GL BasicBlock.fs — gives crisper voxel-corner AO than the
 		// 3D ambientShadowTexture used in the radiosity branch.
-		//
-		// Note: VulkanImageManager y-flips bitmaps on upload (so top-down PNG
-		// data lands top-up in screen-space 2D UI rendering). The AO atlas is
-		// sampled from world geometry though, not screen space — and GL uploads
-		// the same PNG without a flip, so its tile order is opposite to ours.
-		// Invert v here so aoID maps to the same physical tile as GL.
-		vec2 aoUV = vec2(ambientOcclusionCoord.x, 1.0 - ambientOcclusionCoord.y);
-		float ao = texture(ambientOcclusionAtlas, aoUV).x;
+		float ao = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float hemisphere = 1.0 - nrm.z * 0.2;
 		vec3 ambientColor = mix(inFogColor, vec3(1.0), 0.5);
 		diffuse = ambientColor * (0.5 * ao * hemisphere) + sun;

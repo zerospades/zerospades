@@ -38,7 +38,9 @@ layout(location = 0) in  vec2 texCoord;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-	vec3 dust1 = texture(dustTexture, texCoord).xyz;
+	// As GL has it, the dust's first row at the bottom of the screen, where
+	// `texCoord` is the top
+	vec3 dust1 = texture(dustTexture, vec2(texCoord.x, 1.0 - texCoord.y)).xyz;
 	dust1 *= dust1; // linearize
 
 	vec3 blur1 = texture(blurTexture1, texCoord).xyz;

@@ -62,8 +62,7 @@ void main() {
 			discard;
 	}
 
-	vec2 flippedTexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
-	vec4 col = texture(mainTexture, flippedTexCoord);
+	vec4 col = texture(mainTexture, texCoord);
 	col.xyz *= col.w;
 	col *= color;
 	fragColor = vec4(srgbToLinear(col.xyz), col.w);
