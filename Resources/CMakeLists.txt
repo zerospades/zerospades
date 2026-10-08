@@ -59,6 +59,11 @@ if(ZEROSPADES_RESOURCES)
 		file(GLOB_RECURSE VK_FRAG_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.frag)
 		file(GLOB_RECURSE VK_VS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.vk.vs)
 		file(GLOB_RECURSE VK_FS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.vk.fs)
+		file(GLOB_RECURSE VK_COMP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.comp)
+
+		# Sources the shaders #include (GL_GOOGLE_include_directive); every shader
+		# is rebuilt when one of them changes.
+		file(GLOB_RECURSE VK_INCLUDE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Shaders/Vulkan/*.glsl)
 
 		# Exclude non-standalone shader files (helper/include files without #version/main())
 		list(FILTER VK_VS_FILES EXCLUDE REGEX "Shadow/Common\\.vk\\.vs$")
@@ -72,7 +77,7 @@ if(ZEROSPADES_RESOURCES)
 			add_custom_command(
 				OUTPUT ${SHADER_SPV}
 				COMMAND ${GLSLANG_VALIDATOR} -V -o ${SHADER_SPV} ${SHADER_SRC}
-				DEPENDS ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC} ${VK_INCLUDE_FILES}
 				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
 			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
 		endforeach()
@@ -83,7 +88,7 @@ if(ZEROSPADES_RESOURCES)
 			add_custom_command(
 				OUTPUT ${SHADER_SPV}
 				COMMAND ${GLSLANG_VALIDATOR} -V -o ${SHADER_SPV} ${SHADER_SRC}
-				DEPENDS ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC} ${VK_INCLUDE_FILES}
 				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
 			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
 		endforeach()
@@ -94,7 +99,7 @@ if(ZEROSPADES_RESOURCES)
 			add_custom_command(
 				OUTPUT ${SHADER_SPV}
 				COMMAND ${GLSLANG_VALIDATOR} -V -S vert -o ${SHADER_SPV} ${SHADER_SRC}
-				DEPENDS ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC} ${VK_INCLUDE_FILES}
 				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
 			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
 		endforeach()
@@ -105,7 +110,18 @@ if(ZEROSPADES_RESOURCES)
 			add_custom_command(
 				OUTPUT ${SHADER_SPV}
 				COMMAND ${GLSLANG_VALIDATOR} -V -S frag -o ${SHADER_SPV} ${SHADER_SRC}
-				DEPENDS ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC} ${VK_INCLUDE_FILES}
+				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
+			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
+		endforeach()
+
+		# Compile .comp files (stage auto-detected by glslangValidator)
+		foreach(SHADER_SRC ${VK_COMP_FILES})
+			set(SHADER_SPV "${SHADER_SRC}.spv")
+			add_custom_command(
+				OUTPUT ${SHADER_SPV}
+				COMMAND ${GLSLANG_VALIDATOR} -V -o ${SHADER_SPV} ${SHADER_SRC}
+				DEPENDS ${SHADER_SRC} ${VK_INCLUDE_FILES}
 				COMMENT "Compiling Vulkan shader: ${SHADER_SRC}")
 			list(APPEND COMPILED_SPIRV_FILES ${SHADER_SPV})
 		endforeach()

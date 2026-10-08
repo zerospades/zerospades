@@ -33,7 +33,6 @@ namespace spades {
 	namespace draw {
 		class VulkanRenderer;
 		class VulkanModel;
-		class VulkanDynamicLight;
 
 		class VulkanModelRenderer {
 			VulkanRenderer& renderer;
@@ -59,8 +58,6 @@ namespace spades {
 
 			void Prerender(VkCommandBuffer commandBuffer, bool ghostPass);
 			void RenderSunlightPass(VkCommandBuffer commandBuffer, bool ghostPass);
-			void RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-			                            const std::vector<VulkanDynamicLight>& lights);
 			void RenderXRayPass(VkCommandBuffer commandBuffer);
 
 			void Clear();

@@ -1,0 +1,377 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ ZeroSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ ZeroSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#include "VulkanDynamicLightClusters.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+
+#include "VulkanBuffer.h"
+#include "VulkanDynamicLight.h"
+#include "VulkanImage.h"
+#include "VulkanImageWrapper.h"
+#include "VulkanRenderer.h"
+#include "VulkanSpirvCache.h"
+#include <Client/SceneDefinition.h>
+#include <Core/Debug.h>
+#include <Core/Exception.h>
+#include <Gui/SDLVulkanDevice.h>
+
+namespace spades {
+	namespace draw {
+		namespace {
+			/** `DynamicLight` of `DynamicLight/Table.glsl`, std430 */
+			struct GpuLight {
+				float originReach[4];
+				float colorReachInversed[4];
+				float spotMatrix[16];
+				float linearDirectionLength[4];
+				float kind[4];
+				float viewSphere[4];
+			};
+			static_assert(sizeof(GpuLight) == 144, "GpuLight must match DynamicLight");
+
+			/** `DynamicLightFrame` of `DynamicLight/Table.glsl`, std140 */
+			struct GpuFrame {
+				float eyeNear[4];
+				float right[4];
+				float up[4];
+				float forward[4];
+				float tangents[4];
+				std::uint32_t counts[4];
+			};
+			static_assert(sizeof(GpuFrame) == 96, "GpuFrame must match DynamicLightFrame");
+
+			/** `kind.x` of a light, `DYNAMIC_LIGHT_POINT`, `_LINEAR` or `_SPOT` */
+			float KindOf(client::DynamicLightType type) {
+				switch (type) {
+					case client::DynamicLightTypeLinear: return 1.0F;
+					case client::DynamicLightTypeSpotlight: return 2.0F;
+					case client::DynamicLightTypePoint: break;
+				}
+				return 0.0F;
+			}
+
+			constexpr std::uint32_t kClusterCount =
+			  VulkanDynamicLightClusters::ClustersX * VulkanDynamicLightClusters::ClustersY *
+			  VulkanDynamicLightClusters::ClustersZ;
+			constexpr std::uint32_t kMaskWords = VulkanDynamicLightClusters::MaxLights / 32;
+
+			void Store(float (&out)[4], const Vector3& v, float w) {
+				out[0] = v.x;
+				out[1] = v.y;
+				out[2] = v.z;
+				out[3] = w;
+			}
+		} // namespace
+
+		VulkanDynamicLightClusters::VulkanDynamicLightClusters(VulkanRenderer& renderer,
+		                                                       std::size_t framesInFlight)
+		    : renderer(renderer), device(renderer.GetDevice()->GetDevice()) {
+			SPADES_MARK_FUNCTION();
+
+			const VkShaderStageFlags stages =
+			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
+			bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr};
+			bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
+			bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
+			bindings[3] = {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxImages,
+			               VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+
+			VkDescriptorSetLayoutCreateInfo layoutInfo{};
+			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			layoutInfo.bindingCount = static_cast<std::uint32_t>(bindings.size());
+			layoutInfo.pBindings = bindings.data();
+			if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &setLayout) != VK_SUCCESS)
+				SPRaise("Failed to create the dynamic light descriptor set layout");
+
+			VkDescriptorSetLayoutCreateInfo emptyInfo{};
+			emptyInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			if (vkCreateDescriptorSetLayout(device, &emptyInfo, nullptr, &emptySetLayout) !=
+			    VK_SUCCESS)
+				SPRaise("Failed to create the empty descriptor set layout");
+
+			const std::uint32_t slotCount = static_cast<std::uint32_t>(framesInFlight);
+			std::array<VkDescriptorPoolSize, 3> poolSizes{{
+			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slotCount},
+			  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slotCount * 2},
+			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, slotCount * MaxImages},
+			}};
+			VkDescriptorPoolCreateInfo poolInfo{};
+			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			poolInfo.maxSets = slotCount;
+			poolInfo.poolSizeCount = static_cast<std::uint32_t>(poolSizes.size());
+			poolInfo.pPoolSizes = poolSizes.data();
+			if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS)
+				SPRaise("Failed to create the dynamic light descriptor pool");
+
+			slots.resize(framesInFlight);
+			for (Slot& slot : slots)
+				CreateSlot(slot);
+
+			CreatePipeline();
+		}
+
+		VulkanDynamicLightClusters::~VulkanDynamicLightClusters() {
+			SPADES_MARK_FUNCTION();
+
+			if (pipeline != VK_NULL_HANDLE)
+				vkDestroyPipeline(device, pipeline, nullptr);
+			if (pipelineLayout != VK_NULL_HANDLE)
+				vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+			// The sets go with their pool.
+			if (pool != VK_NULL_HANDLE)
+				vkDestroyDescriptorPool(device, pool, nullptr);
+			if (emptySetLayout != VK_NULL_HANDLE)
+				vkDestroyDescriptorSetLayout(device, emptySetLayout, nullptr);
+			if (setLayout != VK_NULL_HANDLE)
+				vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
+		}
+
+		void VulkanDynamicLightClusters::CreateSlot(Slot& slot) {
+			Handle<gui::SDLVulkanDevice> vulkanDevice = renderer.GetDevice();
+			const VkMemoryPropertyFlags hostVisible =
+			  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+			// Written by the CPU every frame and mapped for good
+			slot.frame = Handle<VulkanBuffer>::New(vulkanDevice, sizeof(GpuFrame),
+			                                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, hostVisible);
+			slot.lights = Handle<VulkanBuffer>::New(vulkanDevice, sizeof(GpuLight) * MaxLights,
+			                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, hostVisible);
+			// Written by the binning pass, read by the fragments
+			slot.clusters = Handle<VulkanBuffer>::New(
+			  vulkanDevice, sizeof(std::uint32_t) * kMaskWords * kClusterCount,
+			  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			VkDescriptorSetAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			allocInfo.descriptorPool = pool;
+			allocInfo.descriptorSetCount = 1;
+			allocInfo.pSetLayouts = &setLayout;
+			if (vkAllocateDescriptorSets(device, &allocInfo, &slot.set) != VK_SUCCESS)
+				SPRaise("Failed to allocate a dynamic light descriptor set");
+
+			std::array<VkDescriptorBufferInfo, 3> buffers{{
+			  {slot.frame->GetBuffer(), 0, VK_WHOLE_SIZE},
+			  {slot.lights->GetBuffer(), 0, VK_WHOLE_SIZE},
+			  {slot.clusters->GetBuffer(), 0, VK_WHOLE_SIZE},
+			}};
+			std::array<VkWriteDescriptorSet, 3> writes{};
+			for (std::uint32_t i = 0; i < writes.size(); i++) {
+				writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				writes[i].dstSet = slot.set;
+				writes[i].dstBinding = i;
+				writes[i].descriptorCount = 1;
+				writes[i].descriptorType =
+				  i == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				writes[i].pBufferInfo = &buffers[i];
+			}
+			vkUpdateDescriptorSets(device, static_cast<std::uint32_t>(writes.size()),
+			                       writes.data(), 0, nullptr);
+
+			// A frame without spotlights still reads a valid image in each place.
+			BindImages(slot, {});
+
+			// Nothing is lit until the first update says otherwise.
+			const GpuFrame empty{};
+			std::memcpy(slot.frame->Map(), &empty, sizeof(empty));
+		}
+
+		void VulkanDynamicLightClusters::CreatePipeline() {
+			VkPipelineLayoutCreateInfo layoutInfo{};
+			layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			layoutInfo.setLayoutCount = 1;
+			layoutInfo.pSetLayouts = &setLayout;
+			if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+				SPRaise("Failed to create the dynamic light cluster pipeline layout");
+
+			const std::vector<std::uint32_t> code =
+			  SpirvCache::Load("Shaders/Vulkan/DynamicLight/Cluster.comp.spv");
+			VkShaderModuleCreateInfo moduleInfo{};
+			moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			moduleInfo.codeSize = code.size() * sizeof(std::uint32_t);
+			moduleInfo.pCode = code.data();
+			VkShaderModule module;
+			if (vkCreateShaderModule(device, &moduleInfo, nullptr, &module) != VK_SUCCESS)
+				SPRaise("Failed to create the dynamic light cluster shader module");
+
+			VkComputePipelineCreateInfo pipelineInfo{};
+			pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+			pipelineInfo.stage.module = module;
+			pipelineInfo.stage.pName = "main";
+			pipelineInfo.layout = pipelineLayout;
+			const VkResult result = vkCreateComputePipelines(device, renderer.GetPipelineCache(), 1,
+			                                                 &pipelineInfo, nullptr, &pipeline);
+			vkDestroyShaderModule(device, module, nullptr);
+			if (result != VK_SUCCESS)
+				SPRaise("Failed to create the dynamic light cluster pipeline (error code: %d)",
+				        result);
+		}
+
+		VkDescriptorSet VulkanDynamicLightClusters::GetDescriptorSet(std::size_t frameSlot) const {
+			SPAssert(frameSlot < slots.size());
+			return slots[frameSlot].set;
+		}
+
+		void VulkanDynamicLightClusters::BindImages(
+		  Slot& slot, const std::array<VulkanImage*, MaxImages>& images) {
+			VulkanImage* white = renderer.GetWhiteImage();
+			SPAssert(white);
+
+			std::array<VkDescriptorImageInfo, MaxImages> infos{};
+			std::uint32_t first = MaxImages, end = 0;
+			for (std::uint32_t i = 0; i < MaxImages; i++) {
+				VulkanImage* image = images[i] ? images[i] : white;
+				infos[i] = {image->GetSampler(), image->GetImageView(),
+				            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+				if (slot.images[i].GetPointerOrNull() == image)
+					continue;
+				slot.images[i] = Handle<VulkanImage>(image);
+				first = std::min(first, i);
+				end = i + 1;
+			}
+			if (first >= end)
+				return;
+
+			VkWriteDescriptorSet write{};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = slot.set;
+			write.dstBinding = 3;
+			write.dstArrayElement = first;
+			write.descriptorCount = end - first;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write.pImageInfo = infos.data() + first;
+			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+		}
+
+		void VulkanDynamicLightClusters::Update(VkCommandBuffer commandBuffer,
+		                                        std::size_t frameSlot,
+		                                        const std::vector<VulkanDynamicLight>& lights,
+		                                        const client::SceneDefinition& view) {
+			SPADES_MARK_FUNCTION();
+			SPAssert(frameSlot < slots.size());
+			Slot& slot = slots[frameSlot];
+
+			const std::uint32_t count =
+			  static_cast<std::uint32_t>(std::min<std::size_t>(lights.size(), MaxLights));
+
+			// The table, and the images its spotlights project
+			std::array<VulkanImage*, MaxImages> images{};
+			std::uint32_t imageCount = 0;
+			auto* table = static_cast<GpuLight*>(slot.lights->Map());
+			for (std::uint32_t i = 0; i < count; i++) {
+				const VulkanDynamicLight& light = lights[i];
+				const client::DynamicLightParam& param = light.GetParam();
+				GpuLight& out = table[i];
+
+				Store(out.originReach, param.origin, param.radius);
+				Store(out.colorReachInversed, param.color, 1.0F / param.radius);
+
+				const Matrix4 spotMatrix = param.type == client::DynamicLightTypeSpotlight
+				                             ? light.GetProjectionMatrix()
+				                             : Matrix4::Identity();
+				std::memcpy(out.spotMatrix, spotMatrix.m, sizeof(out.spotMatrix));
+
+				Vector3 direction = MakeVector3(0.0F, 0.0F, 0.0F);
+				float length = 0.0F;
+				if (param.type == client::DynamicLightTypeLinear) {
+					direction = param.point2 - param.origin;
+					length = direction.GetLength();
+					direction = length > 1.0e-4F ? direction / length : MakeVector3(0.0F, 0.0F, 0.0F);
+				}
+				Store(out.linearDirectionLength, direction, length);
+
+				float image = -1.0F;
+				auto* wrapper = dynamic_cast<VulkanImageWrapper*>(param.image);
+				VulkanImage* vulkanImage = wrapper ? wrapper->GetVulkanImage() : nullptr;
+				if (param.type == client::DynamicLightTypeSpotlight && vulkanImage) {
+					const auto found = std::find(images.begin(), images.begin() + imageCount,
+					                             vulkanImage);
+					if (found != images.begin() + imageCount) {
+						image = static_cast<float>(found - images.begin());
+					} else if (imageCount < MaxImages) {
+						images[imageCount] = vulkanImage;
+						image = static_cast<float>(imageCount++);
+					}
+				}
+				out.kind[0] = KindOf(param.type);
+				out.kind[1] = image;
+				out.kind[2] = 0.0F;
+				out.kind[3] = 0.0F;
+
+				Vector3 center;
+				float radius;
+				light.GetBoundingSphere(center, radius);
+				const Vector3 relative = center - view.viewOrigin;
+				Store(out.viewSphere,
+				      MakeVector3(Vector3::Dot(relative, view.viewAxis[0]),
+				                  Vector3::Dot(relative, view.viewAxis[1]),
+				                  Vector3::Dot(relative, view.viewAxis[2])),
+				      radius);
+			}
+			BindImages(slot, images);
+
+			// How the clusters cut the view up
+			const float tanX = std::tan(view.fovX * 0.5F);
+			const float tanY = std::tan(view.fovY * 0.5F);
+			const float far = std::max(view.zFar, ClusterNear * 2.0F);
+			GpuFrame frame{};
+			Store(frame.eyeNear, view.viewOrigin, ClusterNear);
+			Store(frame.right, view.viewAxis[0], 1.0F / tanX);
+			Store(frame.up, view.viewAxis[1], 1.0F / tanY);
+			Store(frame.forward, view.viewAxis[2],
+			      static_cast<float>(ClustersZ) / std::log(far / ClusterNear));
+			frame.tangents[0] = tanX;
+			frame.tangents[1] = tanY;
+			frame.counts[0] = ClustersX;
+			frame.counts[1] = ClustersY;
+			frame.counts[2] = ClustersZ;
+			frame.counts[3] = count;
+			std::memcpy(slot.frame->Map(), &frame, sizeof(frame));
+
+			if (count == 0)
+				return;
+
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout,
+			                        0, 1, &slot.set, 0, nullptr);
+			vkCmdDispatch(commandBuffer, (kClusterCount + ClusterGroupSize - 1) / ClusterGroupSize,
+			              1, 1);
+
+			// The masks are read by the lit fragments of the passes that follow.
+			VkBufferMemoryBarrier barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.buffer = slot.clusters->GetBuffer();
+			barrier.offset = 0;
+			barrier.size = VK_WHOLE_SIZE;
+			vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 1, &barrier,
+			                     0, nullptr);
+		}
+	} // namespace draw
+} // namespace spades

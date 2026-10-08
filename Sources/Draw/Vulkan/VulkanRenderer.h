@@ -44,6 +44,7 @@ namespace spades {
 		class VulkanSpriteRenderer;
 		class VulkanLongSpriteRenderer;
 		class VulkanGlareRenderer;
+		class VulkanDynamicLightClusters;
 		class VulkanImageRenderer;
 		class VulkanWaterRenderer;
 		class VulkanFlatMapRenderer;
@@ -190,17 +191,8 @@ namespace spades {
 
 			Handle<VulkanImage> whiteImage; // 1x1 white image for solid color rendering
 
-			// Shared spotlight-cookie descriptors for the dynamic-light passes.
-			// Both the map and model dlight pipelines bind a set-0 combined image
-			// sampler holding the spotlight projection texture (Gfx/Spotlight.jpg),
-			// or the 1x1 white image for point/linear lights. Descriptor sets are
-			// cached per cookie image (the cookie images are static for the app's
-			// lifetime, so a set is created once and reused across frames).
-			VkDescriptorSetLayout dlightCookieSetLayout;
-			VkDescriptorPool dlightCookiePool;
-			std::unordered_map<VulkanImage*, VkDescriptorSet> dlightCookieCache;
-			void EnsureDlightCookieResources();
-			void DestroyDlightCookieResources();
+			// The frame's dynamic lights as the lit shaders read them
+			std::unique_ptr<VulkanDynamicLightClusters> dynamicLightClusters;
 
 			// Sky gradient rendering
 			VkPipeline skyPipeline;
@@ -326,12 +318,8 @@ namespace spades {
 			const Matrix4& GetProjectionMatrix() const { return projectionMatrix; }
 			VulkanImage* GetWhiteImage() { return whiteImage.GetPointerOrNull(); }
 
-			// Spotlight-cookie descriptors shared by the dynamic-light passes.
-			// GetDlightCookieDescriptorSet returns a set-0 combined image sampler
-			// for the given cookie image (pass nullptr for point/linear lights to
-			// get the 1x1 white fallback).
-			VkDescriptorSetLayout GetDlightCookieSetLayout();
-			VkDescriptorSet GetDlightCookieDescriptorSet(VulkanImage* cookieImage);
+			/** The frame's dynamic lights, which the lit pipelines bind as set 2 */
+			VulkanDynamicLightClusters& GetDynamicLightClusters() { return *dynamicLightClusters; }
 			bool IsRenderingMirror() const { return renderingMirror; }
 		int GetRenderWidth() const { return renderWidth; }
 		int GetRenderHeight() const { return renderHeight; }

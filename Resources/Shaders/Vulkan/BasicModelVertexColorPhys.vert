@@ -52,10 +52,12 @@ layout(location = 9) out vec3 aoCoord;          // 3D coords into AO texture
 layout(location = 10) out vec3 radiosityTextureCoord;
 layout(location = 11) out vec3 normalVarying;
 layout(location = 12) out float waterClip;     // >=0 keep, <0 clip below the reflection plane
+// World-space position, where the fragment shader evaluates the dynamic lights
+layout(location = 13) out vec3 worldPosition;
 
-// Must match ModelDynamicLit.vert's gl_Position exactly: the additive dynamic-
-// light pass uses depth test EQUAL against this physical-lighting opaque pass,
-// so a mix of invariant/non-invariant position makes the weapon speckle.
+// Keep gl_Position bit-identical across the pipelines drawing a model with this
+// shader: the ghost pass tests its colour against its own depth prepass with
+// EQUAL.
 invariant gl_Position;
 
 void main() {
@@ -113,4 +115,5 @@ void main() {
 	// Reflection-pass water clip: negative below the water plane.
 	// mirrorClipZ is +inf in the normal scene pass, so this stays positive.
 	waterClip = pushConstants.mirrorClipZ - worldPos.z;
+	worldPosition = worldPos;
 }

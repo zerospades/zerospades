@@ -19,6 +19,7 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Selects the radiosity-on permutation (matches GL MapRadiosity.fs) vs the
 // no-radiosity permutation (matches GL OptimizedVoxelModel.fs + MapRadiosityNull.fs).
@@ -56,8 +57,12 @@ layout(location = 11) in vec3 modelShadowCoord0;    // light-clip coords per cas
 layout(location = 12) in vec3 modelShadowCoord1;
 layout(location = 13) in vec3 modelShadowCoord2;
 layout(location = 14) in float shadowViewDepth;     // camera-axis depth, for cascade choice
+// World-space position, where the dynamic lights are evaluated
+layout(location = 15) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
+
+#include "DynamicLight/Lights.glsl"
 
 // Same cascade sampling as BasicMap.frag -- see the rationale there for both
 // the 2x2 filtered compare and the depth-based cascade choice. Local Z 0 = sun
@@ -161,6 +166,7 @@ void main() {
 	}
 
 	fragColor = vec4(vertexColor * diffuse, 1.0);
+	fragColor.xyz += vertexColor * EvaluateDynamicLights(worldPosition, nrm);
 
 	// Apply fog fading
 	fragColor.xyz = mix(fragColor.xyz, inFogColor, fogDensity);

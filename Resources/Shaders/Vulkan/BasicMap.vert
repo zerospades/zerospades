@@ -60,6 +60,8 @@ layout(location = 11) out vec3 modelShadowCoord2;
 // standard perspective projection gl_Position.w is exactly that depth, so no
 // view matrix is needed here.
 layout(location = 12) out float shadowViewDepth;
+// World-space position, where the fragment shader evaluates the dynamic lights
+layout(location = 13) out vec3 worldPosition;
 
 void main() {
 	// Convert uint8 position to float
@@ -155,4 +157,5 @@ void main() {
 	modelShadowCoord1 = (shadowSampling.cascadeMatrix[1] * worldPos).xyz;
 	modelShadowCoord2 = (shadowSampling.cascadeMatrix[2] * worldPos).xyz;
 	shadowViewDepth = gl_Position.w;
+	worldPosition = worldPos.xyz;
 }

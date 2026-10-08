@@ -19,6 +19,7 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
 layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
@@ -51,8 +52,12 @@ layout(location = 7) in vec3 reflectionDir;
 layout(location = 8) in vec3 aoCoord;          // 3D coords into AO texture
 layout(location = 9) in vec3 radiosityTextureCoord;
 layout(location = 10) in vec3 normalVarying;
+// World-space position, where the dynamic lights are evaluated
+layout(location = 11) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
+
+#include "DynamicLight/Lights.glsl"
 
 vec3 DecodeRadiosityValue(vec3 val) {
 	val *= 1023.0 / 1022.0;
@@ -169,6 +174,7 @@ void main() {
 
 	// Blend diffuse and specular with Fresnel
 	fragColor.xyz = mix(diffuseShading * fragColor.xyz, specularShading, fresnel);
+	fragColor.xyz += color.xyz * EvaluateDynamicLights(worldPosition, nrm);
 
 	// Apply fog
 	fragColor.xyz = mix(fragColor.xyz, inFogColor, fogDensity);

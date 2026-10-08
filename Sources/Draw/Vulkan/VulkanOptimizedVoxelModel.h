@@ -62,16 +62,6 @@ namespace spades {
 			Vector3 customColor;    float _pad2;
 			Vector3 viewSpaceLight; float _pad3;
 		};
-		struct ModelDlightPushConstants { // dynamic light pass (272 bytes)
-			Matrix4 projectionViewModelMatrix;
-			Matrix4 modelMatrix;
-			Vector3 modelOrigin;           float fogDensityVal;
-			Vector3 customColor;           float lightRadius;
-			Vector3 lightOrigin;           float lightTypeVal;
-			Vector3 lightColor;            float lightRadiusInversed;
-			Vector3 lightLinearDirection;  float lightLinearLength;
-			Matrix4 lightSpotMatrix;
-		};
 
 		class VulkanOptimizedVoxelModel : public VulkanModel {
 			struct Vertex {
@@ -93,8 +83,6 @@ namespace spades {
 				VkRenderPass renderPass;
 				VkPipeline pipeline;
 				VkPipeline mirroredPipeline;          // same as pipeline, VK_CULL_MODE_FRONT_BIT
-				VkPipeline dlightPipeline;
-				VkPipeline mirroredDlightPipeline;    // same as dlightPipeline, VK_CULL_MODE_FRONT_BIT
 				VkPipeline shadowMapPipeline;
 				VkPipeline ghostDepthPipeline;
 				VkPipeline mirroredGhostDepthPipeline; // same as ghostDepthPipeline, VK_CULL_MODE_FRONT_BIT
@@ -104,7 +92,6 @@ namespace spades {
 				VkPipeline mirroredXRayPipeline;      // same as xrayPipeline, VK_CULL_MODE_FRONT_BIT
 				VkPipelineLayout xrayPipelineLayout;  // own layout: no descriptor sets, wider push range
 				VkPipelineLayout pipelineLayout;
-				VkPipelineLayout dlightPipelineLayout;
 				VkPipelineLayout shadowMapPipelineLayout;
 				VkRenderPass shadowMapRenderPass;     // render pass shadowMapPipeline was built against
 				VkDescriptorSetLayout descriptorSetLayout;
@@ -112,14 +99,12 @@ namespace spades {
 
 				PipelineCache() : renderPass(VK_NULL_HANDLE), pipeline(VK_NULL_HANDLE),
 				                  mirroredPipeline(VK_NULL_HANDLE),
-				                  dlightPipeline(VK_NULL_HANDLE), mirroredDlightPipeline(VK_NULL_HANDLE),
 				                  shadowMapPipeline(VK_NULL_HANDLE),
 				                  ghostDepthPipeline(VK_NULL_HANDLE), mirroredGhostDepthPipeline(VK_NULL_HANDLE),
 				                  ghostColorPipeline(VK_NULL_HANDLE), mirroredGhostColorPipeline(VK_NULL_HANDLE),
 				                  xrayPipeline(VK_NULL_HANDLE), mirroredXRayPipeline(VK_NULL_HANDLE),
 				                  xrayPipelineLayout(VK_NULL_HANDLE),
 				                  pipelineLayout(VK_NULL_HANDLE),
-				                  dlightPipelineLayout(VK_NULL_HANDLE),
 				                  shadowMapPipelineLayout(VK_NULL_HANDLE),
 				                  shadowMapRenderPass(VK_NULL_HANDLE),
 				                  descriptorSetLayout(VK_NULL_HANDLE),
@@ -178,9 +163,6 @@ namespace spades {
 			void RenderSunlightPass(VkCommandBuffer commandBuffer,
 			                        std::vector<client::ModelRenderParam> params,
 			                        bool ghostPass) override;
-			void RenderDynamicLightPass(VkCommandBuffer commandBuffer,
-			                            const std::vector<client::ModelRenderParam>& params,
-			                            const std::vector<VulkanDynamicLight>& lights) override;
 			void RenderXRayPass(VkCommandBuffer commandBuffer,
 			                    std::vector<client::ModelRenderParam> params) override;
 
