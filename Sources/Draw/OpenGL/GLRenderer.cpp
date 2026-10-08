@@ -18,6 +18,7 @@
 
  */
 
+#include <atomic>
 #include <cstdarg>
 #include <cstdlib>
 
@@ -31,12 +32,16 @@
 #include "GLFogFilter.h"
 #include "GLFogFilter2.h"
 #include "GLFramebufferManager.h"
+#include "GLDynamicLightOcclusionMaps.h"
+#include "GLDynamicLightTable.h"
+#include "GLGlareRenderer.h"
 #include "GLImage.h"
 #include "GLImageManager.h"
 #include "GLImageRenderer.h"
 #include "GLLensDustFilter.h"
 #include "GLLensFilter.h"
 #include "GLLensFlareFilter.h"
+#include "GLMapOccupancy.h"
 #include "GLLongSpriteRenderer.h"
 #include "GLMapRenderer.h"
 #include "GLMapShadowRenderer.h"
@@ -86,6 +91,11 @@ namespace spades {
 			 */
 			constexpr int kStencilBitWorld = 1 << 0;
 		} // namespace
+
+		std::uint64_t GLRenderer::NextInstanceId() {
+			static std::atomic<std::uint64_t> next{1};
+			return next++;
+		}
 
 		GLRenderer::GLRenderer(Handle<IGLDevice> _device)
 			: device(std::move(_device)),
@@ -184,6 +194,7 @@ namespace spades {
 			else
 				spriteRenderer = new GLSpriteRenderer(*this);
 			longSpriteRenderer = new GLLongSpriteRenderer(*this);
+			glareRenderer.reset(new GLGlareRenderer(*this));
 			modelRenderer = new GLModelRenderer(*this);
 
 			// preload
@@ -244,6 +255,7 @@ namespace spades {
 			delete mapRenderer;
 			mapRenderer = NULL;
 			waterRenderer.reset();
+			mapOccupancy.reset();
 			delete ambientShadowRenderer;
 			ambientShadowRenderer = NULL;
 			shadowMapRenderer.reset();
@@ -251,6 +263,9 @@ namespace spades {
 			cameraBlur = NULL;
 			delete longSpriteRenderer;
 			longSpriteRenderer = NULL;
+			glareRenderer.reset();
+			dynamicLightOcclusionMaps.reset();
+			dynamicLightTable.reset();
 			delete modelRenderer;
 			modelRenderer = NULL;
 			delete spriteRenderer;
@@ -332,6 +347,8 @@ namespace spades {
 				flatMapRenderer = new GLFlatMapRenderer(*this, *newMap);
 				SPLog("Creating Water Renderer");
 				waterRenderer.reset(new GLWaterRenderer(*this, newMap.get_pointer()));
+				SPLog("Creating Map Occupancy");
+				mapOccupancy.reset(new GLMapOccupancy(*this, *newMap));
 
 				if (settings.r_radiosity) {
 					SPLog("Creating Ray-traced Ambient Occlusion Renderer");
@@ -462,6 +479,7 @@ namespace spades {
 			debugLines.clear();
 			spriteRenderer->Clear();
 			longSpriteRenderer->Clear();
+			glareRenderer->Clear();
 			modelRenderer->Clear();
 			lights.clear();
 
@@ -495,13 +513,22 @@ namespace spades {
 		void GLRenderer::AddLight(const client::DynamicLightParam& light) {
 			if (!settings.r_dlights)
 				return;
-			if (!SphereFrustrumCull(light.origin, light.radius))
+
+			GLDynamicLight glLight(light);
+
+			// A spotlight pointing away from the view lights nothing in it.
+			Vector3 center;
+			float radius;
+			glLight.GetBoundingSphere(center, radius);
+			if (!SphereFrustrumCull(center, radius))
 				return;
 
 			EnsureInitialized();
 			EnsureSceneStarted();
 
-			lights.push_back(GLDynamicLight(light));
+			// The table lists this frame's lights in the order they were added.
+			glLight.SetTableRow(lights.size());
+			lights.push_back(std::move(glLight));
 		}
 
 		void GLRenderer::AddDebugLine(spades::Vector3 a, spades::Vector3 b, spades::Vector4 color) {
@@ -538,6 +565,17 @@ namespace spades {
 			EnsureSceneStarted();
 
 			longSpriteRenderer->Add(&glImage, p1, p2, radius, drawColorAlphaPremultiplied);
+		}
+
+		void GLRenderer::AddGlare(client::IImage& img, const client::GlareParam& param) {
+			SPADES_MARK_FUNCTION_DEBUG();
+
+			GLImage& glImage = dynamic_cast<GLImage&>(img);
+
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			glareRenderer->Add(glImage, param);
 		}
 
 #pragma mark - Scene Finalizer
@@ -703,7 +741,12 @@ namespace spades {
 				GLProfiler::Context p(*profiler, "Dynamic Light Pass [%d light(s)]",
 									  (int)lights.size());
 
+				++dynamicLightPass;
+
 				device->DepthFunc(IGLDevice::Equal);
+				// Only the surfaces already in the depth buffer are lit, so it is not
+				// written: the GPU can then reject hidden fragments before shading them.
+				device->DepthMask(false);
 				device->Enable(IGLDevice::Blend, true);
 				device->BlendFunc(IGLDevice::SrcAlpha, IGLDevice::One, IGLDevice::Zero,
 								  IGLDevice::One);
@@ -713,6 +756,7 @@ namespace spades {
 				modelRenderer->RenderDynamicLightPass(lights);
 
 				device->Enable(IGLDevice::Blend, false);
+				device->DepthMask(true);
 			}
 
 			if (settings.r_outlines && !mirror) {
@@ -832,6 +876,17 @@ namespace spades {
 					mapShadowRenderer->Update();
 				if (ambientShadowRenderer)
 					ambientShadowRenderer->Update();
+				if (mapOccupancy)
+					mapOccupancy->Update();
+				if (settings.r_dlights) {
+					// Made on first use: they need float textures, which nothing else
+					// asks for unless HDR is on.
+					if (!dynamicLightTable)
+						dynamicLightTable.reset(new GLDynamicLightTable(*device));
+					if (!dynamicLightOcclusionMaps)
+						dynamicLightOcclusionMaps.reset(new GLDynamicLightOcclusionMaps(*this));
+					dynamicLightTable->Update(lights, mapOccupancy != nullptr);
+				}
 				if (radiosityRenderer)
 					radiosityRenderer->Update();
 				if (mapRenderer)
@@ -840,6 +895,12 @@ namespace spades {
 
 			if (settings.r_srgb)
 				device->Enable(IGLDevice::FramebufferSRGB, false);
+
+			{
+				GLProfiler::Context p(*profiler, "Dynamic Light Occlusion Maps");
+				if (settings.r_dlights)
+					dynamicLightOcclusionMaps->Render(lights, *dynamicLightTable);
+			}
 
 			// build shadowmap
 			{
@@ -1237,6 +1298,13 @@ namespace spades {
 
 			// prepare for 2d drawing
 			Prepare2DRendering(true);
+
+			// The glares go onto the finished frame like the 2D drawing that follows,
+			// with the scene's depth still there to keep the first-person view on top.
+			{
+				GLProfiler::Context p(*profiler, "Glare");
+				glareRenderer->Render();
+			}
 		}
 
 		void GLRenderer::MultiplyScreenColor(spades::Vector3 color) {
@@ -1574,6 +1642,8 @@ namespace spades {
 				mapShadowRenderer->GameMapChanged(x, y, z, map);
 			if (waterRenderer)
 				waterRenderer->GameMapChanged(x, y, z, map);
+			if (mapOccupancy)
+				mapOccupancy->GameMapChanged(x, y, z);
 			if (ambientShadowRenderer)
 				ambientShadowRenderer->GameMapChanged(x, y, z, map);
 		}

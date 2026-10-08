@@ -19,7 +19,13 @@
  */
 
 #include "GLDynamicLightShader.h"
+
+#include <algorithm>
+
+#include "GLDynamicLightOcclusionMaps.h"
+#include "GLDynamicLightTable.h"
 #include "GLImage.h"
+#include "GLMapOccupancy.h"
 #include "GLProgramManager.h"
 #include "GLRenderer.h"
 #include <Core/Settings.h>
@@ -27,17 +33,17 @@
 namespace spades {
 	namespace draw {
 		GLDynamicLightShader::GLDynamicLightShader()
-		    : dynamicLightOrigin("dynamicLightOrigin"),
-		      dynamicLightColor("dynamicLightColor"),
-		      dynamicLightRadius("dynamicLightRadius"),
-		      dynamicLightRadiusInversed("dynamicLightRadiusInversed"),
-		      dynamicLightSpotMatrix("dynamicLightSpotMatrix"),
-		      dynamicLightProjectionTexture("dynamicLightProjectionTexture"),
-		      dynamicLightIsLinear("dynamicLightIsLinear"),
-		      dynamicLightLinearDirection("dynamicLightLinearDirection"),
-		      dynamicLightLinearLength("dynamicLightLinearLength") {
-			lastRenderer = NULL;
-		}
+		    : projectionTexture("dynamicLightProjectionTexture"),
+		      mapOccupancy("dynamicLightMapOccupancy"),
+		      mapSizeInversed("dynamicLightMapSizeInversed"),
+		      mapOcclusion("dynamicLightMapOcclusion"),
+		      eye("dynamicLightEye"),
+		      table("dynamicLightTable"),
+		      tableRowsInversed("dynamicLightTableRowsInversed"),
+		      occlusionMaps("dynamicLightOcclusionMaps"),
+		      count("dynamicLightCount"),
+		      rowsLow("dynamicLightRows[0]"),
+		      rowsHigh("dynamicLightRows[1]") {}
 
 		GLDynamicLightShader::~GLDynamicLightShader() {}
 
@@ -45,8 +51,10 @@ namespace spades {
 		GLDynamicLightShader::RegisterShader(spades::draw::GLProgramManager* r) {
 			std::vector<GLShader*> shaders;
 
+			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Lights.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.vs"));
+			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapOcclusion.fs"));
 
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.vs"));
@@ -54,81 +62,128 @@ namespace spades {
 			return shaders;
 		}
 
-		int GLDynamicLightShader::operator()(GLRenderer* renderer, spades::draw::GLProgram* program,
-		                                     const GLDynamicLight& light, int texStage) {
-			// TODO: Raw pointers are not unique!
-			if (lastRenderer != renderer) {
-				whiteImage = renderer->RegisterImage("Gfx/White.tga").Cast<GLImage>();
-				lastRenderer = renderer;
-			}
-
+		GLImage* GLDynamicLightShader::GetSpotImage(const GLDynamicLight& light) {
 			const client::DynamicLightParam& param = light.GetParam();
+			if (param.type != client::DynamicLightTypeSpotlight)
+				return nullptr;
+			return static_cast<GLImage*>(param.image);
+		}
+
+		GLImage* GLDynamicLightShader::TakeBatch() {
+			batch.clear();
+			deferred.clear();
+
+			GLImage* image = nullptr;
+			for (const GLDynamicLight* light : pending) {
+				GLImage* lightImage = GetSpotImage(*light);
+				const bool fits = batch.size() < MaxLightsPerDraw &&
+				                  (!lightImage || !image || lightImage == image);
+				if (!fits) {
+					deferred.push_back(light);
+					continue;
+				}
+				if (lightImage)
+					image = lightImage;
+				batch.push_back(light);
+			}
+			return image;
+		}
+
+		void GLDynamicLightShader::SetUp(GLRenderer* renderer, GLProgram* program, GLImage* image,
+		                                 int texStage) {
+			// A new renderer has its own images and programs, none of them set up.
+			if (lastRenderer != renderer->GetInstanceId()) {
+				whiteImage = renderer->RegisterImage("Gfx/White.tga").Cast<GLImage>();
+				lastRenderer = renderer->GetInstanceId();
+				// Its programs hold nothing uploaded yet, and it binds nothing yet.
+				uploadedProgram = nullptr;
+				boundPass = 0;
+			}
 
 			IGLDevice& device = renderer->GetGLDevice();
-			dynamicLightOrigin(program);
-			dynamicLightColor(program);
-			dynamicLightRadius(program);
-			dynamicLightRadiusInversed(program);
-			dynamicLightSpotMatrix(program);
-			dynamicLightProjectionTexture(program);
-			dynamicLightIsLinear(program);
-			dynamicLightLinearDirection(program);
-			dynamicLightLinearLength(program);
+			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
+			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
 
-			dynamicLightOrigin.SetValue(param.origin.x, param.origin.y, param.origin.z);
-			dynamicLightColor.SetValue(param.color.x, param.color.y, param.color.z);
-			dynamicLightRadius.SetValue(param.radius);
-			dynamicLightRadiusInversed.SetValue(1.f / param.radius);
+			// Once a pass, the textures every batch shares
+			const std::uint32_t pass = renderer->GetDynamicLightPass();
+			if (pass != boundPass) {
+				boundPass = pass;
+				boundImage = nullptr;
 
-			if (param.type == client::DynamicLightTypeSpotlight) {
-				device.ActiveTexture(texStage);
-				static_cast<GLImage*>(param.image)->Bind(IGLDevice::Texture2D);
-				dynamicLightProjectionTexture.SetValue(texStage);
-				texStage++;
+				// The map hides the lights from what is behind it, once it is loaded.
+				device.ActiveTexture(texStage + 1);
+				device.BindTexture(IGLDevice::Texture3D, occupancy ? occupancy->GetTexture() : 0);
 
-				dynamicLightSpotMatrix.SetValue(light.GetProjectionMatrix());
+				// The lights the batch names rows of
+				device.ActiveTexture(texStage + 2);
+				device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
 
-				// bad hack to make texture clamped to edge
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS,
-				                    IGLDevice::ClampToEdge);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT,
-				                    IGLDevice::ClampToEdge);
-
-				dynamicLightIsLinear.SetValue(0);
-			} else if (param.type == client::DynamicLightTypePoint ||
-			           param.type == client::DynamicLightTypeLinear) {
-				device.ActiveTexture(texStage);
-				whiteImage->Bind(IGLDevice::Texture2D);
-				dynamicLightProjectionTexture.SetValue(texStage);
-				texStage++;
-
-				// The shader samples from a white image. However, we still have to make sure
-				// UV is in a valid range so the fragments are not discarded.
-				dynamicLightSpotMatrix.SetValue(Matrix4::Translate(0.5F, 0.5F, 0.0F) *
-				                                Matrix4::Scale(0.0F));
-
-				if (param.type == client::DynamicLightTypeLinear) {
-					// Convert two endpoints to one endpoint + direction + length.
-					// `Vector3::Normalize` is no-op when the length is zero,
-					// therefore the zero-length case is handled.
-					Vector3 direction = param.point2 - param.origin;
-					float length = direction.GetLength();
-					direction = direction.Normalize();
-
-					dynamicLightLinearDirection.SetValue(direction.x, direction.y, direction.z);
-					dynamicLightLinearLength.SetValue(length);
-
-					dynamicLightIsLinear.SetValue(1);
-				} else {
-					dynamicLightIsLinear.SetValue(0);
-				}
-			} else {
-				SPUnreachable();
+				// Where the map stops the spotlights that have a map
+				device.ActiveTexture(texStage + 3);
+				device.BindTexture(IGLDevice::Texture2D,
+				                   renderer->GetDynamicLightOcclusionMaps().GetTexture());
 			}
 
+			// The batch's image, when it is another one than the last batch's
 			device.ActiveTexture(texStage);
+			GLImage* batchImage = image ? image : whiteImage.GetPointerOrNull();
+			if (batchImage != boundImage) {
+				boundImage = batchImage;
+				batchImage->Bind(IGLDevice::Texture2D);
+				if (image) {
+					// The image must not repeat past the cone's edge, and it is
+					// sampled where only some fragments of a quad reach the light,
+					// where a mipmap level cannot be chosen.
+					image->SetWrap(IGLDevice::ClampToEdge);
+					image->SetMinFilter(IGLDevice::Linear);
+				}
+			}
 
-			return texStage;
+			const std::uint32_t frame = renderer->GetFrameNumber();
+			if (program != uploadedProgram || frame != uploadedFrame) {
+				uploadedProgram = program;
+				uploadedFrame = frame;
+				uploadedBatch.clear();
+
+				projectionTexture(program);
+				projectionTexture.SetValue(texStage);
+				mapOccupancy(program);
+				mapOccupancy.SetValue(texStage + 1);
+				mapOcclusion(program);
+				mapOcclusion.SetValue(occupancy ? 1.F : 0.F);
+				if (occupancy) {
+					const Vector3 size = occupancy->GetSize();
+					mapSizeInversed(program);
+					mapSizeInversed.SetValue(1.F / size.x, 1.F / size.y, 1.F / size.z);
+				}
+				// Where the first-person view's models are lit from, as far as the map
+				// hiding a light from them goes
+				const Vector3& viewOrigin = renderer->GetSceneDef().viewOrigin;
+				eye(program);
+				eye.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
+				table(program);
+				table.SetValue(texStage + 2);
+				tableRowsInversed(program);
+				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
+				occlusionMaps(program);
+				occlusionMaps.SetValue(texStage + 3);
+			}
+
+			if (batch == uploadedBatch)
+				return;
+			uploadedBatch = batch;
+
+			float rows[MaxLightsPerDraw] = {};
+			for (std::size_t i = 0; i < batch.size(); i++)
+				rows[i] = (float)lightTable.GetRow(*batch[i]);
+
+			static_assert(MaxLightsPerDraw == 8, "the rows are sent as two vec4s");
+			count(program);
+			count.SetValue(static_cast<IGLDevice::Integer>(batch.size()));
+			rowsLow(program);
+			rowsLow.SetValue(rows[0], rows[1], rows[2], rows[3]);
+			rowsHigh(program);
+			rowsHigh.SetValue(rows[4], rows[5], rows[6], rows[7]);
 		}
 	} // namespace draw
 } // namespace spades

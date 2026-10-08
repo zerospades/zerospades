@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -81,6 +82,7 @@ namespace spades {
 			PacketTypePlayerProperties = 64,
 			PacketTypeDamageMarker = 96, // S2C, extension id 32 (`64 + extension id`)
 			PacketTypeTeamplay = 112, // S2C2P, extension id 48 (`64 + extension id`)
+			PacketTypeFlashlight = 114, // S2C2P, extension id 0x32 (`64 + extension id`)
 		};
 
 		/** Protocol extension ids, as negotiated through `PacketTypeExtensionInfo`. */
@@ -88,6 +90,7 @@ namespace spades {
 			ExtensionTypePlayerProperties = 0,
 			ExtensionTypeDamageMarkers = 32,
 			ExtensionTypeTeamplay = 48,
+			ExtensionTypeFlashlight = 0x32,
 			ExtensionTypePlayerLimit = 192,
 			ExtensionTypeMessageTypes = 193,
 			ExtensionTypeKickReason = 194,
@@ -104,13 +107,29 @@ namespace spades {
 		/** The fixed part of each Teamplay sub packet, in bytes, counted from just after
 		 * the sub packet id. Each is followed by a Reason that runs to the end of the
 		 * packet and may be empty, so these are minimum lengths. A reader checks its own
-		 * before reading: a short packet is ignored, while reading past the end would
-		 * raise and take the connection down with it. */
+		 * with `HasSubPacketBytes` before reading. */
 		constexpr std::size_t kTeamplayConfigBytes = 1 + 4 + 4;   // features, north x/y
 		constexpr std::size_t kTeamplayPingBytes =
 		  1 + 12 + 4 + 1 + 3 + 1; // player, position, duration, surfaces, colour, message
 		constexpr std::size_t kTeamplayMarkBytes =
 		  1 + 4 + 1 + 1 + 3 + 1; // player, duration, surfaces, flags, colour, message
+
+		/** Sub packet ids of `PacketTypeFlashlight`. */
+		enum FlashlightSubPacketType : std::uint8_t {
+			FlashlightSubLight = 0,       // C2S2P
+			FlashlightSubLightState = 1,  // S2C
+			FlashlightSubLightConfig = 2, // S2C
+		};
+
+		/** The length of each fixed-size Flashlight sub packet, counted from just after
+		 * the sub packet id. Light State runs to the end of the packet. */
+		constexpr std::size_t kFlashlightLightBytes = 1 + 1;          // player, state
+		constexpr std::size_t kFlashlightConfigBytes =
+		  1 + 1 + 1 + 3 + 1; // player, reach, cone, rgb, flicker
+
+		/** The player id that stands for the server: Player Limit reserves it, so no
+		 * player ever has it. */
+		constexpr int kServerPlayerId = 255;
 
 		inline PlayerInput ParsePlayerInput(uint8_t bits) {
 			PlayerInput inp;
@@ -317,6 +336,17 @@ namespace spades {
 					return marker;
 				default: return {};
 			}
+		}
+
+		/** Whether `r` has the `needed` bytes an extension sub packet is about to read,
+		 * `extension` naming it in the log. A short packet is ignored, while reading
+		 * past the end would raise and take the connection down with it. */
+		inline bool HasSubPacketBytes(const NetPacketReader& r, std::size_t needed,
+		                              const char* extension) {
+			if (r.GetNumRemainingBytes() >= needed)
+				return true;
+			SPLog("Ignoring a truncated %s sub packet", extension);
+			return false;
 		}
 
 	} // namespace client

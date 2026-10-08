@@ -1089,11 +1089,13 @@ namespace spades {
 				} else if (CheckKey(cg_keyFlashlight, name) && down) {
 					// spectators and dead players shouldn't be able to toggle the flashlight
 					if (!localPlayerIsSpectator && localPlayerIsAlive) {
-						flashlightOn = !flashlightOn;
-						flashlightOnTime = time;
-						Handle<IAudioChunk> c =
-						  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
-						audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+						if (net->IsFlashlightSynchronized()) {
+							// The switch the server relays back lights it.
+							net->SendFlashlight(!p.IsFlashlightOn());
+						} else {
+							p.SetFlashlightOn(!p.IsFlashlightOn());
+							PlayerSwitchedFlashlight(p);
+						}
 					}
 				} else if (CheckKey(cg_keyAutoFocus, name) && down && cg_manualFocus) {
 					autoFocusEnabled = true;

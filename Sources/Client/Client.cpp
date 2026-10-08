@@ -120,7 +120,6 @@ namespace spades {
 			  scoreboardVisible(false),
 			  netgraphVisible(false),
 			  hudVisible(true),
-			  flashlightOn(false),
 			  isChristmasOn(false),
 			  lastSnowDropTime(0.0F),
 			  hotBarIconState(0.0F),
@@ -238,7 +237,6 @@ namespace spades {
 			aimingDownSight = false;
 			reloadKeyPressed = false;
 			scoreboardVisible = false;
-			flashlightOn = false;
 			debugHitTestZoom = false;
 			spectatorZoom = false;
 			largeMapView->SetZoom(false);
@@ -402,6 +400,7 @@ namespace spades {
 			renderer->RegisterImage("Gfx/Ball.png");
 			renderer->RegisterImage("Gfx/HurtRing.png");
 			renderer->RegisterImage("Gfx/HurtSprite.png");
+			renderer->RegisterImage("Gfx/Glare.png");
 			renderer->RegisterImage("Gfx/ReflexSight.png");
 			renderer->RegisterImage("Gfx/Spotlight.jpg");
 			renderer->RegisterImage("Gfx/White.tga");
@@ -604,6 +603,7 @@ namespace spades {
 			renderer->RegisterModel("Models/Player/Torso.kv6");
 			renderer->RegisterModel("Models/Player/TorsoCrouch.kv6");
 			renderer->RegisterModel("Models/Player/UpperArm.kv6");
+			renderer->RegisterModel("Models/Player/Headlamp.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Pickaxe.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Spade.kv6");
 			renderer->RegisterModel("Models/Weapons/Block/Block.kv6");
@@ -1307,7 +1307,7 @@ namespace spades {
 
 			// No feature bit gates this: a relayed ping is drawn on the surfaces the
 			// packet names, and a server that wants one unseen does not send it.
-			std::string who = (playerId == Teamplay::kServerPlayerId)
+			std::string who = (playerId == kServerPlayerId)
 				? _Tr("Client", "The server")
 				: world ? world->GetPlayerName(playerId) : std::string();
 
@@ -1321,7 +1321,7 @@ namespace spades {
 			// exactly the surfaces its packet named.
 			uint8_t placed = Teamplay::ResolveSurfaces(surfaces);
 			if (duration != 0.0F && !(placed & Teamplay::SurfaceWorld) &&
-				playerId != Teamplay::kServerPlayerId) {
+				playerId != kServerPlayerId) {
 				std::string line = who;
 				if (!reason.empty())
 					line += line.empty() ? reason : ": " + reason;

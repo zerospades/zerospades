@@ -669,10 +669,14 @@ namespace spades {
 			if (world) {
 				stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 
+				// How lit the world around the lamps is: always full daylight.
+				const float ambient = 1.0F;
+
 				for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
 					if (world->GetPlayer(static_cast<unsigned int>(i))) {
 						SPAssert(clientPlayers[i]);
 						clientPlayers[i]->AddToScene();
+						clientPlayers[i]->AddFlashlightGlareToScene(ambient);
 					}
 				}
 

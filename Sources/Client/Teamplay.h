@@ -96,9 +96,6 @@ namespace spades {
 				MarkFlagShowName = 1 << 1,
 			};
 
-			/** Player ID a Ping carries when the server originated it itself. */
-			static constexpr int kServerPlayerId = 255;
-
 			/** The only Message ID version 1 of the extension defines. The byte is
 			 * reserved for a later version that names a label instead of spelling it;
 			 * a receiver that gets any other value renders the packet and ignores it. */

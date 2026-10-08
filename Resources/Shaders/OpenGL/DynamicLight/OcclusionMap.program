@@ -1,0 +1,3 @@
+Shaders/OpenGL/DynamicLight/OcclusionMap.fs
+Shaders/OpenGL/DynamicLight/OcclusionMap.vs
+Shaders/OpenGL/DynamicLight/MapOcclusion.fs

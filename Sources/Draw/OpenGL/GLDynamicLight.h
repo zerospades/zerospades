@@ -23,12 +23,16 @@
 #include <Client/IRenderer.h>
 #include <Core/Math.h>
 #include <array>
+#include <cstddef>
 
 namespace spades {
 	namespace draw {
 		class GLDynamicLight {
 			client::DynamicLightParam param;
 			Matrix4 projMatrix;
+
+			/** Its row in the renderer's `GLDynamicLightTable` this frame. */
+			std::size_t tableRow = 0;
 
 			/** World-space clip planes (spotlight only) */
 			std::array<Plane3, 4> clipPlanes;
@@ -37,14 +41,31 @@ namespace spades {
 			float poweredLength;
 
 		public:
+			/**
+			 * How far past the edge of its image a spotlight still lights, as a
+			 * fraction of the image's half width: its cone fades out between `0.8`
+			 * and this (`DYNAMIC_LIGHT_SPOT_FADE_END` in `DynamicLight/Lights.fs`).
+			 */
+			static constexpr float SpotFadeEnd = 1.1F;
+
 			GLDynamicLight(const client::DynamicLightParam &param);
 			const client::DynamicLightParam &GetParam() const { return param; }
 
 			const Matrix4 &GetProjectionMatrix() const { return projMatrix; }
 
+			std::size_t GetTableRow() const { return tableRow; }
+			void SetTableRow(std::size_t row) { tableRow = row; }
+
 			bool Cull(const AABB3 &) const;
 
 			bool SphereCull(const Vector3 &center, float radius) const;
+
+			/** The tangent of a spotlight's half angle: how far its image reaches
+			 * sideways per block ahead. */
+			float GetSpotTangent() const;
+
+			/** A sphere holding everything the light reaches. */
+			void GetBoundingSphere(Vector3 &center, float &radius) const;
 		};
 	} // namespace draw
 } // namespace spades

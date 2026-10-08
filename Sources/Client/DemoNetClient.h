@@ -72,6 +72,8 @@ namespace spades {
 			// True while fast-replaying packets after a backward seek; suppresses client callbacks
 			bool seekingMode;
 
+			FlashlightBeams flashlightBeams;
+
 			stmp::optional<World&> GetWorld();
 			Player& GetPlayer(int);
 			stmp::optional<Player&> GetPlayerOrNull(int);
@@ -150,6 +152,9 @@ namespace spades {
 			void SendTeamChange(int) override {}
 			void SendWeaponChange(WeaponType) override {}
 			void SendTeamplayPing(Vector3, const std::string&) override {}
+			void SendFlashlight(bool) override {}
+
+			const FlashlightBeams& GetFlashlightBeams() override { return flashlightBeams; }
 
 			// Damage Markers are never recorded, so a replay predicts its own numbers.
 			bool ServerReportsDamage() const override { return false; }

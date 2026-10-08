@@ -689,6 +689,51 @@ namespace spades {
 			// TODO: long sprite
 		}
 
+		void SWRenderer::AddGlare(client::IImage& image, const client::GlareParam& param) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			Glare glare;
+			glare.img = dynamic_cast<SWImage&>(image);
+			glare.param = param;
+			glares.push_back(std::move(glare));
+		}
+
+		void SWRenderer::DrawGlares() {
+			if (glares.empty())
+				return;
+
+			// Drawn as 2D images in their own colours, leaving the caller's alone
+			const Vector4 savedColor = drawColorAlphaPremultiplied;
+			const bool savedLegacyColorPremultiply = legacyColorPremultiply;
+
+			const float sw = ScreenWidth();
+			const float sh = ScreenHeight();
+
+			for (const Glare& glare : glares) {
+				const client::GlareParam& param = glare.param;
+
+				// `w` is how far ahead of the camera the light is.
+				const Vector4 clip = projectionViewMatrix * param.origin;
+				if (clip.w <= sceneDef.zNear)
+					continue;
+
+				const float x = (clip.x / clip.w * 0.5F + 0.5F) * sw;
+				const float y = (0.5F - clip.y / clip.w * 0.5F) * sh;
+				const Vector3& color = param.color;
+
+				// Added onto the frame: a zero alpha keeps what is underneath.
+				SetColorAlphaPremultiplied(MakeVector4(color.x, color.y, color.z, 0.0F));
+				DrawImage(*glare.img, AABB2(x - param.radius, y - param.radius,
+				                            param.radius * 2.0F, param.radius * 2.0F));
+			}
+
+			drawColorAlphaPremultiplied = savedColor;
+			legacyColorPremultiply = savedLegacyColorPremultiply;
+			glares.clear();
+		}
+
 		static uint32_t ConvertColor32(Vector4 col) {
 			auto convertColor = [](float f) {
 				int i = static_cast<int>(f * 255.0F + 0.5F);
@@ -912,6 +957,9 @@ namespace spades {
 			// all objects were rendered
 
 			duringSceneRendering = false;
+
+			// The glares go onto the finished frame like the 2D drawing that follows.
+			DrawGlares();
 		}
 
 		void SWRenderer::MultiplyScreenColor(spades::Vector3 v) { EnsureSceneNotStarted(); }
