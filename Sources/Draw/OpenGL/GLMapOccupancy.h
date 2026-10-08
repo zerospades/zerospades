@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "IGLDevice.h"
@@ -42,11 +43,20 @@ namespace spades {
 			const client::GameMap& map;
 			IGLDevice::UInteger texture;
 
-			/** Blocks changed since the last `Update`, at most once each. */
-			std::vector<IntVector3> dirtyBlocks;
-			std::vector<bool> isDirty;
+			/**
+			 * Regions holding blocks changed since the last `Update`, at most once
+			 * each. Each one is uploaded whole in a single call: a collapsing
+			 * structure or a grenade changes many blocks at once, but few regions.
+			 */
+			std::vector<IntVector3> dirtyRegions;
+			std::vector<bool> isRegionDirty;
 
-			int BlockIndex(int x, int y, int z) const;
+			int RegionIndex(const IntVector3& region) const;
+
+			/** Fills `texels` with the blocks from `origin` on, `size` of them, running
+			 * along x, then y, then z, as the texture's do. */
+			void ReadBlocks(const IntVector3& origin, const IntVector3& size,
+			                std::vector<std::uint8_t>& texels) const;
 
 		public:
 			GLMapOccupancy(GLRenderer&, const client::GameMap&);

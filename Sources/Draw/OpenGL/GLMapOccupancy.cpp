@@ -30,24 +30,28 @@ namespace spades {
 		namespace {
 			const std::uint8_t kSolid = 255;
 			const std::uint8_t kEmpty = 0;
+
+			/** The edge of a region uploaded at once, in blocks. */
+			constexpr int kRegionSize = 16;
+
+			// Every region is whole, and its rows meet the default unpack alignment.
+			static_assert(client::GameMap::DefaultWidth % kRegionSize == 0 &&
+			                client::GameMap::DefaultHeight % kRegionSize == 0 &&
+			                client::GameMap::DefaultDepth % kRegionSize == 0,
+			              "the map must be made of whole regions");
+			static_assert(kRegionSize % 4 == 0, "region rows must be 4-byte aligned");
 		} // namespace
 
 		GLMapOccupancy::GLMapOccupancy(GLRenderer& renderer, const client::GameMap& map)
 		    : device(renderer.GetGLDevice()), map(map) {
 			SPADES_MARK_FUNCTION();
 
-			const int w = map.Width(), h = map.Height(), d = map.Depth();
-			isDirty.resize((std::size_t)w * h * d);
+			const IntVector3 size = MakeIntVector3(map.Width(), map.Height(), map.Depth());
+			isRegionDirty.resize((std::size_t)(size.x / kRegionSize) * (size.y / kRegionSize) *
+			                     (size.z / kRegionSize));
 
-			// Texels run along x, then y, then z, as the texture's do.
-			std::vector<std::uint8_t> texels((std::size_t)w * h * d);
-			for (int y = 0; y < h; y++) {
-				for (int x = 0; x < w; x++) {
-					const std::uint64_t column = map.GetSolidMap(x, y);
-					for (int z = 0; z < d; z++)
-						texels[BlockIndex(x, y, z)] = ((column >> z) & 1) ? kSolid : kEmpty;
-				}
-			}
+			std::vector<std::uint8_t> texels;
+			ReadBlocks(MakeIntVector3(0, 0, 0), size, texels);
 
 			texture = device.GenTexture();
 			device.BindTexture(IGLDevice::Texture3D, texture);
@@ -60,14 +64,32 @@ namespace spades {
 			device.TexParamater(IGLDevice::Texture3D, IGLDevice::TextureWrapT, IGLDevice::Repeat);
 			device.TexParamater(IGLDevice::Texture3D, IGLDevice::TextureWrapR,
 			                    IGLDevice::ClampToEdge);
-			device.TexImage3D(IGLDevice::Texture3D, 0, IGLDevice::Red, w, h, d, 0, IGLDevice::Red,
-			                  IGLDevice::UnsignedByte, texels.data());
+			device.TexImage3D(IGLDevice::Texture3D, 0, IGLDevice::Red, size.x, size.y, size.z, 0,
+			                  IGLDevice::Red, IGLDevice::UnsignedByte, texels.data());
 		}
 
 		GLMapOccupancy::~GLMapOccupancy() { device.DeleteTexture(texture); }
 
-		int GLMapOccupancy::BlockIndex(int x, int y, int z) const {
-			return x + (y + z * map.Height()) * map.Width();
+		int GLMapOccupancy::RegionIndex(const IntVector3& region) const {
+			const int regionsX = map.Width() / kRegionSize;
+			const int regionsY = map.Height() / kRegionSize;
+			return region.x + (region.y + region.z * regionsY) * regionsX;
+		}
+
+		void GLMapOccupancy::ReadBlocks(const IntVector3& origin, const IntVector3& size,
+		                                std::vector<std::uint8_t>& texels) const {
+			texels.resize((std::size_t)size.x * size.y * size.z);
+
+			for (int y = 0; y < size.y; y++) {
+				for (int x = 0; x < size.x; x++) {
+					const std::uint64_t column = map.GetSolidMap(origin.x + x, origin.y + y);
+					for (int z = 0; z < size.z; z++) {
+						const bool solid = ((column >> (origin.z + z)) & 1) != 0;
+						texels[x + (y + z * (std::size_t)size.y) * size.x] =
+						  solid ? kSolid : kEmpty;
+					}
+				}
+			}
 		}
 
 		Vector3 GLMapOccupancy::GetSize() const {
@@ -79,25 +101,32 @@ namespace spades {
 			    z >= map.Depth())
 				return;
 
-			const int index = BlockIndex(x, y, z);
-			if (isDirty[index])
+			const IntVector3 region =
+			  MakeIntVector3(x / kRegionSize, y / kRegionSize, z / kRegionSize);
+			const int index = RegionIndex(region);
+			if (isRegionDirty[index])
 				return;
-			isDirty[index] = true;
-			dirtyBlocks.push_back(MakeIntVector3(x, y, z));
+			isRegionDirty[index] = true;
+			dirtyRegions.push_back(region);
 		}
 
 		void GLMapOccupancy::Update() {
-			if (dirtyBlocks.empty())
+			if (dirtyRegions.empty())
 				return;
 
+			const IntVector3 size = MakeIntVector3(kRegionSize, kRegionSize, kRegionSize);
+			std::vector<std::uint8_t> texels;
+
 			device.BindTexture(IGLDevice::Texture3D, texture);
-			for (const IntVector3& block : dirtyBlocks) {
-				const std::uint8_t texel = map.IsSolid(block.x, block.y, block.z) ? kSolid : kEmpty;
-				device.TexSubImage3D(IGLDevice::Texture3D, 0, block.x, block.y, block.z, 1, 1, 1,
-				                     IGLDevice::Red, IGLDevice::UnsignedByte, &texel);
-				isDirty[BlockIndex(block.x, block.y, block.z)] = false;
+			for (const IntVector3& region : dirtyRegions) {
+				const IntVector3 origin = region * kRegionSize;
+				ReadBlocks(origin, size, texels);
+				device.TexSubImage3D(IGLDevice::Texture3D, 0, origin.x, origin.y, origin.z, size.x,
+				                     size.y, size.z, IGLDevice::Red, IGLDevice::UnsignedByte,
+				                     texels.data());
+				isRegionDirty[RegionIndex(region)] = false;
 			}
-			dirtyBlocks.clear();
+			dirtyRegions.clear();
 		}
 	} // namespace draw
 } // namespace spades
