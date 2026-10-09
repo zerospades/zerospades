@@ -91,10 +91,10 @@ namespace spades {
 			// Swapchain generation counter, incremented on every successful recreation
 		uint32_t swapchainGeneration{0};
 
-		// Debug messenger (only in debug mode)
-#ifndef NDEBUG
-			VkDebugUtilsMessengerEXT debugMessenger;
-#endif
+			/** Whether the validation layers are on: asked for (debug builds, or
+			 * `ZS_VULKAN_VALIDATION`) and found */
+			bool validationEnabled{false};
+			VkDebugUtilsMessengerEXT debugMessenger{VK_NULL_HANDLE};
 
 			// Helper methods
 			void CreateInstance();
