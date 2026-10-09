@@ -62,7 +62,7 @@ layout(location = 15) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
 
-#include "DynamicLight/Lights.glsl"
+#include "SceneLight/Lights.glsl"
 
 // Same cascade sampling as BasicMap.frag -- see the rationale there for both
 // the 2x2 filtered compare and the depth-based cascade choice. Local Z 0 = sun

@@ -1,5 +1,5 @@
 #include "VulkanWaterRenderer.h"
-#include "VulkanDynamicLightClusters.h"
+#include "VulkanSceneLights.h"
 #include "VulkanRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanBuffer.h"
@@ -1044,7 +1044,7 @@ namespace spades {
 		                       waterProgram->GetPipelineLayout(), 0, 1,
 		                       &descriptorSets[frameIndex], 0, nullptr);
 		VkDescriptorSet lightSet =
-		  renderer.GetDynamicLightClusters().GetDescriptorSet(renderer.GetCurrentFrameIndex());
+		  renderer.GetSceneLights().GetDescriptorSet(renderer.GetCurrentFrameIndex());
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		                        waterProgram->GetPipelineLayout(), 2, 1, &lightSet, 0, nullptr);
 

@@ -27,7 +27,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
 #include "VulkanImageWrapper.h"
-#include "VulkanDynamicLightClusters.h"
+#include "VulkanSceneLights.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Client/GameMap.h>
 #include <Core/Debug.h>
@@ -250,7 +250,7 @@ namespace spades {
 			}
 
 			// The frame's dynamic lights (set 2), lit in this pass
-			VkDescriptorSet lightSet = renderer.GetDynamicLightClusters().GetDescriptorSet(
+			VkDescriptorSet lightSet = renderer.GetSceneLights().GetDescriptorSet(
 			  renderer.GetCurrentFrameIndex());
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			                        2, 1, &lightSet, 0, nullptr);
@@ -654,7 +654,7 @@ namespace spades {
 			VkDescriptorSetLayout setLayouts[3] = {
 			    descriptorSetLayout,
 			    smr ? smr->GetSamplingSetLayout() : VK_NULL_HANDLE,
-			    renderer.GetDynamicLightClusters().GetSetLayout(),
+			    renderer.GetSceneLights().GetSetLayout(),
 			};
 			SPAssert(setLayouts[1] != VK_NULL_HANDLE);
 

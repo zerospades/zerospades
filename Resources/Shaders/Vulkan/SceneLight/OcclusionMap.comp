@@ -25,15 +25,15 @@
 // a layer of workgroups per tile, each storing how far from its light the ray
 // through its texel gets before it enters a solid block, up to the light's reach.
 
-#define DYNAMIC_LIGHT_SET 0
+#define SCENE_LIGHT_SET 0
 #define DYNAMIC_LIGHT_CLUSTER_ACCESS readonly
 #include "Table.glsl"
 #include "MapWalk.glsl"
 
-layout(set = DYNAMIC_LIGHT_SET, binding = 5, r32f) uniform writeonly image2D
+layout(set = SCENE_LIGHT_SET, binding = 5, r32f) uniform writeonly image2D
   dynamicLightOcclusionMaps;
 
-// `VulkanDynamicLightClusters::OcclusionGroupSize`
+// `VulkanSceneLights::OcclusionGroupSize`
 layout(local_size_x = 8, local_size_y = 8) in;
 
 void main() {
