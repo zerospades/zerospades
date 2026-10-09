@@ -35,7 +35,6 @@ namespace spades {
 		class VulkanModel;
 
 		class VulkanModelRenderer {
-			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 
 			struct RenderModel {

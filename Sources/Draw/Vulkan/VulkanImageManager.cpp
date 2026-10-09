@@ -31,8 +31,8 @@
 namespace spades {
 	namespace draw {
 
-		VulkanImageManager::VulkanImageManager(VulkanRenderer& r, Handle<gui::SDLVulkanDevice> dev)
-		    : renderer(r), device(dev), whiteImage(nullptr) {
+		VulkanImageManager::VulkanImageManager(Handle<gui::SDLVulkanDevice> dev)
+		    : device(dev), whiteImage(nullptr) {
 			SPADES_MARK_FUNCTION();
 		}
 

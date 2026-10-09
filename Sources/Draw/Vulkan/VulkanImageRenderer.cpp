@@ -37,7 +37,7 @@ namespace spades {
 	namespace draw {
 		VulkanImageRenderer::VulkanImageRenderer(VulkanRenderer& r)
 		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.GetDevice().Unmanage())),
+		      device(r.GetDevice()),
 		      image(nullptr),
 		      pipeline(VK_NULL_HANDLE),
 		      pipelineLayout(VK_NULL_HANDLE),
