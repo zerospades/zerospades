@@ -19,28 +19,30 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Vulkan port of OptimizedVoxelModelXRay.vs. The GL model samples a texture
 // atlas where this one carries per-vertex colours, so the albedo arrives as a
 // vertex attribute instead of a texture coordinate; everything else matches.
 //
 // The GL shader builds the fresnel term in world space from viewOriginVector.
-// The view matrix is rigid, so the same angle falls out of view space, and
-// pushing viewModelMatrix alone covers the fresnel, the eye vector and the
-// specular normal -- one matrix instead of three.
+// The view matrix is rigid, so the same angle falls out of view space, and the
+// view-model matrix alone covers the fresnel, the eye vector and the specular
+// normal.
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewModelMatrix;
-	mat4 viewModelMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the model's placement and colours. The rest is
+// the pass's (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
+	mat4 modelMatrix;
 	vec3 modelOrigin;
 	float _pad0;
 	vec3 xrayColor;
 	float _pad1;
 	vec3 customColor;
 	float _pad2;
-	vec3 viewSpaceLight; // sun direction in view space, normalized
-	float _pad3;
-} pushConstants;
+} draw;
 
 layout(location = 0) in uvec3 positionAttribute;
 layout(location = 1) in uvec3 colorAttribute;
@@ -52,12 +54,14 @@ layout(location = 2) out vec3 viewSpaceCoord;
 layout(location = 3) out vec3 viewSpaceNormal;
 
 void main() {
-	vec4 localPos = vec4(vec3(positionAttribute) + pushConstants.modelOrigin, 1.0);
-	gl_Position = pushConstants.projectionViewModelMatrix * localPos;
+	vec4 localPos = vec4(vec3(positionAttribute) + draw.modelOrigin, 1.0);
+	vec4 worldPos = draw.modelMatrix * localPos;
+	gl_Position = sceneView.projectionView * worldPos;
 
-	viewSpaceCoord = (pushConstants.viewModelMatrix * localPos).xyz;
+	mat4 viewModelMatrix = sceneView.view * draw.modelMatrix;
+	viewSpaceCoord = (sceneView.view * worldPos).xyz;
 	viewSpaceNormal =
-		normalize((pushConstants.viewModelMatrix * vec4(normalize(vec3(normalAttribute)), 0.0)).xyz);
+		normalize((viewModelMatrix * vec4(normalize(vec3(normalAttribute)), 0.0)).xyz);
 
 	vec3 viewDir = normalize(-viewSpaceCoord);
 	float dotNV = max(dot(viewSpaceNormal, viewDir), 0.0);
