@@ -34,14 +34,16 @@
 
 #version 450
 
-layout(push_constant) uniform Params {
+// The frame's parameters (`VulkanFogFilter`): a uniform buffer, past the 128
+// bytes of push constants every device takes
+layout(binding = 8, std140) uniform Params {
     mat4 viewProjectionMatrixInv; // [0..63]   UV → view-centric world (VS+FS)
     vec4 viewOriginFogDist;       // [64..79]  xyz=viewOrigin, w=fogDistance (FS)
     vec4 sunlightScale;           // [80..95]  xyz (FS)
     vec4 ambientScale;            // [96..111] xyz (FS)
     vec4 radiosityScale;          // [112..127] xyz (FS)
     vec4 ditherFrame;             // [128..143] xy=per-frame noise seed (FS)
-} pc;
+} params;
 
 layout(location = 0) out vec2 texCoord;
 layout(location = 1) out vec4 viewcentricWorldPositionPartial;
@@ -51,5 +53,5 @@ void main() {
     texCoord    = uv;
     gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
 
-    viewcentricWorldPositionPartial = pc.viewProjectionMatrixInv * vec4(uv, 0.0, 1.0);
+    viewcentricWorldPositionPartial = params.viewProjectionMatrixInv * vec4(uv, 0.0, 1.0);
 }
