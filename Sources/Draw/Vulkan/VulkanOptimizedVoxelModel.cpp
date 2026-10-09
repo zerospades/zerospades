@@ -135,9 +135,8 @@ namespace spades {
 
 		VulkanOptimizedVoxelModel::VulkanOptimizedVoxelModel(VoxelModel* m, VulkanRenderer& r)
 		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.GetDevice().Unmanage())),
+		      device(r.GetDevice()),
 		      descriptorPool(VK_NULL_HANDLE),
-		      descriptorSet(VK_NULL_HANDLE),
 		      numIndices(0) {
 			SPADES_MARK_FUNCTION();
 
