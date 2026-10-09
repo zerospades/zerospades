@@ -68,19 +68,30 @@ namespace spades {
 			"VK_LAYER_KHRONOS_validation"
 		};
 
-
 		// Debug callback for validation layers
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-			VkDebugUtilsMessageTypeFlagsEXT messageType,
+			VkDebugUtilsMessageSeverityFlagBitsEXT,
+			VkDebugUtilsMessageTypeFlagsEXT,
 			const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-			void* pUserData) {
-
-			if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-				SPLog("[Vulkan] %s", pCallbackData->pMessage);
-			}
-
+			void*) {
+			SPLog("[Vulkan] %s", pCallbackData->pMessage);
 			return VK_FALSE;
+		}
+
+		// What the validation layers report to the log: warnings and errors, of
+		// every kind. The same description serves the messenger kept for the
+		// device's life and the one covering the instance's own creation and
+		// destruction.
+		static VkDebugUtilsMessengerCreateInfoEXT MakeDebugMessengerCreateInfo() {
+			VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+			createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+			createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+			                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+			                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+			createInfo.pfnUserCallback = debugCallback;
+			return createInfo;
 		}
 
 		const std::vector<const char*>& SDLVulkanDevice::GetRequiredDeviceExtensions() {
@@ -122,11 +133,7 @@ namespace spades {
 		  currentFrame(0),
 		  allocator(VK_NULL_HANDLE),
 		  dedicatedAllocEnabled(false),
-		  bindMemory2Enabled(false)
-#ifndef NDEBUG
-		  , debugMessenger(VK_NULL_HANDLE)
-#endif  // NDEBUG
-		{
+		  bindMemory2Enabled(false) {
 			SPADES_MARK_FUNCTION();
 
 			SDL_GetWindowSize(window, &w, &h);
@@ -186,7 +193,6 @@ namespace spades {
 			if (surface != VK_NULL_HANDLE)
 				vkDestroySurfaceKHR(instance, surface, nullptr);
 
-#ifndef NDEBUG
 			if (debugMessenger != VK_NULL_HANDLE) {
 				auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)
 					vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -194,7 +200,6 @@ namespace spades {
 					func(instance, debugMessenger, nullptr);
 				}
 			}
-#endif
 
 			if (instance != VK_NULL_HANDLE)
 				vkDestroyInstance(instance, nullptr);
@@ -262,8 +267,8 @@ namespace spades {
 			}
 
 			// Add debug extension and check validation layer availability if validation layers are enabled
-			bool useValidationLayers = enableValidationLayers;
-			if (useValidationLayers) {
+			validationEnabled = enableValidationLayers;
+			if (validationEnabled) {
 				// Check available instance layers
 				uint32_t availableLayerCount = 0;
 				vkEnumerateInstanceLayerProperties(&availableLayerCount, nullptr);
@@ -282,12 +287,12 @@ namespace spades {
 					}
 					if (!found) {
 						SPLog("Warning: Requested validation layer '%s' not available; disabling validation layers", layerName);
-						useValidationLayers = false;
+						validationEnabled = false;
 						break;
 					}
 				}
 
-				if (useValidationLayers) {
+				if (validationEnabled) {
 					extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 				}
 			}
@@ -299,6 +304,10 @@ namespace spades {
 			// vkCreateInstance fails with VK_ERROR_INCOMPATIBLE_DRIVER. Opt in
 			// when the loader advertises the extension; a direct MoltenVK link
 			// does not advertise it, so this is a no-op there.
+			//
+			// A portability device's VK_KHR_portability_subset depends on
+			// VK_KHR_get_physical_device_properties2, so that is enabled wherever
+			// it is offered too.
 			VkInstanceCreateFlags instanceFlags = 0;
 			{
 				uint32_t extCount = 0;
@@ -308,12 +317,13 @@ namespace spades {
 					vkEnumerateInstanceExtensionProperties(nullptr, &extCount, available.data());
 
 				for (const auto& ext : available) {
-					if (strcmp(ext.extensionName, "VK_KHR_portability_enumeration") == 0) {
-						extensions.push_back("VK_KHR_portability_enumeration");
-						// VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
-						instanceFlags |= 0x00000001;
+					if (strcmp(ext.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
+						extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+						instanceFlags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 						SPLog("Enabling portability enumeration (running behind the Vulkan loader)");
-						break;
+					} else if (strcmp(ext.extensionName,
+					                  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) == 0) {
+						extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 					}
 				}
 			}
@@ -325,62 +335,18 @@ namespace spades {
 			createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 			createInfo.ppEnabledExtensionNames = extensions.data();
 
-			// Enable validation layers in debug mode (if available)
-			VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-			if (useValidationLayers) {
+			// Enable the validation layers, if asked for and available, with a
+			// messenger covering the instance's own creation and destruction
+			VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = MakeDebugMessengerCreateInfo();
+			if (validationEnabled) {
 				createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 				createInfo.ppEnabledLayerNames = validationLayers.data();
-
-				// Setup debug messenger creation info for instance creation/destruction
-				debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-				debugCreateInfo.messageSeverity =
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-					VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-				debugCreateInfo.messageType =
-					VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-					VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-					VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-				debugCreateInfo.pfnUserCallback = debugCallback;
-
 				createInfo.pNext = &debugCreateInfo;
 			} else {
 				createInfo.enabledLayerCount = 0;
 				createInfo.pNext = nullptr;
 			}
 
-			// On macOS with MoltenVK, enable portability enumeration if available.
-			// When linking directly to MoltenVK the extension may not be present,
-			// but MoltenVK still exposes its device without it.
-#ifdef __APPLE__
-			{
-				uint32_t availableExtCount = 0;
-				vkEnumerateInstanceExtensionProperties(nullptr, &availableExtCount, nullptr);
-				std::vector<VkExtensionProperties> availableExts(availableExtCount);
-				if (availableExtCount > 0) {
-					vkEnumerateInstanceExtensionProperties(nullptr, &availableExtCount, availableExts.data());
-				}
-
-				bool hasPortabilityEnum = false;
-				bool hasPhysDevProps2 = false;
-				for (const auto& ext : availableExts) {
-					if (strcmp(ext.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
-						hasPortabilityEnum = true;
-					if (strcmp(ext.extensionName, "VK_KHR_get_physical_device_properties2") == 0)
-						hasPhysDevProps2 = true;
-				}
-
-				if (hasPortabilityEnum) {
-					createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-					extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-				}
-				if (hasPhysDevProps2) {
-					extensions.push_back("VK_KHR_get_physical_device_properties2");
-				}
-				createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-				createInfo.ppEnabledExtensionNames = extensions.data();
-			}
-#endif
 
 			VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
 			if (result != VK_SUCCESS) {
@@ -391,20 +357,9 @@ namespace spades {
 		}
 
 		void SDLVulkanDevice::SetupDebugMessenger() {
-#ifndef NDEBUG
-			if (!enableValidationLayers) return;
+			if (!validationEnabled) return;
 
-			VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-			createInfo.messageSeverity =
-				VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-				VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-				VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-			createInfo.messageType =
-				VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-				VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-				VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-			createInfo.pfnUserCallback = debugCallback;
+			VkDebugUtilsMessengerCreateInfoEXT createInfo = MakeDebugMessengerCreateInfo();
 
 			auto func = (PFN_vkCreateDebugUtilsMessengerEXT)
 				vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -417,7 +372,6 @@ namespace spades {
 					SPLog("Vulkan debug messenger created");
 				}
 			}
-#endif
 		}
 
 		void SDLVulkanDevice::CreateSurface() {
