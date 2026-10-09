@@ -48,8 +48,9 @@ namespace spades {
 				float fogColorDistance[4];
 				float nearFar[4];
 				float sunDirection[4];
+				float lowResolution[4];
 			};
-			static_assert(sizeof(GpuView) == 176, "GpuView must match SpriteView");
+			static_assert(sizeof(GpuView) == 192, "GpuView must match SpriteView");
 
 			/** The fewest vertices and indices a frame's buffers are made for */
 			constexpr std::size_t kInitialVertexCapacity = 1024;

@@ -52,13 +52,19 @@ namespace spades {
 		 * a pass of their own over the scene's colour. At `r_softParticles` 2 they are
 		 * also lit as the volumes they stand for, by the sun through the map's and the
 		 * models' shadows, the sky, and the dynamic lights, with the lit pipelines'
-		 * sets bound before their own.
+		 * sets bound before their own. As in GL, a soft sprite covering much of the
+		 * screen is drawn at a quarter of the resolution instead, blurred, and laid
+		 * over the scene after the rest, crossfading with its full-resolution self
+		 * in between.
 		 */
 		class VulkanSpriteRenderer : public RefCountedObject {
 		public:
 			/** The descriptor set the sprite shaders bind their own resources to: the
 			 * lit pipelines' sets come first. */
 			static constexpr std::uint32_t SpriteSet = 3;
+
+			/** Which of a soft sprite's layers a pipeline draws: `SPRITE_LAYER` */
+			enum class Layer : std::int32_t { Every = 0, FullResolution = 1, LowResolution = 2 };
 
 		private:
 			struct Sprite {
@@ -90,6 +96,13 @@ namespace spades {
 				/** The image sets allocated this frame, and the images they hold */
 				std::unordered_map<VulkanImage*, VkDescriptorSet> imageSets;
 				std::vector<Handle<VulkanImage>> images;
+				std::vector<VkFramebuffer> framebuffers;
+
+				/** Whether this frame's sprites are uploaded, and lit as volumes */
+				bool prepared = false;
+				bool lit = false;
+				/** The blurred quarter-resolution layer to lay over the scene, if any */
+				Handle<VulkanImage> lowResolution;
 			};
 
 			VulkanRenderer& renderer;
@@ -104,16 +117,50 @@ namespace spades {
 			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 			VkPipeline litPipeline = VK_NULL_HANDLE;
 			VkPipelineLayout litPipelineLayout = VK_NULL_HANDLE;
+
+			// The quarter-resolution layer of soft sprites: their pipelines, its
+			// passes, its blur and its compositing over the scene
+			VkPipeline lowPipeline = VK_NULL_HANDLE;
+			VkPipeline litLowPipeline = VK_NULL_HANDLE;
+			VkRenderPass lowRenderPass = VK_NULL_HANDLE;
+			VkRenderPass blurRenderPass = VK_NULL_HANDLE;
+			VkDescriptorSetLayout textureSetLayout = VK_NULL_HANDLE;
+			VkPipelineLayout blurLayout = VK_NULL_HANDLE;
+			VkPipeline blurPipeline = VK_NULL_HANDLE;
+			VkPipelineLayout compositeLayout = VK_NULL_HANDLE;
+			VkPipeline compositePipeline = VK_NULL_HANDLE;
+			VkSampler linearSampler = VK_NULL_HANDLE;
 			/** The sprite's own set: its view, its image and, for soft sprites, the
 			 * scene's depth */
 			VkDescriptorSetLayout spriteSetLayout = VK_NULL_HANDLE;
 
 			std::vector<FrameResources> frames;
 
-			/** Builds the sprites' pipeline with `layout` from the shaders given; with
+			/** Builds the sprites' pipeline with `layout` from the shaders given, for
+			 * `renderPass` at `samples`, drawing `layer` of soft sprites; with
 			 * `specializeRadiosity`, `USE_RADIOSITY` follows `r_radiosity`. */
 			VkPipeline BuildPipeline(VkPipelineLayout layout, const char* vertexShader,
-			                         const char* fragmentShader, bool specializeRadiosity);
+			                         const char* fragmentShader, bool specializeRadiosity,
+			                         VkRenderPass renderPass, VkSampleCountFlagBits samples,
+			                         Layer layer);
+
+			/** Builds a full-screen pipeline drawing `fragmentShader` with `layout`,
+			 * blending premultiplied colours over what is there if `blend`. */
+			VkPipeline BuildFullscreenPipeline(VkPipelineLayout layout, const char* fragmentShader,
+			                                   VkRenderPass renderPass,
+			                                   VkSampleCountFlagBits samples, bool blend);
+			void CreateLowResolutionResources();
+
+			/** Writes the frame's view and sprites, the first time it is asked to. */
+			void Upload(FrameResources&, std::size_t frameSlot);
+
+			/** Draws the frame's sprites with `pipeline` into the pass under way. */
+			void DrawSprites(VkCommandBuffer, FrameResources&, std::size_t frameSlot,
+			                 VkPipeline pipeline);
+
+			/** A set holding `image` alone, for the full-screen passes */
+			VkDescriptorSet MakeTextureSet(FrameResources&, VulkanImage& image);
+			VkFramebuffer MakeFramebuffer(FrameResources&, VkRenderPass, VulkanImage& image);
 			void CreatePipeline();
 
 			/** Makes the lit pipeline the first time there is a map to light the
@@ -132,6 +179,14 @@ namespace spades {
 
 			void Add(VulkanImage* img, Vector3 center, float rad, float ang, Vector4 color);
 			void Clear();
+
+			/**
+			 * Uploads the sprites added since the last `Clear`, and, for soft sprites,
+			 * records the passes drawing the quarter-resolution layer: outside of a
+			 * render pass, once the scene's depth is there to fade into, and before
+			 * `Render`.
+			 */
+			void Prepare(VkCommandBuffer commandBuffer, std::size_t frameSlot);
 
 			/** Records the sprites added since the last `Clear` into the render pass
 			 * under way, with frame slot `frameSlot`'s resources. */

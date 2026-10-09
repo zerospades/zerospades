@@ -2407,6 +2407,10 @@ namespace spades {
 			// ends that way), in the still-multisampled scene image (the MSAA resolve
 			// is below), so soft particles are included in that resolve.
 			if (useSoftParticles && spriteRenderer) {
+				// The large sprites' quarter-resolution layer, in passes of its own
+				// before the sprite pass, now that the depth they fade into is there
+				spriteRenderer->Prepare(commandBuffer, currentFrameSlot);
+
 				// Move colour back to COLOR_ATTACHMENT for the sprite pass; depth stays
 				// SHADER_READ for sampling.
 				VkImageMemoryBarrier toColor{};
