@@ -663,7 +663,11 @@ namespace spades {
 						scriptedUI->EnterChatLogWindow();
 						scriptedUI->SetIgnored(name);
 					} else if (CheckKey(cg_keyZoomChatLog, name)) {
-						chatWindow->SetExpanded(down);
+						// hold to peek at the chat history
+						if (down)
+							scriptedUI->EnterChatPeek();
+						else
+							scriptedUI->ExitChatPeek();
 					} else if (CheckKey(cg_keyDemoToggleHud, name) && down) {
 						demoHudVisible = !demoHudVisible;
 
@@ -993,7 +997,11 @@ namespace spades {
 					scriptedUI->EnterChatLogWindow();
 					scriptedUI->SetIgnored(name);
 				} else if (CheckKey(cg_keyZoomChatLog, name)) {
-					chatWindow->SetExpanded(down);
+					// hold to peek at the chat history
+					if (down)
+						scriptedUI->EnterChatPeek();
+					else
+						scriptedUI->ExitChatPeek();
 				} else if (CheckKey(cg_keyCaptureColor, name) && down) {
 					if (!localPlayerIsSpectator && localPlayerIsAlive && p.IsToolBlock())
 						CaptureColor();

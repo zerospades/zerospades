@@ -59,6 +59,9 @@ namespace spades {
 				float rowHeight = 24.0F;
 				float scrollBarWidth = 16.0F;
 
+				/** When true, the rows are anchored to the bottom edge instead of the top one. */
+				bool bottomAligned = false;
+
 				ListViewBase(UIManager* manager);
 
 				int GetNumVisibleRows() const;
@@ -69,6 +72,9 @@ namespace spades {
 				void Layout();
 
 				float GetItemWidth() const { return size.x - scrollBarWidth; }
+
+				/** Vertical offset of the first loaded row; non-zero only when `bottomAligned` is set. */
+				float GetRowsOffsetY() const;
 
 				void MouseWheel(float delta) override;
 

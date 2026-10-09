@@ -149,6 +149,7 @@ namespace spades {
 			std::string archInfo = VersionInfo::GetAppArchitecture();
 			std::string s = _Tr("Client", "You are connected with {0} ({2}) on {1}", verStr, osInfo, archInfo);
 			chatWindow->AddMessage(ChatWindow::ColoredMessage(s, MsgColorSysInfo));
+			scriptedUI->RecordChatLog(s, chatWindow->GetColor(MsgColorSysInfo));
 
 			// start recording if auto-record is enabled
 			if (net && (int)cg_demoAutoRecord != 0) {
@@ -405,7 +406,7 @@ namespace spades {
 			std::string msg;
 			std::string teamName = p.IsSpectator()
 				? _Tr("Client", "Spectator") : p.GetTeamName();
-			
+
 			if (p.IsLocalPlayer()) {
 				msg = p.IsSpectator()
 					? _Tr("Client", "You are now a spectator")
@@ -413,7 +414,7 @@ namespace spades {
 				centerMessageView->AddMessage(msg);
 				return;
 			}
-			
+
 			{
 				msg = _Tr("Client", "{0} joined {1} team", p.GetName(), teamName);
 				NetLog("%s", msg.c_str());

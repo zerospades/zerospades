@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <utility>
 
 #include "DrawUtils.h"
@@ -51,9 +52,13 @@ namespace spades {
 					return out;
 				}
 
-				/** Removes paired backticks from `src` and records the enclosed byte ranges. */
+				/**
+				 * Removes paired backticks from `src` and records the enclosed byte ranges. The
+				 * offsets in `src` of the removed backticks are appended to `removed`, in order.
+				 */
 				std::string StripInlineCode(const std::string& src,
-				                            std::vector<std::pair<int, int>>& ranges) {
+				                            std::vector<std::pair<int, int>>& ranges,
+				                            std::vector<int>* removed = nullptr) {
 					std::string out;
 					size_t i = 0;
 					while (i < src.size()) {
@@ -74,6 +79,10 @@ namespace spades {
 						int end = static_cast<int>(out.size());
 						if (end > begin)
 							ranges.push_back(std::make_pair(begin, end));
+						if (removed) {
+							removed->push_back(static_cast<int>(a));
+							removed->push_back(static_cast<int>(b));
+						}
 						i = b + 1;
 					}
 					return out;
@@ -267,7 +276,8 @@ namespace spades {
 				}
 
 				// draw selection
-				if (selection->focusElement && selection->focusElement->IsFocused()) {
+				if (selection->focusElement &&
+				    (selection->showUnfocused || selection->focusElement->IsFocused())) {
 					int start = selection->GetSelectionStart() - item.index;
 					int end = selection->GetSelectionEnd() - item.index;
 					if (start < 0)
@@ -340,8 +350,13 @@ namespace spades {
 				std::vector<std::pair<int, int>> ranges;
 				std::vector<TextViewerLink> links;
 
-				// backticks are removed first so the link offsets match the displayed text
-				std::string plain = parseCode ? StripInlineCode(text, ranges) : text;
+				// Control bytes and backticks are removed first so the link offsets match the
+				// displayed text.
+				std::string plain = text;
+				if (parseCode) {
+					std::vector<int> removed;
+					plain = StripInlineCode(plain, ranges, &removed);
+				}
 				if (parseLinks) {
 					FindLinks(plain, links);
 					RemoveLinksInCode(links, ranges);
@@ -461,11 +476,18 @@ namespace spades {
 				RefreshHover();
 			}
 
+			void TextViewer::SetScrollBarVisible(bool visible) {
+				scrollBar->visible = visible;
+				// 16 pixels is the default width of `ListViewBase`
+				scrollBarWidth = visible ? 16.0F : 0.0F;
+				Layout();
+			}
+
 			int TextViewer::PointToCharIndex(Vector2 clientPosition) const {
 				if (!textmodel)
 					return 0;
 
-				int line = static_cast<int>(clientPosition.y / rowHeight) + GetTopRowIndex();
+				int line = static_cast<int>(std::floor((clientPosition.y - GetRowsOffsetY()) / rowHeight)) + GetTopRowIndex();
 				if (line < 0)
 					return textmodel->contentStart;
 				if (line >= static_cast<int>(textmodel->lines.size()))
@@ -625,7 +647,7 @@ namespace spades {
 				if (!textmodel || clientPosition.x < 0.0F || clientPosition.y < 0.0F)
 					return nullptr;
 
-				int line = static_cast<int>(clientPosition.y / rowHeight) + GetTopRowIndex();
+				int line = static_cast<int>(std::floor((clientPosition.y - GetRowsOffsetY()) / rowHeight)) + GetTopRowIndex();
 				if (line < 0 || line >= static_cast<int>(textmodel->lines.size()))
 					return nullptr;
 
@@ -677,8 +699,13 @@ namespace spades {
 			}
 
 			void TextViewer::AddLine(const std::string& line, bool autoscroll, Vector4 color) {
-				if (!textmodel)
+				if (!textmodel) {
 					SetText("");
+					// SetText("") builds a model with one empty row (SplitLines("") returns
+					// a single empty string). Drop it so the first real line is the first row.
+					textmodel->RemoveFirstLines(1);
+					SetModel(textmodel.GetPointerOrNull());
+				}
 				if (autoscroll) {
 					Layout();
 					if (scrollBar->value < scrollBar->maxValue)

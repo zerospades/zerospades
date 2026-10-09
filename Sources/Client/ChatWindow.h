@@ -64,7 +64,6 @@ namespace spades {
 			std::list<ChatEntry> entries;
 			float firstY;
 			bool killfeed;
-			bool expanded = false;
 
 			float GetWidth();
 			float GetNormalHeight();
@@ -73,7 +72,6 @@ namespace spades {
 
 			std::vector<IImage*> killImages;
 			IImage* GetKillImage(char);
-			Vector4 GetColor(char);
 
 		public:
 			ChatWindow(Client*, IFont* font, bool killfeed);
@@ -84,8 +82,8 @@ namespace spades {
 			static std::string TeamColorMessage(const std::string&, int);
 			static std::string KillImage(int killType, int weaponType = -1);
 
-			void SetExpanded(bool value) { expanded = value; }
-			bool IsExpanded() { return expanded; }
+			/** Returns the color that a message color control byte selects. */
+			Vector4 GetColor(char);
 
 			void Update(float dt);
 			void Draw();

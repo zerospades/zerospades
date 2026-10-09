@@ -21,6 +21,7 @@
 
 #include <algorithm>
 
+#include "ChatWindow.h"
 #include "ClientUI.h"
 #include "ClientUIHelper.h"
 #include "NetClient.h"
@@ -90,6 +91,11 @@ namespace spades {
 		void ClientUI::ClientDestroyed() { client = NULL; }
 
 		void ClientUI::SetActiveUI(gui::ui::UIElement* value) {
+			// The chat panel belongs to the screen that is being replaced, so forget it before
+			// that screen can go away. Entering a panel sets it again afterwards.
+			chatPanel = nullptr;
+			peeking = false;
+
 			if (activeUI)
 				manager->GetRootElement().RemoveChild(activeUI.GetPointerOrNull());
 			activeUI = value;
@@ -117,8 +123,14 @@ namespace spades {
 				time = 0.0F;
 
 			manager->RunFrame(dt);
-			if (activeUI)
-				manager->Render();
+			if (activeUI) {
+				if (peeking) {
+					// the peek view has no mouse, so the UI cursor must stay hidden
+					activeUI->Render();
+				} else {
+					manager->Render();
+				}
+			}
 
 			time += std::min(dt, 0.05F);
 		}
@@ -126,11 +138,13 @@ namespace spades {
 		void ClientUI::Closing() {}
 
 		bool ClientUI::WantsClientToBeClosed() { return shouldExit; }
-		bool ClientUI::NeedsInput() { return static_cast<bool>(activeUI); }
+		bool ClientUI::NeedsInput() { return static_cast<bool>(activeUI) && !peeking; }
 
 		void ClientUI::RecordChatLog(const std::string& msg, Vector4 color) {
 			chatLogRecords.emplace_back(msg, color);
 			chatLogWindow->Record(msg, color);
+			if (chatPanel)
+				chatPanel->Record(msg, color);
 		}
 
 		void ClientUI::ReloadScreens() {
@@ -162,15 +176,35 @@ namespace spades {
 		}
 
 		void ClientUI::EnterTeamChatWindow() {
-			Handle<ClientChatWindow> wnd = Handle<ClientChatWindow>::New(this, true);
+			Handle<ClientChatWindow> wnd =
+			    Handle<ClientChatWindow>::New(this, true, ChatWindowMode::Docked);
 			SetActiveUI(wnd.GetPointerOrNull());
+			chatPanel = wnd.GetPointerOrNull();
 			manager->SetActiveElement(wnd->field);
 		}
 
 		void ClientUI::EnterGlobalChatWindow() {
-			Handle<ClientChatWindow> wnd = Handle<ClientChatWindow>::New(this, false);
+			Handle<ClientChatWindow> wnd =
+			    Handle<ClientChatWindow>::New(this, false, ChatWindowMode::Docked);
 			SetActiveUI(wnd.GetPointerOrNull());
+			chatPanel = wnd.GetPointerOrNull();
 			manager->SetActiveElement(wnd->field);
+		}
+
+		void ClientUI::EnterChatPeek() {
+			if (peeking)
+				return;
+			Handle<ClientChatWindow> wnd =
+			    Handle<ClientChatWindow>::New(this, false, ChatWindowMode::Peek);
+			SetActiveUI(wnd.GetPointerOrNull());
+			chatPanel = wnd.GetPointerOrNull();
+			peeking = true;
+		}
+
+		void ClientUI::ExitChatPeek() {
+			// another screen may have replaced the peek view in the meantime
+			if (peeking)
+				SetActiveUI(nullptr);
 		}
 
 		void ClientUI::EnterChatLogWindow() {

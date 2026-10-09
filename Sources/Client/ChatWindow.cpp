@@ -71,14 +71,8 @@ namespace spades {
 		}
 
 		float ChatWindow::GetBufferHeight() {
-			if (killfeed) {
-				return GetNormalHeight();
-			} else {
-				// Take up the remaining height
-				float prop = 100.0F - (float)cg_killfeedHeight;
-
-				return renderer.ScreenHeight() * prop * 0.01F - 100.0F;
-			}
+			// Nothing is kept past the visible area: the chat history lives in the chat panel.
+			return GetNormalHeight();
 		}
 
 		float ChatWindow::GetLineHeight() { return 20.0F; }
@@ -177,11 +171,32 @@ namespace spades {
 
 			float normalHeight = GetNormalHeight();
 			float bufferHeight = GetBufferHeight();
-			float y = firstY;
+
+			// The killfeed grows downwards from the top (newest first).
+			// The chat grows upwards from the bottom edge (newest at the bottom),
+			// like the TextViewer based chats.
+			float y = killfeed ? firstY : normalHeight - firstY;
 
 			for (auto it = entries.begin(); it != entries.end();) {
 				ChatEntry& ent = *it;
-				if (y + ent.height > bufferHeight) {
+
+				float top = killfeed ? y : y - ent.height;
+				float bottom = top + ent.height;
+
+				bool pastBuffer;  // outside the area where entries are kept
+				bool pastNormal;  // outside the visible area, fading out
+				bool onScreen;    // reached the visible area (slide-in finished or in progress)
+				if (killfeed) {
+					pastBuffer = bottom > bufferHeight;
+					pastNormal = bottom > normalHeight;
+					onScreen = bottom > 0.0F;
+				} else {
+					pastBuffer = top < normalHeight - bufferHeight;
+					pastNormal = top < 0.0F;
+					onScreen = top < normalHeight;
+				}
+
+				if (pastBuffer) {
 					ent.bufferFade -= dt * 4.0F;
 					if (ent.bufferFade < 0.0F) {
 						// evict from the buffer
@@ -191,9 +206,9 @@ namespace spades {
 					}
 				}
 
-				if (y + ent.height > normalHeight) {
+				if (pastNormal) {
 					ent.fade = std::max(ent.fade - dt * 4.0F, 0.0F);
-				} else if (y + ent.height > 0.0F) {
+				} else if (onScreen) {
 					ent.fade = std::min(ent.fade + dt * 4.0F, 1.0F);
 					ent.bufferFade = std::min(ent.bufferFade + dt * 4.0F, 1.0F);
 				}
@@ -204,7 +219,7 @@ namespace spades {
 						ent.timeFade = 0.0F;
 				}
 
-				y += ent.height;
+				y = killfeed ? bottom : top;
 				++it;
 			}
 		}
@@ -212,14 +227,13 @@ namespace spades {
 		void ChatWindow::Draw() {
 			SPADES_MARK_FUNCTION();
 
-			float sw = renderer.ScreenWidth();
 			float sh = renderer.ScreenHeight();
 
-			float winH = expanded ? GetBufferHeight() : GetNormalHeight();
+			float winH = GetNormalHeight();
 			float winX = 8.0F;
 			float winY = killfeed ? 8.0F : (sh - 64.0F) - winH;
 			float lh = GetLineHeight();
-			float y = firstY;
+			float y = killfeed ? firstY : winH - firstY;
 
 			if (killfeed) {
 				bool demoMode = client->IsDemoMode();
@@ -234,40 +248,23 @@ namespace spades {
 			std::string ch = "aaaaaa"; // let's not make a new object for each character.
 			// note: UTF-8's longest character is 6 bytes
 
-			// Draw a box behind text when expanded
-			if (expanded && !killfeed) {
-				float bgX = 8.0F;
-				float bgY = winY;
-				float bgW = std::min(sw - bgX, 640.0F);
-				float bgH = winH + bgY;
-
-				renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.8F));
-				renderer.DrawFilledRect(bgX + 1, bgY + 1, bgW - 1, bgH - 1);
-				renderer.SetColorAlphaPremultiplied(MakeVector4(1, 1, 1, 1) * 0.07F);
-				renderer.DrawOutlinedRect(bgX, bgY, bgW, bgH);
-
-				winX += 8.0F;
-				winY += 8.0F;
-			}
-
 			std::list<ChatEntry>::iterator it;
 			for (it = entries.begin(); it != entries.end(); ++it) {
 				ChatEntry& ent = *it;
+
+				// top of this entry: the chat stacks upwards, the killfeed downwards.
+				float entryY = killfeed ? y : y - ent.height;
 
 				const auto& msg = ent.msg;
 				Vector4 color = GetColor(MsgColorRestore);
 
 				float curPosX = winX;
-				float tx = 0.0F, ty = y;
+				float tx = 0.0F, ty = entryY;
 				float fade = ent.fade;
 
-				if (expanded) { // Display out-dated messages
-					fade = ent.bufferFade;
-				} else {
-					float fadeOut = killfeed ? 0.5F : 1.0F;
-					if (ent.timeFade < fadeOut)
-						fade *= (ent.timeFade / fadeOut);
-				}
+				float fadeOut = killfeed ? 0.5F : 1.0F;
+				if (ent.timeFade < fadeOut)
+					fade *= (ent.timeFade / fadeOut);
 
 				if (fade < 0.01F)
 					goto endDrawLine; // Skip rendering invisible messages
@@ -327,7 +324,7 @@ namespace spades {
 				}
 
 			endDrawLine:
-				y += ent.height;
+				y = killfeed ? y + ent.height : entryY;
 			}
 		}
 	} // namespace client

@@ -101,6 +101,7 @@ namespace spades {
 			{
 				Handle<Button> button = Handle<Button>::New(manager);
 				button->caption = _Tr("Client", "Say Global");
+				button->hotKeyText = _Tr("Client", "[{0}]", ToUpperCase(cg_keyGlobalChat));
 				button->SetBounds(
 				    AABB2(contentsLeft, contentsTop + contentsHeight - 30.0F, 150.0F, 30.0F));
 				button->activated = [this](UIElement& s) { OnGlobalChat(s); };
@@ -110,6 +111,7 @@ namespace spades {
 			{
 				Handle<Button> button = Handle<Button>::New(manager);
 				button->caption = _Tr("Client", "Say Team");
+				button->hotKeyText = _Tr("Client", "[{0}]", ToUpperCase(cg_keyTeamChat));
 				button->SetBounds(AABB2(contentsLeft + 155.0F, contentsTop + contentsHeight - 30.0F,
 				                        150.0F, 30.0F));
 				button->activated = [this](UIElement& s) { OnTeamChat(s); };
@@ -119,6 +121,7 @@ namespace spades {
 			{
 				Handle<TextViewer> v = Handle<TextViewer>::New(manager);
 				AddChild(v.GetPointerOrNull());
+				v->bottomAligned = true;
 				v->SetBounds(AABB2(contentsLeft, contentsTop, contentsWidth, contentsHeight - 40.0F));
 				// every link goes through a confirmation dialog.
 				v->parseLinks = true;

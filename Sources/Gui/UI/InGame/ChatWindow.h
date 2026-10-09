@@ -20,13 +20,20 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
+#include <Core/Math.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
+	namespace gui {
+		namespace ui {
+			class TextViewer;
+		}
+	}
 	namespace client {
 		class ClientUI;
 		class ClientUIHelper;
@@ -47,11 +54,24 @@ namespace spades {
 			Handle<CommandFieldConfigValueView> valueView;
 
 		public:
+			/** Called when Tab is pressed while no "/cvar" completion applies. */
+			std::function<void()> tabPressed;
+
 			CommandField(gui::ui::UIManager* manager,
-			             std::vector<gui::ui::CommandHistoryItem>* history);
+						 std::vector<gui::ui::CommandHistoryItem>* history);
 
 			void OnChanged() override;
 			void KeyDown(const std::string& key) override;
+		};
+
+		/** How a `ClientChatWindow` is laid out. */
+		enum class ChatWindowMode {
+			/** The composer alone, centered near the bottom of the screen. */
+			Centered,
+			/** The composer below a scrollable chat history, at the bottom left. */
+			Docked,
+			/** Only the chat history, without input, shown while the peek key is held. */
+			Peek
 		};
 
 		/** The floating chat composer (global/team) shown while playing. */
@@ -59,6 +79,21 @@ namespace spades {
 			ClientUI* ui;             // weak
 			ClientUIHelper* helper;   // weak
 			bool isTeamChat;
+			ChatWindowMode mode;
+
+			gui::ui::TextViewer* viewer = nullptr; // weak; owned as a child
+
+			// Frame of the docked and peek views, relative to this window
+			float frameX = 0.0F;
+			float frameY = 0.0F;
+			float frameW = 0.0F;
+			float frameH = 0.0F;
+			float separatorY = 0.0F;
+			float headerSeparatorY = 0.0F;
+
+			void BuildPanel();
+			void BuildHistory(float x, float y, float w, float h, float rowHeight,
+			                  bool interactive);
 
 			void OnSetGlobal(gui::ui::UIElement& sender);
 			void OnSetTeam(gui::ui::UIElement& sender);
@@ -71,19 +106,28 @@ namespace spades {
 			virtual void Close();
 
 		public:
-			CommandField* field;                 // weak; owned as a child
-			gui::ui::Button* sayButton;          // weak
-			gui::ui::SimpleButton* teamButton;   // weak
-			gui::ui::SimpleButton* globalButton; // weak
+			// weak; owned as children. Null when the mode has no such control.
+			CommandField* field = nullptr;
+			gui::ui::Button* sayButton = nullptr;
+			gui::ui::SimpleButton* teamButton = nullptr;
+			gui::ui::SimpleButton* globalButton = nullptr;
 
-			ClientChatWindow(ClientUI* ui, bool isTeamChat);
+			ClientChatWindow(ClientUI* ui, bool isTeamChat,
+			                 ChatWindowMode mode = ChatWindowMode::Centered);
 
 			void UpdateState();
+
+			/** Appends a line to the history of the docked and peek views. */
+			void Record(const std::string& text, Vector4 color);
+
+			/** Scrolls the history; positive moves down, like the mouse wheel. */
+			void ScrollBy(float delta);
 
 			bool GetIsTeamChat() const { return isTeamChat; }
 			void SetIsTeamChat(bool value);
 
 			void HotKey(const std::string& key) override;
+			void Render() override;
 		};
 	} // namespace client
 } // namespace spades

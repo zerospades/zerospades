@@ -2487,6 +2487,7 @@ namespace spades {
 
 			bool isDemoMode = IsDemoMode();
 			bool shouldDrawHUD = hudVisible && !cg_hideHud;
+			bool isChatPanelVisible = scriptedUI->IsChatPanelOpen();
 
 			float sw = renderer->ScreenWidth();
 			float sh = renderer->ScreenHeight();
@@ -2577,7 +2578,9 @@ namespace spades {
 					if (netgraphVisible && !isDemoMode)
 						DrawNetGraph();
 
-					chatWindow->Draw();
+					// the chat panel shows the history by itself while it is open
+					if (!isChatPanelVisible)
+						chatWindow->Draw();
 					killfeedWindow->Draw();
 
 					if (debugHitTestZoom)
@@ -2586,9 +2589,6 @@ namespace spades {
 					// large map view should come in front
 					if (largeMap)
 						largeMapView->Draw();
-				} else if (AcceptsTextInput() || chatWindow->IsExpanded()) {
-					// chat bypass cg_hideHud
-					chatWindow->Draw();
 				}
 
 				if (pieMenuView && pieMenuView->IsOpen())
@@ -2625,7 +2625,8 @@ namespace spades {
 
 						DrawSpectateHUD();
 
-						chatWindow->Draw();
+						if (!isChatPanelVisible)
+							chatWindow->Draw();
 						killfeedWindow->Draw();
 
 						// large map view should come in front

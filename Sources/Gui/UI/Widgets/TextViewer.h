@@ -44,6 +44,8 @@ namespace spades {
 				int cursorPosition = 0;
 				/** ID of the link under the mouse (-1 if none); shared so rows can highlight it. */
 				int hoverLinkId = -1;
+				/** Draw the selection even while the viewer does not have the keyboard focus. */
+				bool showUnfocused = false;
 
 				int GetSelectionStart() const { return std::min(markPosition, cursorPosition); }
 				int GetSelectionEnd() const { return std::max(markPosition, cursorPosition); }
@@ -194,6 +196,12 @@ namespace spades {
 				const std::string& GetText() const { return text; }
 				void SetText(const std::string& value);
 
+				/**
+				 * Shows or hides the scroll bar. A hidden one takes no room from the rows but the
+				 * view still scrolls with `MouseWheel`. Call it before the text is set.
+				 */
+				void SetScrollBarVisible(bool visible);
+
 				void MouseWheel(float delta) override;
 				void MouseDown(MouseButton button, Vector2 clientPosition) override;
 				void MouseMove(Vector2 clientPosition) override;
@@ -204,6 +212,17 @@ namespace spades {
 				void KeyDown(const std::string& key) override;
 
 				std::string GetSelectedText() const;
+
+				/** True when some text is selected. */
+				bool HasSelection() const {
+					return selection->GetSelectionEnd() > selection->GetSelectionStart();
+				}
+
+				/**
+				 * Keeps the selection visible without the keyboard focus, for a viewer that must
+				 * not take the focus away from a text field next to it.
+				 */
+				void SetSelectionAlwaysVisible(bool value) { selection->showUnfocused = value; }
 
 				/** Returns the URL of the link at `clientPosition`, or an empty string. */
 				std::string GetLinkAt(Vector2 clientPosition) const;

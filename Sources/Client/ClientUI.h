@@ -38,6 +38,7 @@ namespace spades {
 		class ClientUIHelper;
 		class ClientMenu;
 		class ChatLogWindow;
+		class ClientChatWindow;
 
 		class ClientUI : public gui::IGameModeUI {
 			friend class ClientUIHelper;
@@ -55,6 +56,12 @@ namespace spades {
 
 			Handle<ChatLogWindow> chatLogWindow;
 			Handle<ClientMenu> clientMenu;
+
+			// The docked chat composer or the peek view while one of them is the active UI.
+			// Weak: `activeUI` owns it, so `SetActiveUI` clears this before it goes away.
+			ClientChatWindow* chatPanel = nullptr;
+			// True while the peek view is shown. It leaves the input to the game.
+			bool peeking = false;
 
 			// The chat log only exists inside `chatLogWindow`, which a screen resize
 			// has to rebuild. Kept here so the rebuilt window can be replayed into.
@@ -109,6 +116,14 @@ namespace spades {
 			bool WantsClientToBeClosed();
 			bool WantsToClose() override { return WantsClientToBeClosed(); }
 			bool NeedsInput();
+
+			/** True while the docked composer or the peek view stands in for the HUD chat. */
+			bool IsChatPanelOpen() const { return chatPanel != nullptr; }
+			bool IsChatPeeking() const { return peeking; }
+
+			/** Shows the read-only chat history without taking the input from the game. */
+			void EnterChatPeek();
+			void ExitChatPeek();
 
 			void RecordChatLog(const std::string&, Vector4 col = {1, 1, 1, 0.8F});
 

@@ -233,7 +233,6 @@ namespace spades {
 						// TODO: make this configurable
 						playerInput = PlayerInput();
 						largeMapView->SetZoom(false);
-						chatWindow->SetExpanded(false);
 						scoreboardVisible = false;
 					}
 

@@ -56,6 +56,16 @@ namespace spades {
 				return Clamp(idx, 0, GetMaxTopRowIndex());
 			}
 
+			float ListViewBase::GetRowsOffsetY() const {
+				if (!bottomAligned)
+					return 0.0F;
+
+				int visibleStart = GetTopRowIndex();
+				int visibleEnd = std::min(visibleStart + GetNumVisibleRows(), model->GetNumRows());
+				float contentsHeight = static_cast<float>(visibleEnd - visibleStart) * rowHeight;
+				return std::max(0.0F, size.y - contentsHeight);
+			}
+
 			void ListViewBase::OnResized() {
 				Layout();
 				UIElement::OnResized();
@@ -112,7 +122,7 @@ namespace spades {
 
 				// relayout items
 				int count = static_cast<int>(items.size());
-				float y = 0.0F;
+				float y = GetRowsOffsetY();
 				float w = GetItemWidth();
 				for (int i = 0; i < count; i++) {
 					items[i]->SetBounds(AABB2(0.0F, y, w, rowHeight));
