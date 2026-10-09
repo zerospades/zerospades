@@ -118,6 +118,13 @@ namespace spades {
 		public:
 			SDLVulkanDevice(SDL_Window* window);
 
+			/** The device extensions the renderer cannot do without: a device
+			 * lacking any of them is never picked. */
+			static const std::vector<const char*>& GetRequiredDeviceExtensions();
+
+			/** Whether `physicalDevice` has every required device extension */
+			static bool HasRequiredDeviceExtensions(VkPhysicalDevice physicalDevice);
+
 			// Getters for Vulkan objects
 			VkInstance GetInstance() const { return instance; }
 			VkDevice GetDevice() const { return device; }
