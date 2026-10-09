@@ -44,7 +44,7 @@ namespace spades {
 
 		/**
 		 * The map's `client::MapClearance` as a 3D image the dynamic lights' shaders
-		 * walk rays through (`DynamicLight/Lights.glsl`): an unsigned integer per
+		 * walk rays through (`SceneLight/Lights.glsl`): an unsigned integer per
 		 * block, x by y by z. It is uploaded whole when the map is set, then a few
 		 * changed regions a frame through each frame in flight's own staging buffer.
 		 */

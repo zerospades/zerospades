@@ -20,11 +20,11 @@
 
 // Walks a segment through the map block by block, crossing open air a clear cube
 // at a time, to find where it enters the first solid block. The includer defines
-// `DYNAMIC_LIGHT_SET`, the descriptor set the map's occupancy is bound to.
+// `SCENE_LIGHT_SET`, the descriptor set the map's occupancy is bound to.
 
 // `VulkanMapOccupancy`: each block's clearance, 0 for a solid block; every block
 // within `c - 1` of one with a clearance `c` is clear.
-layout(set = DYNAMIC_LIGHT_SET, binding = 4) uniform usampler3D dynamicLightMapOccupancy;
+layout(set = SCENE_LIGHT_SET, binding = 4) uniform usampler3D dynamicLightMapOccupancy;
 
 // The most steps a walk takes, each to the next block or out of a clear cube: more
 // than a light's reach needs. A walk that has not got through by then stops where it

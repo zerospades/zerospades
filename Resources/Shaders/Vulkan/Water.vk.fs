@@ -78,8 +78,8 @@ layout(location = 0) out vec4 fragColor;
 
 // The frame's dynamic lights, lit in this same draw: the water's colour replaces
 // the scene under it.
-#include "DynamicLight/Lights.glsl"
-#include "DynamicLight/WaterGlint.glsl"
+#include "SceneLight/Lights.glsl"
+#include "SceneLight/WaterGlint.glsl"
 
 
 

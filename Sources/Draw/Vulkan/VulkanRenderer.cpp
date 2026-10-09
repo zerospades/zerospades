@@ -32,7 +32,7 @@
 #include "VulkanMapShadowRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanGlareRenderer.h"
-#include "VulkanDynamicLightClusters.h"
+#include "VulkanSceneLights.h"
 #include "VulkanMapOccupancy.h"
 #include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
@@ -186,14 +186,14 @@ namespace spades {
 
 			// Binds the white image in place of missing spotlight images, so it
 			// comes after it.
-			dynamicLightClusters = stmp::make_unique<VulkanDynamicLightClusters>(
+			sceneLights = stmp::make_unique<VulkanSceneLights>(
 			  *this, device->GetMaxFramesInFlight());
 
-			// Programs that take the dynamic lights say so (`*dynamicLights*`), as set
+			// Programs that take the dynamic lights say so (`*sceneLights*`), as set
 			// 2; set 1 is the model shadows' in the lit pipelines, which they lack.
 			programManager->RegisterDirectiveSetLayouts(
-			  "dynamicLights",
-			  {dynamicLightClusters->GetEmptySetLayout(), dynamicLightClusters->GetSetLayout()});
+			  "sceneLights",
+			  {sceneLights->GetEmptySetLayout(), sceneLights->GetSetLayout()});
 
 			// Preload shaders
 			VulkanMapRenderer::PreloadShaders(*this);
@@ -510,7 +510,7 @@ namespace spades {
 		DestroyMultiplyColorPipeline();
 		DestroyDebugLinePipeline();
 		glareRenderer.reset();
-		dynamicLightClusters.reset();
+		sceneLights.reset();
 
 			if (renderPass != VK_NULL_HANDLE && vkDevice != VK_NULL_HANDLE) {
 				vkDestroyRenderPass(vkDevice, renderPass, nullptr);
@@ -1847,7 +1847,7 @@ namespace spades {
 		if (sceneUsedInThisFrame) {
 			if (mapOccupancy)
 				mapOccupancy->Update(commandBuffer, currentFrameSlot);
-			dynamicLightClusters->Update(commandBuffer, currentFrameSlot, lights, sceneDef,
+			sceneLights->Update(commandBuffer, currentFrameSlot, lights, sceneDef,
 			                             mapOccupancy.get());
 		}
 

@@ -27,7 +27,7 @@
 #include "VulkanBuffer.h"
 #include "VulkanImage.h"
 #include "VulkanImageWrapper.h"
-#include "VulkanDynamicLightClusters.h"
+#include "VulkanSceneLights.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Bitmap.h>
 #include <Core/BitmapAtlasGenerator.h>
@@ -488,7 +488,7 @@ namespace spades {
 			}
 			{
 				// The frame's dynamic lights (set 2), lit in this pass
-				VkDescriptorSet lightSet = renderer.GetDynamicLightClusters().GetDescriptorSet(
+				VkDescriptorSet lightSet = renderer.GetSceneLights().GetDescriptorSet(
 				  renderer.GetCurrentFrameIndex());
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
@@ -847,7 +847,7 @@ namespace spades {
 			}
 			{
 				// The frame's dynamic lights (set 2), lit in this pass
-				VkDescriptorSet lightSet = renderer.GetDynamicLightClusters().GetDescriptorSet(
+				VkDescriptorSet lightSet = renderer.GetSceneLights().GetDescriptorSet(
 				  renderer.GetCurrentFrameIndex());
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
@@ -1337,7 +1337,7 @@ namespace spades {
 			// shaders that don't declare it are still compatible with the wider
 			// layout. Set 2 = the frame's dynamic lights.
 			VulkanShadowMapRenderer* smrLayout = renderer.GetShadowMapRenderer();
-			VulkanDynamicLightClusters& lightClusters = renderer.GetDynamicLightClusters();
+			VulkanSceneLights& lightClusters = renderer.GetSceneLights();
 			VkDescriptorSetLayout modelSetLayouts[3] = {
 			    sharedPipeline.descriptorSetLayout,
 			    smrLayout ? smrLayout->GetSamplingSetLayout() : lightClusters.GetEmptySetLayout(),

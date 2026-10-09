@@ -20,7 +20,7 @@
 
 // The dynamic lights glinting off the water's waves: what tells the water from the
 // ground under a flashlight, where no sun shines on either. The includer includes
-// `DynamicLight/Lights.glsl` first.
+// `SceneLight/Lights.glsl` first.
 
 // How tight a glint is: the Phong exponent of the water's highlight
 const float waterGlintShininess = 256.0;
