@@ -119,10 +119,16 @@ namespace spades {
 			l.AddToggleField(_Tr("Preferences", "Show Server Alerts"), "cg_serverAlert");
 			l.AddVolumeSlider(_Tr("Preferences", "Alert Sounds"), "cg_alertSounds");
 			l.AddToggleField(_Tr("Preferences", "Hit Log"), "cg_hitLog");
+			l.AddHelp(_Tr("Preferences",
+				"Logs each of your hits with the target name, distance, and body "
+				"part. Messages appear in the chat window."));
 			l.AddToggleField(_Tr("Preferences", "Hit Indicator"), "cg_hitIndicator");
 
 			l.AddHeading(_Tr("Preferences", "Viewmodel"));
 			l.AddToggleField(_Tr("Preferences", "Weapon Keychains"), "cg_weaponCharms");
+			l.AddHelp(_Tr("Preferences",
+				"Shows decorative keychains and charms hanging from weapons. "
+				"Only visible if the active weapon skin supports them."));
 			l.AddViewmodelPresetField(
 			    _Tr("Preferences", "Viewmodel Position"),
 			    {_Tr("Preferences", "Default"), _Tr("Preferences", "Balanced"),
@@ -134,7 +140,12 @@ namespace spades {
 			l.AddToggleField(_Tr("Preferences", "Hide Player Arms"), "cg_hideArms");
 			l.AddToggleField(_Tr("Preferences", "Hide Player Body"), "cg_hideBody");
 			l.AddToggleField(_Tr("Preferences", "Classic Player Model"), "cg_classicPlayerModels");
+			l.AddHelp(_Tr("Preferences",
+				"Uses the original `AoS 0.75` player models instead of the new ones."));
 			l.AddToggleField(_Tr("Preferences", "Classic Viewmodel"), "cg_classicViewWeapon");
+			l.AddHelp(_Tr("Preferences",
+				"Uses the original `AoS 0.75` first-person weapon positions and "
+				"animations instead of the new ones."));
 
 			l.AddHeading(_Tr("Preferences", "Misc"));
 			l.AddSliderField(_Tr("Preferences", "Field of View"), "cg_fov", 45, 110, 1,
@@ -236,6 +247,9 @@ namespace spades {
 			                 1, NumberFormatter(0, "s"));
 			l.AddToggleField(_Tr("Preferences", "Killfeed Icons"), "cg_killfeedIcons");
 			l.AddToggleField(_Tr("Preferences", "Show Dominations"), "cg_killfeedStreaks");
+			l.AddHelp(_Tr("Preferences",
+				"Shows domination and multi-kill streak messages in the killfeed "
+				"(e.g. when you repeatedly kill the same player)."));
 
 			l.AddHeading(_Tr("Preferences", "Minimap"));
 			l.AddSliderField(_Tr("Preferences", "Minimap Size"), "cg_minimapSize", 128, 256, 8,
@@ -478,8 +492,14 @@ namespace spades {
 			l.AddControl(_Tr("Preferences", "Pie Menu"), "cg_keyPieMenu");
 			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Show Teammates"), "cg_keyTeamOverlay");
+			l.AddHelp(_Tr("Preferences",
+				"Hold to show teammates through walls (team ESP). "
+				"Only works on servers that allow it."));
 			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Team Ping"), "cg_keyTeamPing");
+			l.AddHelp(_Tr("Preferences",
+				"Marks a point at the crosshair for your team. "
+				"Requires server support for the teamplay extension."));
 			l.AddBadgeNew();
 			l.AddControl(_Tr("Preferences", "Limbo Menu"), "cg_keyLimbo");
 			l.AddControl(_Tr("Preferences", "Save Map"), "cg_keySaveMap");
@@ -524,10 +544,12 @@ namespace spades {
 			l.AddSliderField(_Tr("Preferences", "JPEG Quality"), "core_jpegQuality", 1, 100, 1,
 			                 NumberFormatter(0, "%"));
 			l.AddToggleField(_Tr("Preferences", "Enable Startup Window"), "cl_showStartupWindow");
-			l.AddToggleField(_Tr("Preferences", "Show Update Prompt"), "cl_zsUpdatePrompt");
 			l.AddHelp(_Tr("Preferences",
 				"Shows the setup window every time you start the game. When off, goes "
 				"straight to the main menu."));
+			l.AddToggleField(_Tr("Preferences", "Show Update Prompt"), "cl_zsUpdatePrompt");
+			l.AddHelp(_Tr("Preferences",
+				"Shows a notice on the main menu when a newer version is available."));
 			l.AddHeading(_Tr("Preferences", "Demo Recording"));
 			l.AddControl(_Tr("Preferences", "Start/Stop Recording"), "cg_keyDemoRecord");
 			l.AddToggleField(_Tr("Preferences", "Auto Record"), "cg_demoAutoRecord");
