@@ -34,6 +34,8 @@ layout(set = SPRITE_SET, binding = 0, std140) uniform SpriteView {
 	vec4 fogColorDistance;
 	// x: the near plane's distance, y: the far plane's
 	vec4 nearFar;
+	// xyz: towards the sun
+	vec4 sunDirection;
 } spriteView;
 
 layout(set = SPRITE_SET, binding = 1) uniform sampler2D mainTexture;

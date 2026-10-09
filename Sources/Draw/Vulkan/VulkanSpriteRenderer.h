@@ -49,7 +49,10 @@ namespace spades {
 		 * They are drawn in the order they were added, as their blending needs.
 		 *
 		 * Soft sprites (`r_softParticles`) fade where they meet the scene's depth, in
-		 * a pass of their own over the scene's colour.
+		 * a pass of their own over the scene's colour. At `r_softParticles` 2 they are
+		 * also lit as the volumes they stand for, by the sun through the map's and the
+		 * models' shadows, the sky, and the dynamic lights, with the lit pipelines'
+		 * sets bound before their own.
 		 */
 		class VulkanSpriteRenderer : public RefCountedObject {
 		public:
@@ -64,6 +67,8 @@ namespace spades {
 				float radius;
 				float angle;
 				Vector4 color;
+				/** Whether it scatters the light it is lit by, rather than emits its own */
+				bool scattering;
 			};
 
 			/** A sprite as the vertex shader takes it, one per instance */
@@ -90,16 +95,28 @@ namespace spades {
 			std::vector<Sprite> sprites;
 
 			bool softParticles;
+			/** Whether soft sprites are lit, where there is a map to light them */
+			bool litParticles;
 
 			VkPipeline pipeline = VK_NULL_HANDLE;
 			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+			VkPipeline litPipeline = VK_NULL_HANDLE;
+			VkPipelineLayout litPipelineLayout = VK_NULL_HANDLE;
 			/** The sprite's own set: its view, its image and, for soft sprites, the
 			 * scene's depth */
 			VkDescriptorSetLayout spriteSetLayout = VK_NULL_HANDLE;
 
 			std::vector<FrameResources> frames;
 
+			/** Builds the sprites' pipeline with `layout` from the shaders given; with
+			 * `specializeRadiosity`, `USE_RADIOSITY` follows `r_radiosity`. */
+			VkPipeline BuildPipeline(VkPipelineLayout layout, const char* vertexShader,
+			                         const char* fragmentShader, bool specializeRadiosity);
 			void CreatePipeline();
+
+			/** Makes the lit pipeline the first time there is a map to light the
+			 * sprites with, and says whether there is one. */
+			bool PrepareLitPipeline();
 			void CreateFrameResources(FrameResources&);
 			void ReserveInstances(FrameResources&, std::size_t count);
 
