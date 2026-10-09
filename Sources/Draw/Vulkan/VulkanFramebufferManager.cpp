@@ -134,7 +134,7 @@ namespace spades {
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sampleCount);
 			renderColorImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 			renderColorImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-			                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+			                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 			// No SAMPLED usage on the depth attachment at 1x: MoltenVK on Intel Macs
 			// gives the scene encoder a nil Metal depth attachment when the depth
@@ -155,7 +155,7 @@ namespace spades {
 				// may carry only one aspect, so the attachment gets its own view.
 				renderDepthImage->CreateAttachmentImageView();
 				renderDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
 
 			if (!useMSAA) {
@@ -174,7 +174,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				sceneDepthSampleImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				sceneDepthSampleImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-				                                     VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                     VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
 
 			// Single-sample resolve targets sampled by the post-process chain. Color
@@ -189,7 +189,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				renderColorResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				renderColorResolveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 				// Resolved depth is stored as R32_SFLOAT *colour* (the raw sample-0
 				// depth value), filled by VulkanDepthResolveFilter. Depth-reading
@@ -203,7 +203,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				renderDepthResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				renderDepthResolveImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 				// Single-sample resolves of the mirror (water reflection) images.
 				mirrorColorResolveImage = Handle<VulkanImage>::New(
@@ -213,7 +213,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				mirrorColorResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				mirrorColorResolveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 				mirrorDepthResolveImage = Handle<VulkanImage>::New(
 				    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
@@ -222,7 +222,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				mirrorDepthResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				mirrorDepthResolveImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
 
 			VkImageView attachments[] = {
@@ -285,7 +285,7 @@ namespace spades {
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sampleCount);
 				mirrorColorImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				mirrorColorImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 				mirrorDepthImage = Handle<VulkanImage>::New(
 				    device, renderWidth, renderHeight, fbDepthFormat,
@@ -296,7 +296,7 @@ namespace spades {
 				mirrorDepthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
 				mirrorDepthImage->CreateAttachmentImageView();
 				mirrorDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 				VkImageView mirrorAttachments[] = {
 				    mirrorColorImage->GetImageView(),
@@ -329,7 +329,7 @@ namespace spades {
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			screenCopyColorImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 			screenCopyColorImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-			                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+			                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 			screenCopyDepthImage = Handle<VulkanImage>::New(
 			    device, renderWidth, renderHeight, fbDepthFormat,
@@ -338,7 +338,7 @@ namespace spades {
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			screenCopyDepthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
 			screenCopyDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-			                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+			                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			SPLog("Screen copy images created");
 
 			// Add main render buffer to managed buffers
@@ -1231,7 +1231,7 @@ namespace spades {
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			colorImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 			colorImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-			                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+			                          VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 			Handle<VulkanImage> depthImage = Handle<VulkanImage>::New(
 			    device, w, h, fbDepthFormat,

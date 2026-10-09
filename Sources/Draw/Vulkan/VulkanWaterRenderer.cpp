@@ -15,6 +15,7 @@
 #include <cmath>
 
 SPADES_SETTING(r_water);
+SPADES_SETTING(r_maxAnisotropy);
 
 namespace spades {
 	namespace draw {
@@ -418,7 +419,7 @@ namespace spades {
 			// until we call CreateSampler. Skipping this binds a null sampler in the water
 			// descriptor set, and the shader reads zero from mainTexture/waveTexture.
 			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT, false);
+				VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
 			// Create wave tanks using FFT solver for realistic waves
 			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
@@ -444,7 +445,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				} else {
 					// Multiple layers - use 2D array texture with mipmaps
 					waveImageArray = Handle<VulkanImage>::New(device, size, size,
@@ -453,7 +454,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				}
 
 				// Pre-allocate staging buffers for wave uploads
@@ -592,7 +593,7 @@ namespace spades {
 				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT, false);
+				VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
 			// Create wave tanks using FFT solver for realistic waves
 			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
@@ -628,7 +629,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				} else {
 					// Multiple layers - use 2D array texture with mipmaps
 					waveImageArray = Handle<VulkanImage>::New(device, size, size,
@@ -637,7 +638,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				}
 
 				// Pre-allocate staging buffers for wave uploads
@@ -680,7 +681,7 @@ namespace spades {
 				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT, false);
+				VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
 			// Create wave tanks using FFT solver for realistic waves
 			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
@@ -706,7 +707,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				} else {
 					// Multiple layers - use 2D array texture with mipmaps
 					waveImageArray = Handle<VulkanImage>::New(device, size, size,
@@ -715,7 +716,7 @@ namespace spades {
 						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, true);
+						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
 				}
 
 				// Pre-allocate staging buffers for wave uploads
