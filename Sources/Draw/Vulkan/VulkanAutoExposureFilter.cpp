@@ -148,9 +148,10 @@ namespace spades {
 			// UNDEFINED → SHADER_READ_ONLY.
 			//
 			// computeGainPipeline is created against this pass but also used with
-			// gainRenderPass, so the two must stay compatible: same attachment
-			// description and the SAME dependencies. Giving only one of them a
-			// widened dependency makes every draw with that pipeline invalid.
+			// gainRenderPass, so the two must stay compatible: the same attachment
+			// format and samples, and the SAME dependencies. Both are therefore
+			// built by the one helper from the one incoming dependency, differing
+			// only in what compatibility leaves free: load op and layouts.
 			VkSubpassDependency gainDep = dep;
 			gainDep.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
 			                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -168,56 +169,17 @@ namespace spades {
 			    &gainDep);
 
 			// gainRenderPass: subsequent frames — LOAD, COLOR_ATTACHMENT → SHADER_READ_ONLY.
-			// Two dependencies: one incoming (wait for prior writes), one outgoing
-			// (signal fragment-shader readers before the apply pass).
-			{
-				VkSubpassDependency deps[2];
-				// Incoming: this pass LOADs the accumulator, which is a
-				// COLOR_ATTACHMENT_READ at COLOR_ATTACHMENT_OUTPUT -- not the
-				// FRAGMENT_SHADER/SHADER_READ the shared dependency describes.
-				// The preceding barrier moves the image SHADER_READ_ONLY ->
-				// COLOR_ATTACHMENT_OPTIMAL, a colour-attachment write, so both
-				// sides have to be named here or the loadOp races that
-				// transition.
-				deps[0] = gainDep;
-
-				deps[1].srcSubpass      = 0;
-				deps[1].dstSubpass      = VK_SUBPASS_EXTERNAL;
-				deps[1].srcStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-				deps[1].dstStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-				deps[1].srcAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				deps[1].dstAccessMask   = VK_ACCESS_SHADER_READ_BIT;
-				deps[1].dependencyFlags = 0;
-
-				VkAttachmentDescription att{};
-				att.format         = colorFormat;
-				att.samples        = VK_SAMPLE_COUNT_1_BIT;
-				att.loadOp         = VK_ATTACHMENT_LOAD_OP_LOAD;
-				att.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-				att.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-				att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-				att.initialLayout  = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-				att.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-				VkAttachmentReference ref{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-
-				VkSubpassDescription subpass{};
-				subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-				subpass.colorAttachmentCount = 1;
-				subpass.pColorAttachments    = &ref;
-
-				VkRenderPassCreateInfo rpInfo{};
-				rpInfo.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-				rpInfo.attachmentCount = 1;
-				rpInfo.pAttachments    = &att;
-				rpInfo.subpassCount    = 1;
-				rpInfo.pSubpasses      = &subpass;
-				rpInfo.dependencyCount = 2;
-				rpInfo.pDependencies   = deps;
-
-				if (vkCreateRenderPass(dev, &rpInfo, nullptr, &gainRenderPass) != VK_SUCCESS)
-					SPRaise("Failed to create gain render pass");
-			}
+			// It LOADs the accumulator, a COLOR_ATTACHMENT_READ at
+			// COLOR_ATTACHMENT_OUTPUT right after the barrier moving it to
+			// COLOR_ATTACHMENT_OPTIMAL, which is what gainDep's destination
+			// names; the helper's outgoing dependency hands the result to the
+			// apply pass's fragment shader.
+			gainRenderPass = CreateSimpleColorRenderPass(
+			    dev, colorFormat,
+			    VK_ATTACHMENT_LOAD_OP_LOAD,
+			    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			    &gainDep);
 		}
 
 		void VulkanAutoExposureFilter::InitDescriptorSetLayouts() {
