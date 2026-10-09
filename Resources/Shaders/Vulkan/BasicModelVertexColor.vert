@@ -19,18 +19,19 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the model's placement and colours. The rest is
+// the pass's (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
 	mat4 modelMatrix;
 	vec3 modelOrigin;
 	float fogDensity;
 	vec3 customColor;
-	float _pad;
-	vec3 fogColor;
-	float mirrorClipZ; // water-plane Z in the reflection pass (else +inf)
-	vec3 sunDirection; // points toward the sun (renderer GetSunDirection)
-} pushConstants;
+	float opacity; // a ghost's
+} draw;
 
 layout(set = 1, binding = 0) uniform ShadowSampling {
 	mat4 cascadeMatrix[3];
@@ -70,24 +71,24 @@ invariant gl_Position;
 void main() {
 	// Convert uint8 position to float
 	vec3 position = vec3(positionAttribute);
-	vec4 localPos = vec4(position + pushConstants.modelOrigin, 1.0);
-	gl_Position = pushConstants.projectionViewMatrix * localPos;
-
+	vec4 localPos = vec4(position + draw.modelOrigin, 1.0);
 	// World position via model matrix
-	vec3 worldPos = (pushConstants.modelMatrix * localPos).xyz;
+	vec4 worldPos4 = draw.modelMatrix * localPos;
+	vec3 worldPos = worldPos4.xyz;
+	gl_Position = sceneView.projectionView * worldPos4;
 
 	// Transform normal to world space via model matrix (handles mirrored models correctly)
-	vec3 normalFloat = normalize((pushConstants.modelMatrix * vec4(normalize(vec3(normalAttribute)), 0.0)).xyz);
+	vec3 normalFloat = normalize((draw.modelMatrix * vec4(normalize(vec3(normalAttribute)), 0.0)).xyz);
 
 	// Sun direction from the renderer (single source of truth, GetSunDirection)
-	vec3 sunDir = normalize(pushConstants.sunDirection);
+	vec3 sunDir = normalize(sceneView.sunDirection.xyz);
 	float lambert = max(dot(normalFloat, sunDir), 0.0);
 
 	// Ambient color matching GL GLShadowShader: fog * 0.5 with a minimum
 	// luminance floor of 0.35 so things stay visible even when the sky is
 	// near-black. (fogColor is already linearized in C++.)
 	float hemisphere = 1.0 - normalFloat.z * 0.2;
-	vec3 ac = pushConstants.fogColor * 0.5;
+	vec3 ac = sceneView.fogColorMirrorClipZ.xyz * 0.5;
 	float L = (ac.x + ac.y + ac.z) / 3.0;
 	ac += ((ac + 0.003) / (L + 0.003)) * max(0.35 - L, 0.0);
 	ambientLight = ac * hemisphere;
@@ -95,7 +96,7 @@ void main() {
 	// Pass vertex color + lambert to fragment shader
 	vec3 vertexColor = vec3(colorAttribute) / 255.0;
 	color = vec4(vertexColor, lambert);
-	customColorOut = pushConstants.customColor;
+	customColorOut = draw.customColor;
 
 	// Shadow map coordinates (sun projects diagonally along y-z)
 	// Sample slightly inside the surface to avoid shadow bleed at voxel boundaries
@@ -103,8 +104,8 @@ void main() {
 	shadowCoord = vec3(shadowPos.x / 512.0, (shadowPos.y - shadowPos.z) / 512.0, shadowPos.z / 255.0);
 
 	// Fog density pre-computed on CPU from model world position
-	fogDensityOut = vec3(pushConstants.fogDensity);
-	outFogColor = pushConstants.fogColor;
+	fogDensityOut = vec3(draw.fogDensity);
+	outFogColor = sceneView.fogColorMirrorClipZ.xyz;
 
 	// AO 3D-texture coords (matches BasicMap; 512x512x65 texture).
 	aoCoord = (worldPos + vec3(0.0, 0.0, 1.0)) / vec3(512.0, 512.0, 65.0);
@@ -118,7 +119,6 @@ void main() {
 	ambientOcclusionCoord = (vec2(aoXAttribute, aoYAttribute) + 0.5) * (1.0 / 256.0);
 
 	// Model-on-model shadow cascades (same set-1 sampling as BasicMap).
-	vec4 worldPos4 = vec4(worldPos, 1.0);
 	modelShadowCoord0 = (shadowSampling.cascadeMatrix[0] * worldPos4).xyz;
 	modelShadowCoord1 = (shadowSampling.cascadeMatrix[1] * worldPos4).xyz;
 	modelShadowCoord2 = (shadowSampling.cascadeMatrix[2] * worldPos4).xyz;
@@ -126,6 +126,6 @@ void main() {
 
 	// Reflection-pass water clip: negative for fragments below the water plane.
 	// In the normal scene mirrorClipZ is +inf, so this stays positive (no clip).
-	waterClip = pushConstants.mirrorClipZ - worldPos.z;
+	waterClip = sceneView.fogColorMirrorClipZ.w - worldPos.z;
 	worldPosition = worldPos;
 }

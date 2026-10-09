@@ -33,6 +33,7 @@
 
 #include "VulkanDynamicLight.h"
 #include "VulkanSceneLights.h"
+#include "VulkanSceneView.h"
 
 namespace spades {
 	namespace gui {
@@ -196,6 +197,8 @@ namespace spades {
 
 			// The frame's dynamic lights as the lit shaders read them
 			std::unique_ptr<VulkanSceneLights> sceneLights;
+			// How the scene's passes see the world, the same for every draw of a pass
+			std::unique_ptr<VulkanSceneView> sceneView;
 
 			// Sky gradient rendering
 			VkPipeline skyPipeline;
@@ -330,6 +333,9 @@ namespace spades {
 			/** The sun's and the sky's light of the frame, as the lit shaders take it. */
 			VulkanSceneLights::SunSky GetSunSky();
 
+			/** How the pass under way sees the world, as `VulkanSceneView` holds it */
+			VulkanSceneView::Parameters GetSceneViewParameters();
+
 			float GetFogDistance() { return fogDistance; }
 
 			const client::SceneDefinition& GetSceneDef() const { return sceneDef; }
@@ -344,6 +350,13 @@ namespace spades {
 			const Matrix4& GetViewMatrix() const { return viewMatrix; }
 			const Matrix4& GetProjectionMatrix() const { return projectionMatrix; }
 			VulkanImage* GetWhiteImage() { return whiteImage.GetPointerOrNull(); }
+
+			/** Binds the view the pass under way sees the world through, the main one or
+			 * the water's mirrored one, as set `VulkanSceneView::Set` of `layout`. */
+			void BindSceneView(VkCommandBuffer, VkPipelineLayout layout);
+
+			/** The layout of the set `BindSceneView` binds */
+			VkDescriptorSetLayout GetSceneViewSetLayout() const;
 
 			/** The frame's dynamic lights, which the lit pipelines bind as set 2 */
 			VulkanSceneLights& GetSceneLights() { return *sceneLights; }

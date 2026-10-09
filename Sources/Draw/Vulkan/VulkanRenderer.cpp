@@ -34,6 +34,7 @@
 #include "VulkanGlareRenderer.h"
 #include "VulkanSceneLights.h"
 #include "VulkanMapOccupancy.h"
+#include "VulkanSceneView.h"
 #include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanImageManager.h"
@@ -188,6 +189,7 @@ namespace spades {
 			// comes after it.
 			sceneLights = stmp::make_unique<VulkanSceneLights>(
 			  *this, device->GetMaxFramesInFlight());
+			sceneView = stmp::make_unique<VulkanSceneView>(*this, device->GetMaxFramesInFlight());
 
 			// Programs that take the dynamic lights say so (`*sceneLights*`), as set
 			// 2; set 1 is the model shadows' in the lit pipelines, which they lack.
@@ -511,6 +513,7 @@ namespace spades {
 		DestroyDebugLinePipeline();
 		glareRenderer.reset();
 		sceneLights.reset();
+		sceneView.reset();
 
 			if (renderPass != VK_NULL_HANDLE && vkDevice != VK_NULL_HANDLE) {
 				vkDestroyRenderPass(vkDevice, renderPass, nullptr);
@@ -891,6 +894,31 @@ namespace spades {
 				return MakeVector3(0, 0, 0);
 			else
 				return GetFullDaylightFogColor();
+		}
+
+		VulkanSceneView::Parameters VulkanRenderer::GetSceneViewParameters() {
+			VulkanSceneView::Parameters parameters;
+			parameters.projectionView = projectionViewMatrix;
+			parameters.view = viewMatrix;
+			parameters.eye = sceneDef.viewOrigin;
+			parameters.fogDistance = GetFogDistance();
+			// The solid passes fade to it; see GetFogColorForSolidPass.
+			Vector3 fog = GetFogColorForSolidPass();
+			parameters.fogColor = fog * fog; // linearize
+			// The water's reflection keeps what lies above the water plane at 63.
+			parameters.mirrorClipZ = renderingMirror ? 63.0F : 1.0e9F;
+			parameters.sunDirection = GetSunDirection();
+			return parameters;
+		}
+
+		void VulkanRenderer::BindSceneView(VkCommandBuffer commandBuffer, VkPipelineLayout layout) {
+			sceneView->Bind(commandBuffer, layout, VK_PIPELINE_BIND_POINT_GRAPHICS, currentFrameSlot,
+			                renderingMirror ? VulkanSceneView::View::Mirror
+			                                : VulkanSceneView::View::Main);
+		}
+
+		VkDescriptorSetLayout VulkanRenderer::GetSceneViewSetLayout() const {
+			return sceneView->GetSetLayout();
 		}
 
 		VulkanSceneLights::SunSky VulkanRenderer::GetSunSky() {
@@ -1871,6 +1899,7 @@ namespace spades {
 		// Bin the frame's dynamic lights into the view's clusters, for every lit
 		// pass that follows to read, the mirror's included.
 		if (sceneUsedInThisFrame) {
+			sceneView->Write(currentFrameSlot, VulkanSceneView::View::Main, GetSceneViewParameters());
 			if (mapOccupancy)
 				mapOccupancy->Update(commandBuffer, currentFrameSlot);
 			sceneLights->Update(commandBuffer, currentFrameSlot, lights, sceneDef,
@@ -1891,6 +1920,8 @@ namespace spades {
 			reflectedView = reflectedView * Matrix4::Translate(0, 0, -63);
 			viewMatrix = reflectedView;
 			projectionViewMatrix = projectionMatrix * viewMatrix;
+			sceneView->Write(currentFrameSlot, VulkanSceneView::View::Mirror,
+			                 GetSceneViewParameters());
 
 			// Get fog color for background. The scene target is linear in every
 			// mode here (SFLOAT under r_hdr, A2B10G10R10_UNORM otherwise), so
