@@ -133,7 +133,7 @@ void main() {
 	float sunLambert = color.w;
 
 	// Sun contribution — matches GL Common.fs EvaluateSunLight() * color.w
-	vec3 sun = vec3(0.6) * sunLambert * shadow;
+	vec3 sun = vec3(0.6 * sceneSunSky.sunlight) * sunLambert * shadow;
 
 	// Per-block ambient occlusion (sampled from 3D ambient shadow texture).
 	// .x = AO accumulation, .y = sample weight (1 in air, 0 in solids).
@@ -147,7 +147,7 @@ void main() {
 		radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
 		radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
 		radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-		radiosity = max(radiosity, 0.0) * 1.5;
+		radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
 
 		// Blend the coarse 3D ambient-shadow AO with the per-vertex detail AO
 		// from the 2D atlas, exactly as GL MapRadiosity.fs EvaluateRadiosity
@@ -159,12 +159,10 @@ void main() {
 		float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float amb = mix(sqrt(aoFactor * detailAO), min(aoFactor, detailAO), 0.5);
 
-		// Ambient color matches GL GLShadowShader: fog * 0.5 with a min-luminance
-		// floor of 0.35 (keeps things visible when the sky is near-black).
+		// GL GLShadowShader's ambient colour, worked out in full daylight
+		// (`VulkanRenderer::GetSunSky`), drawn at the daylight.
 		float aoTerm = amb * (0.8 - nrm.z * 0.2);
-		vec3 ambientColor = inFogColor * 0.5;
-		float ambL = (ambientColor.x + ambientColor.y + ambientColor.z) / 3.0;
-		ambientColor += ((ambientColor + 0.003) / (ambL + 0.003)) * max(0.35 - ambL, 0.0);
+		vec3 ambientColor = sceneSunSky.ambientLight * sceneSunSky.daylight;
 
 		diffuse = radiosity + aoTerm * ambientColor + sun;
 	} else {
@@ -175,7 +173,7 @@ void main() {
 		// 3D ambientShadowTexture used in the radiosity branch.
 		float ao = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float hemisphere = 1.0 - nrm.z * 0.2;
-		vec3 ambientColor = mix(inFogColor, vec3(1.0), 0.5);
+		vec3 ambientColor = mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * sceneSunSky.daylight;
 		diffuse = ambientColor * (0.5 * ao * hemisphere) + sun;
 	}
 

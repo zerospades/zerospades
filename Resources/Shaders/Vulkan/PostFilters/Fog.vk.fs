@@ -44,7 +44,7 @@ layout(push_constant) uniform Params {
     vec4 viewOriginPad;  // xyz = viewOrigin
     vec4 viewAxisUp;     // xyz
     vec4 viewAxisSide;   // xyz
-    vec4 viewAxisFront;  // xyz
+    vec4 viewAxisFront;  // xyz, w = sunlight: with none, no shafts and an even fog
     vec4 fovZNearFar;    // xy = fov (tan half-angle), z = zNear, w = zFar
     vec4 fogColorDist;   // xyz = fogColor (linear), w = fogDistance
 } pc;
@@ -132,7 +132,8 @@ void main() {
     vec2 timePerVoxelAbs = abs(timePerVoxel);
     vec2 timeToNextVoxel = (voxelIndex + dirSign2 - pos.xy) * timePerVoxel;
 
-    if (ceilTime <= 0.0) {
+    if (ceilTime <= 0.0 || pc.viewAxisFront.w <= 0.0) {
+        // The ray never goes below the ceiling, or there is no sun to cast shafts.
         total = fogDensFunc(zMaxTime);
     } else {
         // Coarse traversal: walk the 64×64 cell grid, fetching min/max
@@ -244,11 +245,13 @@ void main() {
 
     // Sun direction packed into the free .w slots of the view-axis vectors
     // (filled at render time from renderer.GetSunDirection()).
-    vec3 sunDir = normalize(vec3(pc.viewOriginPad.w, pc.viewAxisUp.w, pc.viewAxisSide.w));
-    float bright = dot(sunDir, normalize(viewDir));
-    total *= 0.8 + bright * 0.3;
-    bright = exp2(bright * 16.0 - 15.0);
-    total *= bright + 1.0;
+    if (pc.viewAxisFront.w > 0.0) {
+        vec3 sunDir = normalize(vec3(pc.viewOriginPad.w, pc.viewAxisUp.w, pc.viewAxisSide.w));
+        float bright = dot(sunDir, normalize(viewDir));
+        total *= 0.8 + bright * 0.3;
+        bright = exp2(bright * 16.0 - 15.0);
+        total *= bright + 1.0;
+    }
 
     outColor      = texture(colorTexture, texCoord);
     outColor.xyz += total * pc.fogColorDist.xyz;

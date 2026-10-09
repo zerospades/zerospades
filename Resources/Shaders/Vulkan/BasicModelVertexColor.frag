@@ -129,7 +129,7 @@ void main() {
 
 	vec3 nrm = normalize(normalVarying);
 	float sunLambert = color.w;
-	vec3 sun = vec3(0.6) * sunLambert * shadow;
+	vec3 sun = vec3(0.6 * sceneSunSky.sunlight) * sunLambert * shadow;
 
 	vec3 diffuse;
 	if (USE_RADIOSITY != 0) {
@@ -141,7 +141,7 @@ void main() {
 		radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
 		radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
 		radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-		radiosity = max(radiosity, 0.0) * 1.5;
+		radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
 
 		// Blend in the per-vertex detail AO from the 2D atlas, as GL does via
 		// EvaluateAmbientLight(ao) -> EvaluateRadiosity. Without it the sqrt()
@@ -150,9 +150,7 @@ void main() {
 		float amb = mix(sqrt(aoFactor * detailAO), min(aoFactor, detailAO), 0.5);
 
 		float aoTerm = amb * (0.8 - nrm.z * 0.2);
-		vec3 ambientColor = inFogColor * 0.5;
-		float ambL = (ambientColor.x + ambientColor.y + ambientColor.z) / 3.0;
-		ambientColor += ((ambientColor + 0.003) / (ambL + 0.003)) * max(0.35 - ambL, 0.0);
+		vec3 ambientColor = sceneSunSky.ambientLight * sceneSunSky.daylight;
 
 		diffuse = radiosity + aoTerm * ambientColor + sun;
 	} else {
@@ -161,7 +159,7 @@ void main() {
 		// mix(fog, white, 0.5) ambient.
 		float ao = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 		float hemisphere = 1.0 - nrm.z * 0.2;
-		vec3 ambientColor = mix(inFogColor, vec3(1.0), 0.5);
+		vec3 ambientColor = mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * sceneSunSky.daylight;
 		diffuse = ambientColor * (0.5 * ao * hemisphere) + sun;
 	}
 

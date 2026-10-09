@@ -676,9 +676,11 @@ namespace spades {
 				requests.push_back(std::move(rq));
 			};
 
-			// sun
-			AddRequest(renderer.GetSunDirection(), MakeVector3(1.0F, 0.9F, 0.8F),
-			           true, true);
+			// sun, unless there is none to flare
+			const float sunlight = renderer.GetSunlight();
+			if (sunlight > 0.0F)
+				AddRequest(renderer.GetSunDirection(), MakeVector3(1.0F, 0.9F, 0.8F) * sunlight,
+				           true, true);
 
 			// dynamic lights (r_lensFlareDynamic); culls copied from
 			// GLRenderer's dynamic-flare loop
