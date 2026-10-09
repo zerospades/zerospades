@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <vector>
 #include <vulkan/vulkan.h>
-#include <Draw/Vulkan/vk_mem_alloc.h>
+#include <Draw/Vulkan/VulkanMemoryAllocator.h>
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
