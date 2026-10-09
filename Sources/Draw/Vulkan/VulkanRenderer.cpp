@@ -2112,7 +2112,7 @@ namespace spades {
 				RenderXRayPass(commandBuffer);
 
 				if (!useSoftParticles && spriteRenderer)
-					spriteRenderer->Render(commandBuffer, imageIndex);
+					spriteRenderer->Render(commandBuffer, currentFrameSlot);
 				if (longSpriteRenderer)
 					longSpriteRenderer->Render(commandBuffer, imageIndex);
 				RenderDebugLines(commandBuffer);
@@ -2306,7 +2306,7 @@ namespace spades {
 					RenderXRayPass(commandBuffer);
 
 					if (!useSoftParticles && spriteRenderer)
-						spriteRenderer->Render(commandBuffer, imageIndex);
+						spriteRenderer->Render(commandBuffer, currentFrameSlot);
 					if (longSpriteRenderer)
 						longSpriteRenderer->Render(commandBuffer, imageIndex);
 					RenderDebugLines(commandBuffer);
@@ -2419,7 +2419,7 @@ namespace spades {
 				spriteScissor.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
 				vkCmdSetScissor(commandBuffer, 0, 1, &spriteScissor);
 
-				spriteRenderer->Render(commandBuffer, imageIndex);
+				spriteRenderer->Render(commandBuffer, currentFrameSlot);
 
 				vkCmdEndRenderPass(commandBuffer);
 
