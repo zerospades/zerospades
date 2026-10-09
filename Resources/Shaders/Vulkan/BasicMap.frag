@@ -26,23 +26,6 @@
 // Driven by r_radiosity at pipeline-creation time.
 layout(constant_id = 0) const int USE_RADIOSITY = 0;
 
-layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
-layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
-layout(set = 0, binding = 2) uniform sampler3D radiosityTextureFlat;
-layout(set = 0, binding = 3) uniform sampler3D radiosityTextureX;
-layout(set = 0, binding = 4) uniform sampler3D radiosityTextureY;
-layout(set = 0, binding = 5) uniform sampler3D radiosityTextureZ;
-layout(set = 0, binding = 6) uniform sampler2D ambientOcclusionAtlas; // Gfx/AmbientOcclusion.png
-
-// Set 1: dynamic model-shadow cascades (owned by VulkanShadowMapRenderer).
-layout(set = 1, binding = 0) uniform ShadowSampling {
-	mat4 cascadeMatrix[3];
-	int enabled;
-} shadowSampling;
-layout(set = 1, binding = 1) uniform sampler2D modelShadowMap0;
-layout(set = 1, binding = 2) uniform sampler2D modelShadowMap1;
-layout(set = 1, binding = 3) uniform sampler2D modelShadowMap2;
-
 layout(location = 0) in vec4 color;           // xyz = linearized vertex color, w = sun lambert
 layout(location = 1) in vec3 ambientLight;     // hemisphere ambient fallback (unused, kept for VS↔FS compat)
 layout(location = 2) in vec3 fogDensity;
@@ -62,71 +45,16 @@ layout(location = 13) in vec3 worldPosition;
 layout(location = 0) out vec4 fragColor;
 
 #include "SceneLight/Lights.glsl"
-
-// Sample one cascade with a 2x2 filtered depth compare, the manual equivalent
-// of the sampler2DShadow GL uses (Shadow/Model.fs). Filtering the comparison
-// results rather than taking one hard compare keeps the term continuous, so it
-// cannot flip wholesale between frames.
-float SampleModelCascade(sampler2D tex, vec3 c) {
-	vec2 uv = c.xy * 0.5 + 0.5; // clip [-1,1] -> texcoord [0,1]
-	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || c.z < 0.0 || c.z > 1.0)
-		return 1.0; // outside this cascade: treat as lit, as GL's clamped map does
-
-	vec2 texSize = vec2(textureSize(tex, 0));
-	vec2 texel = 1.0 / texSize;
-	vec2 coord = uv * texSize - 0.5;
-	vec2 frac = fract(coord);
-	vec2 base = (floor(coord) + 0.5) * texel;
-
-	// Local Z 0 = sun side; an occluder with smaller stored depth is nearer the
-	// sun, so this fragment is shadowed. Bias avoids self-shadow acne.
-	float ref = c.z - 0.0015;
-	float s00 = step(ref, texture(tex, base).r);
-	float s10 = step(ref, texture(tex, base + vec2(texel.x, 0.0)).r);
-	float s01 = step(ref, texture(tex, base + vec2(0.0, texel.y)).r);
-	float s11 = step(ref, texture(tex, base + texel).r);
-
-	return mix(mix(s00, s10, frac.x), mix(s01, s11, frac.x), frac.y);
-}
-
-// Dynamic (player/grenade) shadow term, combined multiplicatively with the
-// map shadow.
-//
-// The cascade is picked by camera-axis depth against the same split distances
-// the cascade boxes were fitted to, exactly as GL does. The previous approach
-// -- try cascade 0, fall through to 1 then 2 when the coordinate lands outside
-// the box -- decoupled selection from the fit: the boxes are refitted from the
-// camera frustum every frame, so a fragment near a boundary was reassigned to a
-// different cascade from one frame to the next and the shadow term flipped with
-// it. That is worst when the view axis lines up with the sun, which is when the
-// boxes are most elongated and their boundaries sweep fastest.
-float EvaluteModelShadow() {
-	if (shadowSampling.enabled == 0)
-		return 1.0;
-	if (shadowViewDepth < 12.0)
-		return SampleModelCascade(modelShadowMap0, modelShadowCoord0);
-	else if (shadowViewDepth < 40.0)
-		return SampleModelCascade(modelShadowMap1, modelShadowCoord1);
-	else
-		return SampleModelCascade(modelShadowMap2, modelShadowCoord2);
-}
-
-// Linear (RGB10A2) decode of radiosity values. Mirrors GL MapRadiosity.fs
-// DecodeRadiosityValue, but only the high-precision (linear) branch — the
-// Vulkan port stores radiosity in A2R10G10B10_UNORM_PACK32 always.
-vec3 DecodeRadiosityValue(vec3 val) {
-	val *= 1023.0 / 1022.0;
-	val = (val * 2.0) - 1.0;
-	return val;
-}
+#include "SceneLight/MapLight.glsl"
+#include "SceneLight/ModelShadow.glsl"
 
 void main() {
 	// Map shadow (matches GL Map.fs: EvaluateMapShadow)
-	float shadowVal = texture(mapShadowTexture, shadowCoord.xy).w;
-	float shadow = (shadowVal < shadowCoord.z - 0.0001) ? 0.0 : 1.0;
+	float shadow = MapShadowVisibility(shadowCoord);
 
 	// Fold in dynamic model shadows (GL: VisibilityOfSunLight = map * model).
-	shadow *= EvaluteModelShadow();
+	shadow *= ModelShadowVisibility(modelShadowCoord0, modelShadowCoord1, modelShadowCoord2,
+	                                shadowViewDepth);
 
 	vec3 nrm = normalize(normalVarying);
 	vec3 vertexColor = color.xyz;
@@ -136,18 +64,12 @@ void main() {
 	vec3 sun = vec3(0.6 * sceneSunSky.sunlight) * sunLambert * shadow;
 
 	// Per-block ambient occlusion (sampled from 3D ambient shadow texture).
-	// .x = AO accumulation, .y = sample weight (1 in air, 0 in solids).
-	vec2 ambTexVal = texture(ambientShadowTexture, aoCoord).xy;
-	float aoFactor = max(ambTexVal.x / max(ambTexVal.y, 0.25), 0.0);
+	float aoFactor = MapAmbientShadow(aoCoord);
 
 	vec3 diffuse;
 	if (USE_RADIOSITY != 0) {
 		// MapRadiosity.fs path — directional radiosity + ambient·skyAmbient.
-		vec3 radiosity = DecodeRadiosityValue(texture(radiosityTextureFlat, radiosityTextureCoord).xyz);
-		radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
-		radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
-		radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-		radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
+		vec3 radiosity = MapRadiosity(radiosityTextureCoord, nrm);
 
 		// Blend the coarse 3D ambient-shadow AO with the per-vertex detail AO
 		// from the 2D atlas, exactly as GL MapRadiosity.fs EvaluateRadiosity

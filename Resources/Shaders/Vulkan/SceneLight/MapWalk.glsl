@@ -18,6 +18,9 @@
 
  */
 
+#ifndef SCENE_LIGHT_MAP_WALK_GLSL
+#define SCENE_LIGHT_MAP_WALK_GLSL
+
 // Walks a segment through the map block by block, crossing open air a clear cube
 // at a time, to find where it enters the first solid block. The includer defines
 // `SCENE_LIGHT_SET`, the descriptor set the map's occupancy is bound to.
@@ -120,3 +123,5 @@ float DynamicLightMapWalk(vec3 from, vec3 to, bool stopAtTarget) {
 	}
 	return tEnter;
 }
+
+#endif
