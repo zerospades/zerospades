@@ -22,7 +22,7 @@
 
 #include <vector>
 #include <vulkan/vulkan.h>
-#include <Draw/Vulkan/vk_mem_alloc.h>
+#include <Draw/Vulkan/VulkanMemoryAllocator.h>
 #include "VulkanPostProcessFilter.h"
 
 namespace spades {

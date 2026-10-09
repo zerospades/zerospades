@@ -21,7 +21,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <Draw/Vulkan/vk_mem_alloc.h>
+#include <Draw/Vulkan/VulkanMemoryAllocator.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {

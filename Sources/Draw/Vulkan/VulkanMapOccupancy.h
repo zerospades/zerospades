@@ -27,7 +27,7 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/RefCountedObject.h>
-#include <Draw/Vulkan/vk_mem_alloc.h>
+#include <Draw/Vulkan/VulkanMemoryAllocator.h>
 
 namespace spades {
 	namespace client {

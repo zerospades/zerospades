@@ -21,4 +21,4 @@
 // VMA single-header implementation unit.
 // Compiled once to avoid duplicate symbol issues.
 #define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
+#include "VulkanMemoryAllocator.h"
