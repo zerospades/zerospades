@@ -44,7 +44,7 @@ namespace spades {
 		class VulkanSpriteRenderer;
 		class VulkanLongSpriteRenderer;
 		class VulkanGlareRenderer;
-		class VulkanDynamicLightClusters;
+		class VulkanSceneLights;
 		class VulkanMapOccupancy;
 		class VulkanImageRenderer;
 		class VulkanWaterRenderer;
@@ -195,7 +195,7 @@ namespace spades {
 			Handle<VulkanImage> whiteImage; // 1x1 white image for solid color rendering
 
 			// The frame's dynamic lights as the lit shaders read them
-			std::unique_ptr<VulkanDynamicLightClusters> dynamicLightClusters;
+			std::unique_ptr<VulkanSceneLights> sceneLights;
 
 			// Sky gradient rendering
 			VkPipeline skyPipeline;
@@ -322,7 +322,7 @@ namespace spades {
 			VulkanImage* GetWhiteImage() { return whiteImage.GetPointerOrNull(); }
 
 			/** The frame's dynamic lights, which the lit pipelines bind as set 2 */
-			VulkanDynamicLightClusters& GetDynamicLightClusters() { return *dynamicLightClusters; }
+			VulkanSceneLights& GetSceneLights() { return *sceneLights; }
 			bool IsRenderingMirror() const { return renderingMirror; }
 		int GetRenderWidth() const { return renderWidth; }
 		int GetRenderHeight() const { return renderHeight; }

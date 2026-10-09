@@ -61,7 +61,7 @@ layout(location = 13) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
 
-#include "DynamicLight/Lights.glsl"
+#include "SceneLight/Lights.glsl"
 
 // Sample one cascade with a 2x2 filtered depth compare, the manual equivalent
 // of the sampler2DShadow GL uses (Shadow/Model.fs). Filtering the comparison

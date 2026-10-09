@@ -25,11 +25,11 @@
 // marks, in its cluster's mask, the lights whose sphere reaches into the box the
 // cluster spans.
 
-#define DYNAMIC_LIGHT_SET 0
+#define SCENE_LIGHT_SET 0
 #define DYNAMIC_LIGHT_CLUSTER_ACCESS writeonly
 #include "Table.glsl"
 
-// `VulkanDynamicLightClusters::ClusterGroupSize`
+// `VulkanSceneLights::ClusterGroupSize`
 layout(local_size_x = 64) in;
 
 // Where the last slice ends: it runs on past the far plane, so as to hold

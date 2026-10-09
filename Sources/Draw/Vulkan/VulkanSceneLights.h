@@ -47,7 +47,7 @@ namespace spades {
 		 * them in the pass that draws the surfaces, rather than in passes of their
 		 * own: a table of the lights, and the view cut into clusters, each marking
 		 * the lights that reach into it, which a compute pass works out every frame.
-		 * A fragment reads only its cluster's lights (`DynamicLight/Lights.glsl`).
+		 * A fragment reads only its cluster's lights (`SceneLight/Lights.glsl`).
 		 *
 		 * The map hides the lights, and each spotlight whose beam it can afford gets
 		 * a tile of an occlusion map, traced by another compute pass every frame:
@@ -58,7 +58,7 @@ namespace spades {
 		 * Every frame in flight has its own table, clusters and descriptor set, so a
 		 * frame's are written only once the GPU is done with them.
 		 */
-		class VulkanDynamicLightClusters {
+		class VulkanSceneLights {
 		public:
 			/** The most lights a frame takes (`DYNAMIC_LIGHT_MAX`); the rest are
 			 * left out. */
@@ -77,7 +77,7 @@ namespace spades {
 			 * Points nearer than that read every light. */
 			static constexpr float ClusterNear = 0.5F;
 
-			/** `local_size_x` of `DynamicLight/Cluster.comp` */
+			/** `local_size_x` of `SceneLight/Cluster.comp` */
 			static constexpr std::uint32_t ClusterGroupSize = 64;
 
 			/** The texels along an occlusion map tile's edge
@@ -90,7 +90,7 @@ namespace spades {
 			  OcclusionTilesPerRow * OcclusionTilesPerRow;
 			static constexpr std::uint32_t OcclusionAtlasSize =
 			  OcclusionTileSize * OcclusionTilesPerRow;
-			/** `local_size_x` and `local_size_y` of `DynamicLight/OcclusionMap.comp` */
+			/** `local_size_x` and `local_size_y` of `SceneLight/OcclusionMap.comp` */
 			static constexpr std::uint32_t OcclusionGroupSize = 8;
 
 			/**
@@ -103,14 +103,14 @@ namespace spades {
 			 * small enough over its whole reach. */
 			static bool IsOcclusionMappable(const VulkanDynamicLight&);
 
-			VulkanDynamicLightClusters(VulkanRenderer&, std::size_t framesInFlight);
-			~VulkanDynamicLightClusters();
+			VulkanSceneLights(VulkanRenderer&, std::size_t framesInFlight);
+			~VulkanSceneLights();
 
-			VulkanDynamicLightClusters(const VulkanDynamicLightClusters&) = delete;
-			VulkanDynamicLightClusters& operator=(const VulkanDynamicLightClusters&) = delete;
+			VulkanSceneLights(const VulkanSceneLights&) = delete;
+			VulkanSceneLights& operator=(const VulkanSceneLights&) = delete;
 
 			/** The layout of the set the lit pipelines bind the lights to, as set
-			 * `DYNAMIC_LIGHT_SET` (2). */
+			 * `SCENE_LIGHT_SET` (2). */
 			VkDescriptorSetLayout GetSetLayout() const { return setLayout; }
 
 			/** A layout without bindings, to stand for a set a pipeline layout has to

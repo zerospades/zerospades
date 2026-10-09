@@ -89,7 +89,7 @@ namespace spades {
 			// Format:
 			// Line 1-N: shader file paths (vertex shader first, fragment shader second, etc.)
 			// Lines `*directive*` name descriptor sets the program reads from 1 on, as
-			// `RegisterDirectiveSetLayouts` registered them (e.g. *dynamicLights*).
+			// `RegisterDirectiveSetLayouts` registered them (e.g. *sceneLights*).
 			for (size_t i = 0; i < lines.size(); i++) {
 				std::string line = TrimSpaces(lines[i]);
 

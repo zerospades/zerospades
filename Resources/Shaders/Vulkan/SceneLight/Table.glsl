@@ -19,11 +19,11 @@
  */
 
 // The frame's dynamic lights and the clusters of the view they are binned into,
-// as `VulkanDynamicLightClusters` writes them. The includer defines
-// `DYNAMIC_LIGHT_SET`, the descriptor set they are bound to, and
+// as `VulkanSceneLights` writes them. The includer defines
+// `SCENE_LIGHT_SET`, the descriptor set they are bound to, and
 // `DYNAMIC_LIGHT_CLUSTER_ACCESS`, how it uses the cluster masks.
 
-// The most lights a frame takes: `VulkanDynamicLightClusters::MaxLights`.
+// The most lights a frame takes: `VulkanSceneLights::MaxLights`.
 #define DYNAMIC_LIGHT_MAX 256
 // The 32-bit words of a cluster's mask, a bit for each light
 #define DYNAMIC_LIGHT_MASK_WORDS (DYNAMIC_LIGHT_MAX / 32)
@@ -32,7 +32,7 @@
 // the image's half width: `VulkanDynamicLight::SpotFadeEnd`.
 #define DYNAMIC_LIGHT_SPOT_FADE_END 1.1
 
-// `VulkanDynamicLightClusters`' occlusion maps: tiles of
+// `VulkanSceneLights`' occlusion maps: tiles of
 // `DYNAMIC_LIGHT_OCCLUSION_TILE` texels each, `DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW`
 // to a row of the atlas, each texel holding how far from its light the ray through
 // it gets before it enters a solid block.
@@ -69,7 +69,7 @@ struct DynamicLight {
 	vec4 traceForward;
 };
 
-layout(set = DYNAMIC_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
+layout(set = SCENE_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
 	// xyz: the eye, w: where the first slice of clusters starts ahead of it
 	vec4 eyeNear;
 	// xyz: the view's right axis, w: 1 / the tangent of half its width
@@ -91,12 +91,12 @@ layout(set = DYNAMIC_LIGHT_SET, binding = 0, std140) uniform DynamicLightFrame {
 	uvec4 occlusionTileLights[DYNAMIC_LIGHT_OCCLUSION_MAX_TILES / 4];
 } dynamicLightFrame;
 
-layout(set = DYNAMIC_LIGHT_SET, binding = 1, std430) readonly buffer DynamicLightList {
+layout(set = SCENE_LIGHT_SET, binding = 1, std430) readonly buffer DynamicLightList {
 	DynamicLight dynamicLights[];
 };
 
 // `DYNAMIC_LIGHT_MASK_WORDS` per cluster, across, then up, then deep
-layout(set = DYNAMIC_LIGHT_SET, binding = 2, std430) DYNAMIC_LIGHT_CLUSTER_ACCESS buffer
+layout(set = SCENE_LIGHT_SET, binding = 2, std430) DYNAMIC_LIGHT_CLUSTER_ACCESS buffer
   DynamicLightClusterMasks {
 	uint dynamicLightClusterMasks[];
 };

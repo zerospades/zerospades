@@ -57,7 +57,7 @@ layout(location = 11) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
 
-#include "DynamicLight/Lights.glsl"
+#include "SceneLight/Lights.glsl"
 
 vec3 DecodeRadiosityValue(vec3 val) {
 	val *= 1023.0 / 1022.0;

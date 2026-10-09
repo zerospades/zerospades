@@ -25,20 +25,20 @@
 
 // The descriptor set every lit pipeline binds the lights to, after the map's
 // textures (0) and the model shadows (1)
-#define DYNAMIC_LIGHT_SET 2
+#define SCENE_LIGHT_SET 2
 #define DYNAMIC_LIGHT_CLUSTER_ACCESS readonly
 #include "Table.glsl"
 
-// The images of the frame's spotlights: `VulkanDynamicLightClusters::MaxImages`.
+// The images of the frame's spotlights: `VulkanSceneLights::MaxImages`.
 // Unused ones hold a white image.
 #define DYNAMIC_LIGHT_IMAGES 4
-layout(set = DYNAMIC_LIGHT_SET, binding = 3) uniform sampler2D
+layout(set = SCENE_LIGHT_SET, binding = 3) uniform sampler2D
   dynamicLightImages[DYNAMIC_LIGHT_IMAGES];
 
 #include "MapWalk.glsl"
 
-// The spotlights' occlusion maps, traced this frame by `DynamicLight/OcclusionMap.comp`
-layout(set = DYNAMIC_LIGHT_SET, binding = 5, r32f) uniform readonly image2D
+// The spotlights' occlusion maps, traced this frame by `SceneLight/OcclusionMap.comp`
+layout(set = SCENE_LIGHT_SET, binding = 5, r32f) uniform readonly image2D
   dynamicLightOcclusionMaps;
 
 // The widest a texel may be at a point for its tile to prove the point lit, in

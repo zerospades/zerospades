@@ -18,7 +18,7 @@
 
  */
 
-#include "VulkanDynamicLightClusters.h"
+#include "VulkanSceneLights.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,7 +39,7 @@
 namespace spades {
 	namespace draw {
 		namespace {
-			/** `DynamicLight` of `DynamicLight/Table.glsl`, std430 */
+			/** `DynamicLight` of `SceneLight/Table.glsl`, std430 */
 			struct GpuLight {
 				float originReach[4];
 				float colorReachInversed[4];
@@ -53,7 +53,7 @@ namespace spades {
 			};
 			static_assert(sizeof(GpuLight) == 192, "GpuLight must match DynamicLight");
 
-			/** `DynamicLightFrame` of `DynamicLight/Table.glsl`, std140 */
+			/** `DynamicLightFrame` of `SceneLight/Table.glsl`, std140 */
 			struct GpuFrame {
 				float eyeNear[4];
 				float right[4];
@@ -63,9 +63,9 @@ namespace spades {
 				float mapOcclusion;
 				float firstPersonDepthEnd;
 				std::uint32_t counts[4];
-				std::uint32_t occlusionTileLights[VulkanDynamicLightClusters::MaxOcclusionTiles];
+				std::uint32_t occlusionTileLights[VulkanSceneLights::MaxOcclusionTiles];
 			};
-			static_assert(sizeof(GpuFrame) == 96 + 4 * VulkanDynamicLightClusters::MaxOcclusionTiles,
+			static_assert(sizeof(GpuFrame) == 96 + 4 * VulkanSceneLights::MaxOcclusionTiles,
 			              "GpuFrame must match DynamicLightFrame");
 
 			/**
@@ -85,9 +85,9 @@ namespace spades {
 			}
 
 			constexpr std::uint32_t kClusterCount =
-			  VulkanDynamicLightClusters::ClustersX * VulkanDynamicLightClusters::ClustersY *
-			  VulkanDynamicLightClusters::ClustersZ;
-			constexpr std::uint32_t kMaskWords = VulkanDynamicLightClusters::MaxLights / 32;
+			  VulkanSceneLights::ClustersX * VulkanSceneLights::ClustersY *
+			  VulkanSceneLights::ClustersZ;
+			constexpr std::uint32_t kMaskWords = VulkanSceneLights::MaxLights / 32;
 
 			void Store(float (&out)[4], const Vector3& v, float w) {
 				out[0] = v.x;
@@ -97,7 +97,7 @@ namespace spades {
 			}
 		} // namespace
 
-		VulkanDynamicLightClusters::VulkanDynamicLightClusters(VulkanRenderer& renderer,
+		VulkanSceneLights::VulkanSceneLights(VulkanRenderer& renderer,
 		                                                       std::size_t framesInFlight)
 		    : renderer(renderer), device(renderer.GetDevice()->GetDevice()) {
 			SPADES_MARK_FUNCTION();
@@ -150,7 +150,7 @@ namespace spades {
 			CreatePipelines();
 		}
 
-		VulkanDynamicLightClusters::~VulkanDynamicLightClusters() {
+		VulkanSceneLights::~VulkanSceneLights() {
 			SPADES_MARK_FUNCTION();
 
 			for (Slot& slot : slots) {
@@ -175,7 +175,7 @@ namespace spades {
 				vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
 		}
 
-		void VulkanDynamicLightClusters::CreateSlot(Slot& slot) {
+		void VulkanSceneLights::CreateSlot(Slot& slot) {
 			Handle<gui::SDLVulkanDevice> vulkanDevice = renderer.GetDevice();
 			const VkMemoryPropertyFlags hostVisible =
 			  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -227,7 +227,7 @@ namespace spades {
 			std::memcpy(slot.frame->Map(), &empty, sizeof(empty));
 		}
 
-		void VulkanDynamicLightClusters::CreatePipelines() {
+		void VulkanSceneLights::CreatePipelines() {
 			VkPipelineLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			layoutInfo.setLayoutCount = 1;
@@ -235,12 +235,12 @@ namespace spades {
 			if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 				SPRaise("Failed to create the dynamic light compute pipeline layout");
 
-			pipeline = CreateComputePipeline("Shaders/Vulkan/DynamicLight/Cluster.comp.spv");
+			pipeline = CreateComputePipeline("Shaders/Vulkan/SceneLight/Cluster.comp.spv");
 			occlusionPipeline =
-			  CreateComputePipeline("Shaders/Vulkan/DynamicLight/OcclusionMap.comp.spv");
+			  CreateComputePipeline("Shaders/Vulkan/SceneLight/OcclusionMap.comp.spv");
 		}
 
-		VkPipeline VulkanDynamicLightClusters::CreateComputePipeline(const char* shaderPath) {
+		VkPipeline VulkanSceneLights::CreateComputePipeline(const char* shaderPath) {
 			const std::vector<std::uint32_t> code = SpirvCache::Load(shaderPath);
 			VkShaderModuleCreateInfo moduleInfo{};
 			moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -267,7 +267,7 @@ namespace spades {
 			return created;
 		}
 
-		void VulkanDynamicLightClusters::CreateOcclusionAtlas(Slot& slot) {
+		void VulkanSceneLights::CreateOcclusionAtlas(Slot& slot) {
 			VkImageCreateInfo imageInfo{};
 			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 			imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -311,24 +311,24 @@ namespace spades {
 			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 		}
 
-		float VulkanDynamicLightClusters::GetOcclusionTexelSpread(const VulkanDynamicLight& light) {
+		float VulkanSceneLights::GetOcclusionTexelSpread(const VulkanDynamicLight& light) {
 			return 2.0F * light.GetSpotTangent() * VulkanDynamicLight::SpotFadeEnd /
 			       (float)OcclusionTileSize;
 		}
 
-		bool VulkanDynamicLightClusters::IsOcclusionMappable(const VulkanDynamicLight& light) {
+		bool VulkanSceneLights::IsOcclusionMappable(const VulkanDynamicLight& light) {
 			const client::DynamicLightParam& param = light.GetParam();
 			if (param.type != client::DynamicLightTypeSpotlight)
 				return false;
 			return param.radius * GetOcclusionTexelSpread(light) <= kMaxOcclusionTexelWidth;
 		}
 
-		VkDescriptorSet VulkanDynamicLightClusters::GetDescriptorSet(std::size_t frameSlot) const {
+		VkDescriptorSet VulkanSceneLights::GetDescriptorSet(std::size_t frameSlot) const {
 			SPAssert(frameSlot < slots.size());
 			return slots[frameSlot].set;
 		}
 
-		void VulkanDynamicLightClusters::BindImages(
+		void VulkanSceneLights::BindImages(
 		  Slot& slot, const std::array<VulkanImage*, MaxImages>& images) {
 			VulkanImage* white = renderer.GetWhiteImage();
 			SPAssert(white);
@@ -359,7 +359,7 @@ namespace spades {
 			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 		}
 
-		void VulkanDynamicLightClusters::BindOccupancy(Slot& slot,
+		void VulkanSceneLights::BindOccupancy(Slot& slot,
 		                                               const VulkanMapOccupancy& occupancy) {
 			const VkDescriptorImageInfo info{occupancy.GetSampler(), occupancy.GetImageView(),
 			                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
@@ -373,7 +373,7 @@ namespace spades {
 			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 		}
 
-		void VulkanDynamicLightClusters::Update(VkCommandBuffer commandBuffer,
+		void VulkanSceneLights::Update(VkCommandBuffer commandBuffer,
 		                                        std::size_t frameSlot,
 		                                        const std::vector<VulkanDynamicLight>& lights,
 		                                        const client::SceneDefinition& view,
