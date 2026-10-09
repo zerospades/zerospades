@@ -1,14 +1,8 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	mat4 viewMatrix;
-	vec3 rightVector;
-	vec3 upVector;
-	vec3 viewOriginVector;
-	vec3 fogColor;
-	float fogDistance;
-} pc;
+// The view, from the sprites' own set (`SpriteView.glsl`), whose image this is too
+#include "SpriteView.glsl"
 
 layout(location = 0) in vec3 positionAttribute;
 layout(location = 1) in vec2 texCoordAttribute;
@@ -20,14 +14,10 @@ layout(location = 2) out vec4 fogDensity;
 
 void main() {
 	vec3 pos = positionAttribute;
-	gl_Position = pc.projectionViewMatrix * vec4(pos, 1.0);
+	gl_Position = spriteView.projectionView * vec4(pos, 1.0);
 
 	color = colorAttribute;
 	texCoord = texCoordAttribute;
 
-	// Fog calculation
-	vec2 horzRelativePos = pos.xy - pc.viewOriginVector.xy;
-	float horzDistance = dot(horzRelativePos, horzRelativePos);
-	float density = clamp(horzDistance / (pc.fogDistance * pc.fogDistance), 0.0, 1.0);
-	fogDensity = vec4(density);
+	fogDensity = vec4(SpriteFogDensity(pos));
 }
