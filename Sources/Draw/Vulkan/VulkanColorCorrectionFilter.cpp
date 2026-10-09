@@ -23,6 +23,7 @@
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
 #include "VulkanRenderPassUtils.h"
+#include "VulkanTemporaryImagePool.h"
 #include <Client/SceneDefinition.h>
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -39,6 +40,9 @@ SPADES_SETTING(r_saturation);
 SPADES_SETTING(r_hdr);
 SPADES_SETTING(r_bloom);
 SPADES_SETTING(r_exposureValue);
+SPADES_SETTING(r_sharpen);
+SPADES_SETTING(r_fogShadow);
+SPADES_SETTING(r_radiosity);
 
 namespace spades {
 	namespace draw {
@@ -49,8 +53,11 @@ namespace spades {
 		      linearSampler(VK_NULL_HANDLE),
 		      ppRenderPass(VK_NULL_HANDLE),
 		      singleSamplerDSL(VK_NULL_HANDLE),
+		      dualSamplerDSL(VK_NULL_HANDLE),
 		      layout(VK_NULL_HANDLE),
-		      pipeline(VK_NULL_HANDLE) {
+		      pipeline(VK_NULL_HANDLE),
+		      blurLayout(VK_NULL_HANDLE),
+		      blurPipeline(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
 
 			for (int i = 0; i < MAX_FRAME_SLOTS; ++i)
@@ -78,7 +85,10 @@ namespace spades {
 
 			if (pipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, pipeline, nullptr);
 			if (layout != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, layout, nullptr);
+			if (blurPipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, blurPipeline, nullptr);
+			if (blurLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, blurLayout, nullptr);
 			if (singleSamplerDSL != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, singleSamplerDSL, nullptr);
+			if (dualSamplerDSL != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, dualSamplerDSL, nullptr);
 			if (linearSampler != VK_NULL_HANDLE) vkDestroySampler(dev, linearSampler, nullptr);
 			if (ppRenderPass != VK_NULL_HANDLE) vkDestroyRenderPass(dev, ppRenderPass, nullptr);
 		}
@@ -120,18 +130,23 @@ namespace spades {
 		}
 
 		void VulkanColorCorrectionFilter::InitDescriptorSetLayout() {
-			VkDescriptorSetLayoutBinding b{};
-			b.binding = 0;
-			b.descriptorCount = 1;
-			b.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			b.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			VkDescriptorSetLayoutBinding bindings[2]{};
+			for (uint32_t i = 0; i < 2; ++i) {
+				bindings[i].binding = i;
+				bindings[i].descriptorCount = 1;
+				bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			}
 
 			VkDescriptorSetLayoutCreateInfo info{};
 			info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			info.bindingCount = 1;
-			info.pBindings = &b;
-
+			info.pBindings = bindings;
 			if (vkCreateDescriptorSetLayout(device->GetDevice(), &info, nullptr, &singleSamplerDSL) != VK_SUCCESS)
+				SPRaise("Failed to create ColorCorrection descriptor set layout");
+
+			info.bindingCount = 2;
+			if (vkCreateDescriptorSetLayout(device->GetDevice(), &info, nullptr, &dualSamplerDSL) != VK_SUCCESS)
 				SPRaise("Failed to create ColorCorrection descriptor set layout");
 		}
 
@@ -151,12 +166,13 @@ namespace spades {
 			return mod;
 		}
 
-		void VulkanColorCorrectionFilter::InitPipeline() {
+		VkPipeline VulkanColorCorrectionFilter::BuildPipeline(const char* fragmentShader,
+		                                                      VkPipelineLayout pipelineLayout) {
 			VkDevice dev = device->GetDevice();
 			VkPipelineCache cache = renderer.GetPipelineCache();
 
 			VkShaderModule vs = LoadSPIRV("Shaders/Vulkan/PostFilters/PassThrough.vk.vs.spv");
-			VkShaderModule fs = LoadSPIRV("Shaders/Vulkan/PostFilters/ColorCorrection.vk.fs.spv");
+			VkShaderModule fs = LoadSPIRV(fragmentShader);
 
 			VkPipelineVertexInputStateCreateInfo vertexInput{};
 			vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -198,17 +214,6 @@ namespace spades {
 			blend.attachmentCount = 1;
 			blend.pAttachments = &noBlend;
 
-			// 8 floats = 32 bytes (two vec4s).
-			VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 8};
-			VkPipelineLayoutCreateInfo li{};
-			li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			li.setLayoutCount = 1;
-			li.pSetLayouts = &singleSamplerDSL;
-			li.pushConstantRangeCount = 1;
-			li.pPushConstantRanges = &pcr;
-			if (vkCreatePipelineLayout(dev, &li, nullptr, &layout) != VK_SUCCESS)
-				SPRaise("Failed to create ColorCorrection pipeline layout");
-
 			VkPipelineShaderStageCreateInfo stages[2]{};
 			stages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0,
 			             VK_SHADER_STAGE_VERTEX_BIT, vs, "main", nullptr};
@@ -227,19 +232,48 @@ namespace spades {
 			pi.pDepthStencilState = &ds;
 			pi.pColorBlendState = &blend;
 			pi.pDynamicState = &dyn;
-			pi.layout = layout;
+			pi.layout = pipelineLayout;
 			pi.renderPass = ppRenderPass;
 			pi.subpass = 0;
 
-			if (vkCreateGraphicsPipelines(dev, cache, 1, &pi, nullptr, &pipeline) != VK_SUCCESS)
-				SPRaise("Failed to create ColorCorrection pipeline");
-
+			VkPipeline built = VK_NULL_HANDLE;
+			const VkResult result = vkCreateGraphicsPipelines(dev, cache, 1, &pi, nullptr, &built);
 			vkDestroyShaderModule(dev, vs, nullptr);
 			vkDestroyShaderModule(dev, fs, nullptr);
+			if (result != VK_SUCCESS)
+				SPRaise("Failed to create the ColorCorrection pipeline of %s", fragmentShader);
+			return built;
+		}
+
+		void VulkanColorCorrectionFilter::InitPipeline() {
+			VkDevice dev = device->GetDevice();
+
+			// Three vec4s: the tint and the enhancement, the saturation, HDR and the
+			// sharpening, and the blur's shift
+			VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 12};
+			VkPipelineLayoutCreateInfo li{};
+			li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			li.setLayoutCount = 1;
+			li.pSetLayouts = &dualSamplerDSL;
+			li.pushConstantRangeCount = 1;
+			li.pPushConstantRanges = &pcr;
+			if (vkCreatePipelineLayout(dev, &li, nullptr, &layout) != VK_SUCCESS)
+				SPRaise("Failed to create ColorCorrection pipeline layout");
+			pipeline = BuildPipeline("Shaders/Vulkan/PostFilters/ColorCorrection.vk.fs.spv", layout);
+
+			// The blur's step, and whether the input is sRGB-decoded
+			VkPushConstantRange blurRange{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 3};
+			li.pSetLayouts = &singleSamplerDSL;
+			li.pPushConstantRanges = &blurRange;
+			if (vkCreatePipelineLayout(dev, &li, nullptr, &blurLayout) != VK_SUCCESS)
+				SPRaise("Failed to create ColorCorrection blur pipeline layout");
+			blurPipeline =
+			  BuildPipeline("Shaders/Vulkan/PostFilters/ColorCorrectionBlur.vk.fs.spv", blurLayout);
 		}
 
 		void VulkanColorCorrectionFilter::InitDescriptorPools() {
-			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4};
+			// A frame's sets: the blur's input, and the input with its blur
+			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8};
 			VkDescriptorPoolCreateInfo info{};
 			info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			info.poolSizeCount = 1;
@@ -292,6 +326,33 @@ namespace spades {
 			return set;
 		}
 
+		VkDescriptorSet VulkanColorCorrectionFilter::BindTextures(int frameSlot, VkImageView view,
+		                                                          VkImageView blurred) {
+			VkDescriptorSetAllocateInfo ai{};
+			ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			ai.descriptorPool = perFrameDescPool[frameSlot];
+			ai.descriptorSetCount = 1;
+			ai.pSetLayouts = &dualSamplerDSL;
+			VkDescriptorSet set;
+			if (vkAllocateDescriptorSets(device->GetDevice(), &ai, &set) != VK_SUCCESS)
+				SPRaise("Failed to allocate ColorCorrection descriptor set");
+
+			const VkDescriptorImageInfo images[2] = {
+			  {linearSampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+			  {linearSampler, blurred, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+			VkWriteDescriptorSet writes[2]{};
+			for (uint32_t i = 0; i < 2; ++i) {
+				writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				writes[i].dstSet = set;
+				writes[i].dstBinding = i;
+				writes[i].descriptorCount = 1;
+				writes[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				writes[i].pImageInfo = &images[i];
+			}
+			vkUpdateDescriptorSets(device->GetDevice(), 2, writes, 0, nullptr);
+			return set;
+		}
+
 		void VulkanColorCorrectionFilter::Filter(VkCommandBuffer cmd,
 		                                         VulkanImage* input,
 		                                         VulkanImage* output) {
@@ -314,7 +375,13 @@ namespace spades {
 			// GL. Squaring it ("linearize") makes a bluish fog much darker,
 			// which inverts to a stronger warm bias in `tint`, and the whole
 			// scene ends up shifted toward red/purple. Match GL: no linearize.
-			Vector3 fogCol = renderer.GetFogColor();
+			//
+			// As GL, the tint follows the fog colour slowly, so it doesn't jump when
+			// the fog changes; it starts from the colour set.
+			const Vector3 sceneFogColor = renderer.GetFogColor();
+			if (smoothedFogColor.x < 0.0F)
+				smoothedFogColor = renderer.GetFullDaylightFogColor();
+			Vector3 fogCol = smoothedFogColor;
 
 			Vector3 tint = fogCol + MakeVector3(0.5f, 0.5f, 0.5f);
 			tint = MakeVector3(1.0f, 1.0f, 1.0f) / tint;
@@ -356,16 +423,68 @@ namespace spades {
 			// [0, 1] image shifts blues to purple).
 			float useHdr = (int)r_hdr ? 1.0f : 0.0f;
 
-			float pc[8] = {
-			    tint.x, tint.y, tint.z, enhancement,
-			    saturation, useHdr, 0.0f, 0.0f
-			};
+			// The sharpening, as GLColorCorrectionFilter works it out: it recovers the
+			// contrast the fog takes away, so it grows with the fog's luminance as the
+			// scene shows it (none at night), and r_sharpen scales it. GL raises it to
+			// 1.5 at least under temporal AA, which this renderer doesn't have.
+			float fogLuminance = (sceneFogColor.x + sceneFogColor.y + sceneFogColor.z) / 3.0F;
+			if ((int)r_fogShadow == 2 && (int)r_radiosity != 0) {
+				// Fog2 adds a GI factor, so the fog receives some light even if the
+				// fog color is set to dark.
+				fogLuminance = fogLuminance * 0.9F + 0.2F;
+			}
+			const float sharpening = std::sqrt(fogLuminance) * 2.7F;
+			const float sharpeningFinalGain = Clamp((float)r_sharpen, 0.0F, 1.0F);
 
 			uint32_t w = static_cast<uint32_t>(output->GetWidth());
 			uint32_t h = static_cast<uint32_t>(output->GetHeight());
 
+			float pc[12] = {
+			    tint.x, tint.y, tint.z, enhancement,
+			    saturation, useHdr, sharpening, sharpeningFinalGain,
+			    1.0F / (float)input->GetHeight(), 0.0F, 0.0F, 0.0F
+			};
+
+			// The tint eases towards the scene's fog, as GL's.
+			smoothedFogColor = Mix(smoothedFogColor, sceneFogColor, 0.002F);
+
+			// The horizontal half of the sharpening's blur, in its own pass
+			Handle<VulkanImage> blurred;
+			VulkanTemporaryImagePool* pool = renderer.GetTemporaryImagePool();
+			if (sharpeningFinalGain > 0.0F && pool) {
+				blurred = pool->Acquire(input->GetWidth(), input->GetHeight(), colorFormat);
+
+				VkRenderPassBeginInfo blurBegin{};
+				blurBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+				blurBegin.renderPass = ppRenderPass;
+				blurBegin.framebuffer = MakeFramebuffer(blurred.GetPointerOrNull(), frameSlot);
+				blurBegin.renderArea.extent = {blurred->GetWidth(), blurred->GetHeight()};
+				vkCmdBeginRenderPass(cmd, &blurBegin, VK_SUBPASS_CONTENTS_INLINE);
+
+				const VkViewport blurViewport{0.0f, 0.0f, (float)blurred->GetWidth(),
+				                              (float)blurred->GetHeight(), 0.0f, 1.0f};
+				const VkRect2D blurScissor{{0, 0}, {blurred->GetWidth(), blurred->GetHeight()}};
+				vkCmdSetViewport(cmd, 0, 1, &blurViewport);
+				vkCmdSetScissor(cmd, 0, 1, &blurScissor);
+
+				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blurPipeline);
+				const VkDescriptorSet blurSet = BindTexture(frameSlot, input->GetImageView());
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blurLayout, 0, 1,
+				                        &blurSet, 0, nullptr);
+				const float blurParams[3] = {1.0F / (float)input->GetWidth(), 0.0F, useHdr};
+				vkCmdPushConstants(cmd, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+				                   sizeof(blurParams), blurParams);
+				vkCmdDraw(cmd, 3, 1, 0, 0);
+				vkCmdEndRenderPass(cmd);
+			} else {
+				// Nothing to sharpen: the shader leaves the blur unread.
+				pc[7] = 0.0F;
+			}
+
 			VkFramebuffer fb = MakeFramebuffer(output, frameSlot);
-			VkDescriptorSet dsSet = BindTexture(frameSlot, input->GetImageView());
+			VkDescriptorSet dsSet =
+			  BindTextures(frameSlot, input->GetImageView(),
+			               blurred ? blurred->GetImageView() : input->GetImageView());
 
 			VkRenderPassBeginInfo rpBegin{};
 			rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
