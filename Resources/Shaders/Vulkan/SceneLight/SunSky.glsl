@@ -18,6 +18,9 @@
 
  */
 
+#ifndef SCENE_LIGHT_SUN_SKY_GLSL
+#define SCENE_LIGHT_SUN_SKY_GLSL
+
 // The sun's and the sky's light as the frame has them: `VulkanSceneLights::SunSky`.
 // At night there is no sun, and the sky's light, the fog and the sky go dark with
 // the daylight; the dynamic lights are not affected. The includer defines
@@ -36,3 +39,5 @@ layout(set = SCENE_LIGHT_SET, binding = 6, std140) uniform SceneSunSky {
 	// colour, kept bright enough to see by under a black sky
 	vec3 ambientLight;
 } sceneSunSky;
+
+#endif
