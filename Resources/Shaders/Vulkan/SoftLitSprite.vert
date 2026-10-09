@@ -34,6 +34,9 @@
 #include "SceneLight/ModelShadow.glsl"
 #include "SpriteView.glsl"
 
+// The layer of soft sprites this pipeline draws (`VulkanSpriteRenderer::Layer`)
+layout(constant_id = 1) const int SPRITE_LAYER = SPRITE_LAYER_EVERY;
+
 layout(location = 0) in vec4 centerRadiusAttribute;
 layout(location = 1) in vec4 colorAttribute;
 layout(location = 2) in float angleAttribute;
@@ -105,6 +108,13 @@ void main() {
 		pos += front * (frontDepth - centerDepth);
 
 	gl_Position = spriteView.projectionView * vec4(pos, 1.0);
+
+	// What this layer draws of it: none collapses its quad.
+	float layerFade = SpriteLayerFade(center, radius, SPRITE_LAYER);
+	if (layerFade <= 0.0)
+		gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+	color *= layerFade;
+	emission *= layerFade;
 
 	texCoord.xy = corner * 0.5 + 0.5;
 
