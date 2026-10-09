@@ -71,7 +71,7 @@ namespace spades {
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 			shadowImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-			                           VK_SAMPLER_ADDRESS_MODE_REPEAT, false);
+			                           VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
 			// Create staging buffer (512*512*4 = 1MB)
 			size_t bufferSize = w * h * 4;
@@ -93,7 +93,7 @@ namespace spades {
 				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			coarseShadowImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-			                                 VK_SAMPLER_ADDRESS_MODE_REPEAT, false);
+			                                 VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
 			coarseStagingBuffer = Handle<VulkanBuffer>::New(
 				device, (size_t)cw * ch * 4,

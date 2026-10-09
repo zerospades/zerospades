@@ -501,6 +501,9 @@ namespace spades {
 			samplerAnisotropySupported = supportedFeatures.samplerAnisotropy == VK_TRUE;
 			if (samplerAnisotropySupported) {
 				deviceFeatures.samplerAnisotropy = VK_TRUE;
+				VkPhysicalDeviceProperties properties;
+				vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+				maxSamplerAnisotropy = std::max(properties.limits.maxSamplerAnisotropy, 1.0F);
 			} else {
 				SPLog("Warning: Anisotropic filtering not supported on this device");
 			}

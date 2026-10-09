@@ -19,6 +19,7 @@
  */
 
 #include "VulkanImage.h"
+#include <algorithm>
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -266,7 +267,7 @@ namespace spades {
 		}
 
 		void VulkanImage::CreateSampler(VkFilter magFilter, VkFilter minFilter,
-		                                VkSamplerAddressMode addressMode, bool enableAnisotropy) {
+		                                VkSamplerAddressMode addressMode, float maxAnisotropy) {
 			// Recreates the sampler: any existing one is destroyed first. The caller
 			// must ensure the old sampler is not in flight (not referenced by a
 			// command buffer still executing), otherwise this is a use-after-free.
@@ -283,12 +284,13 @@ namespace spades {
 			samplerInfo.addressModeV = addressMode;
 			samplerInfo.addressModeW = addressMode;
 
-			if (enableAnisotropy) {
+			const float anisotropy = std::min(maxAnisotropy, device->GetMaxSamplerAnisotropy());
+			if (anisotropy > 1.0F) {
 				samplerInfo.anisotropyEnable = VK_TRUE;
-				samplerInfo.maxAnisotropy = 16.0f;
+				samplerInfo.maxAnisotropy = anisotropy;
 			} else {
 				samplerInfo.anisotropyEnable = VK_FALSE;
-				samplerInfo.maxAnisotropy = 1.0f;
+				samplerInfo.maxAnisotropy = 1.0F;
 			}
 
 			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
