@@ -19,6 +19,7 @@
  */
 
 #include "VulkanFogFilter.h"
+#include "VulkanBuffer.h"
 #include "VulkanAmbientShadowRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
@@ -43,8 +44,9 @@ SPADES_SETTING(r_radiosity);
 namespace spades {
 	namespace draw {
 
-		// Push constants for Fog2.vk.vs + Fog2.vk.fs (total = 144 bytes).
-		struct Fog2PushConstants {
+		// Fog2.vk.vs + Fog2.vk.fs's parameters of the frame, a uniform buffer (std140):
+		// past the 128 bytes of push constants every device takes.
+		struct Fog2Parameters {
 			float viewProjInv[16];      // [0..63]   mat4 viewProjectionMatrixInv
 			float viewOriginFogDist[4]; // [64..79]  xyz=viewOrigin, w=fogDistance
 			float sunlightScale[4];     // [80..95]  xyz scale, w = sunDir.x
@@ -52,7 +54,7 @@ namespace spades {
 			float radiosityScale[4];    // [112..127] xyz scale, w = sunDir.z
 			float ditherFrame[4];       // [128..143] xy=per-frame noise seed, z = sunlight
 		};
-		static_assert(sizeof(Fog2PushConstants) == 144, "Fog2PushConstants must be 144 bytes");
+		static_assert(sizeof(Fog2Parameters) == 144, "Fog2Parameters must match Fog2's Parameters");
 
 		// Push constants for Fog.vk.vs + Fog.vk.fs (total = 96 bytes).
 		struct FogClassicPushConstants {
@@ -188,17 +190,22 @@ namespace spades {
 			//   5 radiosityTextureX    (sampler3D)
 			//   6 radiosityTextureY    (sampler3D)
 			//   7 radiosityTextureZ    (sampler3D)
-			VkDescriptorSetLayoutBinding bindings2[8]{};
+			//   8 the frame's parameters (uniform buffer, both stages)
+			VkDescriptorSetLayoutBinding bindings2[9]{};
 			for (int i = 0; i < 8; ++i) {
 				bindings2[i].binding         = static_cast<uint32_t>(i);
 				bindings2[i].descriptorCount = 1;
 				bindings2[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				bindings2[i].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 			}
+			bindings2[8].binding         = 8;
+			bindings2[8].descriptorCount = 1;
+			bindings2[8].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			bindings2[8].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 			VkDescriptorSetLayoutCreateInfo info2{};
 			info2.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			info2.bindingCount = 8;
+			info2.bindingCount = 9;
 			info2.pBindings    = bindings2;
 
 			if (vkCreateDescriptorSetLayout(dev, &info2, nullptr, &fog2DSL) != VK_SUCCESS)
@@ -284,8 +291,9 @@ namespace spades {
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
 				li.pSetLayouts            = &dsl;
-				li.pushConstantRangeCount = 1;
-				li.pPushConstantRanges    = &pcr;
+				// A variant without push constants takes its parameters from its set.
+				li.pushConstantRangeCount = pcSize > 0 ? 1 : 0;
+				li.pPushConstantRanges    = pcSize > 0 ? &pcr : nullptr;
 				if (vkCreatePipelineLayout(dev, &li, nullptr, outLayout) != VK_SUCCESS)
 					SPRaise("Failed to create %s pipeline layout", errLabel);
 
@@ -320,7 +328,7 @@ namespace spades {
 
 			buildVariant("Shaders/Vulkan/PostFilters/Fog2.vk.vs.spv",
 			             "Shaders/Vulkan/PostFilters/Fog2.vk.fs.spv",
-			             sizeof(Fog2PushConstants), fog2DSL,
+			             0, fog2DSL,
 			             &fogLayout, &fogPipeline, "fog2");
 
 			buildVariant("Shaders/Vulkan/PostFilters/Fog.vk.vs.spv",
@@ -332,16 +340,22 @@ namespace spades {
 		void VulkanFogFilter::InitDescriptorPools() {
 			VkDevice dev = device->GetDevice();
 
-			// Up to one set per frame slot; Fog2 needs 8 samplers, Fog1 needs 3.
-			// Budget 16 samplers (2× Fog2 worst case) per pool and 4 sets total.
-			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16};
+			// Up to one set per frame slot; Fog2 needs 8 samplers and its parameters,
+			// Fog1 needs 3. Budget 16 samplers (2× Fog2 worst case) per pool and 4
+			// sets total.
+			VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16},
+			                                 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4}};
 			VkDescriptorPoolCreateInfo info{};
 			info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			info.poolSizeCount = 1;
-			info.pPoolSizes    = &size;
+			info.poolSizeCount = 2;
+			info.pPoolSizes    = sizes;
 			info.maxSets       = 4;
 
 			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
+				fog2Parameters[i] = Handle<VulkanBuffer>::New(
+				  device, sizeof(Fog2Parameters), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+				fog2Parameters[i]->Map();
 				if (vkCreateDescriptorPool(dev, &info, nullptr, &perFrameDescPool[i]) != VK_SUCCESS)
 					SPRaise("Failed to create fog descriptor pool");
 			}
@@ -437,16 +451,21 @@ namespace spades {
 			    {radSampler,    radY,       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
 			    {radSampler,    radZ,       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
 			};
-			VkWriteDescriptorSet writes[8]{};
-			for (int i = 0; i < 8; ++i) {
+			const VkDescriptorBufferInfo parameters{fog2Parameters[frameSlot]->GetBuffer(), 0,
+			                                        sizeof(Fog2Parameters)};
+			VkWriteDescriptorSet writes[9]{};
+			for (int i = 0; i < 9; ++i) {
 				writes[i].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				writes[i].dstSet          = set;
 				writes[i].dstBinding      = static_cast<uint32_t>(i);
 				writes[i].descriptorCount = 1;
 				writes[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				writes[i].pImageInfo      = &imgs[i];
+				writes[i].pImageInfo      = &imgs[i < 8 ? i : 0];
 			}
-			vkUpdateDescriptorSets(device->GetDevice(), 8, writes, 0, nullptr);
+			writes[8].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writes[8].pImageInfo     = nullptr;
+			writes[8].pBufferInfo    = &parameters;
+			vkUpdateDescriptorSets(device->GetDevice(), 9, writes, 0, nullptr);
 			return set;
 		}
 
@@ -486,7 +505,7 @@ namespace spades {
 
 			// ── Build push constants ──────────────────────────────────────────────
 
-			Fog2PushConstants        pc2{};
+			Fog2Parameters        fog2{};
 			FogClassicPushConstants  pc1{};
 			const void*  pcData = nullptr;
 			uint32_t     pcSize = 0;
@@ -580,46 +599,46 @@ namespace spades {
 				           fogTransmission1(fullFogCol.y),
 				           fogTransmission1(fullFogCol.z)};
 
-				std::memcpy(pc2.viewProjInv, vpInv.m, sizeof(pc2.viewProjInv));
+				std::memcpy(fog2.viewProjInv, vpInv.m, sizeof(fog2.viewProjInv));
 
-				pc2.viewOriginFogDist[0] = def.viewOrigin.x;
-				pc2.viewOriginFogDist[1] = def.viewOrigin.y;
-				pc2.viewOriginFogDist[2] = def.viewOrigin.z;
-				pc2.viewOriginFogDist[3] = renderer.GetFogDistance();
+				fog2.viewOriginFogDist[0] = def.viewOrigin.x;
+				fog2.viewOriginFogDist[1] = def.viewOrigin.y;
+				fog2.viewOriginFogDist[2] = def.viewOrigin.z;
+				fog2.viewOriginFogDist[3] = renderer.GetFogDistance();
 
 				const Vector3 sunScale = ft * (sunlightBrightness * sunlight);
-				pc2.sunlightScale[0] = sunScale.x;
-				pc2.sunlightScale[1] = sunScale.y;
-				pc2.sunlightScale[2] = sunScale.z;
+				fog2.sunlightScale[0] = sunScale.x;
+				fog2.sunlightScale[1] = sunScale.y;
+				fog2.sunlightScale[2] = sunScale.z;
 
 				const Vector3 ambient = ft * fullFogCol * (ambientBrightness * daylight);
-				pc2.ambientScale[0] = ambient.x;
-				pc2.ambientScale[1] = ambient.y;
-				pc2.ambientScale[2] = ambient.z;
+				fog2.ambientScale[0] = ambient.x;
+				fog2.ambientScale[1] = ambient.y;
+				fog2.ambientScale[2] = ambient.z;
 
 				// Matches GLFogFilter2: radiosityScale = ft * 1.0 + 0.2, the sun's
 				// light the map bounces
 				const Vector3 radiosity =
 				  (ft * radiosityBrightness + MakeVector3(radiosityOffset, radiosityOffset,
 				                                          radiosityOffset)) * sunlight;
-				pc2.radiosityScale[0] = radiosity.x;
-				pc2.radiosityScale[1] = radiosity.y;
-				pc2.radiosityScale[2] = radiosity.z;
+				fog2.radiosityScale[0] = radiosity.x;
+				fog2.radiosityScale[1] = radiosity.y;
+				fog2.radiosityScale[2] = radiosity.z;
 
 				// Sun direction packed into the free .w slots (see Fog2.vk.fs).
 				Vector3 sunDir = renderer.GetSunDirection();
-				pc2.sunlightScale[3]  = sunDir.x;
-				pc2.ambientScale[3]   = sunDir.y;
-				pc2.radiosityScale[3] = sunDir.z;
+				fog2.sunlightScale[3]  = sunDir.x;
+				fog2.ambientScale[3]   = sunDir.y;
+				fog2.radiosityScale[3] = sunDir.z;
 
 				std::uint32_t frame = frameCounter++ % 4;
-				pc2.ditherFrame[0] = (float)(frame & 1) * 0.5F;
-				pc2.ditherFrame[1] = (float)((frame >> 1) & 1) * 0.5F;
+				fog2.ditherFrame[0] = (float)(frame & 1) * 0.5F;
+				fog2.ditherFrame[1] = (float)((frame >> 1) & 1) * 0.5F;
 				// With no sun, it gives the fog no glow.
-				pc2.ditherFrame[2] = sunlight;
+				fog2.ditherFrame[2] = sunlight;
 
-				pcData = &pc2;
-				pcSize = sizeof(pc2);
+				// Read from the frame's own buffer; the GPU is done with its last use.
+				std::memcpy(fog2Parameters[frameSlot]->Map(), &fog2, sizeof(fog2));
 			}
 
 			// ── Gather image views ────────────────────────────────────────────────
@@ -693,9 +712,10 @@ namespace spades {
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			                        layout, 0, 1, &ds, 0, nullptr);
-			vkCmdPushConstants(cmd, layout,
-			                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, pcSize, pcData);
+			if (pcSize > 0)
+				vkCmdPushConstants(cmd, layout,
+				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+				                   0, pcSize, pcData);
 			vkCmdDraw(cmd, 3, 1, 0, 0);
 
 			vkCmdEndRenderPass(cmd);

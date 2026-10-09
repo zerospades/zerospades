@@ -25,7 +25,7 @@
 //
 // Differences from the GL version that still apply:
 //   - No separate dither/noise textures; per-frame noise is generated
-//     analytically from gl_FragCoord and pc.ditherFrame.
+//     analytically from gl_FragCoord and params.ditherFrame.
 //   - The Vulkan radiosity backend always uses the high-precision
 //     A2R10G10B10_UNORM_PACK32 format, so DecodeRadiosityValue uses
 //     the GL `r_radiosity >= 2` (linear) decode branch only.
@@ -51,14 +51,16 @@ layout(binding = 5) uniform sampler3D radiosityTextureX;
 layout(binding = 6) uniform sampler3D radiosityTextureY;
 layout(binding = 7) uniform sampler3D radiosityTextureZ;
 
-layout(push_constant) uniform Params {
+// The frame's parameters (`VulkanFogFilter`): a uniform buffer, past the 128
+// bytes of push constants every device takes
+layout(binding = 8, std140) uniform Params {
     mat4 viewProjectionMatrixInv; // [0..63]   UV → view-centric world
     vec4 viewOriginFogDist;       // [64..79]  xyz=viewOrigin, w=fogDistance
     vec4 sunlightScale;           // [80..95]  xyz
     vec4 ambientScale;            // [96..111] xyz
     vec4 radiosityScale;          // [112..127] xyz
     vec4 ditherFrame;             // [128..143] xy=per-frame noise seed, z=sunlight
-} pc;
+} params;
 
 layout(location = 0) in  vec2 texCoord;
 layout(location = 1) in  vec4 viewcentricWorldPositionPartial;
@@ -79,13 +81,13 @@ vec3 DecodeRadiosityValue(vec3 val) {
 }
 
 void main() {
-    vec3  viewOrigin  = pc.viewOriginFogDist.xyz;
-    float fogDistance = pc.viewOriginFogDist.w;
+    vec3  viewOrigin  = params.viewOriginFogDist.xyz;
+    float fogDistance = params.viewOriginFogDist.w;
 
     // Reconstruct view-centric world position from hardware depth.
     float localClipZ = texture(depthTexture, texCoord).r;
     vec4  worldPos   = viewcentricWorldPositionPartial
-                     + pc.viewProjectionMatrixInv * vec4(0.0, 0.0, localClipZ, 0.0);
+                     + params.viewProjectionMatrixInv * vec4(0.0, 0.0, localClipZ, 0.0);
     worldPos.xyz /= worldPos.w;
 
     // Clip the ray to fogDistance (VOXLAP cylindrical fog model).
@@ -104,7 +106,7 @@ void main() {
     float weightSum   = 0.0;
 
     // Analytical per-pixel temporal noise (replaces dither + noise textures).
-    vec2  seed   = gl_FragCoord.xy + pc.ditherFrame.xy * vec2(127.0, 113.0);
+    vec2  seed   = gl_FragCoord.xy + params.ditherFrame.xy * vec2(127.0, 113.0);
     float dither = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453);
 
     float weight = 1.0 - weightDelta * dither;
@@ -156,16 +158,16 @@ void main() {
 
     // Rescale to the desired fog density.
     vec3 scale            = vec3(goalFogFactor) / (weightSum + 1.0e-4);
-    vec3 sunlightContrib  = sunlightFactor   * pc.sunlightScale.xyz  * scale;
-    vec3 ambientContrib   = ambientFactor    * pc.ambientScale.xyz   * scale;
+    vec3 sunlightContrib  = sunlightFactor   * params.sunlightScale.xyz  * scale;
+    vec3 ambientContrib   = ambientFactor    * params.ambientScale.xyz   * scale;
     vec3 radiosityContrib = radiosityFactor                          * scale
-                          * pc.radiosityScale.xyz;
+                          * params.radiosityScale.xyz;
 
     // Directional brightness gradient. Sun direction packed into the free
-    // .w slots of the scale vectors (keeps push constants at 144 bytes).
+    // .w slots of the scale vectors (keeps the parameters at 144 bytes).
     // Without the sun, the fog has no glow.
-    if (pc.ditherFrame.z > 0.0) {
-        vec3  sunDir = normalize(vec3(pc.sunlightScale.w, pc.ambientScale.w, pc.radiosityScale.w));
+    if (params.ditherFrame.z > 0.0) {
+        vec3  sunDir = normalize(vec3(params.sunlightScale.w, params.ambientScale.w, params.radiosityScale.w));
         float bright = dot(sunDir, normalize(worldPos.xyz));
         sunlightContrib  *= bright * 0.5 + 1.0;
         ambientContrib   *= bright * 0.5 + 1.0;
