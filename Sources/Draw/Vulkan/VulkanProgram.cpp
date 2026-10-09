@@ -114,8 +114,9 @@ namespace spades {
 					uint32_t set = compiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
 
 					if (set != 0) {
-						SPLog("Warning: Shader '%s' uses descriptor set %d, only set 0 is supported",
-						      name.c_str(), set);
+						if (!IsExternalSet(set))
+							SPLog("Warning: Shader '%s' uses descriptor set %d, which no owner gave",
+							      name.c_str(), set);
 						continue;
 					}
 
@@ -143,8 +144,9 @@ namespace spades {
 					uint32_t set = compiler.get_decoration(sampler.id, spv::DecorationDescriptorSet);
 
 					if (set != 0) {
-						SPLog("Warning: Shader '%s' uses descriptor set %d, only set 0 is supported",
-						      name.c_str(), set);
+						if (!IsExternalSet(set))
+							SPLog("Warning: Shader '%s' uses descriptor set %d, which no owner gave",
+							      name.c_str(), set);
 						continue;
 					}
 
@@ -243,11 +245,34 @@ namespace spades {
 			      name.c_str(), descriptorBindings.size());
 		}
 
+		void VulkanProgram::SetExternalSetLayout(uint32_t set, VkDescriptorSetLayout layout) {
+			SPAssert(!linked);
+			SPAssert(set >= 1);
+			SPAssert(layout != VK_NULL_HANDLE);
+			if (externalSetLayouts.size() < set)
+				externalSetLayouts.resize(set, VK_NULL_HANDLE);
+			externalSetLayouts[set - 1] = layout;
+		}
+
+		bool VulkanProgram::IsExternalSet(uint32_t set) const {
+			return set >= 1 && set <= externalSetLayouts.size() &&
+			       externalSetLayouts[set - 1] != VK_NULL_HANDLE;
+		}
+
 		void VulkanProgram::CreatePipelineLayout() {
+			// The program's own set, then the ones given to it
+			std::vector<VkDescriptorSetLayout> setLayouts{descriptorSetLayout};
+			for (std::size_t i = 0; i < externalSetLayouts.size(); i++) {
+				if (externalSetLayouts[i] == VK_NULL_HANDLE)
+					SPRaise("Program '%s' was given no layout for descriptor set %zu", name.c_str(),
+					        i + 1);
+				setLayouts.push_back(externalSetLayouts[i]);
+			}
+
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount = 1;
-			pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+			pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+			pipelineLayoutInfo.pSetLayouts = setLayouts.data();
 			pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 			pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.empty() ? nullptr : pushConstantRanges.data();
 

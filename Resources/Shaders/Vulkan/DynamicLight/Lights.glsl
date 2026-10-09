@@ -209,15 +209,30 @@ vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 directio
 	return colorReachInversed.xyz * (attenuation * coneFalloff * visibility) * image;
 }
 
-vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal) {
+/**
+ * The light light `i` brings to `position`, on a surface facing `normal`: diffuse,
+ * with `shininess` 0, or else the Phong highlight of exponent `shininess` it makes
+ * along `reflected`, the eye's ray mirrored by the surface, normalized for it, so a
+ * tighter highlight is a brighter one.
+ */
+vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal, vec3 reflected, float shininess) {
 	vec3 direction;
 	vec3 incidence = DynamicLightIncidence(i, position, normal, direction);
-	return incidence * max(dot(direction, normal), 0.0);
+	float cosIncidence = max(dot(direction, normal), 0.0);
+	if (shininess <= 0.0)
+		return incidence * cosIncidence;
+
+	float normalization = (shininess + 2.0) * (1.0 / (2.0 * 3.14159265));
+	float lobe = pow(max(dot(reflected, direction), 0.0), shininess);
+	return incidence * (lobe * normalization * cosIncidence);
 }
 
-/** The light every dynamic light of the frame casts on `position`, facing `normal`
- * (unit length), where the map doesn't hide it. */
-vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
+/**
+ * `EvaluateDynamicLight` summed over the lights that reach `position`: those its
+ * cluster lists, or every light of the frame where it lies outside the view the
+ * clusters cut up.
+ */
+vec3 EvaluateDynamicLightsAt(vec3 position, vec3 normal, vec3 reflected, float shininess) {
 	uvec4 counts = dynamicLightFrame.counts;
 	if (counts.w == 0u)
 		return vec3(0.0);
@@ -241,12 +256,30 @@ vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
 			while (mask != 0u) {
 				uint bit = uint(findLSB(mask));
 				mask &= mask - 1u;
-				light += EvaluateDynamicLight(word * 32u + bit, position, normal);
+				light += EvaluateDynamicLight(word * 32u + bit, position, normal, reflected,
+				                              shininess);
 			}
 		}
 	} else {
 		for (uint i = 0u; i < counts.w; i++)
-			light += EvaluateDynamicLight(i, position, normal);
+			light += EvaluateDynamicLight(i, position, normal, reflected, shininess);
 	}
 	return light;
+}
+
+/** The light every dynamic light of the frame casts on `position`, facing `normal`
+ * (unit length), where the map doesn't hide it. */
+vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
+	return EvaluateDynamicLightsAt(position, normal, vec3(0.0), 0.0);
+}
+
+/**
+ * The light every dynamic light of the frame reflects off a glossy surface at
+ * `position`, facing `normal`, along `reflected`: the eye's ray mirrored by the
+ * surface. Both are unit length; `shininess` is the highlight's Phong exponent, and
+ * the result is normalized for it. The caller weighs it by the surface's Fresnel
+ * term.
+ */
+vec3 EvaluateDynamicLightsSpecular(vec3 position, vec3 normal, vec3 reflected, float shininess) {
+	return EvaluateDynamicLightsAt(position, normal, reflected, shininess);
 }

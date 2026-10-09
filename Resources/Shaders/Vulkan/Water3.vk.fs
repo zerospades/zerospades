@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 /*
  Copyright (c) 2013 Fran6nd
@@ -99,6 +100,11 @@ layout(std140, binding = 5) uniform WaterMatricesUBO {
 } waterMat;
 
 layout(location = 0) out vec4 fragColor;
+
+// The frame's dynamic lights, lit in this same draw: the water's colour replaces
+// the scene under it.
+#include "DynamicLight/Lights.glsl"
+#include "DynamicLight/WaterGlint.glsl"
 
 
 
@@ -246,7 +252,9 @@ void main() {
 	vec2 subCoord = 1.0 - clamp((vec2(0.5) - startPos) / diffPos, 0.0, 1.0);
 	vec2 sampCoord = integralCoord + subCoord * blurDirSign;
 	vec3 waterColor = texture(mainTexture, sampCoord / 512.0).xyz;
-	waterColor *= sunlight + EvaluateAmbientLight(1.0);
+	// The surface faces up, which is -Z in world space.
+	vec3 dynamicLight = EvaluateDynamicLights(v_worldPosition, vec3(0.0, 0.0, -1.0));
+	waterColor *= sunlight + EvaluateAmbientLight(1.0) + dynamicLight;
 
 	// underwater object color
 	fragColor = texture(screenTexture, refractTargetSS);
@@ -420,6 +428,10 @@ void main() {
 
 		fragColor.xyz += sunlight * spec * att;
 	}
+
+	/* ------- Dynamic Light Glint -------- */
+
+	fragColor.xyz += EvaluateWaterDynamicLightGlint(v_worldPosition, wave, ongoing) * att;
 
 #if !LINEAR_FRAMEBUFFER
 	fragColor.xyz = sqrt(fragColor.xyz);
