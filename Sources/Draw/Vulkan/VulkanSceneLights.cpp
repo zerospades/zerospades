@@ -428,6 +428,7 @@ namespace spades {
 				layout.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
 				vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 				                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+				                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
 				                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 				                     0, 0, nullptr, 0, nullptr, 1, &layout);
 				slot.occlusionAtlasInitialized = true;
@@ -557,15 +558,16 @@ namespace spades {
 			vkCmdDispatch(commandBuffer, (kClusterCount + ClusterGroupSize - 1) / ClusterGroupSize,
 			              1, 1);
 
-			// The masks and the occlusion maps are read by the lit fragments of the
-			// passes that follow.
+			// The masks and the occlusion maps are read by the passes that follow: by
+			// the lit fragments, and by the vertices of sprites lit at their corners.
 			VkMemoryBarrier barrier{};
 			barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 			barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 1, &barrier, 0, nullptr,
-			                     0, nullptr);
+			                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+			                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			                     0, 1, &barrier, 0, nullptr, 0, nullptr);
 		}
 	} // namespace draw
 } // namespace spades

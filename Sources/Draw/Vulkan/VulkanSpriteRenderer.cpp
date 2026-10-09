@@ -209,10 +209,11 @@ namespace spades {
 			bindingDescription.stride = sizeof(Instance);
 			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
-			std::array<VkVertexInputAttributeDescription, 3> attributes{{
+			std::array<VkVertexInputAttributeDescription, 4> attributes{{
 			  {0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Instance, centerRadius)},
 			  {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Instance, color)},
 			  {2, 0, VK_FORMAT_R32_SFLOAT, offsetof(Instance, angle)},
+			  {3, 0, VK_FORMAT_R32_SFLOAT, offsetof(Instance, scattering)},
 			}};
 
 			VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
@@ -312,11 +313,11 @@ namespace spades {
 		void VulkanSpriteRenderer::CreatePipeline() {
 			SPADES_MARK_FUNCTION();
 
-			// The sprite's set comes after the lit pipelines' three, which these
-			// sprites have no use for.
+			// These sprites are lit by the scene's lights alone (set 2), at their
+			// corners; the map's and the model shadows' sets are of no use to them.
 			const VkDescriptorSetLayout empty = renderer.GetSceneLights().GetEmptySetLayout();
 			const std::array<VkDescriptorSetLayout, SpriteSet + 1> setLayouts{
-			  {empty, empty, empty, spriteSetLayout}};
+			  {empty, empty, renderer.GetSceneLights().GetSetLayout(), spriteSetLayout}};
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			pipelineLayoutInfo.setLayoutCount = static_cast<std::uint32_t>(setLayouts.size());
@@ -493,10 +494,6 @@ namespace spades {
 			// a map; else as plain soft sprites
 			const bool lit = softParticles && litParticles && PrepareLitPipeline();
 
-			// Unlit, a scattering sprite would glow in the dark: the daylight dims it
-			// as it dims the world, as GL does. A lit one is as dark as its light.
-			const float unlitScattering = lit ? 1.0F : renderer.GetDaylight();
-
 			// The sprites, in the order they were added
 			ReserveInstances(frame, sprites.size());
 			auto* instances = static_cast<Instance*>(frame.instances->Map());
@@ -504,26 +501,31 @@ namespace spades {
 				const Sprite& sprite = sprites[i];
 				Instance& out = instances[i];
 				Store(out.centerRadius, sprite.center, sprite.radius);
-				const float dim = sprite.scattering ? unlitScattering : 1.0F;
-				out.color[0] = sprite.color.x * dim;
-				out.color[1] = sprite.color.y * dim;
-				out.color[2] = sprite.color.z * dim;
+				// The shaders light a scattering sprite: by the daylight and the dynamic
+				// lights, or, lit as a volume, by the sun, the sky and those lights.
+				out.color[0] = sprite.color.x;
+				out.color[1] = sprite.color.y;
+				out.color[2] = sprite.color.z;
 				out.color[3] = sprite.color.w;
 				out.angle = sprite.angle;
+				out.scattering = sprite.scattering ? 1.0F : 0.0F;
 			}
 
 			const VkPipelineLayout layout = lit ? litPipelineLayout : pipelineLayout;
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			                  lit ? litPipeline : pipeline);
 			if (lit) {
-				const std::array<VkDescriptorSet, SpriteSet> lightSets{
+				const std::array<VkDescriptorSet, 2> mapSets{
 				  {renderer.GetMapRenderer()->GetShadowDescriptorSet(),
-				   renderer.GetShadowMapRenderer()->GetSamplingDescriptorSet(),
-				   renderer.GetSceneLights().GetDescriptorSet(frameSlot)}};
+				   renderer.GetShadowMapRenderer()->GetSamplingDescriptorSet()}};
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0,
-				                        static_cast<std::uint32_t>(lightSets.size()),
-				                        lightSets.data(), 0, nullptr);
+				                        static_cast<std::uint32_t>(mapSets.size()), mapSets.data(),
+				                        0, nullptr);
 			}
+			// The scene's lights, which every sprite pipeline lights sprites by
+			const VkDescriptorSet lightSet = renderer.GetSceneLights().GetDescriptorSet(frameSlot);
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 2, 1,
+			                        &lightSet, 0, nullptr);
 
 			const VkBuffer instanceBuffer = frame.instances->GetBuffer();
 			const VkDeviceSize offset = 0;
