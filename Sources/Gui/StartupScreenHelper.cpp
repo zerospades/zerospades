@@ -41,6 +41,7 @@
 #include <cstring>
 #include <vector>
 #include <vulkan/vulkan.h>
+#include <Gui/SDLVulkanDevice.h>
 #endif
 #include <Core/FileManager.h>
 #include <Core/Settings.h>
@@ -711,6 +712,10 @@ namespace spades {
 				instCI.enabledExtensionCount = static_cast<uint32_t>(instExts.size());
 				instCI.ppEnabledExtensionNames = instExts.data();
 
+				// Whether a GPU has what the renderer needs, as SDLVulkanDevice
+				// decides when it picks one
+				bool vulkanCapable = false;
+
 				VkInstance vkProbe = VK_NULL_HANDLE;
 				if (vkCreateInstance(&instCI, nullptr, &vkProbe) == VK_SUCCESS) {
 					uint32_t devCount = 0;
@@ -752,6 +757,15 @@ namespace spades {
 						SPLog("Vulkan device %u: %s (API %s)", i, props.deviceName, apiStr.c_str());
 						AddReport(std::string("Device: ") + props.deviceName, col);
 						AddReport(std::string("Vulkan API: ") + apiStr, col);
+
+						if (gui::SDLVulkanDevice::HasRequiredDeviceExtensions(pd)) {
+							vulkanCapable = true;
+						} else {
+							SPLog("Vulkan device %u lacks a required device extension", i);
+							AddReport("This GPU lacks a device extension the Vulkan renderer "
+							          "requires.",
+							          yellow);
+						}
 
 #ifdef __APPLE__
 						// Query MoltenVK version via VK_KHR_driver_properties
@@ -821,6 +835,24 @@ namespace spades {
 					SPLog("Vulkan probe instance creation failed");
 					AddReport("Vulkan is not available on this system.", yellow);
 					AddReport();
+				}
+
+				SPLog("Vulkan driver is ZeroSpades capable: %s", vulkanCapable ? "YES" : "NO");
+				if (!vulkanCapable) {
+					if ((int)r_vulkan != 0) {
+						SPLog("Switched off the Vulkan renderer");
+						r_vulkan = 0;
+					}
+
+					incapableConfigs.insert(
+					  std::make_pair("r_renderer", [](std::string value) -> std::string {
+						  if (spades::EqualsIgnoringCase(value, "vulkan")) {
+							  return "Vulkan renderer is disabled because no GPU "
+							         "supports everything it requires.";
+						  } else {
+							  return std::string();
+						  }
+					  }));
 				}
 			}
 #endif
