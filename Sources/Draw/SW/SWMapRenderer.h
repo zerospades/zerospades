@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -57,6 +58,10 @@ namespace spades {
 			std::vector<size_t> rleLen;
 
 			int lineResolution;
+
+			// per-frame precomputed tables (shared read-only by BuildLine threads)
+			std::array<float, 65> frameZVal;
+			std::array<float, 65> frameHeightScaleVal;
 
 			typedef int8_t RleData;
 			std::vector<RleData> rleBuf;

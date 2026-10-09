@@ -194,6 +194,21 @@ namespace spades {
 	static bool attemptedToInitializeLog = false;
 	static std::string accumlatedLog;
 
+	// Buffered log-file writing: log lines are accumulated in memory and
+	// written to disk at most once per second (or when the buffer grows
+	// large). This keeps slow disk I/O (fflush, antivirus scans, network
+	// drives) from stalling the calling thread on every single log line.
+	static std::string pendingLogBuffer;
+	static time_t lastLogFlushTime = 0;
+
+	static void FlushPendingLog() {
+		if (logStream && !pendingLogBuffer.empty()) {
+			logStream->Write(pendingLogBuffer);
+			logStream->Flush();
+			pendingLogBuffer.clear();
+		}
+	}
+
 	void StartLog() {
 		attemptedToInitializeLog = true;
 		logStream = FileManager::OpenForWriting("SystemMessages.log");
@@ -204,6 +219,7 @@ namespace spades {
 
 	void StopLog() {
 		if (logStream) {
+			FlushPendingLog();
 			logStream->Flush();
 			logStream.reset(); // closes the underlying file handle
 		}
@@ -259,8 +275,13 @@ namespace spades {
 		// (2) The log file a.k.a. `SystemMessages.log`
 		if (logStream || !attemptedToInitializeLog) {
 			if (attemptedToInitializeLog) {
-				logStream->Write(outStr);
-				logStream->Flush();
+				pendingLogBuffer += outStr;
+				// Flush at most once per second, or when the buffer gets
+				// large. `t` was already obtained above for the timestamp.
+				if (t != lastLogFlushTime || pendingLogBuffer.size() >= 65536) {
+					lastLogFlushTime = t;
+					FlushPendingLog();
+				}
 			} else
 				accumlatedLog += buf;
 		}
