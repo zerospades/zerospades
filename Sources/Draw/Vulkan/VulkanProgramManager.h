@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <vulkan/vulkan.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
@@ -40,6 +42,9 @@ namespace spades {
 			std::unordered_map<std::string, Handle<VulkanProgram>> programs;
 			std::unordered_map<std::string, Handle<VulkanShader>> shaders;
 
+			// The descriptor sets from 1 on that a `.program` file's directives stand for
+			std::unordered_map<std::string, std::vector<VkDescriptorSetLayout>> directiveSetLayouts;
+
 			Handle<VulkanProgram> CreateProgram(const std::string& name);
 			Handle<VulkanShader> CreateShader(const std::string& name);
 
@@ -50,6 +55,14 @@ namespace spades {
 			VulkanProgramManager(Handle<gui::SDLVulkanDevice> device);
 
 			VulkanProgram* RegisterProgram(const std::string& name);
+
+			/**
+			 * Has every program whose `.program` file has a line `*directive*`, loaded
+			 * from now on, take `setLayouts` as its descriptor sets 1, 2, and so on,
+			 * which their owner fills and binds.
+			 */
+			void RegisterDirectiveSetLayouts(const std::string& directive,
+			                                 std::vector<VkDescriptorSetLayout> setLayouts);
 			VulkanShader* RegisterShader(const std::string& name);
 
 			// Clear all cached programs and shaders

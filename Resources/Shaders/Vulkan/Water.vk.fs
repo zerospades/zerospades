@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 /*
  Copyright (c) 2013 Fran6nd
@@ -74,6 +75,11 @@ layout(push_constant) uniform WaterPushConstants {
 } waterPC;
 
 layout(location = 0) out vec4 fragColor;
+
+// The frame's dynamic lights, lit in this same draw: the water's colour replaces
+// the scene under it.
+#include "DynamicLight/Lights.glsl"
+#include "DynamicLight/WaterGlint.glsl"
 
 
 
@@ -163,7 +169,9 @@ void main() {
 	vec3 waterColor = texture(mainTexture, sampCoord / 512.0).xyz;
 	vec3 diffuseShading = EvaluateAmbientLight(1.0);
 	vec3 sunlightForColor = EvaluateSunLight();
-	waterColor *= sunlightForColor + diffuseShading;
+	// The surface faces up, which is -Z in world space.
+	vec3 dynamicLight = EvaluateDynamicLights(v_worldPosition, vec3(0.0, 0.0, -1.0));
+	waterColor *= sunlightForColor + diffuseShading + dynamicLight;
 
 	// underwater object color
 	fragColor = texture(screenTexture, origScrPos);
@@ -211,6 +219,10 @@ void main() {
 		spec *= reflective;
 		fragColor.xyz += sunlight * spec * 1000.0 * att;
 	}
+
+	/* ------- Dynamic Light Glint -------- */
+
+	fragColor.xyz += EvaluateWaterDynamicLightGlint(v_worldPosition, wave, ongoing) * att;
 
 #if !LINEAR_FRAMEBUFFER
 	fragColor.xyz = sqrt(fragColor.xyz);
