@@ -53,9 +53,11 @@ namespace spades {
 			/** The most changed regions a frame uploads; the rest wait for the next. */
 			static constexpr std::uint32_t MaxRegionsPerFrame = 64;
 
-			/** The image the stages that read it wait for */
+			/** The stages that read the image: the lit fragments, the vertices of
+			 * sprites lit at their corners, and the occlusion maps' tracing */
 			static constexpr VkPipelineStageFlags ReaderStages =
-			  VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+			  VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+			  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
 			/** Keeps `map`'s clearance, with a staging buffer per frame in flight. */
 			VulkanMapOccupancy(VulkanRenderer&, client::GameMap& map, std::size_t framesInFlight);

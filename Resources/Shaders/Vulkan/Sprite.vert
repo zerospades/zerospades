@@ -25,10 +25,13 @@
 // sprite, its quad made here from the vertex index.
 
 #include "SpriteView.glsl"
+#include "SpriteLight.glsl"
 
 layout(location = 0) in vec4 centerRadiusAttribute;
 layout(location = 1) in vec4 colorAttribute;
 layout(location = 2) in float angleAttribute;
+// 1 for a sprite that scatters the light it is lit by, 0 for one that emits its own
+layout(location = 3) in float scatteringAttribute;
 
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec2 texCoord;
@@ -41,6 +44,8 @@ void main() {
 
 	gl_Position = spriteView.projectionView * vec4(pos, 1.0);
 	color = colorAttribute;
+	if (scatteringAttribute > 0.5)
+		color.xyz *= SpriteLight(centerRadiusAttribute.xyz, pos);
 	texCoord = corner * 0.5 + 0.5;
 	fogDensity = vec4(SpriteFogDensity(pos));
 }

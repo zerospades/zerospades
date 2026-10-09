@@ -76,6 +76,8 @@ namespace spades {
 				float centerRadius[4];
 				float color[4];
 				float angle;
+				/** 1 when it scatters the light it is lit by, 0 when it emits its own */
+				float scattering;
 			};
 
 			/** What a frame in flight draws with, written only once the GPU is done
