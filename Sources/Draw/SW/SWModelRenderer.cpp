@@ -63,7 +63,9 @@ namespace spades {
 			// evaluate brightness for each normals
 			uint8_t brights[3 * 3 * 3 + 1];
 			{
-				auto lightVec = MakeVector3(0.f, -0.707f, -0.707f);
+				// The sun's share of the shading follows its light; without it every face
+				// is lit alike.
+				auto lightVec = MakeVector3(0.f, -0.707f, -0.707f) * r->sceneDef.sunlight;
 				float dot1 = Vector3::Dot(axis1, lightVec) * fastRSqrt(axis1.GetSquaredLength());
 				float dot2 = Vector3::Dot(axis2, lightVec) * fastRSqrt(axis2.GetSquaredLength());
 				float dot3 = Vector3::Dot(axis3, lightVec) * fastRSqrt(axis3.GetSquaredLength());

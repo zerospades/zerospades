@@ -1194,7 +1194,7 @@ namespace spades {
 				// behind it, and looking it up in the roster would put the marker under
 				// the name of whoever holds a nearby id.
 				std::string label;
-				if (ping.playerId != Teamplay::kServerPlayerId)
+				if (ping.playerId != kServerPlayerId)
 					label = world->GetPlayerName(ping.playerId);
 
 				// Rendered as received: the extension assigns no reason values, so

@@ -339,8 +339,6 @@ namespace spades {
 			bool scoreboardVisible;
 			bool netgraphVisible;
 			bool hudVisible;
-			bool flashlightOn;
-			float flashlightOnTime;
 
 			struct GrenadeTracer {
 				std::vector<Vector3> positions;
@@ -817,6 +815,9 @@ namespace spades {
 			void PlayerLeaving(Player&);
 			void PlayerJoinedTeam(Player&);
 			void PlayerSpawned(Player&);
+
+			/** Called after a player's flashlight was switched, to give the feedback. */
+			void PlayerSwitchedFlashlight(Player&);
 
 			// IWorldListener begin
 			void PlayerObjectSet(int) override;

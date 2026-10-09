@@ -30,6 +30,7 @@ namespace spades {
 			GLProgram *thru;
 			GLProgram *computeGain;
 			GLProgram *preprocess;
+			GLProgram *exposureGamma;
 			GLRenderer &renderer;
 
 			// 1x1 of framebuffer that holds the scene brightness
@@ -39,6 +40,8 @@ namespace spades {
 		public:
 			GLAutoExposureFilter(GLRenderer &);
 			~GLAutoExposureFilter();
+			/** Adapts the exposure to the scene, and returns the scene at that exposure
+			 * with the HDR gamma applied. */
 			GLColorBuffer Filter(GLColorBuffer, float dt);
 		};
 	} // namespace draw

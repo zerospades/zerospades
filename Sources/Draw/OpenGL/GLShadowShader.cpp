@@ -36,6 +36,9 @@ namespace spades {
 		GLShadowShader::GLShadowShader()
 		    : mapShadowTexture("mapShadowTexture"),
 		      fogColor("fogColor"),
+		      daylight("daylight"),
+		      sunlight("sunlight"),
+		      skyLightColor("skyLightColor"),
 		      ambientColor("ambientColor"),
 			  cascadeSplit1("cascadeSplit1"),
 			  cascadeSplit2("cascadeSplit2"),
@@ -109,6 +112,18 @@ namespace spades {
 			Vector3 fc = renderer->GetFogColorForSolidPass();
 			fc *= fc; // linearize
 			fogColor.SetValue(fc.x, fc.y, fc.z);
+
+			// The lights below are as in full daylight; the shaders scale the sky's by
+			// the daylight and the sun's by the sunlight, once.
+			daylight(program);
+			daylight.SetValue(renderer->GetDaylight());
+			sunlight(program);
+			sunlight.SetValue(renderer->GetSunlight());
+
+			skyLightColor(program);
+			Vector3 sky = renderer->GetFullDaylightFogColorForSolidPass();
+			sky *= sky; // linearize
+			skyLightColor.SetValue(sky.x, sky.y, sky.z);
 
 			IGLDevice* dev = program->GetDevice();
 			dev->ActiveTexture(texStage);
@@ -214,7 +229,7 @@ namespace spades {
 			}
 
 			if (settings.r_radiosity) {
-				Vector3 ac = renderer->GetFogColor();
+				Vector3 ac = renderer->GetFullDaylightFogColor();
 				ac *= ac; // linearize
 				ambientColor(program);
 				ac *= 0.5F;

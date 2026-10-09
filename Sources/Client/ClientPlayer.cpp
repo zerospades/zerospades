@@ -74,6 +74,27 @@ SPADES_SETTING(cg_pngScope);
 namespace spades {
 	namespace client {
 
+		namespace {
+			/**
+			 * How far the glare sits ahead of the headlamp model's front face, in the
+			 * model's voxels, so the voxels don't swallow it.
+			 */
+			const float kHeadlampLensClearance = 0.5F;
+
+			/** How far above the lower body's origin the torso is posed, in blocks. */
+			float TorsoHeight(bool crouch) { return crouch ? 0.5F : 1.0F; }
+
+			/** How far below the torso's top the head is posed, in blocks. */
+			float HeadDrop(bool crouch) { return crouch ? 0.05F : 0.0F; }
+
+			/** Places the headlamp model on the third-person head, in the head's frame. */
+			Matrix4 HeadlampModelMatrix() {
+				return Matrix4::Scale(0.1F) * Matrix4::Scale(-1, -1, 1)
+					* Matrix4::Translate(0.0F, 0.0F, -1.0F)
+					* Matrix4::Scale(0.55F);
+			}
+		} // namespace
+
 		class SandboxedRenderer : public IRenderer {
 			Handle<IRenderer> base;
 			AABB3 clipBox;
@@ -198,6 +219,10 @@ namespace spades {
 				if (CheckVisibility(bounds1))
 					base->AddLongSprite(image, p1, p2, radius);
 			}
+			void AddGlare(IImage& image, const GlareParam& param) {
+				if (CheckVisibility(AABB3(param.origin, param.origin)))
+					base->AddGlare(image, param);
+			}
 
 			void EndScene() { OnProhibitedAction(); }
 
@@ -293,7 +318,6 @@ namespace spades {
 			wasAimingDownSight = false;
 			viewWeaponOffset = MakeVector3(0, 0, 0);
 			lastFront = MakeVector3(0, 0, 0);
-			flashlightOrientation = p.GetFront();
 			classicViewWeaponOrigin = MakeVector3(0, 0, 0);
 
 			ScriptContextHandle ctx;
@@ -383,6 +407,13 @@ namespace spades {
 
 		void ClientPlayer::Update(float dt) {
 			time += dt;
+
+			{
+				const FlashlightBeam& beam =
+				  client.activeNet->GetFlashlightBeams().Resolve(player.GetId());
+				flashlightFlicker.Update(dt,
+				                         player.IsFlashlightOn() ? beam.GetFlickerDarkness() : 0.0F);
+			}
 
 			bool isLocalPlayer = player.IsLocalPlayer();
 			bool isThirdPerson = ShouldRenderInThirdPersonView();
@@ -550,16 +581,6 @@ namespace spades {
 						softLimitFunc(viewWeaponOffset.z, 0, limitY);
 					}
 				}
-
-				// Smooth the flashlight's movement
-				if (client.flashlightOn && isLocalPlayer) {
-					Vector3 diff = front - flashlightOrientation;
-					float dist = diff.GetLength();
-					if (dist > 0.1F)
-						flashlightOrientation += diff.Normalize() * (dist - 0.1F);
-					flashlightOrientation = Mix(flashlightOrientation, front, 1.0F - powf(1.0E-6F, dt));
-					flashlightOrientation = flashlightOrientation.Normalize();
-				}
 			}
 
 			// FIXME: should do for non-active skins?
@@ -666,12 +687,116 @@ namespace spades {
 			}
 		}
 
+		Vector3 ClientPlayer::GetFlashlightDirection() {
+			// The orientation the player's model is rendered with, and nothing more, so
+			// that every client points the beam alike.
+			return player.GetFront(cg_orientationSmoothing);
+		}
+
 		std::array<Vector3, 3> ClientPlayer::GetFlashlightAxes() {
+			// Roll the cone around its own direction: the player's up vector snaps with
+			// network updates and is undefined when looking straight up or down.
+			static const Vector3 worldUp = MakeVector3(0, 0, -1);
+
 			std::array<Vector3, 3> axes;
-			axes[2] = flashlightOrientation;
-			axes[0] = Vector3::Cross(axes[2], player.GetUp()).Normalize();
+			axes[2] = GetFlashlightDirection();
+			axes[0] = Vector3::Cross(axes[2], worldUp);
+			if (axes[0].GetSquaredLength() < 1.0E-6F) // pointing straight up or down
+				axes[0] = Vector3::Cross(axes[2], MakeVector3(0, 1, 0));
+			axes[0] = axes[0].Normalize();
 			axes[1] = Vector3::Cross(axes[0], axes[2]);
 			return axes;
+		}
+
+		bool ClientPlayer::IsLampBuried(const Vector3& lightOrigin) {
+			World* world = client.GetWorld();
+			if (!world)
+				return false;
+
+			GameMap* map = world->GetMap().GetPointerOrNull();
+			if (!map)
+				return false;
+
+			IntVector3 block = lightOrigin.Floor();
+			return map->IsSolidWrapped(block.x, block.y, block.z);
+		}
+
+		Vector3 ClientPlayer::GetHeadlampLens(const Matrix4& head) {
+			// The model's front is +Y, which the head's frame turns to face forward
+			AABB3 const bounds = GetHeadlampBounds();
+			Vector3 const lens = MakeVector3((bounds.min.x + bounds.max.x) * 0.5F,
+				bounds.max.y + kHeadlampLensClearance,
+				(bounds.min.z + bounds.max.z) * 0.5F);
+			return (head * HeadlampModelMatrix() * lens).GetXYZ();
+		}
+
+		AABB3 ClientPlayer::GetHeadlampBounds() {
+			Handle<IModel> model = client.GetRenderer().RegisterModel("Models/Player/Headlamp.kv6");
+			return model->GetBoundingBox();
+		}
+
+		bool ClientPlayer::IsFlashlightLit() {
+			if (!player.IsFlashlightOn() || flashlightFlicker.IsDark())
+				return false;
+			return client.activeNet->GetFlashlightBeams().Resolve(player.GetId()).Emits();
+		}
+
+		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
+			Player& p = player;
+			IRenderer& renderer = client.GetRenderer();
+
+			if (!IsFlashlightLit())
+				return;
+
+			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
+
+			DynamicLightParam light;
+			light.type = DynamicLightTypeSpotlight;
+			light.origin = lightOrigin;
+			light.radius = beam.GetReach();
+			light.color = beam.GetColor() * (GetFlashlightFadeIn() * (r_hdr ? 3.0F : 1.5F));
+			light.spotAngle = beam.GetConeAngle();
+			light.spotAxis = GetFlashlightAxes();
+			Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
+			light.image = img.GetPointerOrNull();
+			renderer.AddLight(light);
+		}
+
+		float ClientPlayer::GetFlashlightFadeIn() {
+			Player& p = player;
+			float sinceOn = p.GetWorld().GetTime() - p.GetFlashlightOnTime();
+			return 1.0F - expf(-sinceOn * 5.0F);
+		}
+
+		void ClientPlayer::UpdateFlashlightGlare(const Vector3& lampPosition) {
+			Player& p = player;
+
+			// The glare drops out with the beam.
+			if (!IsFlashlightLit())
+				return;
+
+			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
+
+			World* world = client.GetWorld();
+			if (!world)
+				return;
+
+			GameMap* map = world->GetMap().GetPointerOrNull();
+			if (!map)
+				return;
+
+			FlashlightGlare::Lamp lamp;
+			lamp.position = lampPosition;
+			lamp.direction = GetFlashlightDirection();
+			lamp.coneAngle = beam.GetConeAngle();
+			lamp.reach = beam.GetReach();
+			lamp.color = beam.GetColor();
+			lamp.brightness = GetFlashlightFadeIn();
+			flashlightGlare.Update(lamp, client.GetLastSceneDef().viewOrigin, *map, time);
+		}
+
+		void ClientPlayer::AddFlashlightGlareToScene(float ambient) {
+			flashlightGlare.AddToScene(client.GetRenderer(), ambient);
 		}
 
 		void ClientPlayer::AddToSceneFirstPersonView() {
@@ -699,30 +824,8 @@ namespace spades {
 			// sandbox between frames, so it has to be cleared and not merely not set.
 			sandboxedRenderer->SetPlayerXRay(false, MakeVector3(1, 1, 1));
 
-			// no flashlight if spectating other players while dead
-			if (client.flashlightOn && p.IsLocalPlayer()) {
-				float brightness = client.time - client.flashlightOnTime;
-				brightness = 1.0F - expf(-brightness * 5.0F);
-				brightness *= r_hdr ? 3.0F : 1.5F;
-
-				// add flash light
-				DynamicLightParam light;
-				light.type = DynamicLightTypeSpotlight;
-				light.origin = eyeMatrix.GetOrigin();
-				light.radius = 60.0F;
-				light.color = MakeVector3(1.0F, 0.7F, 0.5F) * brightness;
-				light.spotAngle = DEG2RAD(90);
-				light.spotAxis = GetFlashlightAxes();
-				Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
-				light.image = img.GetPointerOrNull();
-				renderer.AddLight(light);
-
-				light.type = DynamicLightTypePoint;
-				light.radius = 10.0F;
-				light.color *= 0.3F;
-				light.image = nullptr;
-				renderer.AddLight(light);
-			}
+			// This path also runs for a remote player the camera is following.
+			AddFlashlightToScene(eyeMatrix.GetOrigin());
 
 			Vector3 leftHand, rightHand;
 			leftHand = MakeVector3(0, 0, 0);
@@ -954,7 +1057,7 @@ namespace spades {
 			float const legsPosX = 0.25F;
 			float const legsPosY = inp.crouch ? 1.25F : 1.0F;
 			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
-			float const torsoPosZ = inp.crouch ? 0.5F : 1.0F;
+			float const torsoPosZ = TorsoHeight(inp.crouch);
 
 			Vector2 legsRot;
 			legsRot.x = Vector3::Dot(vel, p.GetFront2D());
@@ -1153,8 +1256,8 @@ namespace spades {
 			float const legsPosX = 0.25F;
 			float const legsPosY = inp.crouch ? 0.25F : 0.0F;
 			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
-			float const headPosZ = inp.crouch ? 0.05F : 0.0F;
-			float const torsoPosZ = inp.crouch ? 0.5F : 1.0F;
+			float const headPosZ = HeadDrop(inp.crouch);
+			float const torsoPosZ = TorsoHeight(inp.crouch);
 			float const armsPosZ = inp.crouch ? 0.0F : 0.1F;
 
 			float armPitch = pitch;
@@ -1272,6 +1375,14 @@ namespace spades {
 				renderer.RenderModel(*model, param);
 			}
 
+			// Headlamp, shown while the flashlight is lit
+			if (p.IsFlashlightOn()) {
+				model = renderer.RegisterModel("Models/Player/Headlamp.kv6");
+
+				param.matrix = head * HeadlampModelMatrix();
+				renderer.RenderModel(*model, param);
+			}
+
 			// Tool
 			{
 				ScriptIThirdPersonToolSkin interface(curSkin);
@@ -1302,6 +1413,15 @@ namespace spades {
 				}
 			}
 
+			// Emit at the eye, as the first-person view does, so the beam doesn't
+			// shift when the observer changes camera mode.
+			Vector3 const lightOrigin = p.GetEye();
+			if (!IsLampBuried(lightOrigin))
+				AddFlashlightToScene(lightOrigin);
+
+			// The lamp itself is seen on the front of the headlamp as drawn, though.
+			UpdateFlashlightGlare(GetHeadlampLens(head));
+
 			// third person player rendering, done
 		}
 
@@ -1311,6 +1431,9 @@ namespace spades {
 			Player& p = player;
 
 			hasValidOriginMatrix = false;
+
+			// Only the third-person path, which draws the lamp, gives it a glare.
+			flashlightGlare.Clear();
 
 			if (p.IsSpectator())
 				return; // spectator

@@ -100,8 +100,10 @@ namespace spades {
 		static void ReportError(GLenum err, int line, const char* func) {
 			std::string msg;
 			msg = ErrorToString(err);
-			// Don't call glGetError() again to avoid potential infinite recursion
-			// if glGetError() itself triggers an error (can happen on macOS/Rosetta)
+			while ((err = glGetError()) != GL_NO_ERROR) {
+				msg += ", ";
+				msg += ErrorToString(err);
+			}
 			if (r_ignoreGLErrors) {
 				SPRaise("GL error %s in %s at %s:%d\n\n"
 						"WARNING: r_ignoreGLErrors is enabled. "
@@ -371,6 +373,8 @@ namespace spades {
 				case Version: return (const char*)glGetString(GL_VERSION);
 				case ShadingLanguageVersion:
 					return (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+				// The whole list at once, as the compatibility contexts this runs on have it
+				case Extensions: return (const char*)glGetString(GL_EXTENSIONS);
 				default: SPInvalidEnum("type", type);
 			}
 		}
@@ -893,6 +897,7 @@ namespace spades {
 				case RGB10A2: return GL_RGB10_A2;
 				case RGB16F: return GL_RGB16F;
 				case RGBA16F: return GL_RGBA16F;
+				case RGBA32F: return GL_RGBA32F;
 				case R16F: return GL_R16F;
 				case RGB5: return GL_RGB5;
 				case RGB5A1: return GL_RGB5_A1;

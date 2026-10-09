@@ -32,6 +32,8 @@ uniform vec3 viewOrigin;
 uniform vec3 sunlightScale;
 uniform vec3 ambientScale;
 uniform vec3 radiosityScale;
+// The sun's light; with none, it gives the fog no glow.
+uniform float sunlight;
 uniform float fogDistance;
 uniform mat4 viewProjectionMatrixInv;
 uniform vec2 ditherOffset;
@@ -187,10 +189,12 @@ void main() {
 	// ---------------------------------------------------------------------
 
 	// add gradient
-	vec3 sunDir = normalize(vec3(0.0, -1.0, -1.0));
-	float bright = dot(sunDir, normalize(viewcentricWorldPosition.xyz));
-	sunlightFactorColor *= bright * 0.5 + 1.0;
-	ambientFactorColor *= bright * 0.5 + 1.0;
+	if (sunlight > 0.0) {
+		vec3 sunDir = normalize(vec3(0.0, -1.0, -1.0));
+		float bright = dot(sunDir, normalize(viewcentricWorldPosition.xyz));
+		sunlightFactorColor *= bright * 0.5 + 1.0;
+		ambientFactorColor *= bright * 0.5 + 1.0;
+	}
 
 	// ---------------------------------------------------------------------
 

@@ -19,6 +19,8 @@
 
  */
 
+#include <cmath>
+
 #include "Client.h"
 
 #include <Core/ConcurrentDispatch.h>
@@ -598,7 +600,9 @@ namespace spades {
 			else if (playerInput.crouch)
 				freeState.velocity -= up;
 
-			SPAssert(freeState.velocity.GetLength() < 100.0F);
+			// The drag bounds the speed, but not below 100: sprinting along a diagonal
+			// settles at about 140. Only a speed that is no longer a number is wrong.
+			SPAssert(std::isfinite(freeState.velocity.GetLength()));
 		}
 
 		/** Handles movement of joined local player. */

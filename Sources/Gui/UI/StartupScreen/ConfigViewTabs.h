@@ -40,17 +40,22 @@ namespace spades {
 
 			ui::CheckBox* fullscreenCheck;
 			ui::RadioButton* driverOpenGL;
+			ui::RadioButton* driverVulkan;
 			ui::RadioButton* driverSoftware;
 
 			ui::TextViewer* helpView;
-			StartupScreenConfigView* configViewGL;
+			// Shared by OpenGL and Vulkan: both drive the same `r_*` cvars, so a second
+			// identical view would just be two objects editing one set of settings.
+			StartupScreenConfigView* configViewAccelerated;
 			StartupScreenConfigView* configViewSoftware;
 
 			Settings::ItemHandle r_renderer;
+			Settings::ItemHandle r_vulkan;
 			Settings::ItemHandle r_fullscreen;
 
 			void HandleHelpText(const std::string& text);
 			void OnDriverOpenGL(ui::UIElement&);
+			void OnDriverVulkan(ui::UIElement&);
 			void OnDriverSoftware(ui::UIElement&);
 			void OnFullscreenCheck(ui::UIElement&);
 

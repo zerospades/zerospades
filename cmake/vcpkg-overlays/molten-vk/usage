@@ -1,0 +1,4 @@
+molten-vk provides CMake targets:
+
+    find_package(molten-vk CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE MoltenVK::MoltenVK)

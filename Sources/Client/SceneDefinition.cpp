@@ -52,6 +52,37 @@ namespace spades {
 			return mat;
 		}
 
+		Matrix4 SceneDefinition::ToVulkanProjectionMatrix() const {
+			// Vulkan has:
+			// - Y-axis flipped (handled by negative viewport height)
+			// - Z range [0,1] instead of OpenGL's [-1,1]
+			float near = this->zNear;
+			float far = this->zFar;
+			float t = near * std::tan(this->fovY * 0.5F);
+			float r = near * std::tan(this->fovX * 0.5F);
+			float c = far - near;
+
+			Matrix4 mat;
+			mat.m[0] = 2.0F * near / (2.0F * r);
+			mat.m[1] = 0.0F;
+			mat.m[2] = 0.0F;
+			mat.m[3] = 0.0F;
+			mat.m[4] = 0.0F;
+			mat.m[5] = 2.0F * near / (2.0F * t);
+			mat.m[6] = 0.0F;
+			mat.m[7] = 0.0F;
+			mat.m[8] = 0.0F;
+			mat.m[9] = 0.0F;
+			mat.m[10] = -far / c;  // Changed for Vulkan Z [0,1]
+			mat.m[11] = -1.0F;
+			mat.m[12] = 0.0F;
+			mat.m[13] = 0.0F;
+			mat.m[14] = -(far * near) / c;  // Changed for Vulkan Z [0,1]
+			mat.m[15] = 0.0F;
+
+			return mat;
+		}
+
 		Matrix4 SceneDefinition::ToViewMatrix() const {
 			Matrix4 mat = Matrix4::Identity();
 			mat.m[0] = this->viewAxis[0].x;

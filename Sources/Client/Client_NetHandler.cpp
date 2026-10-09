@@ -439,6 +439,15 @@ namespace spades {
 				RemoveCorpseForPlayer(p.GetId());
 		}
 
+		void Client::PlayerSwitchedFlashlight(Player& p) {
+			// Everyone else sees the beam; only the local player hears the switch.
+			if (!p.IsLocalPlayer())
+				return;
+
+			Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+			audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
+		}
+
 		void Client::TeamWon(int teamId) {
 			// take a screenshot of the scoreboard
 			if (cg_autoScreenshot && !IsDemoMode())
