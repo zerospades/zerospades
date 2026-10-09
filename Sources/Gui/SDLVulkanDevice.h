@@ -74,6 +74,8 @@ namespace spades {
 			// Optional Vulkan device features. Each is true only if the physical
 			// device reports support AND we requested it in CreateLogicalDevice.
 			bool samplerAnisotropySupported{false};
+			/** The highest anisotropy a sampler may ask for: 1 without the feature */
+			float maxSamplerAnisotropy{1.0F};
 			bool sampleRateShadingSupported{false};
 			bool fillModeNonSolidSupported{false};
 			bool wideLinesSupported{false};
@@ -165,6 +167,9 @@ namespace spades {
 			// before relying on a feature so they can degrade gracefully on
 			// implementations that lack it (notably MoltenVK on macOS).
 			bool HasSamplerAnisotropy() const { return samplerAnisotropySupported; }
+			/** The highest anisotropy a sampler may ask for, 1 where the device has
+			 * no anisotropic filtering */
+			float GetMaxSamplerAnisotropy() const { return maxSamplerAnisotropy; }
 			bool HasSampleRateShading() const { return sampleRateShadingSupported; }
 			bool HasFillModeNonSolid() const { return fillModeNonSolidSupported; }
 			bool HasWideLines() const { return wideLinesSupported; }

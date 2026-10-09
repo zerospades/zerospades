@@ -86,7 +86,7 @@ namespace spades {
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 			);
 			newImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-			                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+			                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
 			PooledImage pooled;
 			pooled.image = newImage;

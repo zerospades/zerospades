@@ -47,7 +47,7 @@ namespace spades {
 			if (wrapper && wrapper->GetVulkanImage()) {
 				wrapper->GetVulkanImage()->CreateSampler(
 					VK_FILTER_NEAREST, VK_FILTER_NEAREST,
-					VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+					VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
 		}
 

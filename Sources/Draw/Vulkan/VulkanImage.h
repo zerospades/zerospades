@@ -122,11 +122,15 @@ namespace spades {
 			 */
 			void CreateAttachmentImageView();
 
-			// Create sampler (optional, for texture sampling)
+			/**
+			 * Creates the image's sampler, for texture sampling. It filters
+			 * anisotropically up to `maxAnisotropy` when that is above 1, as far as
+			 * the device allows: not at all on one without anisotropic filtering.
+			 */
 			void CreateSampler(VkFilter magFilter = VK_FILTER_LINEAR,
 			                   VkFilter minFilter = VK_FILTER_LINEAR,
 			                   VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-			                   bool enableAnisotropy = true);
+			                   float maxAnisotropy = 1.0F);
 		};
 
 	} // namespace draw
