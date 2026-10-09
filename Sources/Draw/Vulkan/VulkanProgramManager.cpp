@@ -55,6 +55,11 @@ namespace spades {
 			}
 		}
 
+		void VulkanProgramManager::RegisterDirectiveSetLayouts(
+		  const std::string& directive, std::vector<VkDescriptorSetLayout> setLayouts) {
+			directiveSetLayouts[directive] = std::move(setLayouts);
+		}
+
 		VulkanShader* VulkanProgramManager::RegisterShader(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
@@ -83,7 +88,8 @@ namespace spades {
 			// Parse .program file (same format as OpenGL)
 			// Format:
 			// Line 1-N: shader file paths (vertex shader first, fragment shader second, etc.)
-			// Lines starting with '*' are special directives (e.g., *shadow*)
+			// Lines `*directive*` name descriptor sets the program reads from 1 on, as
+			// `RegisterDirectiveSetLayouts` registered them (e.g. *dynamicLights*).
 			for (size_t i = 0; i < lines.size(); i++) {
 				std::string line = TrimSpaces(lines[i]);
 
@@ -92,8 +98,14 @@ namespace spades {
 				}
 
 				if (line[0] == '*') {
-					// Special directive (e.g., *shadow*)
-					// For now, we'll ignore these
+					const std::string directive = TrimSpaces(line.substr(1, line.find('*', 1) - 1));
+					auto layouts = directiveSetLayouts.find(directive);
+					if (layouts == directiveSetLayouts.end())
+						SPRaise("Program '%s' names the unknown directive '%s'", name.c_str(),
+						        directive.c_str());
+					for (std::size_t set = 0; set < layouts->second.size(); set++)
+						program->SetExternalSetLayout(static_cast<uint32_t>(set + 1),
+						                              layouts->second[set]);
 					continue;
 				}
 

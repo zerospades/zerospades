@@ -1,4 +1,5 @@
 #include "VulkanWaterRenderer.h"
+#include "VulkanDynamicLightClusters.h"
 #include "VulkanRenderer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanBuffer.h"
@@ -1037,10 +1038,15 @@ namespace spades {
 		scissor.extent = extent;
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		// Bind descriptor sets
+		// Bind descriptor sets: the water's own, and the frame's dynamic lights
+		// (set 2), which fall on it in this same draw
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		                       waterProgram->GetPipelineLayout(), 0, 1,
 		                       &descriptorSets[frameIndex], 0, nullptr);
+		VkDescriptorSet lightSet =
+		  renderer.GetDynamicLightClusters().GetDescriptorSet(renderer.GetCurrentFrameIndex());
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		                        waterProgram->GetPipelineLayout(), 2, 1, &lightSet, 0, nullptr);
 
 		// Push constants for per-frame water data (replaces WaterUBO)
 		vkCmdPushConstants(commandBuffer, waterProgram->GetPipelineLayout(),

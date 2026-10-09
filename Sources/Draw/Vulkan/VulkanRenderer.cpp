@@ -189,6 +189,12 @@ namespace spades {
 			dynamicLightClusters = stmp::make_unique<VulkanDynamicLightClusters>(
 			  *this, device->GetMaxFramesInFlight());
 
+			// Programs that take the dynamic lights say so (`*dynamicLights*`), as set
+			// 2; set 1 is the model shadows' in the lit pipelines, which they lack.
+			programManager->RegisterDirectiveSetLayouts(
+			  "dynamicLights",
+			  {dynamicLightClusters->GetEmptySetLayout(), dynamicLightClusters->GetSetLayout()});
+
 			// Preload shaders
 			VulkanMapRenderer::PreloadShaders(*this);
 			VulkanOptimizedVoxelModel::PreloadShaders(*this);

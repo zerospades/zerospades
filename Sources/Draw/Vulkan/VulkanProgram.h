@@ -76,6 +76,13 @@ namespace spades {
 			// Pipeline layout
 			VkPipelineLayout pipelineLayout;
 
+			// The layouts of descriptor sets 1 and up, owned, filled and bound by
+			// others; `VK_NULL_HANDLE` for a set not given
+			std::vector<VkDescriptorSetLayout> externalSetLayouts;
+
+			/** Whether descriptor set `set` is one another owns. */
+			bool IsExternalSet(uint32_t set) const;
+
 			void ReflectShaderResources();
 			void CreateDescriptorSetLayout();
 			void CreatePipelineLayout();
@@ -87,6 +94,14 @@ namespace spades {
 			VulkanProgram(Handle<gui::SDLVulkanDevice> device, const std::string& name = "(unnamed)");
 
 			void AttachShader(Handle<VulkanShader> shader);
+
+			/**
+			 * Has the pipeline layout list `layout` as descriptor set `set`, from 1 up,
+			 * whose resources its owner declares, fills and binds: the program leaves
+			 * them out of its own set 0. Every set from 1 to the highest given must be
+			 * given before `Link`.
+			 */
+			void SetExternalSetLayout(uint32_t set, VkDescriptorSetLayout layout);
 
 			// Link the program (creates descriptor set layout and pipeline layout)
 			void Link();
