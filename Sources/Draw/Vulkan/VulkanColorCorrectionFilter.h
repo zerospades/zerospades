@@ -23,20 +23,24 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "VulkanPostProcessFilter.h"
+#include <Core/Math.h>
 
 namespace spades {
 	namespace draw {
 
 		// Color correction filter (Vulkan port of GLColorCorrectionFilter).
 		//
-		// Single fullscreen pass that applies:
+		// A fullscreen pass that applies:
+		//   - sharpening (r_sharpen), reversing a blur whose horizontal half is
+		//     a pass of its own, as GL's
 		//   - white-balance tint (cancels fog colour cast)
 		//   - saturation desaturation toward gray
 		//   - ACES filmic tonemap (the actual HDR compression)
 		//   - smoothstep enhancement
 		//
-		// Tint and saturation are recomputed every frame from the live
-		// fogColor and r_saturation cvar, matching GLRenderer.cpp:1040+.
+		// Tint and saturation are recomputed every frame from the fog colour,
+		// eased towards the scene's as GL eases it, and the r_saturation cvar,
+		// matching GLRenderer's.
 		//
 		// Call Filter(cmd, input, output). input must be in
 		// SHADER_READ_ONLY_OPTIMAL; output ends up in SHADER_READ_ONLY_OPTIMAL.
@@ -47,9 +51,16 @@ namespace spades {
 			VkSampler linearSampler;
 
 			VkRenderPass ppRenderPass;
-			VkDescriptorSetLayout singleSamplerDSL;
+			VkDescriptorSetLayout singleSamplerDSL; // the blur's input
+			VkDescriptorSetLayout dualSamplerDSL;   // the input and its blur
 			VkPipelineLayout layout;
 			VkPipeline pipeline;
+			VkPipelineLayout blurLayout;
+			VkPipeline blurPipeline;
+
+			// The fog colour the tint is worked out from, eased towards the scene's a
+			// little every frame as GL does; negative until the first frame
+			Vector3 smoothedFogColor{-1.0F, -1.0F, -1.0F};
 
 			static constexpr int MAX_FRAME_SLOTS = 2;
 			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
@@ -64,6 +75,10 @@ namespace spades {
 
 			VkFramebuffer MakeFramebuffer(VulkanImage* image, int frameSlot);
 			VkDescriptorSet BindTexture(int frameSlot, VkImageView view);
+			VkDescriptorSet BindTextures(int frameSlot, VkImageView view, VkImageView blurred);
+
+			/** A full-screen pipeline drawing `fragmentShader` with `pipelineLayout` */
+			VkPipeline BuildPipeline(const char* fragmentShader, VkPipelineLayout pipelineLayout);
 
 			void CreatePipeline() override {}
 			void CreateRenderPass() override {}
