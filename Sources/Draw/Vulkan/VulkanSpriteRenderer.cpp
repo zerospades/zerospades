@@ -28,8 +28,10 @@
 #include "VulkanBuffer.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
+#include "VulkanMapRenderer.h"
 #include "VulkanRenderer.h"
 #include "VulkanSceneLights.h"
+#include "VulkanShadowMapRenderer.h"
 #include "VulkanSpirvCache.h"
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -50,8 +52,9 @@ namespace spades {
 				float eye[4];
 				float fogColorDistance[4];
 				float nearFar[4];
+				float sunDirection[4];
 			};
-			static_assert(sizeof(GpuView) == 160, "GpuView must match SpriteView");
+			static_assert(sizeof(GpuView) == 176, "GpuView must match SpriteView");
 
 			/** The fewest sprites a frame's instance buffer is made for */
 			constexpr std::size_t kInitialInstanceCapacity = 1024;
@@ -83,7 +86,10 @@ namespace spades {
 		} // namespace
 
 		VulkanSpriteRenderer::VulkanSpriteRenderer(VulkanRenderer& r)
-		    : renderer(r), device(r.GetDevice()), softParticles((int)r_softParticles != 0) {
+		    : renderer(r),
+		      device(r.GetDevice()),
+		      softParticles((int)r_softParticles != 0),
+		      litParticles((int)r_softParticles >= 2) {
 			SPADES_MARK_FUNCTION();
 
 			VkDevice vkDevice = device->GetDevice();
@@ -116,10 +122,12 @@ namespace spades {
 			for (FrameResources& frame : frames)
 				if (frame.descriptorPool != VK_NULL_HANDLE)
 					vkDestroyDescriptorPool(vkDevice, frame.descriptorPool, nullptr);
-			if (pipeline != VK_NULL_HANDLE)
-				vkDestroyPipeline(vkDevice, pipeline, nullptr);
-			if (pipelineLayout != VK_NULL_HANDLE)
-				vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
+			for (VkPipeline built : {pipeline, litPipeline})
+				if (built != VK_NULL_HANDLE)
+					vkDestroyPipeline(vkDevice, built, nullptr);
+			for (VkPipelineLayout layout : {pipelineLayout, litPipelineLayout})
+				if (layout != VK_NULL_HANDLE)
+					vkDestroyPipelineLayout(vkDevice, layout, nullptr);
 			if (spriteSetLayout != VK_NULL_HANDLE)
 				vkDestroyDescriptorSetLayout(vkDevice, spriteSetLayout, nullptr);
 		}
@@ -163,30 +171,15 @@ namespace spades {
 			frame.instanceCapacity = capacity;
 		}
 
-		void VulkanSpriteRenderer::CreatePipeline() {
+		VkPipeline VulkanSpriteRenderer::BuildPipeline(VkPipelineLayout layout,
+		                                               const char* vertexShader,
+		                                               const char* fragmentShader,
+		                                               bool specializeRadiosity) {
 			SPADES_MARK_FUNCTION();
 
 			VkDevice vkDevice = device->GetDevice();
-
-			// The sprite's set comes after the lit pipelines' three, which these
-			// sprites have no use for.
-			const VkDescriptorSetLayout empty = renderer.GetSceneLights().GetEmptySetLayout();
-			const std::array<VkDescriptorSetLayout, SpriteSet + 1> setLayouts{
-			  {empty, empty, empty, spriteSetLayout}};
-			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount = static_cast<std::uint32_t>(setLayouts.size());
-			pipelineLayoutInfo.pSetLayouts = setLayouts.data();
-			if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
-			    VK_SUCCESS)
-				SPRaise("Failed to create the sprite pipeline layout");
-
-			VkShaderModule vertexModule = CreateModule(
-			  vkDevice, softParticles ? "Shaders/Vulkan/SoftSprite.vert.spv"
-			                          : "Shaders/Vulkan/Sprite.vert.spv");
-			VkShaderModule fragmentModule = CreateModule(
-			  vkDevice, softParticles ? "Shaders/Vulkan/SoftSprite.frag.spv"
-			                          : "Shaders/Vulkan/Sprite.frag.spv");
+			VkShaderModule vertexModule = CreateModule(vkDevice, vertexShader);
+			VkShaderModule fragmentModule = CreateModule(vkDevice, fragmentShader);
 
 			std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
 			shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -197,6 +190,18 @@ namespace spades {
 			shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 			shaderStages[1].module = fragmentModule;
 			shaderStages[1].pName = "main";
+
+			// The lit sprites take the map's ambient light as its shaders do.
+			SPADES_SETTING(r_radiosity);
+			const std::int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
+			const VkSpecializationMapEntry radiosityEntry{0, 0, sizeof(useRadiosity)};
+			VkSpecializationInfo specialization{};
+			specialization.mapEntryCount = 1;
+			specialization.pMapEntries = &radiosityEntry;
+			specialization.dataSize = sizeof(useRadiosity);
+			specialization.pData = &useRadiosity;
+			if (specializeRadiosity)
+				shaderStages[1].pSpecializationInfo = &specialization;
 
 			// A sprite per instance; the vertices are the quad's corners.
 			VkVertexInputBindingDescription bindingDescription{};
@@ -287,18 +292,73 @@ namespace spades {
 			pipelineInfo.pDepthStencilState = &depthStencil;
 			pipelineInfo.pColorBlendState = &colorBlending;
 			pipelineInfo.pDynamicState = &dynamicState;
-			pipelineInfo.layout = pipelineLayout;
+			pipelineInfo.layout = layout;
 			pipelineInfo.renderPass = softParticles
 			                            ? renderer.GetFramebufferManager()->GetSpriteRenderPass()
 			                            : renderer.GetOffscreenRenderPass();
 			pipelineInfo.subpass = 0;
 
+			VkPipeline built = VK_NULL_HANDLE;
 			const VkResult result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(),
-			                                                  1, &pipelineInfo, nullptr, &pipeline);
+			                                                  1, &pipelineInfo, nullptr, &built);
 			vkDestroyShaderModule(vkDevice, vertexModule, nullptr);
 			vkDestroyShaderModule(vkDevice, fragmentModule, nullptr);
 			if (result != VK_SUCCESS)
 				SPRaise("Failed to create the sprite pipeline (error code: %d)", result);
+			return built;
+		}
+
+
+		void VulkanSpriteRenderer::CreatePipeline() {
+			SPADES_MARK_FUNCTION();
+
+			// The sprite's set comes after the lit pipelines' three, which these
+			// sprites have no use for.
+			const VkDescriptorSetLayout empty = renderer.GetSceneLights().GetEmptySetLayout();
+			const std::array<VkDescriptorSetLayout, SpriteSet + 1> setLayouts{
+			  {empty, empty, empty, spriteSetLayout}};
+			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pipelineLayoutInfo.setLayoutCount = static_cast<std::uint32_t>(setLayouts.size());
+			pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+			if (vkCreatePipelineLayout(device->GetDevice(), &pipelineLayoutInfo, nullptr,
+			                           &pipelineLayout) != VK_SUCCESS)
+				SPRaise("Failed to create the sprite pipeline layout");
+
+			pipeline = softParticles
+			             ? BuildPipeline(pipelineLayout, "Shaders/Vulkan/SoftSprite.vert.spv",
+			                             "Shaders/Vulkan/SoftSprite.frag.spv", false)
+			             : BuildPipeline(pipelineLayout, "Shaders/Vulkan/Sprite.vert.spv",
+			                             "Shaders/Vulkan/Sprite.frag.spv", false);
+		}
+
+		bool VulkanSpriteRenderer::PrepareLitPipeline() {
+			VulkanMapRenderer* mapRenderer = renderer.GetMapRenderer();
+			VulkanShadowMapRenderer* shadowMapRenderer = renderer.GetShadowMapRenderer();
+			if (!mapRenderer || !shadowMapRenderer ||
+			    mapRenderer->GetShadowDescriptorSet() == VK_NULL_HANDLE ||
+			    shadowMapRenderer->GetSamplingDescriptorSet() == VK_NULL_HANDLE)
+				return false;
+			if (litPipeline != VK_NULL_HANDLE)
+				return true;
+
+			// The lit pipelines' sets, then the sprite's own. A later map's sets are
+			// laid out the same, so they still bind to it.
+			const std::array<VkDescriptorSetLayout, SpriteSet + 1> setLayouts{
+			  {mapRenderer->GetShadowDescriptorSetLayout(),
+			   shadowMapRenderer->GetSamplingSetLayout(), renderer.GetSceneLights().GetSetLayout(),
+			   spriteSetLayout}};
+			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pipelineLayoutInfo.setLayoutCount = static_cast<std::uint32_t>(setLayouts.size());
+			pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+			if (vkCreatePipelineLayout(device->GetDevice(), &pipelineLayoutInfo, nullptr,
+			                           &litPipelineLayout) != VK_SUCCESS)
+				SPRaise("Failed to create the lit sprite pipeline layout");
+
+			litPipeline = BuildPipeline(litPipelineLayout, "Shaders/Vulkan/SoftLitSprite.vert.spv",
+			                            "Shaders/Vulkan/SoftLitSprite.frag.spv", true);
+			return true;
 		}
 
 		void VulkanSpriteRenderer::Add(VulkanImage* img, Vector3 center, float rad, float ang,
@@ -317,7 +377,8 @@ namespace spades {
 			// it a dark, mostly-opaque particle (blood, debris) is drawn at its
 			// gamma value in a linear buffer and comes out several times too
 			// bright and desaturated.
-			if (color.x > color.w || color.y > color.w || color.z > color.w) {
+			spr.scattering = !(color.x > color.w || color.y > color.w || color.z > color.w);
+			if (!spr.scattering) {
 				// emissive material
 				color.x *= color.x;
 				color.y *= color.y;
@@ -328,13 +389,6 @@ namespace spades {
 				color.x *= color.x * rcp;
 				color.y *= color.y * rcp;
 				color.z *= color.z * rcp;
-
-				// These sprites are not lit, so a scattering one would glow in the
-				// dark: the daylight dims it as it dims the world, as GL does.
-				const float daylight = renderer.GetDaylight();
-				color.x *= daylight;
-				color.y *= daylight;
-				color.z *= daylight;
 			}
 
 			spr.color = color;
@@ -432,7 +486,16 @@ namespace spades {
 			Store(view.fogColorDistance, fogColor, renderer.GetFogDistance());
 			view.nearFar[0] = def.zNear;
 			view.nearFar[1] = def.zFar;
+			Store(view.sunDirection, renderer.GetSunDirection(), 0.0F);
 			std::memcpy(frame.view->Map(), &view, sizeof(view));
+
+			// Lit by the map, the models' shadows and the scene's lights, when there is
+			// a map; else as plain soft sprites
+			const bool lit = softParticles && litParticles && PrepareLitPipeline();
+
+			// Unlit, a scattering sprite would glow in the dark: the daylight dims it
+			// as it dims the world, as GL does. A lit one is as dark as its light.
+			const float unlitScattering = lit ? 1.0F : renderer.GetDaylight();
 
 			// The sprites, in the order they were added
 			ReserveInstances(frame, sprites.size());
@@ -441,14 +504,27 @@ namespace spades {
 				const Sprite& sprite = sprites[i];
 				Instance& out = instances[i];
 				Store(out.centerRadius, sprite.center, sprite.radius);
-				out.color[0] = sprite.color.x;
-				out.color[1] = sprite.color.y;
-				out.color[2] = sprite.color.z;
+				const float dim = sprite.scattering ? unlitScattering : 1.0F;
+				out.color[0] = sprite.color.x * dim;
+				out.color[1] = sprite.color.y * dim;
+				out.color[2] = sprite.color.z * dim;
 				out.color[3] = sprite.color.w;
 				out.angle = sprite.angle;
 			}
 
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			const VkPipelineLayout layout = lit ? litPipelineLayout : pipelineLayout;
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			                  lit ? litPipeline : pipeline);
+			if (lit) {
+				const std::array<VkDescriptorSet, SpriteSet> lightSets{
+				  {renderer.GetMapRenderer()->GetShadowDescriptorSet(),
+				   renderer.GetShadowMapRenderer()->GetSamplingDescriptorSet(),
+				   renderer.GetSceneLights().GetDescriptorSet(frameSlot)}};
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0,
+				                        static_cast<std::uint32_t>(lightSets.size()),
+				                        lightSets.data(), 0, nullptr);
+			}
+
 			const VkBuffer instanceBuffer = frame.instances->GetBuffer();
 			const VkDeviceSize offset = 0;
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &instanceBuffer, &offset);
@@ -462,8 +538,8 @@ namespace spades {
 					end++;
 
 				const VkDescriptorSet set = GetImageSet(frame, *image);
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				                        pipelineLayout, SpriteSet, 1, &set, 0, nullptr);
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout,
+				                        SpriteSet, 1, &set, 0, nullptr);
 				vkCmdDraw(commandBuffer, kQuadVertices, static_cast<std::uint32_t>(end - first), 0,
 				          static_cast<std::uint32_t>(first));
 				first = end;
