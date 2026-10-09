@@ -386,56 +386,14 @@ namespace spades {
 					return;
 			}
 
-			// Set up push constants (MVP matrix + model origin + fog data).
-			// Matches GLMapRenderer: when r_fogShadow is on, the solid pass
-			// must fade distant blocks to BLACK (not fog colour) so the
-			// fog post-process can re-add the in-scattered light with
-			// the directional shadow shafts on top. Using the full fog
-			// colour here washes out the post-process contribution and
-			// the shaft becomes invisible.
-			Vector3 fogCol = renderer.renderer.GetFogColorForSolidPass();
-			fogCol *= fogCol; // linearize
-
-			if (renderer.physicalLighting) {
-				MapSolidPushConstants pushConstants;
-
-				pushConstants.projectionViewMatrix = renderer.renderer.GetProjectionViewMatrix();
-				pushConstants.modelOrigin = MakeVector3(
-					(float)(chunkX << SizeBits) + sx,
-					(float)(chunkY << SizeBits) + sy,
-					(float)(chunkZ << SizeBits)
-				);
-				pushConstants.fogDistance = renderer.renderer.GetFogDistance();
-				pushConstants.viewOrigin = eye;
-				pushConstants._pad = 0.0f;
-				pushConstants.fogColor = fogCol;
-				pushConstants._pad2 = 0.0f;
-				pushConstants.sunDirection = renderer.renderer.GetSunDirection();
-				pushConstants._pad3 = 0.0f;
-				pushConstants.viewMatrix = renderer.renderer.GetViewMatrix();
-
-				vkCmdPushConstants(commandBuffer, renderer.pipelineLayout,
-				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(pushConstants), &pushConstants);
-			} else {
-				MapSolidPushConstantsBasic pushConstants;
-
-				pushConstants.projectionViewMatrix = renderer.renderer.GetProjectionViewMatrix();
-				pushConstants.modelOrigin = MakeVector3(
-					(float)(chunkX << SizeBits) + sx,
-					(float)(chunkY << SizeBits) + sy,
-					(float)(chunkZ << SizeBits)
-				);
-				pushConstants.fogDistance = renderer.renderer.GetFogDistance();
-				pushConstants.viewOrigin = eye;
-				pushConstants._pad = 0.0f;
-				pushConstants.fogColor = fogCol;
-				pushConstants._pad2 = 0.0f;
-				pushConstants.sunDirection = renderer.renderer.GetSunDirection();
-
-				vkCmdPushConstants(commandBuffer, renderer.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-				                   0, sizeof(pushConstants), &pushConstants);
-			}
+			// What changes from chunk to chunk: its origin, wrapped around the map to
+			// lie nearest the eye. The pass's view is bound once for all of them.
+			MapDrawConstants drawConstants{};
+			drawConstants.modelOrigin = MakeVector3((float)(chunkX << SizeBits) + sx,
+			                                        (float)(chunkY << SizeBits) + sy,
+			                                        (float)(chunkZ << SizeBits));
+			vkCmdPushConstants(commandBuffer, renderer.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+			                   sizeof(drawConstants), &drawConstants);
 
 			// Bind shadow map descriptor set
 			if (renderer.textureDescriptorSet != VK_NULL_HANDLE) {

@@ -19,6 +19,7 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Ghost (semi-transparent) variant of BasicModelVertexColorPhys.frag.
 // Identical physical lighting, but outputs alpha = 0.5 for SRC_ALPHA blending.
@@ -32,20 +33,17 @@
 layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
 layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the model's placement and colours. The rest is
+// the pass's (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
 	mat4 modelMatrix;
 	vec3 modelOrigin;
 	float fogDensity;
 	vec3 customColor;
-	float _pad;
-	vec3 fogColor;
-	float mirrorClipZ; // water-plane Z in the reflection pass (else +inf)
-	vec3 sunDirection;
-	float _pad3;
-	mat4 viewMatrix;
-	vec3 viewOrigin;
-} pushConstants;
+	float opacity; // a ghost's
+} draw;
 
 layout(location = 0) in vec4 color;
 layout(location = 1) in vec3 ambientLight;     // hemisphere ambient fallback
@@ -125,15 +123,15 @@ void main() {
 	vec2 ambTexVal = texture(ambientShadowTexture, aoCoord).xy;
 	float aoFactor = max(ambTexVal.x / max(ambTexVal.y, 0.25), 0.0);
 
-	fragColor = vec4(vertexColor, pushConstants._pad);
+	fragColor = vec4(vertexColor, draw.opacity);
 	vec3 diffuseShading = ambientLight * aoFactor;
 	float shadowing = shadow * 0.6;
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 
 	// Sun direction from the renderer (single source of truth, GetSunDirection)
-	vec3 sunDir = normalize(pushConstants.sunDirection);
-	vec3 viewSpaceLight = normalize((pushConstants.viewMatrix * vec4(sunDir, 0.0)).xyz);
+	vec3 sunDir = normalize(sceneView.sunDirection.xyz);
+	vec3 viewSpaceLight = normalize((sceneView.view * vec4(sunDir, 0.0)).xyz);
 
 	float dotNL = max(color.w, 0.001);
 	float dotNV = max(dot(viewSpaceNormal, eyeVec), 0.001);

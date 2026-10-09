@@ -19,9 +19,10 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Ghost (semi-transparent) variant of BasicModelVertexColor.frag.
-// Identical lighting, but outputs alpha = pushConstants._pad (param.opacity).
+// Identical lighting, but outputs alpha = draw.opacity (param.opacity).
 //
 // Ghosts intentionally skip directional radiosity — they render as a
 // translucent silhouette (placement preview, etc.), where the cheaper
@@ -29,15 +30,17 @@
 // The VS outputs `radiosityTextureCoord` / `normalVarying` at locations
 // 7-8; we leave them unmatched here, which Vulkan permits.
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the model's placement and colours. The rest is
+// the pass's (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
 	mat4 modelMatrix;
 	vec3 modelOrigin;
 	float fogDensity;
 	vec3 customColor;
-	float _pad; // opacity
-	vec3 fogColor;
-} pushConstants;
+	float opacity; // a ghost's
+} draw;
 
 layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
 layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
@@ -69,7 +72,7 @@ void main() {
 
 	float sunLambert = color.w;
 	vec3 sun = vec3(0.6) * sunLambert * shadow;
-	fragColor = vec4(vertexColor * (ambientLight * aoFactor + sun), pushConstants._pad);
+	fragColor = vec4(vertexColor * (ambientLight * aoFactor + sun), draw.opacity);
 
 	fragColor.xyz = mix(fragColor.xyz, inFogColor, fogDensity);
 	fragColor.xyz = max(fragColor.xyz, 0.0);

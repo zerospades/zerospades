@@ -19,19 +19,15 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the chunk's origin. The rest is the pass's
+// (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
 	vec3 modelOrigin;
-	float fogDistance;
-	vec3 viewOrigin;
-	float _pad;
-	vec3 fogColor;
-	float _pad2;
-	vec3 sunDirection; // points toward the sun (renderer GetSunDirection)
-	float _pad3;
-	mat4 viewMatrix;
-} pushConstants;
+} draw;
 
 layout(location = 0) in uvec3 positionAttribute;
 layout(location = 1) in uvec2 aoCoordAttribute;
@@ -55,13 +51,13 @@ layout(location = 11) out vec3 worldPosition;
 
 void main() {
 	vec3 position = vec3(positionAttribute);
-	vec4 worldPos = vec4(position + pushConstants.modelOrigin, 1.0);
-	gl_Position = pushConstants.projectionViewMatrix * worldPos;
+	vec4 worldPos = vec4(position + draw.modelOrigin, 1.0);
+	gl_Position = sceneView.projectionView * worldPos;
 
 	vec3 normalFloat = normalize(vec3(normalAttribute));
 
 	// Sun direction from the renderer (single source of truth, GetSunDirection)
-	vec3 sunDir = normalize(pushConstants.sunDirection);
+	vec3 sunDir = normalize(sceneView.sunDirection.xyz);
 	float lambert = dot(normalFloat, sunDir); // NOT clamped - physical shader needs raw dot
 
 	// Linearize vertex color
@@ -72,7 +68,7 @@ void main() {
 	// luminance floor of 0.35 so things stay visible even when the sky is
 	// near-black. (fogColor is already linearized in C++.)
 	float hemisphere = 1.0 - normalFloat.z * 0.2;
-	vec3 ac = pushConstants.fogColor * 0.5;
+	vec3 ac = sceneView.fogColorMirrorClipZ.xyz * 0.5;
 	float L = (ac.x + ac.y + ac.z) / 3.0;
 	ac += ((ac + 0.003) / (L + 0.003)) * max(0.35 - L, 0.0);
 	ambientLight = ac * hemisphere;
@@ -86,21 +82,21 @@ void main() {
 	// The 0.1 lift is the shadow lookup's own, so keep it out of wPos, which
 	// the AO and radiosity coords below also use. GL derives those from a
 	// different base — see the note on aoCoord in BasicMap.vert.
-	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + pushConstants.modelOrigin;
+	vec3 wPos = vec3(fixedPositionAttribute) * 0.5 + draw.modelOrigin;
 	vec3 shadowPos = wPos + normalFloat * 0.1;
 	shadowCoord = vec3(shadowPos.x / 512.0, (shadowPos.y - shadowPos.z) / 512.0,
 	                   shadowPos.z / 255.0);
 
 	// Fog
-	vec2 horzRelativePos = worldPos.xy - pushConstants.viewOrigin.xy;
+	vec2 horzRelativePos = worldPos.xy - sceneView.eyeFogDistance.xyz.xy;
 	float horzDistance = dot(horzRelativePos, horzRelativePos);
-	fogDensity = vec3(min(horzDistance / (pushConstants.fogDistance * pushConstants.fogDistance), 1.0));
-	outFogColor = pushConstants.fogColor;
+	fogDensity = vec3(min(horzDistance / (sceneView.eyeFogDistance.w * sceneView.eyeFogDistance.w), 1.0));
+	outFogColor = sceneView.fogColorMirrorClipZ.xyz;
 
 	// View-space data for physical lighting
-	viewSpaceCoord = (pushConstants.viewMatrix * worldPos).xyz;
-	viewSpaceNormal = normalize((pushConstants.viewMatrix * vec4(normalFloat, 0.0)).xyz);
-	reflectionDir = reflect(worldPos.xyz - pushConstants.viewOrigin, normalFloat);
+	viewSpaceCoord = (sceneView.view * worldPos).xyz;
+	viewSpaceNormal = normalize((sceneView.view * vec4(normalFloat, 0.0)).xyz);
+	reflectionDir = reflect(worldPos.xyz - sceneView.eyeFogDistance.xyz, normalFloat);
 
 	aoCoord = (wPos + vec3(0.0, 0.0, 1.0)) / vec3(512.0, 512.0, 65.0);
 

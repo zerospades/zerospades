@@ -255,6 +255,9 @@ namespace spades {
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 			                        2, 1, &lightSet, 0, nullptr);
 
+			// The view the pass sees the world through (set 3)
+			renderer.BindSceneView(commandBuffer, pipelineLayout);
+
 			// Draw from nearest to farthest for optimal depth testing
 			// Include all vertical chunks
 			for (int cz = 0; cz < numChunkDepth; cz++) {
@@ -638,29 +641,25 @@ namespace spades {
 			// Pipeline layout with push constants and shadow map descriptor set
 			VkPushConstantRange pushConstantRange{};
 			pushConstantRange.offset = 0;
-			if (physicalLighting) {
-				pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-				pushConstantRange.size = sizeof(MapSolidPushConstants);
-			} else {
-				pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-				pushConstantRange.size = sizeof(MapSolidPushConstantsBasic);
-			}
+			pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			pushConstantRange.size = sizeof(MapDrawConstants);
 
 			// Set 1 = the shadow renderer's model-shadow sampling layout (cascade UBO +
 			// depth maps), so the lit shaders can fold in dynamic model shadows. The
 			// shadow renderer is created before the map renderer (see SetGameMap).
-			// Set 2 = the frame's dynamic lights.
+			// Set 2 = the frame's dynamic lights. Set 3 = the pass's view.
 			VulkanShadowMapRenderer* smr = renderer.GetShadowMapRenderer();
-			VkDescriptorSetLayout setLayouts[3] = {
+			VkDescriptorSetLayout setLayouts[4] = {
 			    descriptorSetLayout,
 			    smr ? smr->GetSamplingSetLayout() : VK_NULL_HANDLE,
 			    renderer.GetSceneLights().GetSetLayout(),
+			    renderer.GetSceneViewSetLayout(),
 			};
 			SPAssert(setLayouts[1] != VK_NULL_HANDLE);
 
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount = 3;
+			pipelineLayoutInfo.setLayoutCount = 4;
 			pipelineLayoutInfo.pSetLayouts = setLayouts;
 			pipelineLayoutInfo.pushConstantRangeCount = 1;
 			pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;

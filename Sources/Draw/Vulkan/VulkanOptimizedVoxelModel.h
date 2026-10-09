@@ -36,32 +36,24 @@ namespace spades {
 		class VulkanBuffer;
 		class VulkanImage;
 
-		// Push-constant blocks for the model pipelines, shared between the pipeline
-		// layout (range size) and the draw calls (the push) so both derive from the
-		// same sizeof() and can never drift. std430 aligns each vec3 to 16 bytes,
-		// hence the trailing pad floats. The non-physical solid pass pushes only the
-		// prefix up to the physical-only tail: offsetof(ModelSolidPushConstants,
-		// physicalTail). An undersized range drops the tail on AMD (fine on MoltenVK).
-		struct ModelSolidPushConstants { // physical lighting (268 bytes); 188 used non-physical
-			Matrix4 projectionViewMatrix;
+		// Push-constant blocks for the model pipelines: what changes from draw to
+		// draw, as `DrawConstants` of their shaders has it. The pass's view is
+		// `VulkanSceneView`'s. The pipeline layout's range and the push are both sized
+		// from these, so they can never drift apart; std430 aligns each vec3 to 16
+		// bytes, hence the pad floats.
+		struct ModelDrawConstants {
 			Matrix4 modelMatrix;
 			Vector3 modelOrigin;   float fogDensity;
-			Vector3 customColor;   float opacity; // _pad: opacity for ghost models
-			Vector3 fogColor;      float mirrorClipZ; // water-plane Z in the reflection pass (else +inf); also pads sunDirection to its 16B slot
-			Vector3 sunDirection;  // points toward the sun (renderer GetSunDirection)
-			// --- physical-lighting-only tail (non-physical push stops here) ---
-			float   physicalTail;  // _pad3 — aligns viewMatrix
-			Matrix4 viewMatrix;
-			Vector3 viewOrigin;
+			Vector3 customColor;   float opacity; // a ghost's
 		};
-		struct ModelXRayPushConstants { // x-ray reveal pass (192 bytes)
-			Matrix4 projectionViewModelMatrix;
-			Matrix4 viewModelMatrix; // covers the eye vector, the fresnel and the normal
+		static_assert(sizeof(ModelDrawConstants) <= 128, "push constants past 128 bytes are not portable");
+		struct ModelXRayDrawConstants {
+			Matrix4 modelMatrix;
 			Vector3 modelOrigin;    float _pad0;
 			Vector3 xrayColor;      float _pad1;
 			Vector3 customColor;    float _pad2;
-			Vector3 viewSpaceLight; float _pad3;
 		};
+		static_assert(sizeof(ModelXRayDrawConstants) <= 128, "push constants past 128 bytes are not portable");
 
 		class VulkanOptimizedVoxelModel : public VulkanModel {
 			struct Vertex {

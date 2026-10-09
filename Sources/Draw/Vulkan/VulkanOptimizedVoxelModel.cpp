@@ -492,6 +492,8 @@ namespace spades {
 				  renderer.GetCurrentFrameIndex());
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
+				// The view the pass sees the world through (set 3)
+				renderer.BindSceneView(commandBuffer, sharedPipeline.pipelineLayout);
 			}
 
 			// Bind vertex buffer
@@ -502,13 +504,9 @@ namespace spades {
 			// Bind index buffer
 			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			const Matrix4& projectionViewMatrix = renderer.GetProjectionViewMatrix();
+			// The pass's view, the fog's colour included, is the scene view's; the fog
+			// density is the model's own, from where it stands.
 			const auto& eye = renderer.GetSceneDef().viewOrigin;
-			// Match GL (GLOptimizedVoxelModel): models fade to BLACK under r_fogShadow
-			// so the fog post-process re-adds in-scattered light. Same as the sunlight
-			// pass below.
-			Vector3 fogCol = renderer.GetFogColorForSolidPass();
-			fogCol *= fogCol; // linearize
 			float fogDist = renderer.GetFogDistance();
 
 			for (const auto& param : params) {
@@ -524,7 +522,6 @@ namespace spades {
 					bindPipeline(isMirrored ? activeMirroredPipeline : activePipeline);
 				}
 
-				Matrix4 mvpMatrix = projectionViewMatrix * param.matrix;
 
 				// Compute fog density from model's world position
 				Vector4 modelWorldPos4 = param.matrix * MakeVector4(origin.x, origin.y, origin.z, 1.0f);
@@ -533,33 +530,16 @@ namespace spades {
 				float horzDistSq = dx * dx + dy * dy;
 				float fogDensity = std::min(horzDistSq / (fogDist * fogDist), 1.0f);
 
-				ModelSolidPushConstants pushConstants;
-
-				pushConstants.projectionViewMatrix = mvpMatrix;
-				pushConstants.modelMatrix = param.matrix;
-				pushConstants.modelOrigin = origin;
-				pushConstants.fogDensity = fogDensity;
-				pushConstants.customColor = param.customColor;
-				// Ghost depth prepass writes full color; set opacity=1.0 (blend is OFF)
-				pushConstants.opacity = ghostPass ? 1.0f : 0.0f;
-				pushConstants.fogColor = fogCol;
-				pushConstants.sunDirection = renderer.GetSunDirection();
-				// Reflection pass: clip geometry below the water plane (z=63) so
-				// underwater players can't leak into the mirror. +inf elsewhere = no clip.
-				pushConstants.mirrorClipZ = renderer.IsRenderingMirror() ? 63.0f : 1.0e9f;
-
-				uint32_t pcSize = offsetof(ModelSolidPushConstants, physicalTail);
-				VkShaderStageFlags pcStages = (ghostPass || sharedPipeline.physicalLighting)
-					? (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-					: VK_SHADER_STAGE_VERTEX_BIT;
-				if (sharedPipeline.physicalLighting) {
-					pushConstants.physicalTail = 0.0f;
-					pushConstants.viewMatrix = renderer.GetViewMatrix();
-					pushConstants.viewOrigin = renderer.GetSceneDef().viewOrigin;
-					pcSize = sizeof(pushConstants);
-				}
-				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout, pcStages,
-				                   0, pcSize, &pushConstants);
+				ModelDrawConstants drawConstants{};
+				drawConstants.modelMatrix = param.matrix;
+				drawConstants.modelOrigin = origin;
+				drawConstants.fogDensity = fogDensity;
+				drawConstants.customColor = param.customColor;
+				// The ghost depth prepass writes it whole (blend is off).
+				drawConstants.opacity = ghostPass ? 1.0f : 0.0f;
+				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout,
+				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+				                   sizeof(drawConstants), &drawConstants);
 
 				vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
 			}
@@ -851,6 +831,8 @@ namespace spades {
 				  renderer.GetCurrentFrameIndex());
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
+				// The view the pass sees the world through (set 3)
+				renderer.BindSceneView(commandBuffer, sharedPipeline.pipelineLayout);
 			}
 
 			// Bind vertex buffer
@@ -861,14 +843,9 @@ namespace spades {
 			// Bind index buffer
 			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			// Get projection-view matrix from renderer
-			const Matrix4& projectionViewMatrix = renderer.GetProjectionViewMatrix();
+			// The pass's view, the fog's colour included, is the scene view's; the fog
+			// density is the model's own, from where it stands.
 			const auto& eye = renderer.GetSceneDef().viewOrigin;
-			// GetFogColorForSolidPass returns BLACK when r_fogShadow is on, so
-			// distant models fade to black and the fog post-process can paint
-			// the lit/shadow directional shafts back in. Matches GL.
-			Vector3 fogCol = renderer.GetFogColorForSolidPass();
-			fogCol *= fogCol; // linearize
 			float fogDist = renderer.GetFogDistance();
 
 			bool mirror = renderer.IsRenderingMirror();
@@ -903,8 +880,6 @@ namespace spades {
 					bindPipeline((isMirrored != mirror) ? activeMirroredPipeline : activePipeline);
 				}
 
-				// Compute final MVP matrix
-				Matrix4 mvpMatrix = projectionViewMatrix * param.matrix;
 
 				// Compute fog density from model's world position
 				Vector4 modelWorldPos4 = param.matrix * MakeVector4(origin.x, origin.y, origin.z, 1.0f);
@@ -913,33 +888,16 @@ namespace spades {
 				float horzDistSq = dx * dx + dy * dy;
 				float fogDensity = std::min(horzDistSq / (fogDist * fogDist), 1.0f);
 
-				ModelSolidPushConstants pushConstants;
-
-				pushConstants.projectionViewMatrix = mvpMatrix;
-				pushConstants.modelMatrix = param.matrix;
-				pushConstants.modelOrigin = origin;
-				pushConstants.fogDensity = fogDensity;
-				pushConstants.customColor = param.customColor;
-				// Pass param.opacity as alpha for ghost models
-				pushConstants.opacity = ghostPass ? param.opacity : 0.0f;
-				pushConstants.fogColor = fogCol;
-				pushConstants.sunDirection = renderer.GetSunDirection();
-				// Reflection pass: clip geometry below the water plane (z=63) so
-				// underwater players can't leak into the mirror. +inf elsewhere = no clip.
-				pushConstants.mirrorClipZ = renderer.IsRenderingMirror() ? 63.0f : 1.0e9f;
-
-				uint32_t pcSize = offsetof(ModelSolidPushConstants, physicalTail);
-				VkShaderStageFlags pcStages = (ghostPass || sharedPipeline.physicalLighting)
-					? (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-					: VK_SHADER_STAGE_VERTEX_BIT;
-				if (sharedPipeline.physicalLighting) {
-					pushConstants.physicalTail = 0.0f;
-					pushConstants.viewMatrix = renderer.GetViewMatrix();
-					pushConstants.viewOrigin = renderer.GetSceneDef().viewOrigin;
-					pcSize = sizeof(pushConstants);
-				}
-				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout, pcStages,
-				                   0, pcSize, &pushConstants);
+				ModelDrawConstants drawConstants{};
+				drawConstants.modelMatrix = param.matrix;
+				drawConstants.modelOrigin = origin;
+				drawConstants.fogDensity = fogDensity;
+				drawConstants.customColor = param.customColor;
+				// A ghost's opacity, its alpha
+				drawConstants.opacity = ghostPass ? param.opacity : 0.0f;
+				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout,
+				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+				                   sizeof(drawConstants), &drawConstants);
 
 				if (param.depthHack) {
 					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, VulkanRenderer::kFirstPersonDepthEnd};
@@ -1002,15 +960,8 @@ namespace spades {
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
 			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-			const Matrix4& projectionViewMatrix = renderer.GetProjectionViewMatrix();
-			const Matrix4& viewMatrix = renderer.GetViewMatrix();
-
-			// Same fixed light vector GL's x-ray shader uses, carried into view space
-			// here rather than per-fragment. Left unnormalized at length sqrt(2), as GL
-			// has it: CookTorrance takes the light vector's magnitude into its dot
-			// products, so normalizing would shift the specular term and the alpha
-			// derived from it away from GL's.
-			Vector3 viewSpaceLight = (viewMatrix * MakeVector4(0, -1, -1, 0)).GetXYZ();
+			// The pass's view, the light's direction included, is the scene view's.
+			renderer.BindSceneView(commandBuffer, sharedPipeline.xrayPipelineLayout);
 
 			int rw = renderer.GetRenderWidth();
 			int rh = renderer.GetRenderHeight();
@@ -1035,17 +986,15 @@ namespace spades {
 				bool isMirrored = Vector3::Dot(Vector3::Cross(ax, ay), az) < 0.0F;
 				bindPipeline(isMirrored ? mirroredXRayPipeline : sharedPipeline.xrayPipeline);
 
-				ModelXRayPushConstants pushConstants;
-				pushConstants.projectionViewModelMatrix = projectionViewMatrix * modelMatrix;
-				pushConstants.viewModelMatrix = viewMatrix * modelMatrix;
-				pushConstants.modelOrigin = origin;
-				pushConstants.xrayColor = param.xrayColor;
-				pushConstants.customColor = param.customColor;
-				pushConstants.viewSpaceLight = viewSpaceLight;
+				ModelXRayDrawConstants drawConstants{};
+				drawConstants.modelMatrix = modelMatrix;
+				drawConstants.modelOrigin = origin;
+				drawConstants.xrayColor = param.xrayColor;
+				drawConstants.customColor = param.customColor;
 
 				vkCmdPushConstants(commandBuffer, sharedPipeline.xrayPipelineLayout,
 				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(pushConstants), &pushConstants);
+				                   0, sizeof(drawConstants), &drawConstants);
 
 				if (param.depthHack) {
 					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, VulkanRenderer::kFirstPersonDepthEnd};
@@ -1319,33 +1268,28 @@ namespace spades {
 				}
 			}
 
-			// Pipeline layout with push constants and shadow map descriptor set.
-			// Physical lighting pushes the whole block; non-physical pushes only the
-			// prefix before the physical-only tail.
+			// Pipeline layout: what changes from draw to draw is pushed, in every
+			// lighting mode alike.
 			VkPushConstantRange pushConstantRange{};
 			pushConstantRange.offset = 0;
 			pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			if (sharedPipeline.physicalLighting) {
-				pushConstantRange.size = sizeof(ModelSolidPushConstants);
-			} else {
-				pushConstantRange.size = offsetof(ModelSolidPushConstants, physicalTail);
-			}
+			pushConstantRange.size = sizeof(ModelDrawConstants);
 
 			// Set 1 = model-shadow cascade sampling (owned by the shadow map
 			// renderer, same set the map lit pipeline binds), or a set without
 			// bindings when there is no map to have one. The Phys/ghost fragment
 			// shaders that don't declare it are still compatible with the wider
-			// layout. Set 2 = the frame's dynamic lights.
+			// layout. Set 2 = the frame's dynamic lights. Set 3 = the pass's view.
 			VulkanShadowMapRenderer* smrLayout = renderer.GetShadowMapRenderer();
 			VulkanSceneLights& lightClusters = renderer.GetSceneLights();
-			VkDescriptorSetLayout modelSetLayouts[3] = {
+			VkDescriptorSetLayout modelSetLayouts[4] = {
 			    sharedPipeline.descriptorSetLayout,
 			    smrLayout ? smrLayout->GetSamplingSetLayout() : lightClusters.GetEmptySetLayout(),
-			    lightClusters.GetSetLayout()};
+			    lightClusters.GetSetLayout(), renderer.GetSceneViewSetLayout()};
 
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount = 3;
+			pipelineLayoutInfo.setLayoutCount = 4;
 			pipelineLayoutInfo.pSetLayouts = modelSetLayouts;
 			pipelineLayoutInfo.pushConstantRangeCount = 1;
 			pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
@@ -1646,17 +1590,23 @@ namespace spades {
 						xrStages[1].pName = "main";
 
 						// Own layout: the x-ray shaders read no textures at all (the
-						// albedo is a vertex attribute), and their push block does not
-						// fit the solid pass's range in the non-physical build.
+						// albedo is a vertex attribute), and push their own block. Only
+						// the pass's view is bound, as set 3 like the solid pass's.
 						VkPushConstantRange xrPushRange{};
 						xrPushRange.offset = 0;
-						xrPushRange.size = sizeof(ModelXRayPushConstants);
+						xrPushRange.size = sizeof(ModelXRayDrawConstants);
 						xrPushRange.stageFlags =
 						    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+						const VkDescriptorSetLayout emptySet =
+						  renderer.GetSceneLights().GetEmptySetLayout();
+						const VkDescriptorSetLayout xrSetLayouts[4] = {
+						  emptySet, emptySet, emptySet, renderer.GetSceneViewSetLayout()};
+
 						VkPipelineLayoutCreateInfo xrLayoutInfo{};
 						xrLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-						xrLayoutInfo.setLayoutCount = 0;
+						xrLayoutInfo.setLayoutCount = 4;
+						xrLayoutInfo.pSetLayouts = xrSetLayouts;
 						xrLayoutInfo.pushConstantRangeCount = 1;
 						xrLayoutInfo.pPushConstantRanges = &xrPushRange;
 

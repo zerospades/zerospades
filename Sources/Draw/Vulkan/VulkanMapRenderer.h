@@ -37,26 +37,15 @@ namespace spades {
 		class VulkanBuffer;
 		class VulkanImage;
 
-		// Push-constant blocks for the map pipelines, shared between the pipeline
-		// layout (range size) and VulkanMapChunk (the actual push) so the two are
-		// always sized from the same sizeof() and can never drift. std430 aligns
-		// each vec3 to 16 bytes, hence the explicit trailing pad floats. An
-		// undersized range silently drops the tail on AMD/amdvlk (fine on MoltenVK).
-		struct MapSolidPushConstants { // physical lighting (192 bytes)
-			Matrix4 projectionViewMatrix;
-			Vector3 modelOrigin;   float fogDistance;
-			Vector3 viewOrigin;    float _pad;
-			Vector3 fogColor;      float _pad2;
-			Vector3 sunDirection;  float _pad3; // _pad3 aligns viewMatrix to 16
-			Matrix4 viewMatrix;
+		// The map pipelines' push constants: what changes from draw to draw, the
+		// chunk's origin, as `DrawConstants` of BasicMap.vert and BasicMapPhys.vert
+		// has it. The pass's view is `VulkanSceneView`'s. The pipeline layout's range
+		// and the push are both sized from this, so they can never drift apart.
+		struct MapDrawConstants {
+			Vector3 modelOrigin;
+			float _pad; // to the block's std430 size
 		};
-		struct MapSolidPushConstantsBasic { // non-physical lighting (124 bytes)
-			Matrix4 projectionViewMatrix;
-			Vector3 modelOrigin;   float fogDistance;
-			Vector3 viewOrigin;    float _pad;
-			Vector3 fogColor;      float _pad2;
-			Vector3 sunDirection;
-		};
+		static_assert(sizeof(MapDrawConstants) <= 128, "push constants past 128 bytes are not portable");
 		class VulkanMapRenderer {
 
 			friend class VulkanMapChunk;

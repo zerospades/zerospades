@@ -21,18 +21,8 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	vec3 modelOrigin;
-	float fogDistance;
-	vec3 viewOrigin;
-	float _pad;
-	vec3 fogColor;
-	float _pad2;
-	vec3 sunDirection; // points toward the sun (renderer GetSunDirection)
-	float _pad3;
-	mat4 viewMatrix;
-} pushConstants;
+#include "SceneView.glsl"
+
 
 layout(location = 0) in vec4 color;           // xyz = vertexColor, w = sun lambert
 layout(location = 1) in vec3 ambientLight;     // hemisphere ambient fallback
@@ -128,8 +118,8 @@ void main() {
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 
 	// Compute view-space light direction (sun from the renderer, GetSunDirection)
-	vec3 sunDir = normalize(pushConstants.sunDirection);
-	vec3 viewSpaceLight = normalize((pushConstants.viewMatrix * vec4(sunDir, 0.0)).xyz);
+	vec3 sunDir = normalize(sceneView.sunDirection.xyz);
+	vec3 viewSpaceLight = normalize((sceneView.view * vec4(sunDir, 0.0)).xyz);
 
 	float dotNL = max(color.w, 0.001);
 	float dotNV = max(dot(viewSpaceNormal, eyeVec), 0.001);

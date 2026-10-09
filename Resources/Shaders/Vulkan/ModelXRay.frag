@@ -19,22 +19,24 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Vulkan port of OptimizedVoxelModelXRay.fs: the tinted, scanlined shape a
 // revealed player is drawn as where the world hides them.
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewModelMatrix;
-	mat4 viewModelMatrix;
+#include "SceneView.glsl"
+
+// What changes from draw to draw: the model's placement and colours. The rest is
+// the pass's (`SceneView.glsl`).
+layout(push_constant) uniform DrawConstants {
+	mat4 modelMatrix;
 	vec3 modelOrigin;
 	float _pad0;
 	vec3 xrayColor;
 	float _pad1;
 	vec3 customColor;
 	float _pad2;
-	vec3 viewSpaceLight;
-	float _pad3;
-} pushConstants;
+} draw;
 
 layout(location = 0) in vec3 vertexColor;
 layout(location = 1) in float fresnel;
@@ -78,16 +80,19 @@ void main() {
 	// fallback, exactly as it does in the solid pass.
 	vec3 albedo = vertexColor;
 	if (dot(albedo, vec3(1.0)) < 0.0001)
-		albedo = pushConstants.customColor;
+		albedo = draw.customColor;
 	albedo *= albedo; // linearize
 
 	vec3 eyeVec = normalize(-viewSpaceCoord);
 	vec3 normal = normalize(viewSpaceNormal);
 
-	float sunSpecularShading = CookTorrance(eyeVec, pushConstants.viewSpaceLight, normal);
+	// GL lights the x-ray along the sun's direction unnormalized, (0, -1, -1),
+	// which is sqrt(2) as long as the unit one: kept so the highlight matches.
+	vec3 viewSpaceLight = (sceneView.view * vec4(sceneView.sunDirection.xyz * sqrt(2.0), 0.0)).xyz;
+	float sunSpecularShading = CookTorrance(eyeVec, viewSpaceLight, normal);
 
-	vec3 color = pushConstants.xrayColor * mix(0.5 + albedo * 0.5, vec3(1.0), fresnel);
-	color += pushConstants.xrayColor * sunSpecularShading * 4.0;
+	vec3 color = draw.xrayColor * mix(0.5 + albedo * 0.5, vec3(1.0), fresnel);
+	color += draw.xrayColor * sunSpecularShading * 4.0;
 
 	// No gamma encode here: this renderer's scene target is linear throughout
 	// and the swapchain blit encodes for display, so GL's !LINEAR_FRAMEBUFFER
