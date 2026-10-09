@@ -113,18 +113,21 @@ namespace spades {
 		    : renderer(renderer), device(renderer.GetDevice()->GetDevice()) {
 			SPADES_MARK_FUNCTION();
 
+			// Read by the compute passes, and by the lit shaders: per fragment on
+			// surfaces, and per vertex in volumes such as smoke.
 			const VkShaderStageFlags stages =
-			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			const VkShaderStageFlags lightingStages =
+			  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
 			bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr};
 			bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
-			bindings[3] = {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxImages,
-			               VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+			bindings[3] = {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MaxImages, lightingStages,
+			               nullptr};
 			bindings[4] = {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, nullptr};
 			bindings[5] = {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr};
-			bindings[6] = {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
-			               nullptr};
+			bindings[6] = {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, lightingStages, nullptr};
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;

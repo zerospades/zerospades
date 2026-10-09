@@ -21,8 +21,9 @@
 #ifndef SCENE_LIGHT_LIGHTS_GLSL
 #define SCENE_LIGHT_LIGHTS_GLSL
 
-// The light the frame's dynamic lights bring to a point of a lit surface, for the
-// fragment shaders of the scene's passes. A point reads only the lights of the
+// The light the frame's dynamic lights bring to a point of a lit surface or volume,
+// for the shaders of the scene's passes. A vertex shader includer defines
+// `SCENE_LIGHT_VERTEX_STAGE`, which has no fragments of the first-person view. A point reads only the lights of the
 // cluster of the view it lies in; one outside the view, as the water's mirror sees
 // it, reads them all.
 
@@ -59,7 +60,11 @@ layout(set = SCENE_LIGHT_SET, binding = 5, r32f) uniform readonly image2D
  * hides the lights from them as it does from the eye.
  */
 bool DynamicLightIsFirstPerson() {
+#ifdef SCENE_LIGHT_VERTEX_STAGE
+	return false;
+#else
 	return gl_FragCoord.z < dynamicLightFrame.firstPersonDepthEnd;
+#endif
 }
 
 /**
@@ -115,6 +120,12 @@ bool DynamicLightOcclusionMapReaches(uint i, int tile, vec3 position, vec3 norma
 	return true;
 }
 
+// How a point takes a dynamic light: as a surface does, diffusely or with a
+// highlight, or as a translucent volume such as smoke, which the light wraps around.
+#define DYNAMIC_LIGHT_DIFFUSE 0
+#define DYNAMIC_LIGHT_SPECULAR 1
+#define DYNAMIC_LIGHT_SCATTERED 2
+
 /**
  * 1 if light `i`, at `lightPosition`, is seen from `position`, on a surface facing
  * `normal`, and 0 if the map is in the way. A spotlight's occlusion map proves most
@@ -137,6 +148,14 @@ float DynamicLightMapVisibility(uint i, vec3 position, vec3 normal, vec3 lightPo
 	return DynamicLightMapWalk(from, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
 
+/** 1 if `lightPosition` is seen from `position`, inside a volume, and 0 if the map
+ * is in the way: a volume has no surface for an occlusion map to prove lit. */
+float DynamicLightVolumeVisibility(vec3 position, vec3 lightPosition) {
+	if (dynamicLightFrame.mapOcclusion < 0.5)
+		return 1.0;
+	return DynamicLightMapWalk(position, lightPosition, true) > 1.0 ? 1.0 : 0.0;
+}
+
 /**
  * Image `image` at `coord`, of the most detailed level: it is read where only some
  * fragments of a quad got that far, which leaves no derivatives to pick one with.
@@ -154,11 +173,13 @@ vec3 DynamicLightImage(int image, vec2 coord) {
 }
 
 /**
- * The light that light `i` brings to `position`, on a surface facing `normal`,
- * shaped by its cone, its image and its reach, and hidden by the map, but not
- * by how the surface faces it; `direction` is set to the unit vector towards the light.
+ * The light that light `i` brings to `position`, on a surface facing `normal` or in
+ * a volume, as `response` says, shaped by its cone, its image and its reach, and
+ * hidden by the map, but not by how the point faces it; `direction` is set to the
+ * unit vector towards the light.
  */
-vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 direction) {
+vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, int response,
+                           out vec3 direction) {
 	direction = vec3(0.0, 0.0, 1.0);
 
 	vec4 originReach = dynamicLights[i].originReach;
@@ -179,8 +200,9 @@ vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 directio
 
 	direction = toLight / max(distance, 1.0e-6);
 
-	// A surface facing away gets nothing.
-	if (dot(direction, normal) <= 0.0)
+	// A surface facing away gets nothing; a volume takes light from all around.
+	bool surface = response != DYNAMIC_LIGHT_SCATTERED;
+	if (surface && dot(direction, normal) <= 0.0)
 		return vec3(0.0);
 
 	vec3 image = vec3(1.0);
@@ -208,22 +230,29 @@ vec3 DynamicLightIncidence(uint i, vec3 position, vec3 normal, out vec3 directio
 	float attenuation = reachLeft * reachLeft;
 
 	// Last, as it is the dearest part
-	float visibility = DynamicLightMapVisibility(i, position, normal, lightPosition);
+	float visibility = surface ? DynamicLightMapVisibility(i, position, normal, lightPosition)
+	                           : DynamicLightVolumeVisibility(position, lightPosition);
 
 	return colorReachInversed.xyz * (attenuation * coneFalloff * visibility) * image;
 }
 
 /**
- * The light light `i` brings to `position`, on a surface facing `normal`: diffuse,
- * with `shininess` 0, or else the Phong highlight of exponent `shininess` it makes
- * along `reflected`, the eye's ray mirrored by the surface, normalized for it, so a
- * tighter highlight is a brighter one.
+ * The light light `i` brings to `position`, facing `normal`, as `response` says:
+ * diffuse; the Phong highlight of exponent `shininess` it makes along `reflected`,
+ * the eye's ray mirrored by the surface, normalized for it, so a tighter highlight
+ * is a brighter one; or scattered through a volume, wrapping around it, brightest
+ * on the side facing the light and half as bright square to it.
  */
-vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal, vec3 reflected, float shininess) {
+vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal, vec3 reflected,
+                          float shininess, int response) {
 	vec3 direction;
-	vec3 incidence = DynamicLightIncidence(i, position, normal, direction);
-	float cosIncidence = max(dot(direction, normal), 0.0);
-	if (shininess <= 0.0)
+	vec3 incidence = DynamicLightIncidence(i, position, normal, response, direction);
+	float cosIncidence = dot(direction, normal);
+	if (response == DYNAMIC_LIGHT_SCATTERED)
+		return incidence * (cosIncidence * 0.5 + 0.5);
+
+	cosIncidence = max(cosIncidence, 0.0);
+	if (response == DYNAMIC_LIGHT_DIFFUSE)
 		return incidence * cosIncidence;
 
 	float normalization = (shininess + 2.0) * (1.0 / (2.0 * 3.14159265));
@@ -236,7 +265,8 @@ vec3 EvaluateDynamicLight(uint i, vec3 position, vec3 normal, vec3 reflected, fl
  * cluster lists, or every light of the frame where it lies outside the view the
  * clusters cut up.
  */
-vec3 EvaluateDynamicLightsAt(vec3 position, vec3 normal, vec3 reflected, float shininess) {
+vec3 EvaluateDynamicLightsAt(vec3 position, vec3 normal, vec3 reflected, float shininess,
+                             int response) {
 	uvec4 counts = dynamicLightFrame.counts;
 	if (counts.w == 0u)
 		return vec3(0.0);
@@ -261,12 +291,12 @@ vec3 EvaluateDynamicLightsAt(vec3 position, vec3 normal, vec3 reflected, float s
 				uint bit = uint(findLSB(mask));
 				mask &= mask - 1u;
 				light += EvaluateDynamicLight(word * 32u + bit, position, normal, reflected,
-				                              shininess);
+				                              shininess, response);
 			}
 		}
 	} else {
 		for (uint i = 0u; i < counts.w; i++)
-			light += EvaluateDynamicLight(i, position, normal, reflected, shininess);
+			light += EvaluateDynamicLight(i, position, normal, reflected, shininess, response);
 	}
 	return light;
 }
@@ -274,7 +304,7 @@ vec3 EvaluateDynamicLightsAt(vec3 position, vec3 normal, vec3 reflected, float s
 /** The light every dynamic light of the frame casts on `position`, facing `normal`
  * (unit length), where the map doesn't hide it. */
 vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
-	return EvaluateDynamicLightsAt(position, normal, vec3(0.0), 0.0);
+	return EvaluateDynamicLightsAt(position, normal, vec3(0.0), 0.0, DYNAMIC_LIGHT_DIFFUSE);
 }
 
 /**
@@ -285,7 +315,17 @@ vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
  * term.
  */
 vec3 EvaluateDynamicLightsSpecular(vec3 position, vec3 normal, vec3 reflected, float shininess) {
-	return EvaluateDynamicLightsAt(position, normal, reflected, shininess);
+	return EvaluateDynamicLightsAt(position, normal, reflected, shininess,
+	                               DYNAMIC_LIGHT_SPECULAR);
+}
+
+/**
+ * The light every dynamic light of the frame scatters through a translucent volume
+ * at `position`, such as a puff of smoke, whose bulge faces `normal` (unit length)
+ * there, where the map doesn't hide it.
+ */
+vec3 EvaluateDynamicLightsScattered(vec3 position, vec3 normal) {
+	return EvaluateDynamicLightsAt(position, normal, vec3(0.0), 0.0, DYNAMIC_LIGHT_SCATTERED);
 }
 
 #endif
