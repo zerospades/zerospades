@@ -24,9 +24,11 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "VulkanPostProcessFilter.h"
+#include <Core/RefCountedObject.h>
 
 namespace spades {
 	namespace draw {
+		class VulkanBuffer;
 
 		// Fog filter.
 		//
@@ -58,7 +60,7 @@ namespace spades {
 			VkRenderPass ppRenderPass;
 
 			VkDescriptorSetLayout triSamplerDSL; // bindings 0..3 (Fog1, +coarse shadow)
-			VkDescriptorSetLayout fog2DSL;       // bindings 0..7 (Fog2: +AO+4 radiosity)
+			VkDescriptorSetLayout fog2DSL;       // bindings 0..7 (Fog2: +AO+4 radiosity), 8 its parameters
 
 			// Fog2 (default, r_fogShadow == 2)
 			VkPipelineLayout fogLayout;
@@ -71,6 +73,8 @@ namespace spades {
 			static constexpr int MAX_FRAME_SLOTS = 2;
 			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
 			std::vector<VkFramebuffer> perFrameFramebuffers[MAX_FRAME_SLOTS];
+			// Fog2's parameters of the frame, written once the GPU is done with them
+			Handle<VulkanBuffer> fog2Parameters[MAX_FRAME_SLOTS];
 
 			std::uint32_t frameCounter = 0;
 
