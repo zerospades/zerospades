@@ -19,83 +19,137 @@
  */
 
 #include "VulkanLongSpriteRenderer.h"
-#include "VulkanSpirvCache.h"
-#include "VulkanRenderer.h"
-#include "VulkanImage.h"
-#include "VulkanBuffer.h"
-#include "VulkanShader.h"
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+
 #include "../SW/SWFeatureLevel.h" // for fastRcp
-#include <Gui/SDLVulkanDevice.h>
+#include "VulkanBuffer.h"
+#include "VulkanImage.h"
+#include "VulkanRenderer.h"
+#include "VulkanSceneLights.h"
+#include "VulkanSpirvCache.h"
+#include "VulkanSpriteRenderer.h"
 #include <Core/Debug.h>
 #include <Core/Exception.h>
-#include <Core/FileManager.h>
-#include <Core/IStream.h>
-#include <algorithm>
-#include <cstring>
+#include <Gui/SDLVulkanDevice.h>
 
 namespace spades {
 	namespace draw {
 		namespace {
-			// Push-constant block shared by LongSprite.vert / .frag. Vulkan's std430
-			// layout aligns each vec3 to 16 bytes, so the explicit trailing floats pad
-			// the vec3s up to match the shader exactly. Both the pipeline's
-			// pushConstantRange size and the vkCmdPushConstants size use
-			// sizeof(LongSpritePushConstants), so they can never disagree — a previous
-			// undersized range left fogDistance outside the declared range, which
-			// AMD/amdvlk drops (-> fogDistance garbage -> density clamps to 1 -> the
-			// reflex reticle fogged out to invisible), while MoltenVK tolerated it.
-			struct LongSpritePushConstants {
-				Matrix4 projectionViewMatrix;
-				Matrix4 viewMatrix;
-				Vector3 rightVector;       float padding1;
-				Vector3 upVector;          float padding2;
-				Vector3 viewOriginVector;  float padding3;
-				Vector3 fogColor;          float fogDistance;
+			/** `SpriteView` of `SpriteView.glsl`, std140 */
+			struct GpuView {
+				float projectionView[16];
+				float right[4];
+				float up[4];
+				float front[4];
+				float eye[4];
+				float fogColorDistance[4];
+				float nearFar[4];
+				float sunDirection[4];
 			};
+			static_assert(sizeof(GpuView) == 176, "GpuView must match SpriteView");
+
+			/** The fewest vertices and indices a frame's buffers are made for */
+			constexpr std::size_t kInitialVertexCapacity = 1024;
+			constexpr std::size_t kInitialIndexCapacity = 1536;
+
+			/** The most images a frame's long sprites use, a descriptor set each */
+			constexpr std::uint32_t kMaxImagesPerFrame = 256;
+
+			void Store(float (&out)[4], const Vector3& v, float w) {
+				out[0] = v.x;
+				out[1] = v.y;
+				out[2] = v.z;
+				out[3] = w;
+			}
+
+			VkShaderModule CreateModule(VkDevice device, const char* path) {
+				const std::vector<std::uint32_t> code = SpirvCache::Load(path);
+				VkShaderModuleCreateInfo info{};
+				info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+				info.codeSize = code.size() * sizeof(std::uint32_t);
+				info.pCode = code.data();
+				VkShaderModule module;
+				if (vkCreateShaderModule(device, &info, nullptr, &module) != VK_SUCCESS)
+					SPRaise("Failed to create shader module: %s", path);
+				return module;
+			}
+
+			/** A buffer of `size` bytes the CPU writes for good, `usage` as given */
+			Handle<VulkanBuffer> MakeHostBuffer(const Handle<gui::SDLVulkanDevice>& device,
+			                                    VkDeviceSize size, VkBufferUsageFlags usage) {
+				Handle<VulkanBuffer> buffer = Handle<VulkanBuffer>::New(
+				  device, size, usage,
+				  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+				buffer->Map();
+				return buffer;
+			}
+
+			/** Twice as many as asked for once `current` is too few, not to grow again
+			 * for every few more */
+			std::size_t GrownCapacity(std::size_t current, std::size_t initial, std::size_t needed) {
+				std::size_t capacity = std::max(current, initial);
+				while (capacity < needed)
+					capacity *= 2;
+				return capacity;
+			}
 		} // namespace
 
 		VulkanLongSpriteRenderer::VulkanLongSpriteRenderer(VulkanRenderer& r)
-		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.GetDevice().Unmanage())),
-		      lastImage(nullptr),
-		      pipeline(VK_NULL_HANDLE),
-		      pipelineLayout(VK_NULL_HANDLE),
-		      descriptorSetLayout(VK_NULL_HANDLE) {
+		    : renderer(r), device(r.GetDevice()) {
 			SPADES_MARK_FUNCTION();
 
-			const auto& swapchainImageViews = device->GetSwapchainImageViews();
-			perFrameDescriptorPools.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
-			perFrameBuffers.resize(swapchainImageViews.size());
-			perFrameImages.resize(swapchainImageViews.size());
+			// The sprite's set, as the sprites lay it out: its view and its image
+			const std::array<VkDescriptorSetLayoutBinding, 2> bindings{{
+			  {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+			   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+			  {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+			}};
+			VkDescriptorSetLayoutCreateInfo layoutInfo{};
+			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			layoutInfo.bindingCount = static_cast<std::uint32_t>(bindings.size());
+			layoutInfo.pBindings = bindings.data();
+			if (vkCreateDescriptorSetLayout(device->GetDevice(), &layoutInfo, nullptr,
+			                                &spriteSetLayout) != VK_SUCCESS)
+				SPRaise("Failed to create the long sprite descriptor set layout");
 
-			CreatePipeline();
-			CreateDescriptorSet();
+			frames.resize(device->GetMaxFramesInFlight());
+			for (FrameResources& frame : frames)
+				CreateFrameResources(frame);
 		}
 
 		VulkanLongSpriteRenderer::~VulkanLongSpriteRenderer() {
 			SPADES_MARK_FUNCTION();
 
 			VkDevice vkDevice = device->GetDevice();
-
-			for (auto pool : perFrameDescriptorPools) {
-				if (pool != VK_NULL_HANDLE) {
-					vkDestroyDescriptorPool(vkDevice, pool, nullptr);
-				}
-			}
-			for (auto& frameImages : perFrameImages) {
-				for (auto* img : frameImages) {
-					img->Release();
-				}
-			}
-			if (pipeline != VK_NULL_HANDLE) {
+			for (FrameResources& frame : frames)
+				if (frame.descriptorPool != VK_NULL_HANDLE)
+					vkDestroyDescriptorPool(vkDevice, frame.descriptorPool, nullptr);
+			if (pipeline != VK_NULL_HANDLE)
 				vkDestroyPipeline(vkDevice, pipeline, nullptr);
-			}
-			if (pipelineLayout != VK_NULL_HANDLE) {
+			if (pipelineLayout != VK_NULL_HANDLE)
 				vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
-			}
-			if (descriptorSetLayout != VK_NULL_HANDLE) {
-				vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
-			}
+			if (spriteSetLayout != VK_NULL_HANDLE)
+				vkDestroyDescriptorSetLayout(vkDevice, spriteSetLayout, nullptr);
+		}
+
+		void VulkanLongSpriteRenderer::CreateFrameResources(FrameResources& frame) {
+			frame.view = MakeHostBuffer(device, sizeof(GpuView), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+			const std::array<VkDescriptorPoolSize, 2> poolSizes{{
+			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kMaxImagesPerFrame},
+			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxImagesPerFrame},
+			}};
+			VkDescriptorPoolCreateInfo poolInfo{};
+			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			poolInfo.maxSets = kMaxImagesPerFrame;
+			poolInfo.poolSizeCount = static_cast<std::uint32_t>(poolSizes.size());
+			poolInfo.pPoolSizes = poolSizes.data();
+			if (vkCreateDescriptorPool(device->GetDevice(), &poolInfo, nullptr,
+			                           &frame.descriptorPool) != VK_SUCCESS)
+				SPRaise("Failed to create a long sprite descriptor pool");
 		}
 
 		void VulkanLongSpriteRenderer::CreatePipeline() {
@@ -103,32 +157,30 @@ namespace spades {
 
 			VkDevice vkDevice = device->GetDevice();
 
-			auto LoadSPIRVFile = [](const char* filename) -> std::vector<uint32_t> {
-				return SpirvCache::Load(filename);
-			};
+			// The sprite's set comes after the lit pipelines' three, as the sprites'.
+			const VkDescriptorSetLayout empty = renderer.GetSceneLights().GetEmptySetLayout();
+			const std::array<VkDescriptorSetLayout, VulkanSpriteRenderer::SpriteSet + 1> setLayouts{
+			  {empty, empty, empty, spriteSetLayout}};
+			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+			pipelineLayoutInfo.setLayoutCount = static_cast<std::uint32_t>(setLayouts.size());
+			pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+			if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
+			    VK_SUCCESS)
+				SPRaise("Failed to create the long sprite pipeline layout");
 
-			std::vector<uint32_t> vertCode = LoadSPIRVFile("Shaders/Vulkan/LongSprite.vert.spv");
-			std::vector<uint32_t> fragCode = LoadSPIRVFile("Shaders/Vulkan/LongSprite.frag.spv");
+			VkShaderModule vertexModule = CreateModule(vkDevice, "Shaders/Vulkan/LongSprite.vert.spv");
+			VkShaderModule fragmentModule = CreateModule(vkDevice, "Shaders/Vulkan/LongSprite.frag.spv");
 
-			Handle<VulkanShader> vertShader(new VulkanShader(device, VulkanShader::VertexShader, "LongSprite.vert"), false);
-			Handle<VulkanShader> fragShader(new VulkanShader(device, VulkanShader::FragmentShader, "LongSprite.frag"), false);
-
-			vertShader->LoadSPIRV(vertCode);
-			fragShader->LoadSPIRV(fragCode);
-
-			VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-			vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-			vertShaderStageInfo.module = vertShader->GetShaderModule();
-			vertShaderStageInfo.pName = "main";
-
-			VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-			fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-			fragShaderStageInfo.module = fragShader->GetShaderModule();
-			fragShaderStageInfo.pName = "main";
-
-			VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+			std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages{};
+			shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+			shaderStages[0].module = vertexModule;
+			shaderStages[0].pName = "main";
+			shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+			shaderStages[1].module = fragmentModule;
+			shaderStages[1].pName = "main";
 
 			// Vertex format: position(3) + pad(1) + texCoord(2) + color(4) = 10 floats
 			VkVertexInputBindingDescription bindingDescription{};
@@ -136,68 +188,49 @@ namespace spades {
 			bindingDescription.stride = sizeof(Vertex);
 			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-			VkVertexInputAttributeDescription attributeDescriptions[3]{};
-			// position
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(Vertex, x);
-
-			// texCoord
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(Vertex, u);
-
-			// color
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(Vertex, r);
+			const std::array<VkVertexInputAttributeDescription, 3> attributes{{
+			  {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x)},
+			  {1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u)},
+			  {2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r)},
+			}};
 
 			VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 			vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 			vertexInputInfo.vertexBindingDescriptionCount = 1;
 			vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-			vertexInputInfo.vertexAttributeDescriptionCount = 3;
-			vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
+			vertexInputInfo.vertexAttributeDescriptionCount =
+			  static_cast<std::uint32_t>(attributes.size());
+			vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
 
 			VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 			inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 			inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-			inputAssembly.primitiveRestartEnable = VK_FALSE;
 
 			VkPipelineViewportStateCreateInfo viewportState{};
 			viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 			viewportState.viewportCount = 1;
-			viewportState.pViewports = nullptr;
 			viewportState.scissorCount = 1;
-			viewportState.pScissors = nullptr;
 
 			VkPipelineRasterizationStateCreateInfo rasterizer{};
 			rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-			rasterizer.depthClampEnable = VK_FALSE;
-			rasterizer.rasterizerDiscardEnable = VK_FALSE;
 			rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 			rasterizer.lineWidth = 1.0f;
 			rasterizer.cullMode = VK_CULL_MODE_NONE; // No culling for sprites
 			rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-			rasterizer.depthBiasEnable = VK_FALSE;
 
 			VkPipelineMultisampleStateCreateInfo multisampling{};
 			multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-			multisampling.sampleShadingEnable = VK_FALSE;
 			// Match the scene render pass sample count (MSAA).
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
+			// Tested against the scene's depth, which they leave as it is
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
 			depthStencil.depthWriteEnable = VK_FALSE;
 			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-			depthStencil.depthBoundsTestEnable = VK_FALSE;
-			depthStencil.stencilTestEnable = VK_FALSE;
 
+			// Premultiplied alpha
 			VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 			colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 			                                      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -211,61 +244,20 @@ namespace spades {
 
 			VkPipelineColorBlendStateCreateInfo colorBlending{};
 			colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-			colorBlending.logicOpEnable = VK_FALSE;
 			colorBlending.attachmentCount = 1;
 			colorBlending.pAttachments = &colorBlendAttachment;
 
-			VkDynamicState dynamicStates[] = {
-				VK_DYNAMIC_STATE_VIEWPORT,
-				VK_DYNAMIC_STATE_SCISSOR
-			};
-
+			const std::array<VkDynamicState, 2> dynamicStates{
+			  {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR}};
 			VkPipelineDynamicStateCreateInfo dynamicState{};
 			dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-			dynamicState.dynamicStateCount = 2;
-			dynamicState.pDynamicStates = dynamicStates;
-
-			VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-			samplerLayoutBinding.binding = 0;
-			samplerLayoutBinding.descriptorCount = 1;
-			samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			samplerLayoutBinding.pImmutableSamplers = nullptr;
-			samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			VkDescriptorSetLayoutCreateInfo layoutInfo{};
-			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			layoutInfo.bindingCount = 1;
-			layoutInfo.pBindings = &samplerLayoutBinding;
-
-			VkResult result = vkCreateDescriptorSetLayout(vkDevice, &layoutInfo, nullptr, &descriptorSetLayout);
-			if (result != VK_SUCCESS) {
-				SPRaise("Failed to create descriptor set layout (error code: %d)", result);
-			}
-
-			// Same push constant layout as the sprite renderer
-			VkPushConstantRange pushConstantRange{};
-			pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			pushConstantRange.offset = 0;
-			// Must cover the full std430-padded block (the trailing fogDistance lives
-			// at offset 188); an undersized range made amdvlk drop it.
-			pushConstantRange.size = sizeof(LongSpritePushConstants);
-
-			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipelineLayoutInfo.setLayoutCount = 1;
-			pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-			pipelineLayoutInfo.pushConstantRangeCount = 1;
-			pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-
-			result = vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout);
-			if (result != VK_SUCCESS) {
-				SPRaise("Failed to create pipeline layout (error code: %d)", result);
-			}
+			dynamicState.dynamicStateCount = static_cast<std::uint32_t>(dynamicStates.size());
+			dynamicState.pDynamicStates = dynamicStates.data();
 
 			VkGraphicsPipelineCreateInfo pipelineInfo{};
 			pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-			pipelineInfo.stageCount = 2;
-			pipelineInfo.pStages = shaderStages;
+			pipelineInfo.stageCount = static_cast<std::uint32_t>(shaderStages.size());
+			pipelineInfo.pStages = shaderStages.data();
 			pipelineInfo.pVertexInputState = &vertexInputInfo;
 			pipelineInfo.pInputAssemblyState = &inputAssembly;
 			pipelineInfo.pViewportState = &viewportState;
@@ -278,34 +270,12 @@ namespace spades {
 			pipelineInfo.renderPass = renderer.GetOffscreenRenderPass();
 			pipelineInfo.subpass = 0;
 
-			result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1, &pipelineInfo, nullptr, &pipeline);
-			if (result != VK_SUCCESS) {
-				SPRaise("Failed to create graphics pipeline (error code: %d)", result);
-			}
-		}
-
-		void VulkanLongSpriteRenderer::CreateDescriptorSet() {
-			SPADES_MARK_FUNCTION();
-
-			VkDevice vkDevice = device->GetDevice();
-
-			VkDescriptorPoolSize poolSize{};
-			poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			poolSize.descriptorCount = 1000;
-
-			VkDescriptorPoolCreateInfo poolInfo{};
-			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			poolInfo.poolSizeCount = 1;
-			poolInfo.pPoolSizes = &poolSize;
-			poolInfo.maxSets = 1000;
-			poolInfo.flags = 0;
-
-			for (size_t i = 0; i < perFrameDescriptorPools.size(); i++) {
-				VkResult result = vkCreateDescriptorPool(vkDevice, &poolInfo, nullptr, &perFrameDescriptorPools[i]);
-				if (result != VK_SUCCESS) {
-					SPRaise("Failed to create descriptor pool for frame %zu (error code: %d)", i, result);
-				}
-			}
+			const VkResult result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(),
+			                                                  1, &pipelineInfo, nullptr, &pipeline);
+			vkDestroyShaderModule(vkDevice, vertexModule, nullptr);
+			vkDestroyShaderModule(vkDevice, fragmentModule, nullptr);
+			if (result != VK_SUCCESS)
+				SPRaise("Failed to create the long sprite pipeline (error code: %d)", result);
 		}
 
 		void VulkanLongSpriteRenderer::Add(VulkanImage *img, Vector3 p1, Vector3 p2,
@@ -339,155 +309,62 @@ namespace spades {
 		void VulkanLongSpriteRenderer::Clear() {
 			SPADES_MARK_FUNCTION();
 			sprites.clear();
-			vertices.clear();
-			indices.clear();
-			lastImage = nullptr;
 		}
 
-		void VulkanLongSpriteRenderer::Flush(VkCommandBuffer commandBuffer, uint32_t frameIndex) {
-			SPADES_MARK_FUNCTION();
-
-			if (vertices.empty() || indices.empty())
-				return;
-
-			if (pipeline == VK_NULL_HANDLE)
-				return;
-
-			if (!lastImage)
-				return;
+		VkDescriptorSet VulkanLongSpriteRenderer::GetImageSet(FrameResources& frame,
+		                                                      VulkanImage& image) {
+			auto found = frame.imageSets.find(&image);
+			if (found != frame.imageSets.end())
+				return found->second;
 
 			VkDevice vkDevice = device->GetDevice();
-
-			size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
-			Handle<VulkanBuffer> vertexBuffer(
-				new VulkanBuffer(device, vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-				                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-				false);
-			vertexBuffer->UpdateData(vertices.data(), vertexBufferSize);
-			perFrameBuffers[frameIndex].push_back(vertexBuffer);
-
-			size_t indexBufferSize = indices.size() * sizeof(uint32_t);
-			Handle<VulkanBuffer> indexBuffer(
-				new VulkanBuffer(device, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-				                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-				false);
-			indexBuffer->UpdateData(indices.data(), indexBufferSize);
-			perFrameBuffers[frameIndex].push_back(indexBuffer);
-
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-			VkBuffer vb = vertexBuffer->GetBuffer();
-			VkDeviceSize offsets[] = {0};
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
-
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
 			VkDescriptorSetAllocateInfo allocInfo{};
 			allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			allocInfo.descriptorPool = perFrameDescriptorPools[frameIndex];
+			allocInfo.descriptorPool = frame.descriptorPool;
 			allocInfo.descriptorSetCount = 1;
-			allocInfo.pSetLayouts = &descriptorSetLayout;
+			allocInfo.pSetLayouts = &spriteSetLayout;
+			VkDescriptorSet set;
+			if (vkAllocateDescriptorSets(vkDevice, &allocInfo, &set) != VK_SUCCESS)
+				SPRaise("Failed to allocate a long sprite descriptor set: more than %u images",
+				        kMaxImagesPerFrame);
 
-			VkDescriptorSet descriptorSet;
-			VkResult result = vkAllocateDescriptorSets(vkDevice, &allocInfo, &descriptorSet);
-			if (result != VK_SUCCESS) {
-				SPLog("Failed to allocate descriptor set (error code: %d)", result);
-				vertices.clear();
-				indices.clear();
-				return;
+			const VkDescriptorBufferInfo viewInfo{frame.view->GetBuffer(), 0, VK_WHOLE_SIZE};
+			const VkDescriptorImageInfo imageInfo{image.GetSampler(), image.GetImageView(),
+			                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+			std::array<VkWriteDescriptorSet, 2> writes{};
+			for (VkWriteDescriptorSet& write : writes) {
+				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				write.dstSet = set;
+				write.descriptorCount = 1;
 			}
+			writes[0].dstBinding = 0;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writes[0].pBufferInfo = &viewInfo;
+			writes[1].dstBinding = 1;
+			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[1].pImageInfo = &imageInfo;
+			vkUpdateDescriptorSets(vkDevice, static_cast<std::uint32_t>(writes.size()), writes.data(),
+			                       0, nullptr);
 
-			VkImageView imageView = lastImage->GetImageView();
-			VkSampler sampler = lastImage->GetSampler();
-
-			if (imageView == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE) {
-				SPLog("Warning: Invalid image view or sampler, skipping");
-				vertices.clear();
-				indices.clear();
-				return;
-			}
-
-			VkDescriptorImageInfo imageInfo{};
-			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo.imageView = imageView;
-			imageInfo.sampler = sampler;
-
-			VkWriteDescriptorSet descriptorWrite{};
-			descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			descriptorWrite.dstSet = descriptorSet;
-			descriptorWrite.dstBinding = 0;
-			descriptorWrite.dstArrayElement = 0;
-			descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descriptorWrite.descriptorCount = 1;
-			descriptorWrite.pImageInfo = &imageInfo;
-
-			vkUpdateDescriptorSets(vkDevice, 1, &descriptorWrite, 0, nullptr);
-
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			                        0, 1, &descriptorSet, 0, nullptr);
-
-			LongSpritePushConstants pushConstants;
-
-			const Matrix4& projViewMatrix = renderer.GetProjectionViewMatrix();
-			Vector3 fogCol = renderer.GetFogColor();
-			fogCol *= fogCol; // linearize
-			float fogDist = renderer.GetFogDistance();
-			const client::SceneDefinition& sceneDef = renderer.GetSceneDef();
-
-			pushConstants.projectionViewMatrix = projViewMatrix;
-			pushConstants.viewMatrix = Matrix4::Identity();
-			pushConstants.rightVector = sceneDef.viewAxis[0];
-			pushConstants.upVector = sceneDef.viewAxis[1];
-			pushConstants.viewOriginVector = sceneDef.viewOrigin;
-			pushConstants.fogColor = fogCol;
-			pushConstants.fogDistance = fogDist;
-
-			vkCmdPushConstants(commandBuffer, pipelineLayout,
-			                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(pushConstants), &pushConstants);
-
-			vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
-
-			lastImage->AddRef();
-			perFrameImages[frameIndex].push_back(lastImage);
-
-			vertices.clear();
-			indices.clear();
+			frame.imageSets.emplace(&image, set);
+			frame.images.push_back(Handle<VulkanImage>(&image));
+			return set;
 		}
 
-		void VulkanLongSpriteRenderer::Render(VkCommandBuffer commandBuffer, uint32_t frameIndex) {
-			SPADES_MARK_FUNCTION();
+		void VulkanLongSpriteRenderer::BuildGeometry() {
+			vertices.clear();
+			indices.clear();
+			batches.clear();
 
-			if (sprites.empty())
-				return;
-
-			VkDevice vkDevice = device->GetDevice();
-
-			// Clear resources from this frame (GPU has finished with them due to fence wait)
-			perFrameBuffers[frameIndex].clear();
-
-			// Release images from previous use of this frame
-			for (auto* img : perFrameImages[frameIndex]) {
-				img->Release();
-			}
-			perFrameImages[frameIndex].clear();
-
-			// Reset descriptor pool for this frame
-			vkResetDescriptorPool(vkDevice, perFrameDescriptorPools[frameIndex], 0);
-
-			// Sort sprites by image to minimize batch breaks and descriptor set allocations
-			std::sort(sprites.begin(), sprites.end(),
-			          [](const Sprite& a, const Sprite& b) { return a.image < b.image; });
-
-			const client::SceneDefinition &def = renderer.GetSceneDef();
+			const client::SceneDefinition& def = renderer.GetSceneDef();
 
 			for (size_t i = 0; i < sprites.size(); i++) {
 				Sprite spr = sprites[i];
 
-				if (spr.image != lastImage) {
-					Flush(commandBuffer, frameIndex);
-					lastImage = spr.image;
-				}
+				// A run of sprites sharing an image is drawn at once.
+				if (batches.empty() || batches.back().image != spr.image)
+					batches.push_back({spr.image, static_cast<std::uint32_t>(indices.size()), 0});
 
 				Vertex v;
 				v.pad = 0;
@@ -668,10 +545,85 @@ namespace spades {
 				}
 			}
 
-			Flush(commandBuffer, frameIndex);
-
-			Clear();
+			// The runs' ends: each one's indices run up to where the next's begin.
+			for (std::size_t i = 0; i < batches.size(); i++) {
+				const std::uint32_t end = i + 1 < batches.size()
+				                            ? batches[i + 1].firstIndex
+				                            : static_cast<std::uint32_t>(indices.size());
+				batches[i].indexCount = end - batches[i].firstIndex;
+			}
 		}
 
+		void VulkanLongSpriteRenderer::Render(VkCommandBuffer commandBuffer, std::size_t frameSlot) {
+			SPADES_MARK_FUNCTION();
+
+			SPAssert(frameSlot < frames.size());
+			FrameResources& frame = frames[frameSlot];
+
+			// What the frame drew with last time is done with: its fence was waited for.
+			vkResetDescriptorPool(device->GetDevice(), frame.descriptorPool, 0);
+			frame.imageSets.clear();
+			frame.images.clear();
+
+			BuildGeometry();
+			Clear();
+			if (indices.empty())
+				return;
+
+			if (pipeline == VK_NULL_HANDLE)
+				CreatePipeline();
+
+			// The view, the same for every sprite
+			const client::SceneDefinition& def = renderer.GetSceneDef();
+			Vector3 fogColor = renderer.GetFogColor();
+			fogColor *= fogColor; // linearize
+			GpuView view{};
+			std::memcpy(view.projectionView, renderer.GetProjectionViewMatrix().m,
+			            sizeof(view.projectionView));
+			Store(view.right, def.viewAxis[0], 0.0F);
+			Store(view.up, def.viewAxis[1], 0.0F);
+			Store(view.front, def.viewAxis[2], 0.0F);
+			Store(view.eye, def.viewOrigin, 1.0F);
+			Store(view.fogColorDistance, fogColor, renderer.GetFogDistance());
+			view.nearFar[0] = def.zNear;
+			view.nearFar[1] = def.zFar;
+			Store(view.sunDirection, renderer.GetSunDirection(), 0.0F);
+			std::memcpy(frame.view->Map(), &view, sizeof(view));
+
+			// The geometry, into the frame's buffers, grown when too small
+			if (vertices.size() > frame.vertexCapacity) {
+				frame.vertexCapacity =
+				  GrownCapacity(frame.vertexCapacity, kInitialVertexCapacity, vertices.size());
+				frame.vertexBuffer = MakeHostBuffer(device, sizeof(Vertex) * frame.vertexCapacity,
+				                                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			}
+			if (indices.size() > frame.indexCapacity) {
+				frame.indexCapacity =
+				  GrownCapacity(frame.indexCapacity, kInitialIndexCapacity, indices.size());
+				frame.indexBuffer =
+				  MakeHostBuffer(device, sizeof(std::uint32_t) * frame.indexCapacity,
+				                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+			}
+			std::memcpy(frame.vertexBuffer->Map(), vertices.data(), sizeof(Vertex) * vertices.size());
+			std::memcpy(frame.indexBuffer->Map(), indices.data(),
+			            sizeof(std::uint32_t) * indices.size());
+
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+			const VkBuffer vertexBuffer = frame.vertexBuffer->GetBuffer();
+			const VkDeviceSize offset = 0;
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &offset);
+			vkCmdBindIndexBuffer(commandBuffer, frame.indexBuffer->GetBuffer(), 0,
+			                     VK_INDEX_TYPE_UINT32);
+
+			for (const Batch& batch : batches) {
+				if (batch.indexCount == 0)
+					continue;
+				const VkDescriptorSet set = GetImageSet(frame, *batch.image);
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				                        pipelineLayout, VulkanSpriteRenderer::SpriteSet, 1, &set, 0,
+				                        nullptr);
+				vkCmdDrawIndexed(commandBuffer, batch.indexCount, 1, batch.firstIndex, 0, 0);
+			}
+		}
 	} // namespace draw
 } // namespace spades

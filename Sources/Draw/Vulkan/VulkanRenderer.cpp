@@ -2145,7 +2145,7 @@ namespace spades {
 				if (!useSoftParticles && spriteRenderer)
 					spriteRenderer->Render(commandBuffer, currentFrameSlot);
 				if (longSpriteRenderer)
-					longSpriteRenderer->Render(commandBuffer, imageIndex);
+					longSpriteRenderer->Render(commandBuffer, currentFrameSlot);
 				RenderDebugLines(commandBuffer);
 				debugLines.clear();
 			}
@@ -2339,7 +2339,7 @@ namespace spades {
 					if (!useSoftParticles && spriteRenderer)
 						spriteRenderer->Render(commandBuffer, currentFrameSlot);
 					if (longSpriteRenderer)
-						longSpriteRenderer->Render(commandBuffer, imageIndex);
+						longSpriteRenderer->Render(commandBuffer, currentFrameSlot);
 					RenderDebugLines(commandBuffer);
 					debugLines.clear();
 				}

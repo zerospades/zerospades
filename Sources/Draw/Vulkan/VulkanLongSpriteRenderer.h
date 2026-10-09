@@ -20,7 +20,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Core/Math.h>
@@ -36,9 +38,19 @@ namespace spades {
 		class VulkanImage;
 		class VulkanBuffer;
 
+		/**
+		 * Draws the scene's long sprites (`IRenderer::AddLongSprite`): tracers and the
+		 * reflex sights' reticles, stretched along a segment between two caps.
+		 *
+		 * Their geometry depends on how the segment lies on screen, so it is built
+		 * here, as GL builds it, into the vertex and index buffers of the frame in
+		 * flight, once a frame; each run of sprites sharing an image is one draw, in
+		 * the order they were added, as their blending needs. They read the view from
+		 * the sprites' own set (`SpriteView.glsl`).
+		 */
 		class VulkanLongSpriteRenderer : public RefCountedObject {
 			struct Sprite {
-				VulkanImage *image;
+				VulkanImage* image;
 				Vector3 start;
 				Vector3 end;
 				float radius;
@@ -51,41 +63,71 @@ namespace spades {
 				float u, v;
 				float r, g, b, a;
 
-				void operator=(const Vector3 &vec) {
+				void operator=(const Vector3& vec) {
 					x = vec.x;
 					y = vec.y;
 					z = vec.z;
 				}
 			};
 
-			VulkanRenderer &renderer;
+			/** A run of sprites sharing an image, as indices of the frame's buffer */
+			struct Batch {
+				VulkanImage* image;
+				std::uint32_t firstIndex;
+				std::uint32_t indexCount;
+			};
+
+			/** What a frame in flight draws with, written only once the GPU is done
+			 * with its previous frame */
+			struct FrameResources {
+				Handle<VulkanBuffer> vertexBuffer;
+				std::size_t vertexCapacity = 0;
+				Handle<VulkanBuffer> indexBuffer;
+				std::size_t indexCapacity = 0;
+				Handle<VulkanBuffer> view;
+				VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+				/** The image sets allocated this frame, and the images they hold */
+				std::unordered_map<VulkanImage*, VkDescriptorSet> imageSets;
+				std::vector<Handle<VulkanImage>> images;
+			};
+
+			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 			std::vector<Sprite> sprites;
 
-			VulkanImage *lastImage;
-
+			// Built anew every frame, kept not to allocate them again
 			std::vector<Vertex> vertices;
-			std::vector<uint32_t> indices;
+			std::vector<std::uint32_t> indices;
+			std::vector<Batch> batches;
 
-			VkPipeline pipeline;
-			VkPipelineLayout pipelineLayout;
-			VkDescriptorSetLayout descriptorSetLayout;
+			VkPipeline pipeline = VK_NULL_HANDLE;
+			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+			/** The sprite's set: its view and its image */
+			VkDescriptorSetLayout spriteSetLayout = VK_NULL_HANDLE;
 
-			std::vector<VkDescriptorPool> perFrameDescriptorPools;
-			std::vector<std::vector<Handle<VulkanBuffer>>> perFrameBuffers;
-			std::vector<std::vector<VulkanImage*>> perFrameImages;
+			std::vector<FrameResources> frames;
 
 			void CreatePipeline();
-			void CreateDescriptorSet();
-			void Flush(VkCommandBuffer commandBuffer, uint32_t frameIndex);
+			void CreateFrameResources(FrameResources&);
+
+			/** Builds the geometry of the sprites added, as GL does, into `vertices`,
+			 * `indices` and `batches`. */
+			void BuildGeometry();
+
+			/** The set holding `image` for the frame, made the first time it is asked
+			 * for. */
+			VkDescriptorSet GetImageSet(FrameResources&, VulkanImage& image);
 
 		public:
-			VulkanLongSpriteRenderer(VulkanRenderer &);
+			VulkanLongSpriteRenderer(VulkanRenderer&);
 			~VulkanLongSpriteRenderer();
 
-			void Add(VulkanImage *img, Vector3 p1, Vector3 p2, float rad, Vector4 color);
+			void Add(VulkanImage* img, Vector3 p1, Vector3 p2, float rad, Vector4 color);
 			void Clear();
-			void Render(VkCommandBuffer commandBuffer, uint32_t frameIndex);
+
+			/** Records the sprites added since the last `Clear` into the render pass
+			 * under way, with frame slot `frameSlot`'s resources. */
+			void Render(VkCommandBuffer commandBuffer, std::size_t frameSlot);
 		};
 	} // namespace draw
 } // namespace spades
