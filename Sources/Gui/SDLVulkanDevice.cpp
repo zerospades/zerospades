@@ -68,9 +68,6 @@ namespace spades {
 			"VK_LAYER_KHRONOS_validation"
 		};
 
-		static const std::vector<const char*> deviceExtensions = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
 
 		// Debug callback for validation layers
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -84,6 +81,32 @@ namespace spades {
 			}
 
 			return VK_FALSE;
+		}
+
+		const std::vector<const char*>& SDLVulkanDevice::GetRequiredDeviceExtensions() {
+			// The scene is drawn through a viewport of negative height, so that it
+			// comes out the way up GL's does; Vulkan 1.0 allows that only with
+			// VK_KHR_maintenance1.
+			static const std::vector<const char*> extensions = {
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+				VK_KHR_MAINTENANCE1_EXTENSION_NAME
+			};
+			return extensions;
+		}
+
+		bool SDLVulkanDevice::HasRequiredDeviceExtensions(VkPhysicalDevice physicalDevice) {
+			uint32_t count = 0;
+			vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count, nullptr);
+			std::vector<VkExtensionProperties> available(count);
+			if (count > 0)
+				vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+				                                     available.data());
+
+			const std::vector<const char*>& required = GetRequiredDeviceExtensions();
+			std::set<std::string> missing(required.begin(), required.end());
+			for (const VkExtensionProperties& extension : available)
+				missing.erase(extension.extensionName);
+			return missing.empty();
 		}
 
 		SDLVulkanDevice::SDLVulkanDevice(SDL_Window* wnd)
@@ -447,20 +470,7 @@ namespace spades {
 					if (foundGraphics && foundPresent) break;
 				}
 
-				// Check device extension support
-				uint32_t extensionCount;
-				vkEnumerateDeviceExtensionProperties(dev, nullptr, &extensionCount, nullptr);
-
-				std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-				vkEnumerateDeviceExtensionProperties(dev, nullptr, &extensionCount,
-					availableExtensions.data());
-
-				std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-				for (const auto& extension : availableExtensions) {
-					requiredExtensions.erase(extension.extensionName);
-				}
-
-				if (foundGraphics && foundPresent && requiredExtensions.empty()) {
+				if (foundGraphics && foundPresent && HasRequiredDeviceExtensions(dev)) {
 					physicalDevice = dev;
 					SPLog("Selected GPU: %s", properties.deviceName);
 					break;
@@ -571,14 +581,13 @@ namespace spades {
 			createInfo.pQueueCreateInfos = queueCreateInfos.data();
 			createInfo.pEnabledFeatures = &deviceFeatures;
 
-			// Device extensions (swapchain is required)
-			std::vector<const char*> extensions = deviceExtensions;
-#ifdef __APPLE__
-			// MoltenVK requires portability subset extension
-			extensions.push_back("VK_KHR_portability_subset");
-#endif
+			// Device extensions: the required ones, checked when the device was
+			// picked, then the optional ones it has
+			std::vector<const char*> extensions = GetRequiredDeviceExtensions();
 
-			// Probe and enable optional extensions needed by VMA.
+			// Probe and enable optional extensions: those VMA makes use of, and
+			// VK_KHR_portability_subset, which a device that is not fully
+			// conformant (MoltenVK) advertises and must then have enabled.
 			// VK_KHR_dedicated_allocation requires VK_KHR_get_memory_requirements2.
 			{
 				uint32_t extCount = 0;
@@ -590,6 +599,7 @@ namespace spades {
 				bool hasGetMemReq2 = false;
 				bool hasDedicatedAlloc = false;
 				bool hasBindMemory2 = false;
+				bool hasPortabilitySubset = false;
 				for (const auto& ext : availExts) {
 					if (strcmp(ext.extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0)
 						hasGetMemReq2 = true;
@@ -597,7 +607,12 @@ namespace spades {
 						hasDedicatedAlloc = true;
 					if (strcmp(ext.extensionName, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME) == 0)
 						hasBindMemory2 = true;
+					if (strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0)
+						hasPortabilitySubset = true;
 				}
+
+				if (hasPortabilitySubset)
+					extensions.push_back("VK_KHR_portability_subset");
 
 				if (hasGetMemReq2 && hasDedicatedAlloc) {
 					extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
@@ -612,13 +627,8 @@ namespace spades {
 
 			createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 			createInfo.ppEnabledExtensionNames = extensions.data();
-
-			if (enableValidationLayers) {
-				createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-				createInfo.ppEnabledLayerNames = validationLayers.data();
-			} else {
-				createInfo.enabledLayerCount = 0;
-			}
+			// No device layers: they are deprecated, and the instance's layers
+			// apply to every device made from it.
 
 			VkResult result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
 			if (result != VK_SUCCESS) {
