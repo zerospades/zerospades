@@ -26,22 +26,6 @@
 // Driven by r_radiosity at pipeline-creation time.
 layout(constant_id = 0) const int USE_RADIOSITY = 0;
 
-layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
-layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
-layout(set = 0, binding = 2) uniform sampler3D radiosityTextureFlat;
-layout(set = 0, binding = 3) uniform sampler3D radiosityTextureX;
-layout(set = 0, binding = 4) uniform sampler3D radiosityTextureY;
-layout(set = 0, binding = 5) uniform sampler3D radiosityTextureZ;
-layout(set = 0, binding = 6) uniform sampler2D ambientOcclusionAtlas; // Gfx/AmbientOcclusion.png
-
-layout(set = 1, binding = 0) uniform ShadowSampling {
-	mat4 cascadeMatrix[3];
-	int enabled;
-} shadowSampling;
-layout(set = 1, binding = 1) uniform sampler2D modelShadowMap0;
-layout(set = 1, binding = 2) uniform sampler2D modelShadowMap1;
-layout(set = 1, binding = 3) uniform sampler2D modelShadowMap2;
-
 layout(location = 0) in vec4 color;           // xyz = vertexColor, w = sun lambert
 layout(location = 1) in vec3 ambientLight;     // hemisphere ambient fallback (kept for VS↔FS compat)
 layout(location = 2) in vec3 customColor;
@@ -63,47 +47,8 @@ layout(location = 15) in vec3 worldPosition;
 layout(location = 0) out vec4 fragColor;
 
 #include "SceneLight/Lights.glsl"
-
-// Same cascade sampling as BasicMap.frag -- see the rationale there for both
-// the 2x2 filtered compare and the depth-based cascade choice. Local Z 0 = sun
-// side; a smaller stored depth means an occluder nearer the sun. Bias avoids
-// self-shadow acne (models render into these cascades themselves).
-float SampleModelCascade(sampler2D tex, vec3 c) {
-	vec2 uv = c.xy * 0.5 + 0.5;
-	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || c.z < 0.0 || c.z > 1.0)
-		return 1.0;
-
-	vec2 texSize = vec2(textureSize(tex, 0));
-	vec2 texel = 1.0 / texSize;
-	vec2 coord = uv * texSize - 0.5;
-	vec2 frac = fract(coord);
-	vec2 base = (floor(coord) + 0.5) * texel;
-
-	float ref = c.z - 0.0015;
-	float s00 = step(ref, texture(tex, base).r);
-	float s10 = step(ref, texture(tex, base + vec2(texel.x, 0.0)).r);
-	float s01 = step(ref, texture(tex, base + vec2(0.0, texel.y)).r);
-	float s11 = step(ref, texture(tex, base + texel).r);
-
-	return mix(mix(s00, s10, frac.x), mix(s01, s11, frac.x), frac.y);
-}
-
-float EvaluteModelShadow() {
-	if (shadowSampling.enabled == 0)
-		return 1.0;
-	if (shadowViewDepth < 12.0)
-		return SampleModelCascade(modelShadowMap0, modelShadowCoord0);
-	else if (shadowViewDepth < 40.0)
-		return SampleModelCascade(modelShadowMap1, modelShadowCoord1);
-	else
-		return SampleModelCascade(modelShadowMap2, modelShadowCoord2);
-}
-
-vec3 DecodeRadiosityValue(vec3 val) {
-	val *= 1023.0 / 1022.0;
-	val = (val * 2.0) - 1.0;
-	return val;
-}
+#include "SceneLight/MapLight.glsl"
+#include "SceneLight/ModelShadow.glsl"
 
 void main() {
 	// Reflection pass: discard fragments below the water plane so underwater
@@ -112,9 +57,9 @@ void main() {
 		discard;
 
 	// Evaluate map shadow (matching OpenGL Map.fs: EvaluateMapShadow)
-	float shadowVal = texture(mapShadowTexture, shadowCoord.xy).w;
-	float shadow = (shadowVal < shadowCoord.z - 0.0001) ? 0.0 : 1.0;
-	shadow *= EvaluteModelShadow(); // model-on-model cascades (set 1)
+	float shadow = MapShadowVisibility(shadowCoord);
+	shadow *= ModelShadowVisibility(modelShadowCoord0, modelShadowCoord1, modelShadowCoord2,
+	                                shadowViewDepth); // model-on-model cascades (set 1)
 
 	vec3 vertexColor = color.xyz;
 
@@ -134,14 +79,9 @@ void main() {
 	vec3 diffuse;
 	if (USE_RADIOSITY != 0) {
 		// MapRadiosity.fs path — 3D radiosity + 3D AO modulating sky-ambient.
-		vec2 ambTexVal = texture(ambientShadowTexture, aoCoord).xy;
-		float aoFactor = max(ambTexVal.x / max(ambTexVal.y, 0.25), 0.0);
+		float aoFactor = MapAmbientShadow(aoCoord);
 
-		vec3 radiosity = DecodeRadiosityValue(texture(radiosityTextureFlat, radiosityTextureCoord).xyz);
-		radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
-		radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
-		radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-		radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
+		vec3 radiosity = MapRadiosity(radiosityTextureCoord, nrm);
 
 		// Blend in the per-vertex detail AO from the 2D atlas, as GL does via
 		// EvaluateAmbientLight(ao) -> EvaluateRadiosity. Without it the sqrt()

@@ -18,6 +18,9 @@
 
  */
 
+#ifndef SCENE_LIGHT_TABLE_GLSL
+#define SCENE_LIGHT_TABLE_GLSL
+
 // The frame's dynamic lights and the clusters of the view they are binned into,
 // as `VulkanSceneLights` writes them. The includer defines
 // `SCENE_LIGHT_SET`, the descriptor set they are bound to, and
@@ -105,3 +108,5 @@ layout(set = SCENE_LIGHT_SET, binding = 2, std430) DYNAMIC_LIGHT_CLUSTER_ACCESS 
 float DynamicLightSliceStart(float slice) {
 	return dynamicLightFrame.eyeNear.w * exp(slice / dynamicLightFrame.forward.w);
 }
+
+#endif

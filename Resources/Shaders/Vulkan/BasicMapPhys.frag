@@ -21,13 +21,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 0) uniform sampler2D mapShadowTexture;
-layout(set = 0, binding = 1) uniform sampler3D ambientShadowTexture;
-layout(set = 0, binding = 2) uniform sampler3D radiosityTextureFlat;
-layout(set = 0, binding = 3) uniform sampler3D radiosityTextureX;
-layout(set = 0, binding = 4) uniform sampler3D radiosityTextureY;
-layout(set = 0, binding = 5) uniform sampler3D radiosityTextureZ;
-
 layout(push_constant) uniform PushConstants {
 	mat4 projectionViewMatrix;
 	vec3 modelOrigin;
@@ -58,12 +51,7 @@ layout(location = 11) in vec3 worldPosition;
 layout(location = 0) out vec4 fragColor;
 
 #include "SceneLight/Lights.glsl"
-
-vec3 DecodeRadiosityValue(vec3 val) {
-	val *= 1023.0 / 1022.0;
-	val = (val * 2.0) - 1.0;
-	return val;
-}
+#include "SceneLight/MapLight.glsl"
 
 // Oren-Nayar diffuse BRDF
 float OrenNayar(float sigma, float dotLight, float dotEye) {
@@ -119,20 +107,14 @@ float CookTorrance(vec3 eyeVec, vec3 lightVec, vec3 normal) {
 
 void main() {
 	// Evaluate map shadow
-	float shadowVal = texture(mapShadowTexture, shadowCoord.xy).w;
-	float shadow = (shadowVal < shadowCoord.z - 0.0001) ? 0.0 : 1.0;
+	float shadow = MapShadowVisibility(shadowCoord);
 
 	// Per-block ambient occlusion (matching GL MapRadiosity.fs).
-	vec2 ambTexVal = texture(ambientShadowTexture, aoCoord).xy;
-	float aoFactor = max(ambTexVal.x / max(ambTexVal.y, 0.25), 0.0);
+	float aoFactor = MapAmbientShadow(aoCoord);
 
 	// Directional radiosity (port of GL MapRadiosity.fs EvaluateRadiosity)
-	vec3 radiosity = DecodeRadiosityValue(texture(radiosityTextureFlat, radiosityTextureCoord).xyz);
 	vec3 nrm = normalize(normalVarying);
-	radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
-	radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
-	radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-	radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
+	vec3 radiosity = MapRadiosity(radiosityTextureCoord, nrm);
 
 	float aoTerm = aoFactor * (0.8 - nrm.z * 0.2);
 	// GL GLShadowShader's ambient colour, worked out in full daylight

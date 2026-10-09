@@ -18,6 +18,9 @@
 
  */
 
+#ifndef SCENE_LIGHT_LIGHTS_GLSL
+#define SCENE_LIGHT_LIGHTS_GLSL
+
 // The light the frame's dynamic lights bring to a point of a lit surface, for the
 // fragment shaders of the scene's passes. A point reads only the lights of the
 // cluster of the view it lies in; one outside the view, as the water's mirror sees
@@ -284,3 +287,5 @@ vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
 vec3 EvaluateDynamicLightsSpecular(vec3 position, vec3 normal, vec3 reflected, float shininess) {
 	return EvaluateDynamicLightsAt(position, normal, reflected, shininess);
 }
+
+#endif
