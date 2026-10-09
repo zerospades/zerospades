@@ -1,16 +1,9 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	mat4 viewMatrix;
-	vec3 rightVector;
-	vec3 upVector;
-	vec3 viewOriginVector;
-	vec3 fogColor;
-	float fogDistance;
-} pc;
+// The view, from the sprites' own set (`SpriteView.glsl`), whose image this is too
+#include "SpriteView.glsl"
 
-layout(binding = 0) uniform sampler2D mainTexture;
 
 layout(location = 0) in vec4 color;
 layout(location = 1) in vec2 texCoord;
@@ -29,7 +22,7 @@ void main() {
 	texColor *= color;
 
 	// Apply fog
-	vec4 fogColorP = vec4(pc.fogColor, 1.0);
+	vec4 fogColorP = vec4(spriteView.fogColorDistance.xyz, 1.0);
 	fogColorP *= texColor.w; // Premultiplied alpha
 	texColor = mix(texColor, fogColorP, fogDensity);
 
