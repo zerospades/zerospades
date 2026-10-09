@@ -32,6 +32,7 @@
 #include <Core/Math.h>
 
 #include "VulkanDynamicLight.h"
+#include "VulkanSceneLights.h"
 
 namespace spades {
 	namespace gui {
@@ -44,7 +45,6 @@ namespace spades {
 		class VulkanSpriteRenderer;
 		class VulkanLongSpriteRenderer;
 		class VulkanGlareRenderer;
-		class VulkanSceneLights;
 		class VulkanMapOccupancy;
 		class VulkanImageRenderer;
 		class VulkanWaterRenderer;
@@ -304,8 +304,32 @@ namespace spades {
 			void SetFogDistance(float) override;
 			void SetFogColor(Vector3) override;
 
-			Vector3 GetFogColor() { return fogColor; }
+			/** The factor the world's lighting but the sun's, the fog and the sky are
+			 * drawn with, in `[0, 1]`. */
+			float GetDaylight() const { return sceneDef.daylight; }
+
+			/** The factor the sun's light is drawn with. At `0` the sun casts no light
+			 * and no shadow. */
+			float GetSunlight() const { return sceneDef.sunlight; }
+
+			/** The Fog Colour as set: the colour of the fog and the sky in full daylight. */
+			Vector3 GetFullDaylightFogColor() const { return fogColor; }
+
+			/** The colour the fog and the sky are drawn in: the Fog Colour times the
+			 * daylight. */
+			Vector3 GetFogColor() const { return fogColor * GetDaylight(); }
+
+			/** The colour solid geometry fades to with distance: none when a fog filter
+			 * draws the fog over it afterwards. */
 			Vector3 GetFogColorForSolidPass();
+
+			/** `GetFogColorForSolidPass` in full daylight: the sky's light, which the
+			 * lighting shaders scale by the daylight themselves. */
+			Vector3 GetFullDaylightFogColorForSolidPass();
+
+			/** The sun's and the sky's light of the frame, as the lit shaders take it. */
+			VulkanSceneLights::SunSky GetSunSky();
+
 			float GetFogDistance() { return fogDistance; }
 
 			const client::SceneDefinition& GetSceneDef() const { return sceneDef; }

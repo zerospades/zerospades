@@ -68,6 +68,17 @@ namespace spades {
 			static_assert(sizeof(GpuFrame) == 96 + 4 * VulkanSceneLights::MaxOcclusionTiles,
 			              "GpuFrame must match DynamicLightFrame");
 
+			/** `SceneSunSky` of `SceneLight/SunSky.glsl`, std140 */
+			struct GpuSunSky {
+				float sunlight;
+				float daylight;
+				float pad[2];
+				float skyLight[4];
+				float ambientLight[3];
+				float pad2; // to the block's std140 size, a multiple of 16
+			};
+			static_assert(sizeof(GpuSunSky) == 48, "GpuSunSky must match SceneSunSky");
+
 			/**
 			 * The widest a texel of a light's occlusion map may get at its reach, in
 			 * blocks: its width is how far off an edge of the beam's shadow can land.
@@ -104,7 +115,7 @@ namespace spades {
 
 			const VkShaderStageFlags stages =
 			  VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
+			std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
 			bindings[0] = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, stages, nullptr};
 			bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
 			bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, stages, nullptr};
@@ -112,6 +123,8 @@ namespace spades {
 			               VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
 			bindings[4] = {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, stages, nullptr};
 			bindings[5] = {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, stages, nullptr};
+			bindings[6] = {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+			               nullptr};
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -128,7 +141,7 @@ namespace spades {
 
 			const std::uint32_t slotCount = static_cast<std::uint32_t>(framesInFlight);
 			std::array<VkDescriptorPoolSize, 4> poolSizes{{
-			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slotCount},
+			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slotCount * 2},
 			  {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slotCount * 2},
 			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, slotCount * (MaxImages + 1)},
 			  {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, slotCount},
@@ -183,6 +196,8 @@ namespace spades {
 			// Written by the CPU every frame and mapped for good
 			slot.frame = Handle<VulkanBuffer>::New(vulkanDevice, sizeof(GpuFrame),
 			                                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, hostVisible);
+			slot.sunSky = Handle<VulkanBuffer>::New(vulkanDevice, sizeof(GpuSunSky),
+			                                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, hostVisible);
 			slot.lights = Handle<VulkanBuffer>::New(vulkanDevice, sizeof(GpuLight) * MaxLights,
 			                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, hostVisible);
 			// Written by the binning pass, read by the fragments
@@ -198,19 +213,26 @@ namespace spades {
 			if (vkAllocateDescriptorSets(device, &allocInfo, &slot.set) != VK_SUCCESS)
 				SPRaise("Failed to allocate a dynamic light descriptor set");
 
-			std::array<VkDescriptorBufferInfo, 3> buffers{{
-			  {slot.frame->GetBuffer(), 0, VK_WHOLE_SIZE},
-			  {slot.lights->GetBuffer(), 0, VK_WHOLE_SIZE},
-			  {slot.clusters->GetBuffer(), 0, VK_WHOLE_SIZE},
+			struct BufferBinding {
+				std::uint32_t binding;
+				VkDescriptorType type;
+				VulkanBuffer* buffer;
+			};
+			const std::array<BufferBinding, 4> bufferBindings{{
+			  {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slot.frame.GetPointerOrNull()},
+			  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slot.lights.GetPointerOrNull()},
+			  {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, slot.clusters.GetPointerOrNull()},
+			  {6, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, slot.sunSky.GetPointerOrNull()},
 			}};
-			std::array<VkWriteDescriptorSet, 3> writes{};
-			for (std::uint32_t i = 0; i < writes.size(); i++) {
+			std::array<VkDescriptorBufferInfo, bufferBindings.size()> buffers{};
+			std::array<VkWriteDescriptorSet, bufferBindings.size()> writes{};
+			for (std::size_t i = 0; i < writes.size(); i++) {
+				buffers[i] = {bufferBindings[i].buffer->GetBuffer(), 0, VK_WHOLE_SIZE};
 				writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				writes[i].dstSet = slot.set;
-				writes[i].dstBinding = i;
+				writes[i].dstBinding = bufferBindings[i].binding;
 				writes[i].descriptorCount = 1;
-				writes[i].descriptorType =
-				  i == 0 ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+				writes[i].descriptorType = bufferBindings[i].type;
 				writes[i].pBufferInfo = &buffers[i];
 			}
 			vkUpdateDescriptorSets(device, static_cast<std::uint32_t>(writes.size()),
@@ -225,6 +247,8 @@ namespace spades {
 			// Nothing is lit until the first update says otherwise.
 			const GpuFrame empty{};
 			std::memcpy(slot.frame->Map(), &empty, sizeof(empty));
+			const GpuSunSky dark{};
+			std::memcpy(slot.sunSky->Map(), &dark, sizeof(dark));
 		}
 
 		void VulkanSceneLights::CreatePipelines() {
@@ -377,7 +401,8 @@ namespace spades {
 		                                        std::size_t frameSlot,
 		                                        const std::vector<VulkanDynamicLight>& lights,
 		                                        const client::SceneDefinition& view,
-		                                        const VulkanMapOccupancy* occupancy) {
+		                                        const VulkanMapOccupancy* occupancy,
+		                                        const SunSky& sunSky) {
 			SPADES_MARK_FUNCTION();
 			SPAssert(frameSlot < slots.size());
 			Slot& slot = slots[frameSlot];
@@ -503,6 +528,15 @@ namespace spades {
 			frame.counts[2] = ClustersZ;
 			frame.counts[3] = count;
 			std::memcpy(slot.frame->Map(), &frame, sizeof(frame));
+
+			GpuSunSky sky{};
+			sky.sunlight = sunSky.sunlight;
+			sky.daylight = sunSky.daylight;
+			Store(sky.skyLight, sunSky.skyLight, 0.0F);
+			sky.ambientLight[0] = sunSky.ambientLight.x;
+			sky.ambientLight[1] = sunSky.ambientLight.y;
+			sky.ambientLight[2] = sunSky.ambientLight.z;
+			std::memcpy(slot.sunSky->Map(), &sky, sizeof(sky));
 
 			if (count == 0)
 				return;

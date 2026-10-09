@@ -411,6 +411,13 @@ namespace spades {
 				color.x *= color.x * rcp;
 				color.y *= color.y * rcp;
 				color.z *= color.z * rcp;
+
+				// These sprites are not lit, so a scattering one would glow in the
+				// dark: the daylight dims it as it dims the world, as GL does.
+				const float daylight = renderer.GetDaylight();
+				color.x *= daylight;
+				color.y *= daylight;
+				color.z *= daylight;
 			}
 
 			spr.color = color;

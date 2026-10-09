@@ -50,7 +50,7 @@ namespace spades {
 			float sunlightScale[4];     // [80..95]  xyz scale, w = sunDir.x
 			float ambientScale[4];      // [96..111] xyz scale, w = sunDir.y
 			float radiosityScale[4];    // [112..127] xyz scale, w = sunDir.z
-			float ditherFrame[4];       // [128..143] xy=per-frame noise seed
+			float ditherFrame[4];       // [128..143] xy=per-frame noise seed, z = sunlight
 		};
 		static_assert(sizeof(Fog2PushConstants) == 144, "Fog2PushConstants must be 144 bytes");
 
@@ -59,7 +59,7 @@ namespace spades {
 			float viewOriginPad[4];   // [0..15]  xyz = viewOrigin
 			float viewAxisUp[4];      // [16..31] xyz
 			float viewAxisSide[4];    // [32..47] xyz
-			float viewAxisFront[4];   // [48..63] xyz
+			float viewAxisFront[4];   // [48..63] xyz, w = sunlight
 			float fovZNearFar[4];     // [64..79] xy = (tan(fovX/2), -tan(fovY/2)),
 			                          //           y is pre-negated to match the
 			                          //           negative-height viewport used in
@@ -508,6 +508,8 @@ namespace spades {
 				pc1.viewAxisFront[0] = def.viewAxis[2].x;
 				pc1.viewAxisFront[1] = def.viewAxis[2].y;
 				pc1.viewAxisFront[2] = def.viewAxis[2].z;
+				// With no sun, there are no shafts and the fog is even.
+				pc1.viewAxisFront[3] = renderer.GetSunlight();
 
 				// Sun direction packed into the free .w slots (see Fog.vk.fs).
 				Vector3 sunDir1 = renderer.GetSunDirection();
@@ -553,17 +555,30 @@ namespace spades {
 
 				Matrix4 vpInv = vp.Inversed();
 
-				constexpr float sunlightBrightness   = 0.6F;
+				// Derived in full daylight, then scaled by the daylight below, so the fog
+				// looks like the Fog Colour times the daylight, as GLFogFilter2 has it.
+				Vector3 fullFogCol = renderer.GetFullDaylightFogColor();
+				fullFogCol *= fullFogCol; // linearise
+				const float sunlight = renderer.GetSunlight();
+				const float daylight = renderer.GetDaylight();
+
+				// Without the sun, the sky alone gives the fog its colour.
+				const bool sunUp = sunlight > 0.0F;
+				const float sunlightBrightness = sunUp ? 0.6F : 0.0F; // Sun -> Fog -> Eye
 				constexpr float ambientBrightness    = 1.0F;
 				constexpr float radiosityBrightness  = 1.0F;
 				constexpr float radiosityOffset      = 0.2F;
 
+				// Without the sun this reduces to `1 / ambientBrightness`, which is
+				// taken as is: a black channel of the Fog Colour would make it `0 / 0`.
 				auto fogTransmission1 = [&](float f) {
+					if (!sunUp)
+						return 1.0F / ambientBrightness;
 					return f / (sunlightBrightness + ambientBrightness * f + 1.0e-6F);
 				};
-				Vector3 ft{fogTransmission1(fogCol.x),
-				           fogTransmission1(fogCol.y),
-				           fogTransmission1(fogCol.z)};
+				Vector3 ft{fogTransmission1(fullFogCol.x),
+				           fogTransmission1(fullFogCol.y),
+				           fogTransmission1(fullFogCol.z)};
 
 				std::memcpy(pc2.viewProjInv, vpInv.m, sizeof(pc2.viewProjInv));
 
@@ -572,18 +587,24 @@ namespace spades {
 				pc2.viewOriginFogDist[2] = def.viewOrigin.z;
 				pc2.viewOriginFogDist[3] = renderer.GetFogDistance();
 
-				pc2.sunlightScale[0] = ft.x * sunlightBrightness;
-				pc2.sunlightScale[1] = ft.y * sunlightBrightness;
-				pc2.sunlightScale[2] = ft.z * sunlightBrightness;
+				const Vector3 sunScale = ft * (sunlightBrightness * sunlight);
+				pc2.sunlightScale[0] = sunScale.x;
+				pc2.sunlightScale[1] = sunScale.y;
+				pc2.sunlightScale[2] = sunScale.z;
 
-				pc2.ambientScale[0] = ft.x * fogCol.x * ambientBrightness;
-				pc2.ambientScale[1] = ft.y * fogCol.y * ambientBrightness;
-				pc2.ambientScale[2] = ft.z * fogCol.z * ambientBrightness;
+				const Vector3 ambient = ft * fullFogCol * (ambientBrightness * daylight);
+				pc2.ambientScale[0] = ambient.x;
+				pc2.ambientScale[1] = ambient.y;
+				pc2.ambientScale[2] = ambient.z;
 
-				// Matches GLFogFilter2: radiosityScale = ft * 1.0 + 0.2
-				pc2.radiosityScale[0] = ft.x * radiosityBrightness + radiosityOffset;
-				pc2.radiosityScale[1] = ft.y * radiosityBrightness + radiosityOffset;
-				pc2.radiosityScale[2] = ft.z * radiosityBrightness + radiosityOffset;
+				// Matches GLFogFilter2: radiosityScale = ft * 1.0 + 0.2, the sun's
+				// light the map bounces
+				const Vector3 radiosity =
+				  (ft * radiosityBrightness + MakeVector3(radiosityOffset, radiosityOffset,
+				                                          radiosityOffset)) * sunlight;
+				pc2.radiosityScale[0] = radiosity.x;
+				pc2.radiosityScale[1] = radiosity.y;
+				pc2.radiosityScale[2] = radiosity.z;
 
 				// Sun direction packed into the free .w slots (see Fog2.vk.fs).
 				Vector3 sunDir = renderer.GetSunDirection();
@@ -594,6 +615,8 @@ namespace spades {
 				std::uint32_t frame = frameCounter++ % 4;
 				pc2.ditherFrame[0] = (float)(frame & 1) * 0.5F;
 				pc2.ditherFrame[1] = (float)((frame >> 1) & 1) * 0.5F;
+				// With no sun, it gives the fog no glow.
+				pc2.ditherFrame[2] = sunlight;
 
 				pcData = &pc2;
 				pcSize = sizeof(pc2);

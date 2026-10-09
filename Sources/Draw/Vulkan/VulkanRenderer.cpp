@@ -878,6 +878,10 @@ namespace spades {
 		}
 
 		Vector3 VulkanRenderer::GetFogColorForSolidPass() {
+			return GetFullDaylightFogColorForSolidPass() * GetDaylight();
+		}
+
+		Vector3 VulkanRenderer::GetFullDaylightFogColorForSolidPass() {
 			// The fog post-process re-adds the in-scattered light, so the solid
 			// pass fades to black instead of the fog colour — but only when the
 			// heightmap shadow that pass samples exists. GL tests
@@ -886,7 +890,28 @@ namespace spades {
 			if (r_fogShadow && mapShadowRenderer)
 				return MakeVector3(0, 0, 0);
 			else
-				return fogColor;
+				return GetFullDaylightFogColor();
+		}
+
+		VulkanSceneLights::SunSky VulkanRenderer::GetSunSky() {
+			VulkanSceneLights::SunSky sunSky;
+			sunSky.sunlight = GetSunlight();
+			sunSky.daylight = GetDaylight();
+
+			Vector3 sky = GetFullDaylightFogColorForSolidPass();
+			sunSky.skyLight = sky * sky; // linearize
+
+			// As GLShadowShader works it out for the radiosity: half the fog colour,
+			// lifted to a luminance that still lets things be seen under a black sky
+			Vector3 ambient = GetFullDaylightFogColor();
+			ambient *= ambient; // linearize
+			ambient *= 0.5F;
+			constexpr float minimumLuminance = 0.35F;
+			const float luminance = (ambient.x + ambient.y + ambient.z) / 3.0F;
+			if (luminance < minimumLuminance)
+				ambient += (ambient + 0.003F) / (luminance + 0.003F) * (minimumLuminance - luminance);
+			sunSky.ambientLight = ambient;
+			return sunSky;
 		}
 
 		void VulkanRenderer::StartScene(const client::SceneDefinition& def) {
@@ -1834,7 +1859,8 @@ namespace spades {
 		// models-only map driven by r_modelShadows alone — independent of r_fogShadow
 		// (the fog in-scatter uses the separate 512² map shadow). So model shadows
 		// work with fog off.
-		if (sceneUsedInThisFrame && shadowMapRenderer && r_modelShadows) {
+		// No sun, no shadow to cast: at night the cascades are left out altogether.
+		if (sceneUsedInThisFrame && shadowMapRenderer && r_modelShadows && GetSunlight() > 0.0F) {
 			shadowMapRenderer->Render(commandBuffer);
 		} else if (shadowMapRenderer) {
 			// Cascade not rendered this frame: keep the sampling UBO marked disabled
@@ -1848,7 +1874,7 @@ namespace spades {
 			if (mapOccupancy)
 				mapOccupancy->Update(commandBuffer, currentFrameSlot);
 			sceneLights->Update(commandBuffer, currentFrameSlot, lights, sceneDef,
-			                             mapOccupancy.get());
+			                             mapOccupancy.get(), GetSunSky());
 		}
 
 		// Render mirror pass for water reflections (r_water >= 2)
@@ -3201,7 +3227,7 @@ namespace spades {
 			// (their C++ also squares fogColor before pushing). The offscreen
 			// target is linear UNORM and the swapchain blit applies sRGB
 			// encoding on output, so we must write linear values here too.
-			Vector3 skyFogColor = fogColor;
+			Vector3 skyFogColor = GetFogColor();
 			skyFogColor *= skyFogColor;
 			pushConstants.fogColor[0] = skyFogColor.x;
 			pushConstants.fogColor[1] = skyFogColor.y;
