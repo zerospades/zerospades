@@ -166,7 +166,7 @@ namespace spades {
 				spriteRenderer = stmp::make_unique<VulkanSpriteRenderer>(*this);
 				longSpriteRenderer = stmp::make_unique<VulkanLongSpriteRenderer>(*this);
 				imageRenderer = stmp::make_unique<VulkanImageRenderer>(*this);
-			imageManager = stmp::make_unique<VulkanImageManager>(*this, device);
+			imageManager = stmp::make_unique<VulkanImageManager>(device);
 			waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
 
 			// Create a 1x1 white image for solid color rendering
@@ -176,13 +176,11 @@ namespace spades {
 				*pixel = 0xFFFFFFFF; // White (RGBA)
 				Handle<client::IImage> imgHandle = CreateImage(*whiteBmp);
 
-				// Get VulkanImage from the IImage
+				// CreateImage always hands out a wrapper of the VulkanImage it made.
 				VulkanImageWrapper* wrapper = dynamic_cast<VulkanImageWrapper*>(imgHandle.GetPointerOrNull());
-				if (wrapper) {
-					whiteImage = Handle<VulkanImage>(wrapper->GetVulkanImage());
-				} else {
-					whiteImage = Handle<VulkanImage>(dynamic_cast<VulkanImage*>(std::move(imgHandle).Unmanage()));
-				}
+				if (!wrapper || !wrapper->GetVulkanImage())
+					SPRaise("Failed to create the white image");
+				whiteImage = Handle<VulkanImage>(wrapper->GetVulkanImage());
 			}
 
 			// Binds the white image in place of missing spotlight images, so it

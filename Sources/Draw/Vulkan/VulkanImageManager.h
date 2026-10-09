@@ -35,7 +35,6 @@ namespace spades {
 		class VulkanImageWrapper;
 
 		class VulkanImageManager {
-			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 			std::map<std::string, Handle<client::IImage>> images;
 			Handle<client::IImage> whiteImage;
@@ -43,7 +42,7 @@ namespace spades {
 			Handle<client::IImage> CreateImage(const std::string& name);
 
 		public:
-			VulkanImageManager(VulkanRenderer& r, Handle<gui::SDLVulkanDevice> dev);
+			explicit VulkanImageManager(Handle<gui::SDLVulkanDevice> dev);
 			~VulkanImageManager();
 
 			Handle<client::IImage> RegisterImage(const std::string& name);

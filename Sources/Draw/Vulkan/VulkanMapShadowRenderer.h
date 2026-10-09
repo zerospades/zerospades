@@ -39,7 +39,6 @@ namespace spades {
 
 		/** Generates a heightmap shadow texture from the game map (matching GLMapShadowRenderer). */
 		class VulkanMapShadowRenderer {
-			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 			client::GameMap* map;
 

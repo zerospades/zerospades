@@ -43,10 +43,8 @@ namespace spades {
 
 		VulkanMapRenderer::VulkanMapRenderer(client::GameMap* map, VulkanRenderer& r)
 		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.GetDevice().Unmanage())),
-		      gameMap(map),
-		      chunks(nullptr),
-		      chunkInfos(nullptr),
+		      device(r.GetDevice()),
+		      physicalLighting(false),
 		      depthonlyPipeline(VK_NULL_HANDLE),
 		      basicPipeline(VK_NULL_HANDLE),
 		      basicMirrorPipeline(VK_NULL_HANDLE),
@@ -55,7 +53,9 @@ namespace spades {
 		      descriptorSetLayout(VK_NULL_HANDLE),
 		      descriptorPool(VK_NULL_HANDLE),
 		      textureDescriptorSet(VK_NULL_HANDLE),
-		      physicalLighting(false) {
+		      chunks(nullptr),
+		      chunkInfos(nullptr),
+		      gameMap(map) {
 			SPADES_MARK_FUNCTION();
 
 			{

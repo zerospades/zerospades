@@ -47,7 +47,7 @@ namespace spades {
 
 		VulkanMapShadowRenderer::VulkanMapShadowRenderer(VulkanRenderer& renderer,
 		                                                 client::GameMap* map)
-		    : renderer(renderer), device(renderer.GetDevice()), map(map) {
+		    : device(renderer.GetDevice()), map(map) {
 			SPADES_MARK_FUNCTION();
 
 			w = map->Width();

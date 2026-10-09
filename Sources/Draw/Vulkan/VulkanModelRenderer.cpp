@@ -27,8 +27,7 @@
 namespace spades {
 	namespace draw {
 		VulkanModelRenderer::VulkanModelRenderer(VulkanRenderer& r)
-		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.GetDevice().Unmanage())),
+		    : device(r.GetDevice()),
 		      modelCount(0) {
 			SPADES_MARK_FUNCTION();
 		}

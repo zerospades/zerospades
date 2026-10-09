@@ -110,7 +110,6 @@ namespace spades {
 			Handle<gui::SDLVulkanDevice> device;
 
 			VkDescriptorPool descriptorPool;
-			VkDescriptorSet descriptorSet;
 
 			Handle<VulkanImage> image;
 			Handle<VulkanImage> aoImage;

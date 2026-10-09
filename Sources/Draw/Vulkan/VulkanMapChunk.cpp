@@ -37,7 +37,7 @@ namespace spades {
 	namespace draw {
 		VulkanMapChunk::VulkanMapChunk(VulkanMapRenderer& r, client::GameMap* mp, int cx, int cy, int cz)
 		    : renderer(r),
-		      device(static_cast<gui::SDLVulkanDevice*>(r.renderer.GetDevice().Unmanage())) {
+		      device(r.renderer.GetDevice()) {
 			SPADES_MARK_FUNCTION();
 
 			map = mp;
