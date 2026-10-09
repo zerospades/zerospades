@@ -28,6 +28,7 @@
 #define SCENE_LIGHT_SET 2
 #define DYNAMIC_LIGHT_CLUSTER_ACCESS readonly
 #include "Table.glsl"
+#include "SunSky.glsl"
 
 // The images of the frame's spotlights: `VulkanSceneLights::MaxImages`.
 // Unused ones hold a white image.

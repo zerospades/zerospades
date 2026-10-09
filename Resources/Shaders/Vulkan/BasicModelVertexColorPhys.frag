@@ -151,18 +151,16 @@ void main() {
 	radiosity += nrm.x * DecodeRadiosityValue(texture(radiosityTextureX, radiosityTextureCoord).xyz);
 	radiosity += nrm.y * DecodeRadiosityValue(texture(radiosityTextureY, radiosityTextureCoord).xyz);
 	radiosity += nrm.z * DecodeRadiosityValue(texture(radiosityTextureZ, radiosityTextureCoord).xyz);
-	radiosity = max(radiosity, 0.0) * 1.5;
+	radiosity = max(radiosity, 0.0) * (1.5 * sceneSunSky.sunlight); // bounced sunlight
 
 	float aoTerm = aoFactor * (0.8 - nrm.z * 0.2);
-	// Ambient color matching GL GLShadowShader: fog * 0.5 with a minimum
-	// luminance floor of 0.35 (keeps things visible when the sky is near-black).
-	vec3 ambientColor = inFogColor * 0.5;
-	float ambL = (ambientColor.x + ambientColor.y + ambientColor.z) / 3.0;
-	ambientColor += ((ambientColor + 0.003) / (ambL + 0.003)) * max(0.35 - ambL, 0.0);
+	// GL GLShadowShader's ambient colour, worked out in full daylight
+	// (`VulkanRenderer::GetSunSky`), drawn at the daylight.
+	vec3 ambientColor = sceneSunSky.ambientLight * sceneSunSky.daylight;
 
 	fragColor = vec4(vertexColor, 1.0);
 	vec3 diffuseShading = radiosity + aoTerm * ambientColor;
-	float shadowing = shadow * 0.6;
+	float shadowing = shadow * (0.6 * sceneSunSky.sunlight);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 
@@ -180,7 +178,8 @@ void main() {
 	// Approximate specular ambient
 	vec3 reflectWS = normalize(reflectionDir);
 	float reflHemisphere = 1.0 - reflectWS.z * 0.2;
-	vec3 specularShading = mix(inFogColor, vec3(1.0), 0.5) * 0.5 * reflHemisphere;
+	vec3 specularShading =
+	  mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * (0.5 * reflHemisphere * sceneSunSky.daylight);
 
 	// Sun diffuse/specular
 	if (shadowing > 0.0 && dotNL > 0.0) {

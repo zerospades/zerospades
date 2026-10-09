@@ -57,7 +57,7 @@ layout(push_constant) uniform Params {
     vec4 sunlightScale;           // [80..95]  xyz
     vec4 ambientScale;            // [96..111] xyz
     vec4 radiosityScale;          // [112..127] xyz
-    vec4 ditherFrame;             // [128..143] xy=per-frame noise seed
+    vec4 ditherFrame;             // [128..143] xy=per-frame noise seed, z=sunlight
 } pc;
 
 layout(location = 0) in  vec2 texCoord;
@@ -163,10 +163,13 @@ void main() {
 
     // Directional brightness gradient. Sun direction packed into the free
     // .w slots of the scale vectors (keeps push constants at 144 bytes).
-    vec3  sunDir = normalize(vec3(pc.sunlightScale.w, pc.ambientScale.w, pc.radiosityScale.w));
-    float bright = dot(sunDir, normalize(worldPos.xyz));
-    sunlightContrib  *= bright * 0.5 + 1.0;
-    ambientContrib   *= bright * 0.5 + 1.0;
+    // Without the sun, the fog has no glow.
+    if (pc.ditherFrame.z > 0.0) {
+        vec3  sunDir = normalize(vec3(pc.sunlightScale.w, pc.ambientScale.w, pc.radiosityScale.w));
+        float bright = dot(sunDir, normalize(worldPos.xyz));
+        sunlightContrib  *= bright * 0.5 + 1.0;
+        ambientContrib   *= bright * 0.5 + 1.0;
+    }
     // (Radiosity already encodes direction; no gradient term in GL Fog2 either.)
 
     outColor      = texture(colorTexture, texCoord);

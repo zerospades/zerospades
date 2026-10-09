@@ -27,6 +27,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 #include <Draw/Vulkan/vk_mem_alloc.h>
 
@@ -43,9 +44,12 @@ namespace spades {
 		class VulkanRenderer;
 
 		/**
-		 * The frame's dynamic lights, laid out for the scene's lit shaders to take
-		 * them in the pass that draws the surfaces, rather than in passes of their
-		 * own: a table of the lights, and the view cut into clusters, each marking
+		 * The scene's lights, as the lit pipelines bind them (set 2): the sun's and
+		 * the sky's of the frame, and its dynamic lights.
+		 *
+		 * The dynamic lights are laid out for the scene's lit shaders to take them in
+		 * the pass that draws the surfaces, rather than in passes of their own: a
+		 * table of the lights, and the view cut into clusters, each marking
 		 * the lights that reach into it, which a compute pass works out every frame.
 		 * A fragment reads only its cluster's lights (`SceneLight/Lights.glsl`).
 		 *
@@ -60,6 +64,19 @@ namespace spades {
 		 */
 		class VulkanSceneLights {
 		public:
+			/** The sun's and the sky's light of the frame: `SceneSunSky` of
+			 * `SceneLight/SunSky.glsl`. */
+			struct SunSky {
+				/** The factor the sun's light is drawn with, in `[0, 1]` */
+				float sunlight = 1.0F;
+				/** The factor the sky's light is drawn with, in `[0, 1]` */
+				float daylight = 1.0F;
+				/** The sky's light falling on surfaces in full daylight, linear */
+				Vector3 skyLight = MakeVector3(0.0F, 0.0F, 0.0F);
+				/** The ambient light the radiosity adds in full daylight, linear */
+				Vector3 ambientLight = MakeVector3(0.0F, 0.0F, 0.0F);
+			};
+
 			/** The most lights a frame takes (`DYNAMIC_LIGHT_MAX`); the rest are
 			 * left out. */
 			static constexpr std::uint32_t MaxLights = 256;
@@ -125,15 +142,18 @@ namespace spades {
 			 * `frameSlot`'s table and records the pass binning them into its
 			 * clusters, which the fragment shaders of `commandBuffer`'s render passes
 			 * that follow can read. The map hides the lights by `occupancy`, or
-			 * nothing does without one. Records outside of a render pass.
+			 * nothing does without one. The sun and the sky light the scene as
+			 * `sunSky` says. Records outside of a render pass.
 			 */
 			void Update(VkCommandBuffer commandBuffer, std::size_t frameSlot,
 			            const std::vector<VulkanDynamicLight>& lights,
-			            const client::SceneDefinition& view, const VulkanMapOccupancy* occupancy);
+			            const client::SceneDefinition& view, const VulkanMapOccupancy* occupancy,
+			            const SunSky& sunSky);
 
 		private:
 			struct Slot {
 				Handle<VulkanBuffer> frame;
+				Handle<VulkanBuffer> sunSky;
 				Handle<VulkanBuffer> lights;
 				Handle<VulkanBuffer> clusters;
 				VkDescriptorSet set = VK_NULL_HANDLE;

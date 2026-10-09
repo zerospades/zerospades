@@ -116,11 +116,11 @@ float GGXDistribution(float m, float dotHalf) {
 }
 
 vec3 EvaluateSunLight() {
-	return vec3(0.6); // Placeholder - should multiply by shadow visibility
+	return vec3(0.6 * sceneSunSky.sunlight); // shadow visibility not sampled here
 }
 
 vec3 EvaluateAmbientLight(float detailAmbientOcclusion) {
-	return vec3(0.3, 0.3, 0.35) * detailAmbientOcclusion;
+	return vec3(0.3, 0.3, 0.35) * (detailAmbientOcclusion * sceneSunSky.daylight);
 }
 
 float decodeDepth(float w, float near, float far) {
