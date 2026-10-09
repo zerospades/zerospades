@@ -394,8 +394,7 @@ namespace spades {
 
 		VulkanWaterRenderer::VulkanWaterRenderer(VulkanRenderer& r, client::GameMap* map)
 	: renderer(r), device(r.GetDevice()), gameMap(map), waterProgram(nullptr),
-	  descriptorPool(VK_NULL_HANDLE), waveStagingBufferSize(0),
-	  occlusionQueryPool(VK_NULL_HANDLE), occlusionQueryActive(false), lastOcclusionResult(1) {
+	  descriptorPool(VK_NULL_HANDLE), waveStagingBufferSize(0) {
 			SPADES_MARK_FUNCTION();
 			SPLog("VulkanWaterRenderer created");
 
@@ -534,11 +533,6 @@ namespace spades {
 
 			// Destroy images and buffers
 			// VulkanImage and VulkanBuffer are ref-counted (Handle) and will be freed automatically
-
-			// Destroy occlusion query pool
-			if (occlusionQueryPool != VK_NULL_HANDLE) {
-				vkDestroyQueryPool(device->GetDevice(), occlusionQueryPool, nullptr);
-			}
 
 			CleanupDescriptorResources();
 		}
@@ -856,16 +850,6 @@ namespace spades {
 		VkRenderPass waterRenderPass = renderer.GetFramebufferManager()->GetWaterRenderPass();
 		waterPipeline = Handle<VulkanPipeline>::New(device, waterProgram, cfg, waterRenderPass, renderer.GetPipelineCache());
 
-		// Create occlusion query pool
-		VkQueryPoolCreateInfo queryPoolInfo{};
-		queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-		queryPoolInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
-		queryPoolInfo.queryCount = 1;
-		if (vkCreateQueryPool(device->GetDevice(), &queryPoolInfo, nullptr, &occlusionQueryPool) != VK_SUCCESS) {
-			SPLog("Warning: Failed to create occlusion query pool");
-			occlusionQueryPool = VK_NULL_HANDLE;
-		}
-
 		SPLog("VulkanWaterRenderer pipeline and descriptors created");
 		}
 
@@ -884,22 +868,6 @@ namespace spades {
 		if (!waterPipeline || numIndices == 0) {
 			SPLog("Early return: waterPipeline or numIndices is 0");
 			return;
-		}
-
-		// Check occlusion query result from previous frame (informational only).
-		// GL never gates the water draw itself on occlusion (only the mirror pass
-		// at r_water>=2 uses it). Gating the draw here causes a permanent lockout:
-		// if any frame ever reports 0 samples passed, the next frame skips the draw,
-		// which means no new query is issued, so lastOcclusionResult stays 0 forever.
-		if (occlusionQueryPool != VK_NULL_HANDLE && occlusionQueryActive) {
-			uint64_t result = 0;
-			VkResult queryResult = vkGetQueryPoolResults(device->GetDevice(), occlusionQueryPool,
-				0, 1, sizeof(result), &result, sizeof(result),
-				VK_QUERY_RESULT_64_BIT);
-			if (queryResult == VK_SUCCESS) {
-				lastOcclusionResult = result;
-				occlusionQueryActive = false;
-			}
 		}
 
 		// Get current frame index for proper double/triple buffering
@@ -1059,20 +1027,8 @@ namespace spades {
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vbuf, &offset);
 		vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-		// Begin occlusion query
-		if (occlusionQueryPool != VK_NULL_HANDLE) {
-			vkCmdResetQueryPool(commandBuffer, occlusionQueryPool, 0, 1);
-			vkCmdBeginQuery(commandBuffer, occlusionQueryPool, 0, 0);
-		}
-
 		// Draw
 		vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
-
-		// End occlusion query
-		if (occlusionQueryPool != VK_NULL_HANDLE) {
-			vkCmdEndQuery(commandBuffer, occlusionQueryPool, 0);
-			occlusionQueryActive = true;
-		}
 	}
 
 	void VulkanWaterRenderer::MarkUpdate(int x, int y) {
