@@ -19,24 +19,12 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	vec3 rightVector;
-	float _pad1;
-	vec3 upVector;
-	float _pad2;
-	vec3 frontVector;
-	float _pad3;
-	vec3 viewOriginVector;
-	float _pad4;
-	vec3 fogColor;
-	float fogDistance;
-	vec2 zNearFar;
-} pc;
+#include "SpriteView.glsl"
 
-layout(set = 0, binding = 0) uniform sampler2D mainTexture;
-layout(set = 1, binding = 0) uniform sampler2D depthTexture;
+// The scene's depth, which a soft sprite fades into
+layout(set = SPRITE_SET, binding = 2) uniform sampler2D depthTexture;
 
 layout(location = 0) in vec4 color;
 layout(location = 1) in vec4 texCoord;
@@ -51,7 +39,7 @@ float decodeDepth(float w, float near, float far) {
 
 float depthAt(vec2 pt) {
 	float w = texture(depthTexture, pt).x;
-	return decodeDepth(w, pc.zNearFar.x, pc.zNearFar.y);
+	return decodeDepth(w, spriteView.nearFar.x, spriteView.nearFar.y);
 }
 
 void main() {
@@ -70,7 +58,7 @@ void main() {
 	fragColor *= color;
 
 	// Apply fog
-	vec4 fogColorP = vec4(pc.fogColor, 1.0);
+	vec4 fogColorP = vec4(spriteView.fogColorDistance.xyz, 1.0);
 	fogColorP *= fragColor.w; // Premultiplied alpha
 	fragColor = mix(fragColor, fogColorP, fogDensity);
 

@@ -19,53 +19,28 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	mat4 viewMatrix;
-	vec3 rightVector;
-	vec3 upVector;
-	vec3 viewOriginVector;
-	vec3 fogColor;
-	float fogDistance;
-} pc;
+// A sprite drawn in the scene's pass, depth-tested against it: an instance per
+// sprite, its quad made here from the vertex index.
 
-layout(location = 0) in vec3 positionAttribute;
-layout(location = 1) in float radiusAttribute;
-layout(location = 2) in vec3 spritePosAttribute;
-layout(location = 3) in vec4 colorAttribute;
+#include "SpriteView.glsl"
+
+layout(location = 0) in vec4 centerRadiusAttribute;
+layout(location = 1) in vec4 colorAttribute;
+layout(location = 2) in float angleAttribute;
 
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec2 texCoord;
 layout(location = 2) out vec4 fogDensity;
 
 void main() {
-	vec3 pos = positionAttribute;
-	float radius = radiusAttribute;
+	vec2 corner = SpriteCorner(gl_VertexIndex);
+	vec3 pos = SpriteCornerPosition(centerRadiusAttribute.xyz, centerRadiusAttribute.w,
+	                                angleAttribute, corner);
 
-	vec3 right = pc.rightVector * radius;
-	vec3 up = pc.upVector * radius;
-
-	float angle = spritePosAttribute.z;
-	float c = cos(angle);
-	float s = sin(angle);
-	vec2 sprP;
-	sprP.x = dot(spritePosAttribute.xy, vec2(c, -s));
-	sprP.y = dot(spritePosAttribute.xy, vec2(s, c));
-	sprP *= radius;
-	pos += right * sprP.x;
-	pos += up * sprP.y;
-
-	gl_Position = pc.projectionViewMatrix * vec4(pos, 1.0);
-
+	gl_Position = spriteView.projectionView * vec4(pos, 1.0);
 	color = colorAttribute;
-
-	// Sprite texture coord
-	texCoord = spritePosAttribute.xy * 0.5 + 0.5;
-
-	// Fog calculation
-	vec2 horzRelativePos = pos.xy - pc.viewOriginVector.xy;
-	float horzDistance = dot(horzRelativePos, horzRelativePos);
-	float density = clamp(horzDistance / (pc.fogDistance * pc.fogDistance), 0.0, 1.0);
-	fogDensity = vec4(density);
+	texCoord = corner * 0.5 + 0.5;
+	fogDensity = vec4(SpriteFogDensity(pos));
 }

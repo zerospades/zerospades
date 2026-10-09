@@ -19,26 +19,17 @@
  */
 
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
-layout(push_constant) uniform PushConstants {
-	mat4 projectionViewMatrix;
-	vec3 rightVector;
-	float _pad1;
-	vec3 upVector;
-	float _pad2;
-	vec3 frontVector;
-	float _pad3;
-	vec3 viewOriginVector;
-	float _pad4;
-	vec3 fogColor;
-	float fogDistance;
-	vec2 zNearFar;
-} pc;
+// A soft sprite: an instance per sprite, its quad made here from the vertex index
+// and brought to the front of the volume it stands for, which the fragment shader
+// fades where the scene's depth cuts into.
 
-layout(location = 0) in vec3 positionAttribute;
-layout(location = 1) in float radiusAttribute;
-layout(location = 2) in vec3 spritePosAttribute;
-layout(location = 3) in vec4 colorAttribute;
+#include "SpriteView.glsl"
+
+layout(location = 0) in vec4 centerRadiusAttribute;
+layout(location = 1) in vec4 colorAttribute;
+layout(location = 2) in float angleAttribute;
 
 layout(location = 0) out vec4 color;
 layout(location = 1) out vec4 texCoord;
@@ -46,24 +37,16 @@ layout(location = 2) out vec4 fogDensity;
 layout(location = 3) out vec4 depthRange;
 
 void main() {
-	vec3 center = positionAttribute;
-	vec3 pos = center;
-	float radius = radiusAttribute;
+	vec3 center = centerRadiusAttribute.xyz;
+	float radius = centerRadiusAttribute.w;
+	vec2 corner = SpriteCorner(gl_VertexIndex);
+	vec3 pos = SpriteCornerPosition(center, radius, angleAttribute, corner);
 
-	vec3 right = pc.rightVector * radius;
-	vec3 up = pc.upVector * radius;
-
-	float angle = spritePosAttribute.z;
-	float c = cos(angle), s = sin(angle);
-	vec2 sprP;
-	sprP.x = dot(spritePosAttribute.xy, vec2(c, -s));
-	sprP.y = dot(spritePosAttribute.xy, vec2(s, c));
-	sprP *= radius;
-	pos += right * sprP.x;
-	pos += up * sprP.y;
+	vec3 eye = spriteView.eye.xyz;
+	vec3 front = spriteView.front.xyz;
 
 	// Move sprite to the front of the volume
-	float centerDepth = dot(center - pc.viewOriginVector, pc.frontVector);
+	float centerDepth = dot(center - eye, front);
 	depthRange.xy = vec2(centerDepth) + vec2(-1.0, 1.0) * radius;
 
 	// Clip the volume by the near clip plane
@@ -77,33 +60,30 @@ void main() {
 	// the eye brings all of it to `frontDepth`. A centre at or behind the eye has
 	// no such projection to keep.
 	if (centerDepth > 0.001)
-		pos = pc.viewOriginVector + (pos - pc.viewOriginVector) * (frontDepth / centerDepth);
+		pos = eye + (pos - eye) * (frontDepth / centerDepth);
 	else
-		pos += pc.frontVector * (frontDepth - centerDepth);
+		pos += front * (frontDepth - centerDepth);
 
-	gl_Position = pc.projectionViewMatrix * vec4(pos, 1.0);
+	gl_Position = spriteView.projectionView * vec4(pos, 1.0);
 
 	color = colorAttribute;
 
 	// Sprite texture coord
-	texCoord.xy = spritePosAttribute.xy * 0.5 + 0.5;
+	texCoord.xy = corner * 0.5 + 0.5;
 
 	// Depth texture coord (screen space).
 	// The Y-flip viewport maps NDC_y → framebuffer_y inversely, so UV_y = 0.5 - NDC_y * 0.5.
 	vec2 ndc = gl_Position.xy / gl_Position.w;
 	texCoord.zw = vec2(0.5 + ndc.x * 0.5, 0.5 - ndc.y * 0.5);
 
-	// Fog
-	vec2 horzRelativePos = pos.xy - pc.viewOriginVector.xy;
-	float horzDistance = dot(horzRelativePos, horzRelativePos);
-	float density = clamp(horzDistance / (pc.fogDistance * pc.fogDistance), 0.0, 1.0);
-	fogDensity = vec4(density);
+	fogDensity = vec4(SpriteFogDensity(pos));
 
 	// Precompute depth range values for fragment shader
+	float nearFar = spriteView.nearFar.x * spriteView.nearFar.y;
 	depthRange.z = 1.0 / (depthRange.y - depthRange.w);
 	depthRange.y = depthRange.x;
 	depthRange.x *= -depthRange.z;
 
-	depthRange.y /= (pc.zNearFar.x * pc.zNearFar.y);
-	depthRange.z *= (pc.zNearFar.x * pc.zNearFar.y);
+	depthRange.y /= nearFar;
+	depthRange.z *= nearFar;
 }
