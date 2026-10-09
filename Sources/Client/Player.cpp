@@ -40,6 +40,14 @@ DEFINE_SPADES_SETTING(cg_classicWeaponRecoil, "1");
 namespace spades {
 	namespace client {
 
+		// Time constant, in seconds, of the relaxation of a remote player's rendered
+		// orientation towards the one the server last reported. Larger is smoother but
+		// lags further behind. This value keeps 0.9 of the error per 1/60 s step
+		// (tau = (1/60) / -ln 0.9), the rate the filter was originally tuned at.
+		constexpr float kOrientationSmoothingTimeConstant = 0.158F;
+		static_assert(kOrientationSmoothingTimeConstant > 0.0F,
+					  "the time constant drives a division and must be positive");
+
 		Player::Player(World& w, int pId, WeaponType wType, int tId) : world(w) {
 			SPADES_MARK_FUNCTION();
 
@@ -55,6 +63,7 @@ namespace spades {
 			velocity = MakeVector3(0, 0, 0);
 			orientation = MakeVector3((tId == 1) ? -1.0F : 1.0F, 0, 0);
 			orientationSmoothed = orientation;
+			hasNetworkOrientation = false;
 			moveDistance = 0.0F;
 			moveSteps = 0;
 
@@ -328,6 +337,15 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			orientation = v;
+
+			// Players are constructed facing their team's default direction, which
+			// is unrelated to where they actually spawn looking. Adopt the first
+			// reported orientation outright so that arbitrary heading is never
+			// smoothed through on screen.
+			if (!hasNetworkOrientation) {
+				orientationSmoothed = v;
+				hasNetworkOrientation = true;
+			}
 		}
 
 		void Player::Turn(float longitude, float latitude) {
@@ -357,12 +375,39 @@ namespace spades {
 		void Player::UpdateSmooth(float dt) {
 			SPADES_MARK_FUNCTION();
 
-			// Smooth the player orientation
-			if (!IsLocalPlayer()) {
-				orientationSmoothed = orientationSmoothed * powf(0.9F, dt * 60.0F) +
-									  orientation * powf(0.1F, dt * 60.0F);
-				orientationSmoothed = orientationSmoothed.Normalize();
+			// The local player aims with the mouse, not with the network; filtering
+			// it would show up directly as crosshair lag.
+			if (IsLocalPlayer())
+				return;
+
+			if (!(dt > 0.0F))
+				return; // paused, or a degenerate frame time
+
+			// The smoothed orientation s relaxes towards the networked one o:
+			//
+			//     ds/dt = -(s - o) / tau
+			//
+			// Over a step of dt with o held, the exact solution keeps exp(-dt / tau) of
+			// the error. Being exact rather than an Euler step, it composes: two steps
+			// of dt / 2 land where one step of dt does, so the settling rate is the
+			// same however often this is called.
+			float const blend = 1.0F - expf(-dt / kOrientationSmoothingTimeConstant);
+
+			// Near-antipodal orientations have no meaningful linear interpolation:
+			// the blend passes through the origin and the direction is lost. Snap,
+			// which is also the sanest depiction of an instant about-face.
+			if (Vector3::Dot(orientationSmoothed, orientation) <= -0.999F) {
+				orientationSmoothed = orientation;
+				return;
 			}
+
+			orientationSmoothed += (orientation - orientationSmoothed) * blend;
+
+			// Guard the renormalization: a collapsed blend would otherwise leave a
+			// zero vector behind and every consumer would inherit it.
+			float const length = orientationSmoothed.GetLength();
+			orientationSmoothed =
+			  (length > 0.0F) ? orientationSmoothed * (1.0F / length) : orientation;
 		}
 
 		void Player::Update(float dt) {

@@ -320,24 +320,19 @@ namespace spades {
 #else
 				// accurately resembles server's physics
 				// but not smooth
-				if (gameplayDt > 0.0F) {
+				if (gameplayDt > 0.0F)
 					worldSubFrame += gameplayDt;
-					worldSubFrameFast += gameplayDt;
-				}
 
-				// these run at exactly ~60fps
+				// physics runs at exactly ~60fps to stay in step with the server
 				float frameStep = 1.0F / 60.0F;
 				while (worldSubFrame >= frameStep) {
-					world->Advance(frameStep); // physics update
+					world->Advance(frameStep);
 					worldSubFrame -= frameStep;
 				}
 
-				// these run at min. ~60fps but as fast as possible
-				float step = std::min(gameplayDt, frameStep);
-				while (worldSubFrameFast >= step) {
-					world->UpdatePlayer(step, false); // smooth orientation update
-					worldSubFrameFast -= step;
-				}
+				// orientation smoothing is presentation only and settles at a rate
+				// independent of the call rate, so one call per frame is enough
+				world->UpdatePlayersSmooth(gameplayDt);
 #endif
 				// update player view (doesn't affect physics/game logics)
 				for (const auto& clientPlayer : clientPlayers) {
