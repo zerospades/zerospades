@@ -67,6 +67,7 @@ namespace spades {
 			GLProgramUniform table;
 			GLProgramUniform tableRowsInversed;
 			GLProgramUniform occlusionMaps;
+			GLProgramUniform tileOnly;
 
 			// Set for each batch: how many lights it has, and their rows in the table,
 			// four to a vector
@@ -79,9 +80,11 @@ namespace spades {
 			std::vector<const GLDynamicLight*> deferred;
 			std::vector<const GLDynamicLight*> batch;
 
-			// The frame the last program was set up for, and the batch it holds.
+			// The frame and the scene (the water's reflection or not) the last program
+			// was set up for, and the batch it holds.
 			GLProgram* uploadedProgram = nullptr;
 			std::uint32_t uploadedFrame = 0;
+			bool uploadedMirror = false;
 			std::vector<const GLDynamicLight*> uploadedBatch;
 
 			/** The image a spotlight projects, or none for another kind of light. */

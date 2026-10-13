@@ -41,6 +41,7 @@ namespace spades {
 		      table("dynamicLightTable"),
 		      tableRowsInversed("dynamicLightTableRowsInversed"),
 		      occlusionMaps("dynamicLightOcclusionMaps"),
+		      tileOnly("dynamicLightTileOnly"),
 		      count("dynamicLightCount"),
 		      rowsLow("dynamicLightRows[0]"),
 		      rowsHigh("dynamicLightRows[1]") {}
@@ -139,9 +140,11 @@ namespace spades {
 			}
 
 			const std::uint32_t frame = renderer->GetFrameNumber();
-			if (program != uploadedProgram || frame != uploadedFrame) {
+			const bool mirror = renderer->IsRenderingMirror();
+			if (program != uploadedProgram || frame != uploadedFrame || mirror != uploadedMirror) {
 				uploadedProgram = program;
 				uploadedFrame = frame;
+				uploadedMirror = mirror;
 				uploadedBatch.clear();
 
 				projectionTexture(program);
@@ -166,6 +169,12 @@ namespace spades {
 				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
 				occlusionMaps(program);
 				occlusionMaps.SetValue(texStage + 3);
+
+				// The water's reflection is drawn as a whole second scene: there, the
+				// map is only walked for the lights without a tile, which leaves the
+				// most costly part of the lighting out of it.
+				tileOnly(program);
+				tileOnly.SetValue(mirror ? 1.F : 0.F);
 			}
 
 			if (batch == uploadedBatch)

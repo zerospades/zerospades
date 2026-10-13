@@ -74,6 +74,11 @@ uniform sampler2D dynamicLightProjectionTexture;
 uniform bool dynamicLightOccludedFromEye;
 uniform vec3 dynamicLightEye;
 
+// 1 to take a point a spotlight's tile can't prove lit as dark rather than walk the
+// map to find out: for the water's reflection, which the waves blur and break up,
+// at the cost of a shadow's edge, and never lighting what the map hides.
+uniform float dynamicLightTileOnly;
+
 // `GLDynamicLightOcclusionMaps`: tiles of `DYNAMIC_LIGHT_OCCLUSION_TILE` texels
 // each, `DYNAMIC_LIGHT_OCCLUSION_ATLAS` texels across, each texel holding how far
 // from its light the ray through it gets before it enters a solid block.
@@ -250,7 +255,8 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, bool volume,
 	// A volume has no surface for a tile to prove lit. The first-person view's
 	// models are lit as if at the eye, which no tile looks from. Any other point a
 	// tile can't prove lit, in and around a shadow, walks the map, from as far
-	// along the way as the tile proves clear; one with no tile walks all of it.
+	// along the way as the tile proves clear, or, in a reflection, is taken as
+	// dark; one with no tile walks all of it.
 	float visibility = 1.0;
 	if (volume) {
 		visibility = DynamicLightMapVolumeVisibility(position, lightPosition);
@@ -262,7 +268,10 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, bool volume,
 		               DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position,
 		                                               normal, lightPosition, clear);
 		if (!reaches)
-			visibility = DynamicLightMapVisibilityBeyond(position, normal, lightPosition, clear);
+			visibility = kind.z >= 0.0 && dynamicLightTileOnly > 0.5
+			               ? 0.0
+			               : DynamicLightMapVisibilityBeyond(position, normal, lightPosition,
+			                                                 clear);
 	}
 
 	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue * visibility;
