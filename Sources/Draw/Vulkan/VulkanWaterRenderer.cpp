@@ -398,6 +398,19 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			SPLog("VulkanWaterRenderer created");
 
+			{
+				const uint32_t slots = device->GetMaxFramesInFlight();
+				VkQueryPoolCreateInfo queryInfo{};
+				queryInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+				queryInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+				queryInfo.queryCount = slots;
+				if (vkCreateQueryPool(device->GetDevice(), &queryInfo, nullptr,
+				                      &occlusionQueryPool) != VK_SUCCESS)
+					SPRaise("Failed to create the water's occlusion query pool");
+				occlusionQueryIssuedLastUse.assign(slots, false);
+				occlusionQueryIssued.assign(slots, false);
+			}
+
 			if (!map)
 				return;
 
@@ -460,6 +473,9 @@ namespace spades {
 		VulkanWaterRenderer::~VulkanWaterRenderer() {
 			SPADES_MARK_FUNCTION();
 			SPLog("VulkanWaterRenderer destroyed");
+
+			if (occlusionQueryPool != VK_NULL_HANDLE)
+				vkDestroyQueryPool(device->GetDevice(), occlusionQueryPool, nullptr);
 
 			// free wave tanks
 			for (void* p : waveTanksPlaceholder) {
@@ -908,8 +924,34 @@ namespace spades {
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vbuf, &offset);
 		vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-		// Draw
+		// Draw, counting what passes the depth test for the next use of this
+		// frame slot (WasSeenInLastUse)
+		const uint32_t querySlot = renderer.GetCurrentFrameIndex();
+		vkCmdBeginQuery(commandBuffer, occlusionQueryPool, querySlot, 0);
 		vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+		vkCmdEndQuery(commandBuffer, occlusionQueryPool, querySlot);
+		occlusionQueryIssued[querySlot] = true;
+	}
+
+	void VulkanWaterRenderer::ResetOcclusionQuery(VkCommandBuffer commandBuffer) {
+		const uint32_t slot = renderer.GetCurrentFrameIndex();
+		occlusionQueryIssuedLastUse[slot] = occlusionQueryIssued[slot];
+		occlusionQueryIssued[slot] = false;
+		vkCmdResetQueryPool(commandBuffer, occlusionQueryPool, slot, 1);
+	}
+
+	bool VulkanWaterRenderer::WasSeenInLastUse() {
+		const uint32_t slot = renderer.GetCurrentFrameIndex();
+		if (!occlusionQueryIssuedLastUse[slot])
+			return true;
+		// The samples that passed, then whether that count is available
+		std::uint64_t result[2] = {0, 0};
+		const VkResult status = vkGetQueryPoolResults(
+		  device->GetDevice(), occlusionQueryPool, slot, 1, sizeof(result), result,
+		  sizeof(result), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+		if (status != VK_SUCCESS || result[1] == 0)
+			return true;
+		return result[0] != 0;
 	}
 
 	void VulkanWaterRenderer::MarkUpdate(int x, int y) {

@@ -87,6 +87,15 @@ namespace spades {
 
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
 
+			/** Resets this frame slot's occlusion query, outside any render pass,
+			 * before the water is drawn in it (`RenderSunlightPass`) */
+			void ResetOcclusionQuery(VkCommandBuffer commandBuffer);
+			/** Whether any of the water passed the depth test the last time this
+			 * frame slot drew it, as GL's `r_occlusionQuery` asks before drawing
+			 * the reflections; unknown counts as seen. That frame's fence has been
+			 * waited on, so its result is there without waiting. */
+			bool WasSeenInLastUse();
+
 			// Water update tick
 			void UpdateSimulation(float dt);
 			void UploadWaveTextures(VkCommandBuffer commandBuffer);
@@ -108,6 +117,12 @@ namespace spades {
 			void CreateUniformBuffers();
 			void UpdateUniformBuffers(uint32_t frameIndex);
 			void CleanupDescriptorResources();
+
+			// One occlusion query per frame in flight around the water's draw, and
+			// whether a slot's query was drawn in its last use and in this one
+			VkQueryPool occlusionQueryPool = VK_NULL_HANDLE;
+			std::vector<bool> occlusionQueryIssuedLastUse;
+			std::vector<bool> occlusionQueryIssued;
 
 			// Mesh
 			Handle<VulkanBuffer> vertexBuffer;

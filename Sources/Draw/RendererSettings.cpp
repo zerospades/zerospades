@@ -45,6 +45,7 @@ DEFINE_SPADES_SETTING(r_lensFlareDynamic, "1");
 DEFINE_SPADES_SETTING(r_maxAnisotropy, "8");
 DEFINE_SPADES_SETTING(r_modelShadows, "1");
 DEFINE_SPADES_SETTING(r_multisamples, "0");
+DEFINE_SPADES_SETTING(r_occlusionQuery, "0");
 DEFINE_SPADES_SETTING(r_outlines, "0");
 DEFINE_SPADES_SETTING(r_outlinesDepthThreshold, "0.05");
 DEFINE_SPADES_SETTING(r_outlinesStrength, "1");

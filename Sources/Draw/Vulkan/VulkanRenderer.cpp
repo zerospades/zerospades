@@ -78,6 +78,7 @@ SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
 SPADES_SETTING(r_cameraBlur);
 SPADES_SETTING(r_depthPrepass);
+SPADES_SETTING(r_occlusionQuery);
 SPADES_SETTING(r_scale);
 SPADES_SETTING(r_scaleFilter);
 SPADES_SETTING(r_outlines);
@@ -2047,6 +2048,7 @@ namespace spades {
 
 			if (waterRenderer) {
 				waterRenderer->UploadWaveTextures(commandBuffer);
+				waterRenderer->ResetOcclusionQuery(commandBuffer);
 			}
 
 
@@ -2142,8 +2144,14 @@ namespace spades {
 			mirrorClearValues[0].color = {{bgColor.x, bgColor.y, bgColor.z, 1.0f}};
 			mirrorClearValues[1].depthStencil = {1.0f, 0};
 
+			// GL's r_occlusionQuery: no reflections for water none of which was
+			// seen the last time this frame slot drew it; the mirror is only
+			// cleared to the fog, as GL clears its texture
+			const bool mirrorDrawn =
+			  !(int)r_occlusionQuery || waterRenderer->WasSeenInLastUse();
+
 			// The depth pre-pass and its ambient occlusion, as GL's for the mirror too
-			const bool mirrorDepthPrepass = UsesDepthPrepass();
+			const bool mirrorDepthPrepass = mirrorDrawn && UsesDepthPrepass();
 			if (mirrorDepthPrepass) {
 				RecordDepthPrepass(commandBuffer, framebufferManager->GetMirrorFramebuffer(),
 				                   mirrorClearValues, UsesFullDepthPrepass());
@@ -2167,12 +2175,12 @@ namespace spades {
 			// Rendering sky here with non-reflected view axes causes incorrect reflections
 
 			// Render mirrored map
-			if (mapRenderer) {
+			if (mapRenderer && mirrorDrawn) {
 				mapRenderer->RenderSunlightPass(commandBuffer);
 			}
 
 			// Render mirrored models
-			if (modelRenderer) {
+			if (modelRenderer && mirrorDrawn) {
 				modelRenderer->RenderSunlightPass(commandBuffer, false);
 			}
 
