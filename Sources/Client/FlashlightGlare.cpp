@@ -79,6 +79,12 @@ namespace spades {
 
 			/** Below this a layer is too faint and small to show. */
 			const float kMinLayerAmount = 1.0F / 1024.0F;
+
+			/** How much of a glare's light `layer` takes, `beam` and `lens` as in
+			 * `FlashlightGlare::Frame`. */
+			float LayerWeight(const GlareLayer& layer, float beam, float lens) {
+				return layer.intensity * (std::pow(beam, layer.beamPower) + layer.lensGlint * lens);
+			}
 		} // namespace
 
 		void FlashlightGlare::Update(const Lamp& lamp, const Vector3& viewOrigin,
@@ -138,16 +144,26 @@ namespace spades {
 				frame = f;
 		}
 
-		void FlashlightGlare::AddToScene(IRenderer& renderer, float ambient) const {
+		float FlashlightGlare::GetStrength() const {
 			if (!frame)
+				return 0.0F;
+
+			float weight = 0.0F;
+			for (const GlareLayer& layer : kGlareLayers)
+				weight = std::max(weight, LayerWeight(layer, frame->beam, frame->lens));
+			return frame->reception * weight;
+		}
+
+		void FlashlightGlare::AddToScene(IRenderer& renderer, float ambient, float share) const {
+			if (!frame || share <= 0.0F)
 				return;
 
 			const float adaptation = Mix(kDarkAdaptation, 1.0F, Clamp(ambient, 0.0F, 1.0F));
+			const float received = frame->reception * std::min(share, 1.0F) * adaptation;
 			Handle<IImage> image = renderer.RegisterImage(kGlareImage);
 
 			for (const GlareLayer& layer : kGlareLayers) {
-				const float weight = std::pow(frame->beam, layer.beamPower) + layer.lensGlint * frame->lens;
-				const float amount = frame->reception * adaptation * layer.intensity * weight;
+				const float amount = received * LayerWeight(layer, frame->beam, frame->lens);
 				if (amount < kMinLayerAmount)
 					continue;
 

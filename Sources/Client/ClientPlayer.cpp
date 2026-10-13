@@ -824,8 +824,8 @@ namespace spades {
 			flashlightGlare.Update(lamp, client.GetLastSceneDef().viewOrigin, *map, time);
 		}
 
-		void ClientPlayer::AddFlashlightGlareToScene(float ambient) {
-			flashlightGlare.AddToScene(client.GetRenderer(), ambient);
+		void ClientPlayer::AddFlashlightGlareToScene(float ambient, float share) {
+			flashlightGlare.AddToScene(client.GetRenderer(), ambient, share);
 		}
 
 		void ClientPlayer::AddToSceneFirstPersonView() {

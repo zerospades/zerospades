@@ -154,10 +154,14 @@ namespace spades {
 			void AddToScene();
 			void Draw2D();
 
+			/** How strongly the glare of this player's lamp worked out by `AddToScene`
+			 * shows (see `FlashlightGlare::GetStrength`). */
+			float GetFlashlightGlareStrength() const { return flashlightGlare.GetStrength(); }
+
 			/** Adds the glare of this player's lamp worked out by `AddToScene` to the
-			 * scene, in a scene as bright as `ambient` (see
+			 * scene, in a scene as bright as `ambient`, keeping `share` of it (see
 			 * `FlashlightGlare::AddToScene`). */
-			void AddFlashlightGlareToScene(float ambient);
+			void AddFlashlightGlareToScene(float ambient, float share);
 
 			bool IsChangingTool();
 			void FiredWeapon();

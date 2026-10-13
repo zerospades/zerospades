@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include <Core/Math.h>
 #include <Core/TMPUtils.h>
 
@@ -46,6 +48,13 @@ namespace spades {
 		 */
 		class FlashlightGlare {
 		public:
+			/**
+			 * The most lamps whose glare is drawn at once: the strongest ones. Each
+			 * glare covers up to the whole screen, and a crowd of lamps facing the
+			 * camera would otherwise draw it over again for every one of them.
+			 */
+			static constexpr std::size_t MaxShown = 8;
+
 			/** A lit lamp, as it is this frame. */
 			struct Lamp {
 				Vector3 position;
@@ -67,11 +76,19 @@ namespace spades {
 			void Clear() { frame.reset(); }
 
 			/**
+			 * How strongly this frame's glare shows, whatever the scene's darkness,
+			 * to rank lamps by; `0` for none.
+			 */
+			float GetStrength() const;
+
+			/**
 			 * Adds this frame's glare to the scene being built. `ambient` is how
 			 * bright the scene around it is, from `0` for total darkness, where the
-			 * glare is at its widest, to `1` for full daylight.
+			 * glare is at its widest, to `1` for full daylight. `share`, from 0 to 1,
+			 * is how much of its strength it keeps, to fade it out as it drops out of
+			 * the strongest `MaxShown`.
 			 */
-			void AddToScene(IRenderer&, float ambient) const;
+			void AddToScene(IRenderer&, float ambient, float share) const;
 
 		private:
 			struct Frame {
