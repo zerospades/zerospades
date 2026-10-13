@@ -104,30 +104,55 @@ namespace spades {
 			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
 			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
 
+			// The units of the textures this program samples
+			projectionTexture(program);
+			mapOccupancy(program);
+			table(program);
+			occlusionMaps(program);
+			Units units;
+			{
+				int next = texStage;
+				auto assign = [&next](const GLProgramUniform& uniform) {
+					return uniform.IsActive() ? next++ : -1;
+				};
+				units.projection = assign(projectionTexture);
+				units.occupancy = assign(mapOccupancy);
+				units.table = assign(table);
+				units.occlusionMaps = assign(occlusionMaps);
+			}
+
 			// Once a pass, the textures every batch shares
 			const std::uint32_t pass = renderer->GetDynamicLightPass();
-			if (pass != boundPass) {
+			if (pass != boundPass || units != boundUnits) {
 				boundPass = pass;
+				boundUnits = units;
 				boundImage = nullptr;
 
 				// The map hides the lights from what is behind it, once it is loaded.
-				device.ActiveTexture(texStage + 1);
-				device.BindTexture(IGLDevice::Texture3D, occupancy ? occupancy->GetTexture() : 0);
+				if (units.occupancy >= 0) {
+					device.ActiveTexture(units.occupancy);
+					device.BindTexture(IGLDevice::Texture3D,
+					                   occupancy ? occupancy->GetTexture() : 0);
+				}
 
 				// The lights the batch names rows of
-				device.ActiveTexture(texStage + 2);
-				device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
+				if (units.table >= 0) {
+					device.ActiveTexture(units.table);
+					device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
+				}
 
 				// Where the map stops the spotlights that have a map
-				device.ActiveTexture(texStage + 3);
-				device.BindTexture(IGLDevice::Texture2D,
-				                   renderer->GetDynamicLightOcclusionMaps().GetTexture());
+				if (units.occlusionMaps >= 0) {
+					device.ActiveTexture(units.occlusionMaps);
+					device.BindTexture(IGLDevice::Texture2D,
+					                   renderer->GetDynamicLightOcclusionMaps().GetTexture());
+				}
 			}
 
 			// The batch's image, when it is another one than the last batch's
-			device.ActiveTexture(texStage);
 			GLImage* batchImage = image ? image : whiteImage.GetPointerOrNull();
-			if (batchImage != boundImage) {
+			if (units.projection >= 0 && batchImage != boundImage) {
+				device.ActiveTexture(units.projection);
 				boundImage = batchImage;
 				batchImage->Bind(IGLDevice::Texture2D);
 				if (image) {
@@ -138,6 +163,7 @@ namespace spades {
 					image->SetMinFilter(IGLDevice::Linear);
 				}
 			}
+			device.ActiveTexture(texStage);
 
 			const std::uint32_t frame = renderer->GetFrameNumber();
 			const bool mirror = renderer->IsRenderingMirror();
@@ -147,10 +173,8 @@ namespace spades {
 				uploadedMirror = mirror;
 				uploadedBatch.clear();
 
-				projectionTexture(program);
-				projectionTexture.SetValue(texStage);
-				mapOccupancy(program);
-				mapOccupancy.SetValue(texStage + 1);
+				projectionTexture.SetValue(units.projection);
+				mapOccupancy.SetValue(units.occupancy);
 				mapOcclusion(program);
 				mapOcclusion.SetValue(occupancy ? 1.F : 0.F);
 				if (occupancy) {
@@ -163,12 +187,10 @@ namespace spades {
 				const Vector3& viewOrigin = renderer->GetSceneDef().viewOrigin;
 				eye(program);
 				eye.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
-				table(program);
-				table.SetValue(texStage + 2);
+				table.SetValue(units.table);
 				tableRowsInversed(program);
 				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
-				occlusionMaps(program);
-				occlusionMaps.SetValue(texStage + 3);
+				occlusionMaps.SetValue(units.occlusionMaps);
 
 				// The water's reflection is drawn as a whole second scene: there, the
 				// map is only walked for the lights without a tile, which leaves the

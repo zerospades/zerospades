@@ -56,6 +56,26 @@ namespace spades {
 			// passes in between use the same texture stages for something else.
 			std::uint32_t boundPass = 0;
 			GLImage* boundImage = nullptr;
+
+			/**
+			 * The texture units of the textures a program samples, in turn from the
+			 * first one it is given, or -1 for one it doesn't: a GPU may have no more
+			 * units than one program can sample (16 on macOS), so a texture the
+			 * program leaves out takes none.
+			 */
+			struct Units {
+				int projection = -1;
+				int occupancy = -1;
+				int table = -1;
+				int occlusionMaps = -1;
+				bool operator==(const Units& o) const {
+					return projection == o.projection && occupancy == o.occupancy &&
+					       table == o.table && occlusionMaps == o.occlusionMaps;
+				}
+				bool operator!=(const Units& o) const { return !(*this == o); }
+			};
+			/** The units the pass's shared textures are bound to. */
+			Units boundUnits;
 			Handle<GLImage> whiteImage;
 
 			// Set once a frame
