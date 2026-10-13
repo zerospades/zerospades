@@ -358,8 +358,11 @@ namespace spades {
 		void GLProfiler::BeginPhaseInner(Phase& phase) {
 			SPADES_MARK_FUNCTION_DEBUG();
 
+			// Waits for the GPU to be done with what came before, so that a phase's
+			// wall clock time is the GPU's time on it too, rather than that of
+			// whichever later call happens to wait for the GPU.
 			if (m_settings.r_debugTimingFlush)
-				m_device.Flush();
+				m_device.Finish();
 
 			phase.startWallClockTime = GetWallClockTime();
 
@@ -387,8 +390,11 @@ namespace spades {
 
 			Phase& current = GetCurrentPhase();
 
+			// Waits for the GPU to be done with what came before, so that a phase's
+			// wall clock time is the GPU's time on it too, rather than that of
+			// whichever later call happens to wait for the GPU.
 			if (m_settings.r_debugTimingFlush)
-				m_device.Flush();
+				m_device.Finish();
 
 			double wallClockTime = GetWallClockTime();
 
