@@ -229,6 +229,13 @@ namespace spades {
 			void CleanupVulkanResources();
 			void RecreateSwapchainDependencies();
 
+			/** The render size the window and `r_scale` ask for now */
+			VkExtent2D DesiredRenderExtent() const;
+
+			/** Rebuilds what is sized to the render size, at the size asked for:
+			 * between frames, with the device idle */
+			void RecreateRenderTargets();
+
 			/**
 			 * Begins a frame on the swapchain: brings it, and what the renderer
 			 * sizes from it, in line with the window, then acquires an image.
@@ -374,8 +381,12 @@ namespace spades {
 			/** The frame's dynamic lights, which the lit pipelines bind as set 2 */
 			VulkanSceneLights& GetSceneLights() { return *sceneLights; }
 			bool IsRenderingMirror() const { return renderingMirror; }
-		int GetRenderWidth() const { return renderWidth; }
-		int GetRenderHeight() const { return renderHeight; }
+			/** The size the scene is drawn and post-processed at: the window's,
+			 * scaled by `r_scale` as GL does. The final blit scales it to the
+			 * swapchain, by `r_scaleFilter`. The 2D layer and `ScreenWidth` /
+			 * `ScreenHeight` stay in the window's units. */
+			int GetRenderWidth() const { return renderWidth; }
+			int GetRenderHeight() const { return renderHeight; }
 
 			void StartScene(const client::SceneDefinition& def) override;
 
