@@ -74,6 +74,8 @@ namespace spades {
 			bool BuildMatrix(float near, float far);
 			void CreateRenderPass();
 			void CreateFramebuffers();
+			/** Puts the cascades in the layout the sampling descriptors declare */
+			void InitializeLayouts();
 			void CreatePipeline();
 			void CreateDescriptorSets();
 			void CreateSamplingResources();
