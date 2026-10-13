@@ -625,10 +625,37 @@ namespace spades {
 			SPLog("VMA allocator created (flags: 0x%x)", allocatorFlags);
 		}
 
-		void SDLVulkanDevice::CreateSwapchain() {
+		VkExtent2D
+		SDLVulkanDevice::ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const {
+			// Most surfaces state their extent, which is 0x0 while minimised. The
+			// others leave it to the swapchain: the window's size in pixels, which
+			// SDL reports as its drawable size, clamped to what the surface allows.
+			if (capabilities.currentExtent.width != UINT32_MAX)
+				return capabilities.currentExtent;
+
+			int width = 0, height = 0;
+			SDL_Vulkan_GetDrawableSize(window, &width, &height);
+			if (width <= 0 || height <= 0)
+				return VkExtent2D{0, 0};
+			VkExtent2D extent{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+			extent.width = std::max(capabilities.minImageExtent.width,
+			                        std::min(capabilities.maxImageExtent.width, extent.width));
+			extent.height = std::max(capabilities.minImageExtent.height,
+			                         std::min(capabilities.maxImageExtent.height, extent.height));
+			return extent;
+		}
+
+		void SDLVulkanDevice::CreateSwapchain(VkSwapchainKHR oldSwapchain) {
 			// Query swapchain support
 			VkSurfaceCapabilitiesKHR capabilities;
 			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+
+			const VkExtent2D extent = ChooseSwapchainExtent(capabilities);
+			if (extent.width == 0 || extent.height == 0) {
+				// Callers past the first check the surface has an area first
+				// (PrepareSwapchain); the first one is the window just created.
+				SPRaise("Cannot create a swapchain for a surface without area");
+			}
 
 			uint32_t formatCount;
 			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
@@ -660,16 +687,7 @@ namespace spades {
 				}
 			}
 
-			// Choose swap extent
-			if (capabilities.currentExtent.width != UINT32_MAX) {
-				swapchainExtent = capabilities.currentExtent;
-			} else {
-				swapchainExtent = {static_cast<uint32_t>(w), static_cast<uint32_t>(h)};
-				swapchainExtent.width = std::max(capabilities.minImageExtent.width,
-					std::min(capabilities.maxImageExtent.width, swapchainExtent.width));
-				swapchainExtent.height = std::max(capabilities.minImageExtent.height,
-					std::min(capabilities.maxImageExtent.height, swapchainExtent.height));
-			}
+			swapchainExtent = extent;
 
 			// Request one more image than the minimum to avoid waiting
 			uint32_t imageCount = capabilities.minImageCount + 1;
@@ -715,7 +733,9 @@ namespace spades {
 			createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 			createInfo.presentMode = presentMode;
 			createInfo.clipped = VK_TRUE;
-			createInfo.oldSwapchain = VK_NULL_HANDLE;
+			// Handing the old swapchain over lets the presentation engine retire
+			// its images in order rather than tear them away
+			createInfo.oldSwapchain = oldSwapchain;
 
 			VkResult result = vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain);
 			if (result != VK_SUCCESS) {
@@ -842,11 +862,17 @@ namespace spades {
 			VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
 				imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
+			// Out of date: no image was acquired, nor the semaphore signalled, so
+			// the frame is dropped. Suboptimal: the image is acquired and has to
+			// be presented. Either way the swapchain is rebuilt at the next frame
+			// boundary, never under a frame already being recorded against it.
 			if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-				RecreateSwapchain();
-				return UINT32_MAX; // Signal caller to retry
-			} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-				SPRaise("Failed to acquire swapchain image");
+				swapchainStale = true;
+				return UINT32_MAX;
+			} else if (result == VK_SUBOPTIMAL_KHR) {
+				swapchainStale = true;
+			} else if (result != VK_SUCCESS) {
+				SPRaise("Failed to acquire swapchain image (error code: %d)", result);
 			}
 
 			// imageAvailable follows the frame-in-flight; renderFinished follows the
@@ -871,9 +897,9 @@ namespace spades {
 			VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
 			if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-				RecreateSwapchain();
+				swapchainStale = true;
 			} else if (result != VK_SUCCESS) {
-				SPRaise("Failed to present swapchain image");
+				SPRaise("Failed to present swapchain image (error code: %d)", result);
 			}
 
 			currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -884,25 +910,48 @@ namespace spades {
 			vkResetFences(device, 1, &inFlightFences[currentFrame]);
 		}
 
-		void SDLVulkanDevice::RecreateSwapchain() {
-			int width = 0, height = 0;
-			SDL_GetWindowSize(window, &width, &height);
-			while (width == 0 || height == 0) {
-				SDL_GetWindowSize(window, &width, &height);
-				SDL_Delay(10);
-			}
+		bool SDLVulkanDevice::PrepareSwapchain() {
+			if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
+				return false;
 
+			int width = 0, height = 0;
+			SDL_Vulkan_GetDrawableSize(window, &width, &height);
+			if (width <= 0 || height <= 0)
+				return false;
+
+			if (!swapchainStale && static_cast<uint32_t>(width) == swapchainExtent.width &&
+			    static_cast<uint32_t>(height) == swapchainExtent.height)
+				return true;
+
+			VkSurfaceCapabilitiesKHR capabilities;
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+			const VkExtent2D extent = ChooseSwapchainExtent(capabilities);
+			if (extent.width == 0 || extent.height == 0)
+				return false;
+
+			RecreateSwapchain();
+			return true;
+		}
+
+		void SDLVulkanDevice::RecreateSwapchain() {
+			// Nothing may still use the old swapchain's images, views or
+			// semaphores, nor the renderer's framebuffers over them
 			vkDeviceWaitIdle(device);
 
-			CleanupSwapchain();
+			SDL_GetWindowSize(window, &w, &h);
 
-			w = width;
-			h = height;
-			CreateSwapchain();
+			// The views and semaphores go first; the swapchain itself is handed
+			// over to its successor and retired after it is made.
+			VkSwapchainKHR oldSwapchain = swapchain;
+			swapchain = VK_NULL_HANDLE;
+			CleanupSwapchain();
+			CreateSwapchain(oldSwapchain);
+			vkDestroySwapchainKHR(device, oldSwapchain, nullptr);
 			CreateImageViews();
 
+			swapchainStale = false;
 			swapchainGeneration++;
-			SPLog("Swapchain recreated (%dx%d)", w, h);
+			SPLog("Swapchain recreated (%ux%u)", swapchainExtent.width, swapchainExtent.height);
 		}
 
 	} // namespace gui
