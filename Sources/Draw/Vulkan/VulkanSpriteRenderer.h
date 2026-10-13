@@ -177,6 +177,13 @@ namespace spades {
 			VulkanSpriteRenderer(VulkanRenderer&);
 			~VulkanSpriteRenderer();
 
+			/** Makes the pipelines now, rather than on the first frame drawing a
+			 * sprite */
+			void PreparePipeline() {
+				if (pipeline == VK_NULL_HANDLE)
+					CreatePipeline();
+			}
+
 			void Add(VulkanImage* img, Vector3 center, float rad, float ang, Vector4 color);
 			void Clear();
 
