@@ -22,7 +22,8 @@
 #define SCENE_LIGHT_LIGHTS_GLSL
 
 // The light the frame's dynamic lights bring to a point of a lit surface or volume,
-// for the shaders of the scene's passes. A vertex shader includer defines
+// for the shaders of the scene's passes. One that includes `SceneView.glsl` first
+// lights the water's reflection more cheaply (`DynamicLightMapVisibility`). A vertex shader includer defines
 // `SCENE_LIGHT_VERTEX_STAGE`, which has no fragments of the first-person view. A point reads only the lights of the
 // cluster of the view it lies in; one outside the view, as the water's mirror sees
 // it, reads them all.
@@ -144,6 +145,14 @@ float DynamicLightMapVisibility(uint i, vec3 position, vec3 normal, vec3 lightPo
 	if (tile >= 0 && !firstPerson &&
 	    DynamicLightOcclusionMapReaches(i, tile, position, normal, lightPosition))
 		return 1.0;
+
+#ifdef SCENE_VIEW_GLSL
+	// The water's reflection is a whole second scene, which the waves blur and
+	// break up: there, a spotlight lights only what its occlusion map proves lit,
+	// at the cost of a shadow's edge, and never what the map hides.
+	if (tile >= 0 && !firstPerson && sceneView.options.y != 0.0)
+		return 0.0;
+#endif
 
 	vec3 from = firstPerson ? dynamicLightFrame.eyeNear.xyz : position + normal * 0.01;
 	return DynamicLightMapWalk(from, lightPosition, true) > 1.0 ? 1.0 : 0.0;
