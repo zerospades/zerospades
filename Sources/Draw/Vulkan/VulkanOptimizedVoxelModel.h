@@ -76,35 +76,27 @@ namespace spades {
 
 			// Shared pipeline cache across all model instances
 			struct PipelineCache {
-				VkRenderPass renderPass;
-				VkPipeline pipeline;
-				VkPipeline mirroredPipeline;          // same as pipeline, VK_CULL_MODE_FRONT_BIT
-				VkPipeline shadowMapPipeline;
-				VkPipeline ghostDepthPipeline;
-				VkPipeline mirroredGhostDepthPipeline; // same as ghostDepthPipeline, VK_CULL_MODE_FRONT_BIT
-				VkPipeline ghostColorPipeline;
-				VkPipeline mirroredGhostColorPipeline; // same as ghostColorPipeline, VK_CULL_MODE_FRONT_BIT
-				VkPipeline xrayPipeline;
-				VkPipeline mirroredXRayPipeline;      // same as xrayPipeline, VK_CULL_MODE_FRONT_BIT
-				VkPipelineLayout xrayPipelineLayout;  // own layout: no descriptor sets, wider push range
-				VkPipelineLayout pipelineLayout;
-				VkPipelineLayout shadowMapPipelineLayout;
-				VkRenderPass shadowMapRenderPass;     // render pass shadowMapPipeline was built against
-				VkDescriptorSetLayout descriptorSetLayout;
-				bool physicalLighting;
+				VkRenderPass renderPass = VK_NULL_HANDLE;
+				VkPipeline pipeline = VK_NULL_HANDLE;
+				VkPipeline mirroredPipeline = VK_NULL_HANDLE; // same as pipeline, VK_CULL_MODE_FRONT_BIT
+				VkPipeline shadowMapPipeline = VK_NULL_HANDLE;
+				VkPipeline ghostDepthPipeline = VK_NULL_HANDLE;
+				VkPipeline mirroredGhostDepthPipeline = VK_NULL_HANDLE; // VK_CULL_MODE_FRONT_BIT
+				VkPipeline ghostColorPipeline = VK_NULL_HANDLE;
+				VkPipeline mirroredGhostColorPipeline = VK_NULL_HANDLE; // VK_CULL_MODE_FRONT_BIT
+				VkPipeline xrayPipeline = VK_NULL_HANDLE;
+				VkPipeline mirroredXRayPipeline = VK_NULL_HANDLE;      // VK_CULL_MODE_FRONT_BIT
+				// own layout: no descriptor sets, wider push range
+				VkPipelineLayout xrayPipelineLayout = VK_NULL_HANDLE;
+				VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+				VkPipelineLayout shadowMapPipelineLayout = VK_NULL_HANDLE;
+				// render pass shadowMapPipeline was built against
+				VkRenderPass shadowMapRenderPass = VK_NULL_HANDLE;
+				VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+				bool physicalLighting = false;
 
-				PipelineCache() : renderPass(VK_NULL_HANDLE), pipeline(VK_NULL_HANDLE),
-				                  mirroredPipeline(VK_NULL_HANDLE),
-				                  shadowMapPipeline(VK_NULL_HANDLE),
-				                  ghostDepthPipeline(VK_NULL_HANDLE), mirroredGhostDepthPipeline(VK_NULL_HANDLE),
-				                  ghostColorPipeline(VK_NULL_HANDLE), mirroredGhostColorPipeline(VK_NULL_HANDLE),
-				                  xrayPipeline(VK_NULL_HANDLE), mirroredXRayPipeline(VK_NULL_HANDLE),
-				                  xrayPipelineLayout(VK_NULL_HANDLE),
-				                  pipelineLayout(VK_NULL_HANDLE),
-				                  shadowMapPipelineLayout(VK_NULL_HANDLE),
-				                  shadowMapRenderPass(VK_NULL_HANDLE),
-				                  descriptorSetLayout(VK_NULL_HANDLE),
-				                  physicalLighting(false) {}
+				/** Destroys every pipeline, layout and set layout it holds */
+				void Destroy(VkDevice device);
 			};
 
 			static PipelineCache sharedPipeline;
