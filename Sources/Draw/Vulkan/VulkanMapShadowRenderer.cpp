@@ -73,12 +73,14 @@ namespace spades {
 			shadowImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 			                           VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
-			// Create staging buffer (512*512*4 = 1MB)
+			// Staging buffers, one per frame in flight (512*512*4 = 1MB each)
+			const std::size_t framesInFlight = device->GetMaxFramesInFlight();
 			size_t bufferSize = w * h * 4;
-			stagingBuffer = Handle<VulkanBuffer>::New(
-				device, bufferSize,
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			for (std::size_t i = 0; i < framesInFlight; i++)
+				stagingBuffers.push_back(Handle<VulkanBuffer>::New(
+					device, bufferSize,
+					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
 			// Coarse min/max shadow companion (64×64 for a 512×512 fine map).
 			int cw = w >> CoarseBits;
@@ -95,10 +97,11 @@ namespace spades {
 			coarseShadowImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 			                                 VK_SAMPLER_ADDRESS_MODE_REPEAT);
 
-			coarseStagingBuffer = Handle<VulkanBuffer>::New(
-				device, (size_t)cw * ch * 4,
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			for (std::size_t i = 0; i < framesInFlight; i++)
+				coarseStagingBuffers.push_back(Handle<VulkanBuffer>::New(
+					device, (size_t)cw * ch * 4,
+					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
 			// Generate all pixels immediately
 			for (int y = 0; y < h; y++) {
@@ -117,8 +120,10 @@ namespace spades {
 			std::fill(coarseUpdateBitmap.begin(), coarseUpdateBitmap.end(), 0u);
 
 			// Upload initial data via one-time command buffer
-			stagingBuffer->UpdateData(bitmap.data(), w * h * 4);
-			coarseStagingBuffer->UpdateData(coarseBitmap.data(), (size_t)cw * ch * 4);
+			// Through the first frame slot's staging: this upload is waited for
+			// below, before any frame uses it
+			stagingBuffers[0]->UpdateData(bitmap.data(), w * h * 4);
+			coarseStagingBuffers[0]->UpdateData(coarseBitmap.data(), (size_t)cw * ch * 4);
 
 			VkCommandBufferAllocateInfo allocInfo{};
 			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -140,7 +145,7 @@ namespace spades {
 				0, VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-			shadowImage->CopyFromBuffer(commandBuffer, stagingBuffer->GetBuffer());
+			shadowImage->CopyFromBuffer(commandBuffer, stagingBuffers[0]->GetBuffer());
 
 			shadowImage->TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
@@ -149,7 +154,7 @@ namespace spades {
 			coarseShadowImage->TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				0, VK_ACCESS_TRANSFER_WRITE_BIT,
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-			coarseShadowImage->CopyFromBuffer(commandBuffer, coarseStagingBuffer->GetBuffer());
+			coarseShadowImage->CopyFromBuffer(commandBuffer, coarseStagingBuffers[0]->GetBuffer());
 			coarseShadowImage->TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
 				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -235,8 +240,11 @@ namespace spades {
 			coarseBitmap[cx + cy * cw] = packed;
 		}
 
-		void VulkanMapShadowRenderer::Update(VkCommandBuffer commandBuffer) {
+		void VulkanMapShadowRenderer::Update(VkCommandBuffer commandBuffer, std::size_t frameSlot) {
 			SPADES_MARK_FUNCTION();
+
+			VulkanBuffer& stagingBuffer = *stagingBuffers[frameSlot];
+			VulkanBuffer& coarseStagingBuffer = *coarseStagingBuffers[frameSlot];
 
 			// Dirty 32-texel spans, coalesced per row; adjacent dirty words in
 			// the same row merge into one copy region.
@@ -287,14 +295,14 @@ namespace spades {
 
 			// Heavy edits: one full upload beats hundreds of tiny copies.
 			if (dirtyTexels * 4 >= (size_t)w * h || spans.size() > 256) {
-				stagingBuffer->UpdateData(bitmap.data(), w * h * 4);
-				shadowImage->CopyFromBuffer(commandBuffer, stagingBuffer->GetBuffer());
+				stagingBuffer.UpdateData(bitmap.data(), w * h * 4);
+				shadowImage->CopyFromBuffer(commandBuffer, stagingBuffer.GetBuffer());
 			} else {
 				// Pack dirty spans contiguously into staging, one copy region each.
 				std::vector<VkBufferImageCopy> regions;
 				regions.reserve(spans.size());
 				VkDeviceSize offset = 0;
-				char* mapped = static_cast<char*>(stagingBuffer->Map());
+				char* mapped = static_cast<char*>(stagingBuffer.Map());
 				for (const Span& s : spans) {
 					std::memcpy(mapped + offset, bitmap.data() + s.y * w + s.x,
 					            (size_t)s.width * 4);
@@ -313,8 +321,8 @@ namespace spades {
 
 					offset += (VkDeviceSize)s.width * 4;
 				}
-				stagingBuffer->Unmap();
-				vkCmdCopyBufferToImage(commandBuffer, stagingBuffer->GetBuffer(),
+				stagingBuffer.Unmap();
+				vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.GetBuffer(),
 				                       shadowImage->GetImage(),
 				                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				                       (uint32_t)regions.size(), regions.data());
@@ -338,11 +346,11 @@ namespace spades {
 				}
 			}
 			if (coarseDirty) {
-				coarseStagingBuffer->UpdateData(coarseBitmap.data(), (size_t)cw * ch * 4);
+				coarseStagingBuffer.UpdateData(coarseBitmap.data(), (size_t)cw * ch * 4);
 				coarseShadowImage->TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 					VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-				coarseShadowImage->CopyFromBuffer(commandBuffer, coarseStagingBuffer->GetBuffer());
+				coarseShadowImage->CopyFromBuffer(commandBuffer, coarseStagingBuffer.GetBuffer());
 				coarseShadowImage->TransitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
 					VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);

@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include <cstdint>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -43,7 +45,9 @@ namespace spades {
 			client::GameMap* map;
 
 			Handle<VulkanImage> shadowImage;
-			Handle<VulkanBuffer> stagingBuffer;
+			// Staging, one per frame in flight: a frame writes only its own, which
+			// the GPU is done copying from once that frame slot's fence was waited on
+			std::vector<Handle<VulkanBuffer>> stagingBuffers;
 
 			// 8×8 downsampled min/max shadow map (matches GLMapShadowRenderer's
 			// coarseTexture). For each 8×8 cell of the fine shadow map, stores
@@ -55,7 +59,7 @@ namespace spades {
 			static constexpr int CoarseBits = 3;            // 1 << 3 = 8
 			static constexpr int CoarseSize = 1 << CoarseBits;
 			Handle<VulkanImage> coarseShadowImage;
-			Handle<VulkanBuffer> coarseStagingBuffer;
+			std::vector<Handle<VulkanBuffer>> coarseStagingBuffers;
 			std::vector<uint32_t> coarseBitmap;
 			std::vector<uint32_t> coarseUpdateBitmap;
 
@@ -74,7 +78,9 @@ namespace spades {
 			~VulkanMapShadowRenderer();
 
 			void GameMapChanged(int x, int y, int z, client::GameMap*);
-			void Update(VkCommandBuffer commandBuffer);
+			/** Uploads what map edits changed, through frame slot `frameSlot`'s
+			 * staging */
+			void Update(VkCommandBuffer commandBuffer, std::size_t frameSlot);
 
 			VulkanImage* GetShadowImage() { return shadowImage.GetPointerOrNull(); }
 			VulkanImage* GetCoarseShadowImage() { return coarseShadowImage.GetPointerOrNull(); }
