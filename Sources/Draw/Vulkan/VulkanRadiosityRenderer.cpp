@@ -36,13 +36,16 @@ namespace spades {
 
 		class VulkanRadiosityRenderer::UpdateDispatch : public ConcurrentDispatch {
 			VulkanRadiosityRenderer& owner;
+			// Where the eye was when the dispatch began, taken on the render
+			// thread: the scene's definition is not the worker's to read
+			const IntVector3 eyeChunk;
 
 		public:
 			std::atomic<bool> done{false};
-			explicit UpdateDispatch(VulkanRadiosityRenderer& o) : owner(o) {}
+			UpdateDispatch(VulkanRadiosityRenderer& o, IntVector3 eye) : owner(o), eyeChunk(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
-				owner.UpdateDirtyChunks();
+				owner.UpdateDirtyChunks(eyeChunk);
 				done = true;
 			}
 		};
@@ -69,7 +72,6 @@ namespace spades {
 		      stagingMapped(nullptr),
 		      stagingPerTextureSize(0),
 		      stagingSlotSize(0),
-		      nextStagingSlot(0),
 		      dispatch(nullptr) {
 			SPADES_MARK_FUNCTION();
 
@@ -164,14 +166,14 @@ namespace spades {
 			if (vkCreateSampler(dev, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
 				SPRaise("Failed to create radiosity sampler");
 
-			// Staging ring: each slot fits all four (flat/X/Y/Z) packed-uint32
-			// chunks back-to-back. 16 slots × 64 KiB = 1 MiB.
+			// Staging: each slot fits all four (flat/X/Y/Z) packed-uint32 chunks
+			// back to back, kStagingSlotsPerFrame of them per frame in flight
 			stagingPerTextureSize = ChunkSize * ChunkSize * ChunkSize * sizeof(VoxelType);
 			stagingSlotSize = stagingPerTextureSize * 4;
 
 			VkBufferCreateInfo bufInfo{};
 			bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufInfo.size = stagingSlotSize * kStagingSlotCount;
+			bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
 			bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -396,6 +398,7 @@ namespace spades {
 			if (minX > maxX || minY > maxY || minZ > maxZ)
 				return;
 
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			int cx1 = minX >> ChunkSizeBits;
 			int cy1 = minY >> ChunkSizeBits;
 			int cz1 = minZ >> ChunkSizeBits;
@@ -436,11 +439,12 @@ namespace spades {
 		}
 
 		int VulkanRadiosityRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			return (int)std::count_if(chunks.begin(), chunks.end(),
 			                          [](const Chunk& c) { return c.dirty; });
 		}
 
-		void VulkanRadiosityRenderer::Update(VkCommandBuffer cmd) {
+		void VulkanRadiosityRenderer::Update(VkCommandBuffer cmd, std::size_t frameSlot) {
 			SPADES_MARK_FUNCTION();
 
 			if (GetNumDirtyChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
@@ -448,7 +452,10 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				const Vector3& eye = renderer.GetSceneDef().viewOrigin;
+				dispatch = new UpdateDispatch(
+				  *this, IntVector3{(int)eye.x >> ChunkSizeBits, (int)eye.y >> ChunkSizeBits,
+				                    (int)eye.z >> ChunkSizeBits});
 				dispatch->Start();
 			}
 
@@ -456,21 +463,19 @@ namespace spades {
 			// finished. Each gets one staging-slot copy and four
 			// VkBufferImageCopy regions (one per dst texture).
 			std::vector<VkBufferImageCopy> regionsFlat, regionsX, regionsY, regionsZ;
-			regionsFlat.reserve(kStagingSlotCount);
-			regionsX.reserve(kStagingSlotCount);
-			regionsY.reserve(kStagingSlotCount);
-			regionsZ.reserve(kStagingSlotCount);
+			regionsFlat.reserve(kStagingSlotsPerFrame);
+			regionsX.reserve(kStagingSlotsPerFrame);
+			regionsY.reserve(kStagingSlotsPerFrame);
+			regionsZ.reserve(kStagingSlotsPerFrame);
 
-			std::vector<Chunk*> uploaded;
-			uploaded.reserve(kStagingSlotCount);
-
+			int slotsUsed = 0;
 			for (Chunk& c : chunks) {
-				if ((int)uploaded.size() >= kStagingSlotCount)
+				if (slotsUsed >= kStagingSlotsPerFrame)
 					break;
-				if (!c.transferDone.exchange(true)) {
-					int slot = nextStagingSlot;
-					nextStagingSlot = (nextStagingSlot + 1) % kStagingSlotCount;
-					std::size_t slotBase = slot * stagingSlotSize;
+				// The worker handed it over: the data is ours until handed back
+				if (!c.transferDone.load(std::memory_order_acquire)) {
+					const std::size_t slot = frameSlot * kStagingSlotsPerFrame + slotsUsed++;
+					const std::size_t slotBase = slot * stagingSlotSize;
 
 					std::uint8_t* base =
 					    static_cast<std::uint8_t*>(stagingMapped) + slotBase;
@@ -502,7 +507,7 @@ namespace spades {
 					regionsX.push_back(makeRegion(1 * stagingPerTextureSize));
 					regionsY.push_back(makeRegion(2 * stagingPerTextureSize));
 					regionsZ.push_back(makeRegion(3 * stagingPerTextureSize));
-					uploaded.push_back(&c);
+					c.transferDone.store(true, std::memory_order_release);
 				}
 			}
 
@@ -559,14 +564,21 @@ namespace spades {
 			                     0, 0, nullptr, 0, nullptr, 4, toRead);
 		}
 
-		void VulkanRadiosityRenderer::UpdateDirtyChunks() {
+		void VulkanRadiosityRenderer::UpdateDirtyChunks(IntVector3 eyeChunk) {
 			std::array<std::size_t, 256> dirtyChunkIds;
 			std::size_t numDirtyChunks = 0;
 
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			const int eyeX = eyeChunk.x;
+			const int eyeY = eyeChunk.y;
+			const int eyeZ = eyeChunk.z;
+
+			// Only chunks whose data is the worker's: one still waiting to be
+			// uploaded stays dirty for a later batch
+			auto available = [](const Chunk& c) {
+				return c.dirty && c.transferDone.load(std::memory_order_acquire);
+			};
+
+			std::unique_lock<std::mutex> lock(dirtyMutex);
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -576,7 +588,7 @@ namespace spades {
 				if (dx >= 6 && dx <= chunkW - 6) continue;
 				if (dy >= 6 && dy <= chunkW - 6) continue;
 				if (dz >= 6 || dz <= -6) continue;
-				if (c.dirty) {
+				if (available(c)) {
 					dirtyChunkIds[numDirtyChunks++] = i;
 					if (numDirtyChunks >= dirtyChunkIds.size()) break;
 				}
@@ -585,12 +597,14 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (available(c)) {
 						dirtyChunkIds[numDirtyChunks++] = i;
 						if (numDirtyChunks >= dirtyChunkIds.size()) break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			// GL processes 8 chunks per dispatch and the menu/post-spawn
 			// scene visibly brightens for ~10 s as the radiosity texture
@@ -605,7 +619,7 @@ namespace spades {
 				if (idx < numDirtyChunks - 1)
 					std::swap(dirtyChunkIds[idx], dirtyChunkIds[numDirtyChunks - 1]);
 				numDirtyChunks--;
-				UpdateChunk(c.cx, c.cy, c.cz);
+				UpdateChunk(c);
 			}
 		}
 
@@ -659,18 +673,27 @@ namespace spades {
 			return out;
 		}
 
-		void VulkanRadiosityRenderer::UpdateChunk(int cx, int cy, int cz) {
-			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
-				return;
+		void VulkanRadiosityRenderer::UpdateChunk(Chunk& c) {
+			// Take what is dirty; an edit landing during the work below marks it
+			// dirty again, for a later batch
+			int minX, minY, minZ, maxX, maxY, maxZ;
+			{
+				std::lock_guard<std::mutex> lock(dirtyMutex);
+				if (!c.dirty)
+					return;
+				minX = c.dirtyMinX; maxX = c.dirtyMaxX;
+				minY = c.dirtyMinY; maxY = c.dirtyMaxY;
+				minZ = c.dirtyMinZ; maxZ = c.dirtyMaxZ;
+				c.dirty = false;
+			}
 
-			int originX = cx * ChunkSize;
-			int originY = cy * ChunkSize;
-			int originZ = cz * ChunkSize;
+			int originX = c.cx * ChunkSize;
+			int originY = c.cy * ChunkSize;
+			int originZ = c.cz * ChunkSize;
 
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-				for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-					for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = minZ; z <= maxZ; z++)
+				for (int y = minY; y <= maxY; y++)
+					for (int x = minX; x <= maxX; x++) {
 						IntVector3 pos;
 						pos.x = (x + originX);
 						pos.y = (y + originY);
@@ -683,8 +706,8 @@ namespace spades {
 						c.dataZ[z][y][x] = EncodeValue(res.z);
 					}
 
-			c.dirty = false;
-			c.transferDone = false;
+			// Hand the data over for upload
+			c.transferDone.store(false, std::memory_order_release);
 		}
 
 	} // namespace draw

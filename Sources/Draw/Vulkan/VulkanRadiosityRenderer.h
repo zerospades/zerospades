@@ -21,7 +21,9 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Draw/Vulkan/VulkanMemoryAllocator.h>
@@ -61,12 +63,18 @@ namespace spades {
 				VoxelType dataX[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataY[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataZ[ChunkSize][ChunkSize][ChunkSize];
+				// What map edits left to recompute: written by the render thread,
+				// taken by the worker, both under `dirtyMutex`
 				bool dirty = true;
 				int dirtyMinX = 0, dirtyMaxX = ChunkSize - 1;
 				int dirtyMinY = 0, dirtyMaxY = ChunkSize - 1;
 				int dirtyMinZ = 0, dirtyMaxZ = ChunkSize - 1;
+				// Who owns the data: the worker while true, which then computes
+				// into it and hands it over by clearing this; the render thread
+				// while false, which copies it out and hands it back by setting it
 				std::atomic<bool> transferDone{true};
 			};
+			std::mutex dirtyMutex;
 
 			int w, h, d;
 			int chunkW, chunkH, chunkD;
@@ -77,17 +85,17 @@ namespace spades {
 			VkImageView viewFlat, viewX, viewY, viewZ;
 			VkSampler sampler;
 
-			// Staging ring large enough to fit dataFlat+X+Y+Z for one chunk
-			// per slot. 128 slots × (4 × 16³ × 4 B) = 8 MiB. Sized to match
-			// the bumped UpdateDirtyChunks per-dispatch budget so the GPU
-			// upload doesn't bottleneck the convergence rate.
-			static constexpr int kStagingSlotCount = 128;
+			// Staging, a slot per chunk uploaded (dataFlat+X+Y+Z back to back),
+			// in a partition of its own for each frame in flight: a frame
+			// writes only its own, which the GPU is done with once that frame
+			// slot's fence was waited on. 64 slots × (4 × 16³ × 4 B) = 4 MiB a
+			// frame, half the worker's batch, so a batch is uploaded in two.
+			static constexpr int kStagingSlotsPerFrame = 64;
 			VkBuffer stagingBuffer;
 			VmaAllocation stagingAllocation;
 			void* stagingMapped;
 			std::size_t stagingPerTextureSize; // bytes per dst texture in one slot
 			std::size_t stagingSlotSize;       // 4 × stagingPerTextureSize
-			int nextStagingSlot;
 
 			UpdateDispatch* dispatch;
 
@@ -99,8 +107,12 @@ namespace spades {
 			}
 
 			void Invalidate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
-			void UpdateChunk(int cx, int cy, int cz);
-			void UpdateDirtyChunks();
+			/** On the worker: recomputes what is dirty in `chunk`, whose data
+			 * it owns */
+			void UpdateChunk(Chunk& chunk);
+			/** On the worker: recomputes a batch of dirty chunks, those around
+			 * `eyeChunk` first */
+			void UpdateDirtyChunks(IntVector3 eyeChunk);
 			int GetNumDirtyChunks();
 
 			std::uint32_t EncodeValue(Vector3 vec);
@@ -118,9 +130,9 @@ namespace spades {
 			void GameMapChanged(int x, int y, int z, client::GameMap*);
 
 			// Schedule a background recompute (if needed) and upload any
-			// chunks the previous dispatch finished. Must be called outside
-			// a render pass.
-			void Update(VkCommandBuffer commandBuffer);
+			// chunks the previous dispatch finished, through frame slot
+			// `frameSlot`'s staging. Must be called outside a render pass.
+			void Update(VkCommandBuffer commandBuffer, std::size_t frameSlot);
 
 			VkImageView GetImageViewFlat() const { return viewFlat; }
 			VkImageView GetImageViewX() const { return viewX; }

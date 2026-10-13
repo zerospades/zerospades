@@ -33,13 +33,17 @@ namespace spades {
 
 		class VulkanAmbientShadowRenderer::UpdateDispatch : public ConcurrentDispatch {
 			VulkanAmbientShadowRenderer& owner;
+			// Where the eye was when the dispatch began, taken on the render
+			// thread: the scene's definition is not the worker's to read
+			const IntVector3 eyeChunk;
 
 		public:
 			std::atomic<bool> done{false};
-			explicit UpdateDispatch(VulkanAmbientShadowRenderer& o) : owner(o) {}
+			UpdateDispatch(VulkanAmbientShadowRenderer& o, IntVector3 eye)
+			    : owner(o), eyeChunk(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
-				owner.UpdateDirtyChunks();
+				owner.UpdateDirtyChunks(eyeChunk);
 				done = true;
 			}
 		};
@@ -57,7 +61,6 @@ namespace spades {
 		      stagingAllocation(VK_NULL_HANDLE),
 		      stagingMapped(nullptr),
 		      stagingSlotSize(0),
-		      nextStagingSlot(0),
 		      dispatch(nullptr) {
 			SPADES_MARK_FUNCTION();
 
@@ -133,12 +136,13 @@ namespace spades {
 			if (vkCreateSampler(dev, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
 				SPRaise("Failed to create AO sampler");
 
-			// Staging ring: kStagingSlotCount slots, each holds one ChunkSize^3 RG float region.
+			// Staging: kStagingSlotsPerFrame slots per frame in flight, each
+			// holding one ChunkSize^3 RG float region.
 			stagingSlotSize = ChunkSize * ChunkSize * ChunkSize * 2 * sizeof(float);
 
 			VkBufferCreateInfo bufInfo{};
 			bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufInfo.size = stagingSlotSize * kStagingSlotCount;
+			bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
 			bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -281,6 +285,7 @@ namespace spades {
 			if (minX > maxX || minY > maxY || minZ > maxZ)
 				return;
 
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			int cx1 = minX >> ChunkSizeBits;
 			int cy1 = minY >> ChunkSizeBits;
 			int cz1 = minZ >> ChunkSizeBits;
@@ -321,11 +326,12 @@ namespace spades {
 		}
 
 		int VulkanAmbientShadowRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			return (int)std::count_if(chunks.begin(), chunks.end(),
 			                          [](const Chunk& c) { return c.dirty; });
 		}
 
-		void VulkanAmbientShadowRenderer::Update(VkCommandBuffer cmd) {
+		void VulkanAmbientShadowRenderer::Update(VkCommandBuffer cmd, std::size_t frameSlot) {
 			SPADES_MARK_FUNCTION();
 
 			if (GetNumDirtyChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
@@ -333,7 +339,10 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				const Vector3& eye = renderer.GetSceneDef().viewOrigin;
+				dispatch = new UpdateDispatch(
+				  *this, IntVector3{(int)eye.x >> ChunkSizeBits, (int)eye.y >> ChunkSizeBits,
+				                    (int)eye.z >> ChunkSizeBits});
 				dispatch->Start();
 			}
 
@@ -341,18 +350,16 @@ namespace spades {
 			// finished (transferDone == false). Each gets one staging-slot copy
 			// and one CmdCopyBufferToImage region.
 			std::vector<VkBufferImageCopy> regions;
-			regions.reserve(kStagingSlotCount);
+			regions.reserve(kStagingSlotsPerFrame);
 
-			std::vector<Chunk*> uploaded;
-			uploaded.reserve(kStagingSlotCount);
-
+			int slotsUsed = 0;
 			for (Chunk& c : chunks) {
-				if ((int)uploaded.size() >= kStagingSlotCount)
+				if (slotsUsed >= kStagingSlotsPerFrame)
 					break;
-				if (!c.transferDone.exchange(true)) {
+				// The worker handed it over: the data is ours until handed back
+				if (!c.transferDone.load(std::memory_order_acquire)) {
 					// Copy this chunk's data into the next staging slot.
-					int slot = nextStagingSlot;
-					nextStagingSlot = (nextStagingSlot + 1) % kStagingSlotCount;
+					const std::size_t slot = frameSlot * kStagingSlotsPerFrame + slotsUsed++;
 					std::size_t offset = slot * stagingSlotSize;
 					std::memcpy(static_cast<std::uint8_t*>(stagingMapped) + offset,
 					            c.data, stagingSlotSize);
@@ -371,7 +378,7 @@ namespace spades {
 					                                              //     "below ground" guard.
 					region.imageExtent = {ChunkSize, ChunkSize, ChunkSize};
 					regions.push_back(region);
-					uploaded.push_back(&c);
+					c.transferDone.store(true, std::memory_order_release);
 				}
 			}
 
@@ -414,14 +421,21 @@ namespace spades {
 			                     0, 0, nullptr, 0, nullptr, 1, &toRead);
 		}
 
-		void VulkanAmbientShadowRenderer::UpdateDirtyChunks() {
+		void VulkanAmbientShadowRenderer::UpdateDirtyChunks(IntVector3 eyeChunk) {
 			std::array<std::size_t, 256> dirtyChunkIds;
 			std::size_t numDirtyChunks = 0;
 
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			const int eyeX = eyeChunk.x;
+			const int eyeY = eyeChunk.y;
+			const int eyeZ = eyeChunk.z;
+
+			// Only chunks whose data is the worker's: one still waiting to be
+			// uploaded stays dirty for a later batch
+			auto available = [](const Chunk& c) {
+				return c.dirty && c.transferDone.load(std::memory_order_acquire);
+			};
+
+			std::unique_lock<std::mutex> lock(dirtyMutex);
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -431,7 +445,7 @@ namespace spades {
 				if (dx >= 6 && dx <= chunkW - 6) continue;
 				if (dy >= 6 && dy <= chunkW - 6) continue;
 				if (dz >= 6 || dz <= -6) continue;
-				if (c.dirty) {
+				if (available(c)) {
 					dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 					if (numDirtyChunks >= dirtyChunkIds.size()) break;
 				}
@@ -440,12 +454,14 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (available(c)) {
 						dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 						if (numDirtyChunks >= dirtyChunkIds.size()) break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			for (int i = 0; i < 8; i++) {
 				if (numDirtyChunks <= 0) break;
@@ -454,18 +470,27 @@ namespace spades {
 				if (idx < numDirtyChunks - 1)
 					std::swap(dirtyChunkIds[idx], dirtyChunkIds[numDirtyChunks - 1]);
 				numDirtyChunks--;
-				UpdateChunk(c.cx, c.cy, c.cz);
+				UpdateChunk(c);
 			}
 		}
 
-		void VulkanAmbientShadowRenderer::UpdateChunk(int cx, int cy, int cz) {
-			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
-				return;
+		void VulkanAmbientShadowRenderer::UpdateChunk(Chunk& c) {
+			// Take what is dirty; an edit landing during the work below marks it
+			// dirty again, for a later batch
+			int dirtyMinX, dirtyMinY, dirtyMinZ, dirtyMaxX, dirtyMaxY, dirtyMaxZ;
+			{
+				std::lock_guard<std::mutex> lock(dirtyMutex);
+				if (!c.dirty)
+					return;
+				dirtyMinX = c.dirtyMinX; dirtyMaxX = c.dirtyMaxX;
+				dirtyMinY = c.dirtyMinY; dirtyMaxY = c.dirtyMaxY;
+				dirtyMinZ = c.dirtyMinZ; dirtyMaxZ = c.dirtyMaxZ;
+				c.dirty = false;
+			}
 
-			int originX = cx * ChunkSize;
-			int originY = cy * ChunkSize;
-			int originZ = cz * ChunkSize;
+			int originX = c.cx * ChunkSize;
+			int originY = c.cy * ChunkSize;
+			int originZ = c.cz * ChunkSize;
 
 			constexpr int padding = 2;
 			float wData[ChunkSize + padding * 2][ChunkSize + padding * 2][ChunkSize + padding * 2][2];
@@ -473,12 +498,12 @@ namespace spades {
 			int wOriginX = originX - padding;
 			int wOriginY = originY - padding;
 			int wOriginZ = originZ - padding;
-			int wDirtyMinX = c.dirtyMinX;
-			int wDirtyMinY = c.dirtyMinY;
-			int wDirtyMinZ = c.dirtyMinZ;
-			int wDirtyMaxX = c.dirtyMaxX + padding * 2;
-			int wDirtyMaxY = c.dirtyMaxY + padding * 2;
-			int wDirtyMaxZ = c.dirtyMaxZ + padding * 2;
+			int wDirtyMinX = dirtyMinX;
+			int wDirtyMinY = dirtyMinY;
+			int wDirtyMinZ = dirtyMinZ;
+			int wDirtyMaxX = dirtyMaxX + padding * 2;
+			int wDirtyMaxY = dirtyMaxY + padding * 2;
+			int wDirtyMaxZ = dirtyMaxZ + padding * 2;
 
 			auto b = [](int i) -> std::uint8_t { return (std::uint8_t)1 << i; };
 			auto to_b = [](bool v, int i) -> std::uint8_t { return (std::uint8_t)v << i; };
@@ -577,15 +602,15 @@ namespace spades {
 						}
 			}
 
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-				for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-					for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = dirtyMinZ; z <= dirtyMaxZ; z++)
+				for (int y = dirtyMinY; y <= dirtyMaxY; y++)
+					for (int x = dirtyMinX; x <= dirtyMaxX; x++) {
 						c.data[z][y][x][0] = wData[z + padding][y + padding][x + padding][0];
 						c.data[z][y][x][1] = wData[z + padding][y + padding][x + padding][1];
 					}
 
-			c.dirty = false;
-			c.transferDone = false;
+			// Hand the data over for upload
+			c.transferDone.store(false, std::memory_order_release);
 		}
 
 	} // namespace draw
