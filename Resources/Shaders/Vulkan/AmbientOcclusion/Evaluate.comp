@@ -1,0 +1,137 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ OpenSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ OpenSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+// Screen-space ambient occlusion, as GL's SSAO.fs evaluates it: for each texel
+// of the occlusion, the highest horizon the depth around the surface raises
+// over it, along sixteen taps spiralling out in a pattern dithered per texel.
+//
+// Worked out in the scene's own view space from its own depth image: positions
+// rebuilt along the camera's rays, the surface normal from the depth's
+// neighbours, turned to face the camera so that no axis convention matters.
+// One texel per invocation, at the full render size or at half of it, where
+// each texel stands for the depth texel at the middle of its 2x2 block.
+
+#include "Common.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTexture;
+layout(set = 0, binding = 1, r32f) uniform writeonly image2D occlusion;
+
+layout(push_constant) uniform Params {
+	vec2 zNearFar;
+	// tan of the half field of view, horizontally and vertically
+	vec2 tanHalfFov;
+	// The taps' first step, in depth texels (GL: 0.18% of the smaller side)
+	float sampleRadius;
+	// Depth texels per occlusion texel: 1 or 2
+	int scale;
+} params;
+
+// GL's 4x4 dither pattern (Gfx/DitherPattern4x4.png), by row
+const float kDither[16] = float[16](
+	0.0 / 255.0,   135.0 / 255.0, 33.0 / 255.0,  168.0 / 255.0,
+	204.0 / 255.0, 120.0 / 255.0, 237.0 / 255.0, 102.0 / 255.0,
+	51.0 / 255.0,  186.0 / 255.0, 15.0 / 255.0,  153.0 / 255.0,
+	255.0 / 255.0, 120.0 / 255.0, 222.0 / 255.0, 84.0 / 255.0);
+
+float Dither(ivec2 p) {
+	return kDither[(p.y & 3) * 4 + (p.x & 3)];
+}
+
+/** The view-space point at depth texel `texel` (continuous), `distance` along
+ * the view: the camera looks down -Z, Y up, and the image runs top-down */
+vec3 ViewPosition(vec2 texel, float distance) {
+	vec2 uv = texel / vec2(textureSize(depthTexture, 0));
+	vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+	return vec3(ndc * params.tanHalfFov * distance, -distance);
+}
+
+vec3 ViewPositionAt(ivec2 texel) {
+	float distance = LinearDepth(DepthTexel(depthTexture, texel), params.zNearFar);
+	return ViewPosition(vec2(texel) + 0.5, distance);
+}
+
+/** Along `axis`, the step from the surface at `texel` to its neighbour on the side
+ * that changes the least in depth: an edge does not bend the normal */
+vec3 SurfaceStep(ivec2 texel, ivec2 axis, vec3 origin) {
+	vec3 forward = ViewPositionAt(texel + axis) - origin;
+	vec3 backward = origin - ViewPositionAt(texel - axis);
+	return abs(forward.z) < abs(backward.z) ? forward : backward;
+}
+
+void main() {
+	ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(p, imageSize(occlusion))))
+		return;
+
+	// The depth texel this occlusion texel stands for
+	ivec2 origin = p * params.scale + (params.scale >> 1);
+	float originRaw = DepthTexel(depthTexture, origin);
+	if (originRaw >= kBackgroundDepth) {
+		imageStore(occlusion, p, vec4(1.0));
+		return;
+	}
+	float originDistance = LinearDepth(originRaw, params.zNearFar);
+	vec3 originPosition = ViewPosition(vec2(origin) + 0.5, originDistance);
+
+	vec3 normal = normalize(cross(SurfaceStep(origin, ivec2(1, 0), originPosition),
+	                              SurfaceStep(origin, ivec2(0, 1), originPosition)));
+	if (dot(normal, originPosition) > 0.0)
+		normal = -normal;
+
+	// Sampling pattern, as GL's: a rotation and a starting distance per texel
+	float patternPos1 = Dither(p) * 15.0 / 16.0 + Dither(p >> 2) / 16.0;
+	float patternPos2 =
+	  Dither(p + ivec2(1, 0)) * 15.0 / 16.0 + Dither((p >> 2) + ivec2(1, 0)) / 16.0;
+
+	// generalization of x[n+1] = x[n] * 1.3 + 1, x[0] = 1, approximated
+	float sampleDistance =
+	  1.0 + patternPos2 * (1.13713 + patternPos2 * (0.147928 + patternPos2 * 0.0149391));
+	const float sampleRotAngle = 2.61314;
+	const vec2 sampleRot = vec2(sin(sampleRotAngle), cos(sampleRotAngle));
+
+	patternPos1 *= 3.141592654 * 2.0;
+	vec2 sampleDir = vec2(sin(patternPos1), cos(patternPos1));
+
+	float sampleDecay = 1.0;
+	float horizon = 0.0;
+	for (int i = 0; i < 16; ++i) {
+		vec2 tap = vec2(origin) + 0.5 + sampleDir * (sampleDistance * params.sampleRadius);
+		// A little behind what is there, as GL's
+		float tapDistance =
+		  LinearDepth(DepthTexel(depthTexture, ivec2(floor(tap))), params.zNearFar) + 0.1;
+		vec3 toTap = normalize(ViewPosition(tap, tapDistance) - originPosition);
+		float cosHorizon = dot(toTap, normal);
+		float depthDecay = exp2(-2.0 * abs(tapDistance - originDistance));
+
+		horizon = mix(horizon, max(horizon, cosHorizon), sampleDecay * depthDecay);
+
+		sampleDistance += 1.0 + sampleDistance * 0.3;
+		sampleDir = vec2(sampleDir.x * sampleRot.x - sampleDir.y * sampleRot.y,
+		                 sampleDir.x * sampleRot.y + sampleDir.y * sampleRot.x);
+		sampleDecay *= 0.92;
+	}
+
+	imageStore(occlusion, p, vec4(1.0 - horizon));
+}

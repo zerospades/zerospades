@@ -31,6 +31,7 @@
 namespace spades {
 	namespace draw {
 		class VulkanBuffer;
+		class VulkanImage;
 		class VulkanRenderer;
 
 		/**
@@ -63,6 +64,9 @@ namespace spades {
 				float mirrorClipZ;
 				/** Towards the sun */
 				Vector3 sunDirection;
+				/** Whether the view's ambient occlusion (`SetAmbientOcclusion`) is to be
+				 * read this frame */
+				bool ambientOcclusion;
 			};
 
 			VulkanSceneView(VulkanRenderer&, std::size_t framesInFlight);
@@ -80,10 +84,21 @@ namespace spades {
 			void Bind(VkCommandBuffer, VkPipelineLayout layout, VkPipelineBindPoint,
 			          std::size_t frameSlot, View view) const;
 
+			/**
+			 * Points `view` of frame slot `frameSlot` at `image` for its ambient
+			 * occlusion (`SceneAmbientOcclusion.glsl`), which is in `layout`
+			 * whenever a pass reads it: the screen-space ambient occlusion's output,
+			 * or a placeholder never read. Only with no frame in flight using it.
+			 */
+			void SetAmbientOcclusion(std::size_t frameSlot, View view, VulkanImage& image,
+			                         VkImageLayout layout);
+
 		private:
 			struct Slot {
 				Handle<VulkanBuffer> buffer;
-				VkDescriptorSet set = VK_NULL_HANDLE;
+				/** A set per view: its offset into the buffer is dynamic, the
+				 * images it reads its own */
+				VkDescriptorSet sets[ViewCount] = {};
 			};
 
 			VkDevice device;

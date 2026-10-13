@@ -43,6 +43,7 @@ layout(location = 0) out vec4 fragColor;
 
 #include "SceneLight/Lights.glsl"
 #include "SceneLight/MapLight.glsl"
+#include "SceneAmbientOcclusion.glsl"
 #include "SceneLight/ModelShadow.glsl"
 
 void main() {
@@ -74,7 +75,8 @@ void main() {
 	// The map's and the sky's light, through the model's own ambient
 	// occlusion from the 2D atlas (GL OptimizedVoxelModel.fs EvaluateAmbientLight)
 	float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
-	vec3 diffuse = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO) + sun;
+	vec3 diffuse = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO,
+	                                SceneAmbientOcclusion()) + sun;
 
 	fragColor = vec4(vertexColor * diffuse, 1.0);
 	fragColor.xyz += vertexColor * EvaluateDynamicLights(worldPosition, nrm);

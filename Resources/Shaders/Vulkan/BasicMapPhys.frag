@@ -43,6 +43,7 @@ layout(location = 0) out vec4 fragColor;
 
 #include "SceneLight/Lights.glsl"
 #include "SceneLight/MapLight.glsl"
+#include "SceneAmbientOcclusion.glsl"
 
 // Oren-Nayar diffuse BRDF
 float OrenNayar(float sigma, float dotLight, float dotEye) {
@@ -105,8 +106,9 @@ void main() {
 	vec3 nrm = normalize(normalVarying);
 	float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 
+	const float ssao = SceneAmbientOcclusion();
 	fragColor = vec4(color.xyz, 1.0);
-	vec3 diffuseShading = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO);
+	vec3 diffuseShading = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO, ssao);
 	float shadowing = shadow * (0.6 * sceneSunSky.sunlight);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
@@ -126,7 +128,7 @@ void main() {
 	// (GL BasicBlockPhys.fs EvaluateDirectionalAmbientLight)
 	vec3 reflectWS = normalize(reflectionDir);
 	vec3 specularShading =
-	  MapSoftReflections(radiosityTextureCoord, aoCoord, nrm, reflectWS, detailAO);
+	  MapSoftReflections(radiosityTextureCoord, aoCoord, nrm, reflectWS, detailAO, ssao);
 
 	// Sun diffuse/specular
 	if (shadowing > 0.0 && dotNL > 0.0) {
