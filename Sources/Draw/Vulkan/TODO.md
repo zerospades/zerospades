@@ -5,6 +5,22 @@ Open work only; what is done is in the git history. The GL renderer in
 
 ## Critical
 
+- [ ] **Crash on every map load at `r_radiosity` 0 (the default)** — df56f06f leaves
+      `chunks` empty for the 1x1x1 placeholders, but the loop setting each chunk's
+      `cx/cy/cz` still runs, writing past the empty vector
+      (`VulkanRadiosityRenderer.cpp:103`, `VulkanAmbientShadowRenderer.cpp:85`).
+      Move that loop under `if (active)` in both.
+- [ ] **Null dereference when `r_water` is raised from the console** — 7f1bd99b sizes
+      the mirror and screen copies from `r_water` at creation, while the renderer and
+      the water renderer read it live (0 → 1: null `screenCopyColorImage`; 1 → 2: null
+      mirror framebuffer and images). Latch `r_water` once, in one member, read
+      everywhere.
+- [ ] **Shared model pipelines leak on every render pass change** —
+      `VulkanOptimizedVoxelModel::CreatePipeline` (around :867) destroys only the lit
+      pipeline, its layout and the x-ray objects before rebuilding; the mirrored,
+      depth, ghost pipelines and the set layout are overwritten. Call
+      `sharedPipeline.Destroy()` there. Every resize and `r_scale` change makes a new
+      render pass now.
 - [ ] **Glare offset, and seen through walls, at `r_scale` < 1** — the `r_scale`
       commit (6cdda895) gave `VulkanGlareRenderer` the render size as its viewport,
       but the glare is recorded in the swapchain (UI) pass, which is window-sized:
@@ -12,12 +28,47 @@ Open work only; what is done is in the git history. The GL renderer in
       the depth at the wrong place. The viewport must be the swapchain's again (the
       depth taps already use normalized coordinates, right at any render size).
       Repro: `--override-cvar "r_ssao=1" --override-cvar "r_scale=0.7"`.
-- [ ] **Longer freeze between the server list and the map loading view** since the
-      unpushed commits (seen with `r_radiosity` 1). Cause not yet pinned down;
-      candidates: the extra pipelines built at map load (depth pre-pass, SSAO), the
-      radiosity / ambient-shadow `Invalidate` now taking a mutex per call (it runs
-      per changed block), one-time submits waiting on the queue. Measure before
-      changing anything.
+- [ ] **Longer freeze between the server list and the map loading view** (seen with
+      `r_radiosity` 1). Leaving the title map joins its radiosity worker, whose batch
+      of up to 128 chunks (GL: 8) cannot be interrupted: likely the bulk of it.
+      Give both workers a stop flag checked between chunks, set before joining.
+      The depth pre-pass adds four pipelines compiled at map load (cold cache on
+      MoltenVK). Time `SetGameMap` and the two joins to confirm.
+
+## Wrong results
+
+- [ ] **Screen tints pile up while frames are skipped** — the skipped-frame path in
+      `Flip` discards the 2D batches but not `pendingMultiplyColors`; restoring a
+      minimised window multiplies every queued tint at once. Clear it there too.
+- [ ] **Settings read live against resources sized at map load** — `r_modelShadows`
+      (cascades 1x1 when off at load, rendered into if turned on) and `r_radiosity`
+      (pipelines specialized on the live value, volumes placeholders until the next
+      map). Latch both with what they size.
+- [ ] **`r_vsync` ignored by Vulkan** — the present mode always prefers MAILBOX (GL
+      applies `r_vsync` through `SDL_GL_SetSwapInterval` only). Choose FIFO at 1,
+      IMMEDIATE (else MAILBOX, else FIFO) at 0, and mark the swapchain stale when it
+      changes. `cl_fps` is honoured as in GL (`SDLRunner`).
+- [ ] **Swapchain extent compared against SDL's drawable size** — `PrepareSwapchain`
+      rebuilds when they differ, but the swapchain follows `currentExtent`; where the
+      two disagree for good it would rebuild every frame (not seen yet). Compare
+      against `ChooseSwapchainExtent`.
+
+## Spec / performance
+
+- [ ] **Depth copied into an R32F colour image** (`CopyDepthForSampling`, the 1x path
+      for post filters and SSAO): a depth-to-colour `vkCmdCopyImage` is not allowed
+      by Vulkan 1.0 core (VUID-vkCmdCopyImage-srcImage-01548). Copy through a
+      fragment or compute pass instead; also drop `SAMPLED` from the 1x mirror depth
+      (the MoltenVK Intel issue the main depth avoids).
+- [ ] **Redundant depth work with SSAO** — the mirror depth resolved twice under MSAA
+      at `r_water` 3, the main depth copied twice at 1x; the depth-resolve filter
+      makes framebuffers and sets every frame, and SSAO brings it to its pool limit
+      of four.
+- [ ] **Radiosity / ambient-shadow dispatch every frame** while chunks only wait for
+      upload (`GetNumDirtyChunks` counts them); radiosity now uploads 64 chunks a
+      frame against a batch of 128.
+- [ ] **Depth barriers list only late fragment tests as their source** (attachment →
+      shader read); add early fragment tests.
 
 ## GL features still missing
 
