@@ -450,8 +450,9 @@ namespace spades {
 			fragShaderStageInfo.module = fragShaderModule;
 			fragShaderStageInfo.pName = "main";
 
-			// Specialization constant: USE_RADIOSITY (BasicMap.frag) — picks
-			// the MapRadiosityNull vs MapRadiosity ambient permutation.
+			// Specialization constant: USE_RADIOSITY (SceneLight/MapLight.glsl),
+			// for the physical shader as for the basic one — picks the
+			// MapRadiosityNull vs MapRadiosity ambient permutation.
 			SPADES_SETTING(r_radiosity);
 			int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
 			VkSpecializationMapEntry specEntry{};
@@ -463,9 +464,7 @@ namespace spades {
 			specInfo.pMapEntries = &specEntry;
 			specInfo.dataSize = sizeof(int32_t);
 			specInfo.pData = &useRadiosity;
-			if (!physicalLighting) {
-				fragShaderStageInfo.pSpecializationInfo = &specInfo;
-			}
+			fragShaderStageInfo.pSpecializationInfo = &specInfo;
 
 			VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 

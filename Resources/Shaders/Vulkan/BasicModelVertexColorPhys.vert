@@ -36,6 +36,8 @@ layout(push_constant) uniform DrawConstants {
 layout(location = 0) in uvec3 positionAttribute;
 layout(location = 1) in uvec3 colorAttribute;
 layout(location = 2) in ivec3 normalAttribute;
+layout(location = 3) in uint aoXAttribute;     // per-face AO atlas u (0..255)
+layout(location = 4) in uint aoYAttribute;     // per-face AO atlas v (0..255)
 
 layout(location = 0) out vec4 color;           // xyz = vertexColor, w = sun lambert (may be negative)
 layout(location = 1) out vec3 ambientLight;    // hemisphere ambient fallback
@@ -52,6 +54,7 @@ layout(location = 11) out vec3 normalVarying;
 layout(location = 12) out float waterClip;     // >=0 keep, <0 clip below the reflection plane
 // World-space position, where the fragment shader evaluates the dynamic lights
 layout(location = 13) out vec3 worldPosition;
+layout(location = 14) out vec2 ambientOcclusionCoord; // 2D coords into the AO atlas
 
 // Keep gl_Position bit-identical across the pipelines drawing a model with this
 // shader: the ghost pass tests its colour against its own depth prepass with
@@ -109,6 +112,8 @@ void main() {
 	// Radiosity 3D-texture coords (matches GL MapRadiosity.vs).
 	radiosityTextureCoord = worldPos / vec3(512.0, 512.0, 64.0);
 	normalVarying = worldNormal;
+	// The face's own ambient occlusion, from the atlas, as BasicModelVertexColor.vert
+	ambientOcclusionCoord = (vec2(aoXAttribute, aoYAttribute) + 0.5) * (1.0 / 256.0);
 
 	// Reflection-pass water clip: negative below the water plane.
 	// mirrorClipZ is +inf in the normal scene pass, so this stays positive.

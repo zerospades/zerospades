@@ -21,11 +21,6 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-// Selects the radiosity-on permutation (matches GL MapRadiosity.fs) vs the
-// no-radiosity permutation (matches GL OptimizedVoxelModel.fs + MapRadiosityNull.fs).
-// Driven by r_radiosity at pipeline-creation time.
-layout(constant_id = 0) const int USE_RADIOSITY = 0;
-
 layout(location = 0) in vec4 color;           // xyz = vertexColor, w = sun lambert
 layout(location = 1) in vec3 ambientLight;     // hemisphere ambient fallback (kept for VS↔FS compat)
 layout(location = 2) in vec3 customColor;
@@ -76,32 +71,10 @@ void main() {
 	float sunLambert = color.w;
 	vec3 sun = vec3(0.6 * sceneSunSky.sunlight) * sunLambert * shadow;
 
-	vec3 diffuse;
-	if (USE_RADIOSITY != 0) {
-		// MapRadiosity.fs path — 3D radiosity + 3D AO modulating sky-ambient.
-		float aoFactor = MapAmbientShadow(aoCoord);
-
-		vec3 radiosity = MapRadiosity(radiosityTextureCoord, nrm);
-
-		// Blend in the per-vertex detail AO from the 2D atlas, as GL does via
-		// EvaluateAmbientLight(ao) -> EvaluateRadiosity. Without it the sqrt()
-		// lift is missing and ambient-lit faces come out darker than GL.
-		float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
-		float amb = mix(sqrt(aoFactor * detailAO), min(aoFactor, detailAO), 0.5);
-
-		float aoTerm = amb * (0.8 - nrm.z * 0.2);
-		vec3 ambientColor = sceneSunSky.ambientLight * sceneSunSky.daylight;
-
-		diffuse = radiosity + aoTerm * ambientColor + sun;
-	} else {
-		// MapRadiosityNull.fs + GL OptimizedVoxelModel.fs path — per-face AO
-		// from the 2D atlas (baked per-vertex aoID), modulating
-		// mix(fog, white, 0.5) ambient.
-		float ao = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
-		float hemisphere = 1.0 - nrm.z * 0.2;
-		vec3 ambientColor = mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * sceneSunSky.daylight;
-		diffuse = ambientColor * (0.5 * ao * hemisphere) + sun;
-	}
+	// The map's and the sky's light, through the model's own ambient
+	// occlusion from the 2D atlas (GL OptimizedVoxelModel.fs EvaluateAmbientLight)
+	float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
+	vec3 diffuse = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO) + sun;
 
 	fragColor = vec4(vertexColor * diffuse, 1.0);
 	fragColor.xyz += vertexColor * EvaluateDynamicLights(worldPosition, nrm);

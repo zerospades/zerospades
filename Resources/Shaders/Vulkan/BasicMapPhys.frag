@@ -37,6 +37,7 @@ layout(location = 9) in vec3 radiosityTextureCoord;
 layout(location = 10) in vec3 normalVarying;
 // World-space position, where the dynamic lights are evaluated
 layout(location = 11) in vec3 worldPosition;
+layout(location = 12) in vec2 ambientOcclusionCoord; // 2D coords into the AO atlas
 
 layout(location = 0) out vec4 fragColor;
 
@@ -99,20 +100,13 @@ void main() {
 	// Evaluate map shadow
 	float shadow = MapShadowVisibility(shadowCoord);
 
-	// Per-block ambient occlusion (matching GL MapRadiosity.fs).
-	float aoFactor = MapAmbientShadow(aoCoord);
-
-	// Directional radiosity (port of GL MapRadiosity.fs EvaluateRadiosity)
+	// The map's and the sky's light, through the face's own ambient occlusion
+	// (GL BasicBlockPhys.fs EvaluateAmbientLight)
 	vec3 nrm = normalize(normalVarying);
-	vec3 radiosity = MapRadiosity(radiosityTextureCoord, nrm);
-
-	float aoTerm = aoFactor * (0.8 - nrm.z * 0.2);
-	// GL GLShadowShader's ambient colour, worked out in full daylight
-	// (`VulkanRenderer::GetSunSky`), drawn at the daylight.
-	vec3 ambientColor = sceneSunSky.ambientLight * sceneSunSky.daylight;
+	float detailAO = texture(ambientOcclusionAtlas, ambientOcclusionCoord).x;
 
 	fragColor = vec4(color.xyz, 1.0);
-	vec3 diffuseShading = radiosity + aoTerm * ambientColor;
+	vec3 diffuseShading = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO);
 	float shadowing = shadow * (0.6 * sceneSunSky.sunlight);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
@@ -128,11 +122,11 @@ void main() {
 	float fresnel2 = 1.0 - dotNV;
 	float fresnel = 0.03 + 0.1 * fresnel2 * fresnel2;
 
-	// Approximate specular ambient from reflection direction
+	// What the map and the sky reflect towards the eye
+	// (GL BasicBlockPhys.fs EvaluateDirectionalAmbientLight)
 	vec3 reflectWS = normalize(reflectionDir);
-	float reflHemisphere = 1.0 - reflectWS.z * 0.2;
 	vec3 specularShading =
-	  mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * (0.5 * reflHemisphere * sceneSunSky.daylight);
+	  MapSoftReflections(radiosityTextureCoord, aoCoord, nrm, reflectWS, detailAO);
 
 	// Sun diffuse/specular
 	if (shadowing > 0.0 && dotNL > 0.0) {
