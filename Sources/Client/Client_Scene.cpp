@@ -680,6 +680,12 @@ namespace spades {
 					}
 				}
 
+				// Every lit flashlight was offered: light the scene with those that
+				// matter most.
+				if (map)
+					flashlightBudget.Submit(*renderer, *map, lastSceneDef);
+				flashlightBudget.Clear();
+
 				for (const auto& nade : world->GetAllGrenades())
 					AddGrenadeToScene(*nade);
 

@@ -113,11 +113,12 @@ namespace spades {
 			AABB3 GetHeadlampBounds();
 
 			/**
-			 * Emit this player's flashlight from `lightOrigin`, if it should be lit
-			 * at all. Shared by the first- and third-person paths, which differ only
-			 * in where the lamp sits.
+			 * Offer this player's flashlight, from `lightOrigin`, to the client's
+			 * `FlashlightBudget`, if it should be lit at all; `viewed` when the camera
+			 * looks through this player's eyes. Shared by the first- and third-person
+			 * paths, which differ only in where the lamp sits.
 			 */
-			void AddFlashlightToScene(const Vector3& lightOrigin);
+			void AddFlashlightToScene(const Vector3& lightOrigin, bool viewed);
 
 			/** How far this player's lamp has come up since it was switched on, from
 			 * 0 to 1. */

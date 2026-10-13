@@ -763,7 +763,7 @@ namespace spades {
 			return client.activeNet->GetFlashlightBeams().Resolve(player.GetId()).Emits();
 		}
 
-		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin) {
+		void ClientPlayer::AddFlashlightToScene(const Vector3& lightOrigin, bool viewed) {
 			Player& p = player;
 			IRenderer& renderer = client.GetRenderer();
 
@@ -771,17 +771,24 @@ namespace spades {
 				return;
 
 			const FlashlightBeam& beam = client.activeNet->GetFlashlightBeams().Resolve(p.GetId());
+			const float fadeIn = GetFlashlightFadeIn();
 
-			DynamicLightParam light;
+			FlashlightBudget::Beam offer;
+			offer.glowColor = beam.GetColor() * fadeIn;
+			offer.viewed = viewed;
+
+			DynamicLightParam& light = offer.light;
 			light.type = DynamicLightTypeSpotlight;
 			light.origin = lightOrigin;
 			light.radius = beam.GetReach();
-			light.color = beam.GetColor() * (GetFlashlightFadeIn() * (r_hdr ? 3.0F : 1.5F));
+			light.color = beam.GetColor() * (fadeIn * (r_hdr ? 3.0F : 1.5F));
 			light.spotAngle = beam.GetConeAngle();
 			light.spotAxis = GetFlashlightAxes();
 			Handle<IImage> img = renderer.RegisterImage("Gfx/Spotlight.jpg");
 			light.image = img.GetPointerOrNull();
-			renderer.AddLight(light);
+
+			// Lit as a spotlight or as a glow where it lands, once every lamp is known
+			client.flashlightBudget.Offer(offer);
 		}
 
 		float ClientPlayer::GetFlashlightFadeIn() {
@@ -845,7 +852,7 @@ namespace spades {
 			sandboxedRenderer->SetPlayerXRay(false, MakeVector3(1, 1, 1));
 
 			// This path also runs for a remote player the camera is following.
-			AddFlashlightToScene(eyeMatrix.GetOrigin());
+			AddFlashlightToScene(eyeMatrix.GetOrigin(), true);
 
 			Vector3 leftHand, rightHand;
 			leftHand = MakeVector3(0, 0, 0);
@@ -1432,7 +1439,7 @@ namespace spades {
 			// shift when the observer changes camera mode.
 			Vector3 const lightOrigin = p.GetEye();
 			if (!IsLampBuried(lightOrigin))
-				AddFlashlightToScene(lightOrigin);
+				AddFlashlightToScene(lightOrigin, false);
 
 			// The lamp itself is seen on the front of the headlamp as drawn, though.
 			UpdateFlashlightGlare(GetHeadlampLens(head));
