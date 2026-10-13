@@ -957,6 +957,13 @@ namespace spades {
 			if (extent.width == 0 || extent.height == 0)
 				return false;
 
+			// The drawable size only says when to look: the swapchain follows the
+			// extent the surface states, which can differ from it for good. A new
+			// swapchain would then be no closer, only made again every frame.
+			if (!swapchainStale && extent.width == swapchainExtent.width &&
+			    extent.height == swapchainExtent.height)
+				return true;
+
 			RecreateSwapchain();
 			return true;
 		}

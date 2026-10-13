@@ -169,8 +169,8 @@ namespace spades {
 			/**
 			 * Brings the swapchain in line with the surface, at a frame boundary,
 			 * before an image is acquired: rebuilds it when acquiring or presenting
-			 * reported it out of date or suboptimal, the window's drawable size
-			 * changed, or `r_vsync` did. Nothing recorded against the old one can be
+			 * reported it out of date or suboptimal, the extent it would be made
+			 * with changed, or `r_vsync` did. Nothing recorded against the old one can be
 			 * in use then.
 			 *
 			 * Returns false while the surface has no area (a minimised window): no
