@@ -81,4 +81,19 @@ float ModelShadowVisibility(vec3 coord0, vec3 coord1, vec3 coord2, float viewDep
 		return SampleModelCascade(modelShadowMap2, coord2);
 }
 
+#ifdef SCENE_VIEW_GLSL
+// The same for a point in the world, its cascade coordinates and camera-axis
+// depth worked out here: for the shaders with no input locations left for them
+// (the physically lit ones are near the 16 every device has)
+float ModelShadowVisibilityAt(vec3 worldPos) {
+	if (shadowSampling.enabled == 0)
+		return 1.0;
+	vec4 p = vec4(worldPos, 1.0);
+	return ModelShadowVisibility((shadowSampling.cascadeMatrix[0] * p).xyz,
+	                             (shadowSampling.cascadeMatrix[1] * p).xyz,
+	                             (shadowSampling.cascadeMatrix[2] * p).xyz,
+	                             (sceneView.projectionView * p).w);
+}
+#endif
+
 #endif

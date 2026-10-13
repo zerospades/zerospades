@@ -44,6 +44,7 @@ layout(location = 0) out vec4 fragColor;
 #include "SceneLight/Lights.glsl"
 #include "SceneLight/MapLight.glsl"
 #include "SceneAmbientOcclusion.glsl"
+#include "SceneLight/ModelShadow.glsl"
 
 // Oren-Nayar diffuse BRDF
 float OrenNayar(float sigma, float dotLight, float dotEye) {
@@ -100,6 +101,7 @@ float CookTorrance(vec3 eyeVec, vec3 lightVec, vec3 normal) {
 void main() {
 	// Evaluate map shadow
 	float shadow = MapShadowVisibility(shadowCoord);
+	shadow *= ModelShadowVisibilityAt(worldPosition); // GL: VisibilityOfSunLight = map * model, as the basic shader does
 
 	// The map's and the sky's light, through the face's own ambient occlusion
 	// (GL BasicBlockPhys.fs EvaluateAmbientLight)
