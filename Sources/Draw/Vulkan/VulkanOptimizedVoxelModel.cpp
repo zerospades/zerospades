@@ -66,70 +66,34 @@ namespace spades {
 			                     "Shaders/Vulkan/ModelXRay.frag.spv"});
 		}
 
+		void VulkanOptimizedVoxelModel::PipelineCache::Destroy(VkDevice device) {
+			for (VkPipeline* p :
+			     {&pipeline, &mirroredPipeline, &shadowMapPipeline, &ghostDepthPipeline,
+			      &mirroredGhostDepthPipeline, &ghostColorPipeline, &mirroredGhostColorPipeline,
+			      &xrayPipeline, &mirroredXRayPipeline}) {
+				if (*p != VK_NULL_HANDLE)
+					vkDestroyPipeline(device, *p, nullptr);
+				*p = VK_NULL_HANDLE;
+			}
+			for (VkPipelineLayout* l : {&xrayPipelineLayout, &pipelineLayout, &shadowMapPipelineLayout}) {
+				if (*l != VK_NULL_HANDLE)
+					vkDestroyPipelineLayout(device, *l, nullptr);
+				*l = VK_NULL_HANDLE;
+			}
+			if (descriptorSetLayout != VK_NULL_HANDLE)
+				vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+			descriptorSetLayout = VK_NULL_HANDLE;
+			renderPass = VK_NULL_HANDLE;
+			shadowMapRenderPass = VK_NULL_HANDLE;
+		}
+
 		void VulkanOptimizedVoxelModel::InvalidateSharedPipeline(gui::SDLVulkanDevice* device) {
 			SPADES_MARK_FUNCTION();
 
 			if (!device || sharedPipeline.pipeline == VK_NULL_HANDLE)
 				return;
 
-			VkDevice vkDevice = device->GetDevice();
-
-			// Clean up all shared pipelines
-			if (sharedPipeline.pipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.pipeline, nullptr);
-				sharedPipeline.pipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.mirroredPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredPipeline, nullptr);
-				sharedPipeline.mirroredPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.shadowMapPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.shadowMapPipeline, nullptr);
-				sharedPipeline.shadowMapPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.shadowMapPipelineLayout != VK_NULL_HANDLE) {
-				vkDestroyPipelineLayout(vkDevice, sharedPipeline.shadowMapPipelineLayout, nullptr);
-				sharedPipeline.shadowMapPipelineLayout = VK_NULL_HANDLE;
-			}
-			sharedPipeline.shadowMapRenderPass = VK_NULL_HANDLE;
-			if (sharedPipeline.ghostDepthPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.ghostDepthPipeline, nullptr);
-				sharedPipeline.ghostDepthPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.mirroredGhostDepthPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredGhostDepthPipeline, nullptr);
-				sharedPipeline.mirroredGhostDepthPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.ghostColorPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.ghostColorPipeline, nullptr);
-				sharedPipeline.ghostColorPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.mirroredGhostColorPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredGhostColorPipeline, nullptr);
-				sharedPipeline.mirroredGhostColorPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
-				sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
-				sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
-				vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
-				sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
-				vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
-				sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
-			}
-			if (sharedPipeline.descriptorSetLayout != VK_NULL_HANDLE) {
-				vkDestroyDescriptorSetLayout(vkDevice, sharedPipeline.descriptorSetLayout, nullptr);
-				sharedPipeline.descriptorSetLayout = VK_NULL_HANDLE;
-			}
-			sharedPipeline.renderPass = VK_NULL_HANDLE;
-
+			sharedPipeline.Destroy(device->GetDevice());
 			SPLog("Invalidated shared voxel model pipeline cache");
 		}
 
@@ -208,45 +172,8 @@ namespace spades {
 
 			// Decrement reference count and clean up shared pipeline if this is the last instance
 			pipelineRefCount--;
-			if (pipelineRefCount == 0) {
-				if (sharedPipeline.pipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.pipeline, nullptr);
-					sharedPipeline.pipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.shadowMapPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.shadowMapPipeline, nullptr);
-					sharedPipeline.shadowMapPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.ghostDepthPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.ghostDepthPipeline, nullptr);
-					sharedPipeline.ghostDepthPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.ghostColorPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.ghostColorPipeline, nullptr);
-					sharedPipeline.ghostColorPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
-					sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
-					sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
-					vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
-					sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
-					vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
-					sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.descriptorSetLayout != VK_NULL_HANDLE) {
-					vkDestroyDescriptorSetLayout(vkDevice, sharedPipeline.descriptorSetLayout, nullptr);
-					sharedPipeline.descriptorSetLayout = VK_NULL_HANDLE;
-				}
-				sharedPipeline.renderPass = VK_NULL_HANDLE;
-			}
+			if (pipelineRefCount == 0)
+				sharedPipeline.Destroy(vkDevice);
 		}
 
 		void VulkanOptimizedVoxelModel::GenerateTexture() {
