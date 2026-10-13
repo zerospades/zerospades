@@ -21,6 +21,7 @@
 #include "VulkanFramebufferManager.h"
 #include "VulkanSettings.h"
 #include "VulkanImage.h"
+#include "VulkanBuffer.h"
 #include "VulkanSceneStencil.h"
 #include <Gui/SDLVulkanDevice.h>
 #include <Core/Debug.h>
@@ -161,7 +162,7 @@ namespace spades {
 				// MoltenVK translates sampler2D to Metal's texture2d<float>, but
 				// D32 depth textures require depth2d<float> — reading a D32 image
 				// through sampler2D silently returns 0 on Metal. Using R32F as the
-				// sample target (with a cross-aspect vkCmdCopyImage) lets all
+				// sample target (copied through `depthCopyBuffer`) lets all
 				// post-processing shaders (Fog2, LensFlare scanner, etc.) read
 				// depth as a plain float texture. The MSAA path already does this
 				// via VulkanDepthResolveFilter → R32F color target.
@@ -173,6 +174,16 @@ namespace spades {
 				sceneDepthSampleImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				sceneDepthSampleImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                     VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+				// Vulkan 1.0 copies an image's depth aspect into a buffer, and a buffer
+				// into a colour image, but never one straight into the other
+				// (VUID-vkCmdCopyImage-srcImage-01548): the copies go through this.
+				// A depth aspect is 4 bytes a texel in a buffer; the mirror's depth,
+				// the same size, shares it.
+				depthCopyBuffer = Handle<VulkanBuffer>::New(
+				    device, (VkDeviceSize)renderWidth * (VkDeviceSize)renderHeight * 4,
+				    VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			}
 
 			// Single-sample resolve targets sampled by the post-process chain. Color
@@ -942,22 +953,39 @@ namespace spades {
 			pre[1].srcAccessMask = 0;
 			pre[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
+			// TRANSFER as a source too: the buffer may still be read by the last
+			// copy through it, which this one is not to overwrite
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-				  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				0, 0, nullptr, 0, nullptr, 2, pre);
 
-			VkImageCopy depthCopy{};
-			depthCopy.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
-			// Cross-aspect copy: D32_SFLOAT(DEPTH) → R32_SFLOAT(COLOR).
-			// Same 32-bit float bit pattern; valid since Vulkan 1.1 (maintenance1).
-			depthCopy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-			depthCopy.extent = {(uint32_t)renderWidth, (uint32_t)renderHeight, 1};
-			vkCmdCopyImage(commandBuffer,
-			               depth.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			               sample.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			               1, &depthCopy);
+			// The depth aspect into the buffer, a 32-bit float a texel for
+			// D32_SFLOAT_S8_UINT; then the buffer, bit for bit, into the R32F image
+			VkBufferImageCopy depthCopy{};
+			depthCopy.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+			depthCopy.imageExtent = {(uint32_t)renderWidth, (uint32_t)renderHeight, 1};
+			vkCmdCopyImageToBuffer(commandBuffer, depth.GetImage(),
+			                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			                       depthCopyBuffer->GetBuffer(), 1, &depthCopy);
+
+			VkBufferMemoryBarrier copied{};
+			copied.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			copied.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			copied.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			copied.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copied.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			copied.buffer = depthCopyBuffer->GetBuffer();
+			copied.offset = 0;
+			copied.size = VK_WHOLE_SIZE;
+			vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1, &copied, 0,
+			                     nullptr);
+
+			depthCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			vkCmdCopyBufferToImage(commandBuffer, depthCopyBuffer->GetBuffer(), sample.GetImage(),
+			                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &depthCopy);
 
 			VkImageMemoryBarrier post[2]{};
 			post[0] = pre[0];
