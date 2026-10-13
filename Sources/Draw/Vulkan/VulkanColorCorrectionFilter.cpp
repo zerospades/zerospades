@@ -19,6 +19,7 @@
  */
 
 #include "VulkanColorCorrectionFilter.h"
+#include "VulkanSettings.h"
 #include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
@@ -38,12 +39,8 @@
 
 SPADES_SETTING(r_colorCorrection);
 SPADES_SETTING(r_saturation);
-SPADES_SETTING(r_hdr);
-SPADES_SETTING(r_bloom);
 SPADES_SETTING(r_exposureValue);
 SPADES_SETTING(r_sharpen);
-SPADES_SETTING(r_fogShadow);
-SPADES_SETTING(r_radiosity);
 
 namespace spades {
 	namespace draw {
@@ -416,8 +413,8 @@ namespace spades {
 			float satCvar = (float)r_saturation * def.saturation;
 			float enhancement;
 			float saturation;
-			if ((int)r_hdr) {
-				if ((int)r_bloom) {
+			if ((int)renderer.GetSettings().r_hdr) {
+				if ((int)renderer.GetSettings().r_bloom) {
 					saturation  = 0.8f * satCvar;
 					enhancement = 0.1f;
 				} else {
@@ -425,7 +422,7 @@ namespace spades {
 					enhancement = 0.0f;
 				}
 			} else {
-				if ((int)r_bloom) {
+				if ((int)renderer.GetSettings().r_bloom) {
 					saturation  = 0.85f * satCvar;
 					enhancement = 0.7f;
 				} else {
@@ -437,14 +434,14 @@ namespace spades {
 			// satAndHdr.y is the runtime gate for the ACES branch in the
 			// shader (ACES is calibrated for HDR; running it on a non-HDR
 			// [0, 1] image shifts blues to purple).
-			float useHdr = (int)r_hdr ? 1.0f : 0.0f;
+			float useHdr = (int)renderer.GetSettings().r_hdr ? 1.0f : 0.0f;
 
 			// The sharpening, as GLColorCorrectionFilter works it out: it recovers the
 			// contrast the fog takes away, so it grows with the fog's luminance as the
 			// scene shows it (none at night), and r_sharpen scales it. GL raises it to
 			// 1.5 at least under temporal AA, which this renderer doesn't have.
 			float fogLuminance = (sceneFogColor.x + sceneFogColor.y + sceneFogColor.z) / 3.0F;
-			if ((int)r_fogShadow == 2 && (int)r_radiosity != 0) {
+			if (renderer.GetSettings().UsesFog2()) {
 				// Fog2 adds a GI factor, so the fog receives some light even if the
 				// fog color is set to dark.
 				fogLuminance = fogLuminance * 0.9F + 0.2F;

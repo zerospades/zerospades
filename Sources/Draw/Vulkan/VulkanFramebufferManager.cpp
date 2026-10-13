@@ -19,6 +19,7 @@
  */
 
 #include "VulkanFramebufferManager.h"
+#include "VulkanSettings.h"
 #include "VulkanImage.h"
 #include "VulkanSceneStencil.h"
 #include <Gui/SDLVulkanDevice.h>
@@ -26,16 +27,12 @@
 #include <Core/Exception.h>
 #include <Core/Settings.h>
 
-SPADES_SETTING(r_highPrec);
-SPADES_SETTING(r_hdr);
-SPADES_SETTING(r_srgb);
-SPADES_SETTING(r_water);
-SPADES_SETTING(r_ssao);
 
 namespace spades {
 	namespace draw {
 
 		VulkanFramebufferManager::VulkanFramebufferManager(Handle<gui::SDLVulkanDevice> dev,
+		                                                   VulkanSettings& settings,
 		                                                   int renderWidth, int renderHeight)
 		    : device(dev),
 		      doingPostProcessing(false),
@@ -51,9 +48,9 @@ namespace spades {
 
 			SPLog("Initializing Vulkan framebuffer manager");
 
-			useHighPrec = (bool)(int)r_highPrec;
-			useHdr = (bool)(int)r_hdr;
-			useSRGB = (bool)(int)r_srgb;
+			useHighPrec = (bool)(int)settings.r_highPrec;
+			useHdr = (bool)(int)settings.r_hdr;
+			useSRGB = (bool)(int)settings.r_srgb;
 
 			// MSAA sample count for the scene attachments, resolved (and clamped to
 			// hardware support) once at device creation. > 1 enables the multisample
@@ -254,7 +251,7 @@ namespace spades {
 			// resolved for the water shader under MSAA, depth too at r_water >= 3 or
 			// for SSAO.
 			// Below that the water reflects no scene, so there is no mirror.
-			const int waterQuality = (int)r_water;
+			const int waterQuality = (int)settings.r_water;
 			if (waterQuality >= 2) {
 				SPLog("Creating mirror framebuffer for water reflections");
 				mirrorColorImage = Handle<VulkanImage>::New(
@@ -298,7 +295,7 @@ namespace spades {
 
 				// At 1x the mirror's ambient occlusion reads a copy of its depth,
 				// as the scene's does (`sceneDepthSampleImage`)
-				if (!useMSAA && (int)r_ssao != 0) {
+				if (!useMSAA && (int)settings.r_ssao != 0) {
 					mirrorDepthSampleImage = Handle<VulkanImage>::New(
 					    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
 					    VK_IMAGE_TILING_OPTIMAL,
@@ -322,7 +319,7 @@ namespace spades {
 
 					// Its depth for the depth-aware reflections (r_water 3) and the
 					// mirror's screen-space ambient occlusion
-					if (waterQuality >= 3 || (int)r_ssao != 0) {
+					if (waterQuality >= 3 || (int)settings.r_ssao != 0) {
 						mirrorDepthResolveImage = Handle<VulkanImage>::New(
 						    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
 						    VK_IMAGE_TILING_OPTIMAL,

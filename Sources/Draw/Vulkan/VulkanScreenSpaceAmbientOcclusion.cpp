@@ -19,6 +19,7 @@
  */
 
 #include "VulkanScreenSpaceAmbientOcclusion.h"
+#include "VulkanSettings.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +35,6 @@
 #include <Core/Settings.h>
 #include <Gui/SDLVulkanDevice.h>
 
-SPADES_SETTING(r_ssao);
 
 namespace spades {
 	namespace draw {
@@ -216,7 +216,7 @@ namespace spades {
 			ViewResources& main = views[static_cast<std::size_t>(VulkanSceneView::View::Main)];
 			main.present = true;
 			main.depth = framebuffers.GetResolvedDepthImage().GetPointerOrNull();
-			main.scale = (int)r_ssao >= 2 ? 2 : 1;
+			main.scale = (int)renderer.GetSettings().r_ssao >= 2 ? 2 : 1;
 
 			ViewResources& mirror = views[static_cast<std::size_t>(VulkanSceneView::View::Mirror)];
 			mirror.present = framebuffers.GetMirrorFramebuffer() != VK_NULL_HANDLE;

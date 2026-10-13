@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 #include "VulkanRenderer.h"
+#include "VulkanSettings.h"
 #include "VulkanPushConstants.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanMapRenderer.h"
@@ -73,20 +74,12 @@
 #include <vector>
 
 SPADES_SETTING(r_dlights);
-SPADES_SETTING(r_hdr);
-SPADES_SETTING(r_bloom);
-SPADES_SETTING(r_fogShadow);
-SPADES_SETTING(r_modelShadows);
-SPADES_SETTING(r_radiosity);
 SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
 SPADES_SETTING(r_cameraBlur);
 SPADES_SETTING(r_depthPrepass);
-SPADES_SETTING(r_ssao);
 SPADES_SETTING(r_scale);
 SPADES_SETTING(r_scaleFilter);
-SPADES_SETTING(r_water);
-SPADES_SETTING(r_softParticles);
 SPADES_SETTING(r_outlines);
 SPADES_SETTING(r_colorCorrection);
 SPADES_SETTING(r_lensFlare);
@@ -166,7 +159,7 @@ namespace spades {
 			InitializeVulkanResources();  // Create semaphores for synchronization
 
 			// Create framebuffer manager for offscreen rendering
-			framebufferManager = stmp::make_unique<VulkanFramebufferManager>(device, renderWidth, renderHeight);
+			framebufferManager = stmp::make_unique<VulkanFramebufferManager>(device, settings, renderWidth, renderHeight);
 
 			CreateRenderPass();  // Must create render pass before framebuffers
 			CreateFramebuffers();
@@ -615,7 +608,7 @@ namespace spades {
 		waterRenderer.reset();
 		ambientOcclusion.reset();
 		framebufferManager =
-		  stmp::make_unique<VulkanFramebufferManager>(device, renderWidth, renderHeight);
+		  stmp::make_unique<VulkanFramebufferManager>(device, settings, renderWidth, renderHeight);
 		waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
 		ConfigureAmbientOcclusion();
 
@@ -881,7 +874,7 @@ namespace spades {
 				// Whole-map volumes only when radiosity lights the scene, as GL makes
 				// these renderers only then; otherwise placeholders for the lit
 				// pipelines' descriptors
-				const bool radiosity = (int)r_radiosity != 0;
+				const bool radiosity = (int)settings.r_radiosity != 0;
 				ambientShadowRenderer =
 				  stmp::make_unique<VulkanAmbientShadowRenderer>(*this, *map, radiosity);
 				radiosityRenderer = stmp::make_unique<VulkanRadiosityRenderer>(*this, *map, radiosity);
@@ -942,7 +935,7 @@ namespace spades {
 			// heightmap shadow that pass samples exists. GL tests
 			// mapShadowRenderer here; testing shadowMapRenderer (the model
 			// cascades) is a different object and gates on the wrong thing.
-			if (r_fogShadow && mapShadowRenderer)
+			if (settings.r_fogShadow && mapShadowRenderer)
 				return MakeVector3(0, 0, 0);
 			else
 				return GetFullDaylightFogColor();
@@ -1051,7 +1044,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			ambientOcclusion.reset();
-			if ((int)r_ssao != 0)
+			if ((int)settings.r_ssao != 0)
 				ambientOcclusion = stmp::make_unique<VulkanScreenSpaceAmbientOcclusion>(
 				  *this, device->GetMaxFramesInFlight());
 
@@ -2088,7 +2081,7 @@ namespace spades {
 		// (the fog in-scatter uses the separate 512² map shadow). So model shadows
 		// work with fog off.
 		// No sun, no shadow to cast: at night the cascades are left out altogether.
-		if (sceneUsedInThisFrame && shadowMapRenderer && r_modelShadows && GetSunlight() > 0.0F) {
+		if (sceneUsedInThisFrame && shadowMapRenderer && settings.r_modelShadows && GetSunlight() > 0.0F) {
 			shadowMapRenderer->Render(commandBuffer);
 		} else if (shadowMapRenderer) {
 			// Cascade not rendered this frame: keep the sampling UBO marked disabled
@@ -2107,7 +2100,7 @@ namespace spades {
 		}
 
 		// Render mirror pass for water reflections (r_water >= 2)
-		if (sceneUsedInThisFrame && framebufferManager && waterRenderer && (int)r_water >= 2) {
+		if (sceneUsedInThisFrame && framebufferManager && waterRenderer && (int)settings.r_water >= 2) {
 			renderingMirror = true;
 
 			// Save original matrices
@@ -2224,7 +2217,7 @@ namespace spades {
 			if (framebufferManager->IsMSAA()) {
 				framebufferManager->ResolveMirrorColor(commandBuffer,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				if ((int)r_water >= 3 && depthResolveFilter) {
+				if ((int)settings.r_water >= 3 && depthResolveFilter) {
 					depthResolveFilter->Resolve(commandBuffer, mirrorDepth.GetPointerOrNull(),
 						framebufferManager->GetMirrorDepthResolveImage().GetPointerOrNull());
 				}
@@ -2285,8 +2278,8 @@ namespace spades {
 			// black sky on a black clear. We only suppress Sky.frag when
 			// Fog1 is what actually runs (the variant selection mirrors
 			// VulkanFogFilter's): r_fogShadow != 0 AND not (Fog2 active).
-			const bool useFog2Pass = ((int)r_fogShadow == 2 && (int)r_radiosity != 0);
-			const bool useFog1Pass = ((int)r_fogShadow != 0) && !useFog2Pass;
+			const bool useFog2Pass = settings.UsesFog2();
+			const bool useFog1Pass = ((int)settings.r_fogShadow != 0) && !useFog2Pass;
 			if (!useFog1Pass)
 				RenderSky(commandBuffer);
 
@@ -2324,7 +2317,7 @@ namespace spades {
 			// after water). Drawn here in the order particles -> long sprites -> debug.
 			// When the water pass will run, defer them to it (same render pass, the
 			// pipelines are render-pass-compatible); otherwise draw them here.
-			const bool willRenderWater = (int)r_water > 0 && waterRenderer && framebufferManager;
+			const bool willRenderWater = (int)settings.r_water > 0 && waterRenderer && framebufferManager;
 
 			if (!willRenderWater) {
 				// Ahead of the transparent overlays, as in GL, so smoke and tracers
@@ -2437,7 +2430,7 @@ namespace spades {
 			// (see CopySceneForWaterSampling / ResolveMirrorColor
 			// and the GetWater*() accessors), and refraction depth reuses the scene's
 			// resolved depth.
-			bool waterEnabled = (int)r_water > 0 && waterRenderer;
+			bool waterEnabled = (int)settings.r_water > 0 && waterRenderer;
 
 			// Copy scene to screen copy images for water refraction sampling
 			// (water renders to the same framebuffer, so it can't sample from it directly)
@@ -2729,7 +2722,7 @@ namespace spades {
 			// and the whole frame to come out over-bright.
 
 			// Fog shadow / atmospheric in-scatter
-			if ((int)r_fogShadow && fogFilter && mapShadowRenderer && currentInput && currentOutput) {
+			if ((int)settings.r_fogShadow && fogFilter && mapShadowRenderer && currentInput && currentOutput) {
 				fogFilter->Filter(commandBuffer, currentInput, currentOutput);
 				advanceChain();
 			}
@@ -2758,7 +2751,7 @@ namespace spades {
 			}
 
 			// Bloom
-			if ((int)r_bloom && bloomFilter && currentInput && currentOutput) {
+			if ((int)settings.r_bloom && bloomFilter && currentInput && currentOutput) {
 				bloomFilter->Filter(commandBuffer, currentInput, currentOutput);
 				advanceChain();
 			}
@@ -2779,7 +2772,7 @@ namespace spades {
 
 			// Auto-exposure + tonemap (HDR only) — runs LAST, sampling the
 			// fully composed scene to compute its gain.
-			if ((int)r_hdr && autoExposureFilter && currentInput && currentOutput) {
+			if ((int)settings.r_hdr && autoExposureFilter && currentInput && currentOutput) {
 				autoExposureFilter->Filter(commandBuffer, currentInput, currentOutput, lastDt);
 				advanceChain();
 			}

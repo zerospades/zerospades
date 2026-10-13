@@ -19,6 +19,7 @@
  */
 
 #include "VulkanSpriteRenderer.h"
+#include "VulkanSettings.h"
 #include "VulkanPushConstants.h"
 
 #include <algorithm>
@@ -42,7 +43,6 @@
 #include <Core/Settings.h>
 #include <Gui/SDLVulkanDevice.h>
 
-SPADES_SETTING(r_softParticles);
 
 namespace spades {
 	namespace draw {
@@ -109,8 +109,8 @@ namespace spades {
 		VulkanSpriteRenderer::VulkanSpriteRenderer(VulkanRenderer& r)
 		    : renderer(r),
 		      device(r.GetDevice()),
-		      softParticles((int)r_softParticles != 0),
-		      litParticles((int)r_softParticles >= 2) {
+		      softParticles((int)renderer.GetSettings().r_softParticles != 0),
+		      litParticles((int)renderer.GetSettings().r_softParticles >= 2) {
 			SPADES_MARK_FUNCTION();
 
 			VkDevice vkDevice = device->GetDevice();
@@ -228,8 +228,7 @@ namespace spades {
 			shaderStages[1].pName = "main";
 
 			// The lit sprites take the map's ambient light as its shaders do.
-			SPADES_SETTING(r_radiosity);
-			const std::int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
+			const std::int32_t useRadiosity = (int)renderer.GetSettings().r_radiosity != 0 ? 1 : 0;
 			const VkSpecializationMapEntry radiosityEntry{0, 0, sizeof(useRadiosity)};
 			VkSpecializationInfo specialization{};
 			specialization.mapEntryCount = 1;

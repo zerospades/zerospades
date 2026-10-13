@@ -19,6 +19,7 @@
  */
 
 #include "VulkanFogFilter.h"
+#include "VulkanSettings.h"
 #include "VulkanPushConstants.h"
 #include "VulkanBuffer.h"
 #include "VulkanAmbientShadowRenderer.h"
@@ -39,8 +40,6 @@
 #include <cmath>
 #include <cstring>
 
-SPADES_SETTING(r_fogShadow);
-SPADES_SETTING(r_radiosity);
 
 namespace spades {
 	namespace draw {
@@ -498,7 +497,7 @@ namespace spades {
 			//   r_fogShadow == 2 AND r_radiosity != 0. Otherwise fall back to
 			//   Fog (DDA-style sharp shadow shafts), which is also what GL
 			//   uses when r_fogShadow == 1 or when r_radiosity is off.
-			const bool useFog2    = ((int)r_fogShadow == 2 && (int)r_radiosity != 0);
+			const bool useFog2    = renderer.GetSettings().UsesFog2();
 			const bool useClassic = !useFog2;
 
 			const client::SceneDefinition& def = renderer.GetSceneDef();
