@@ -95,8 +95,9 @@ namespace spades {
 			/** Set when acquiring or presenting found the swapchain out of date or
 			 * suboptimal; acted on by the next `PrepareSwapchain` */
 			bool swapchainStale{false};
-			/** `r_vsync` as the swapchain's present mode was chosen from: 1, 0 or
-			 * -1. A change rebuilds the swapchain at the next frame boundary. */
+			/** `r_vsync` as the swapchain's present mode was chosen from: 1 with
+			 * vsync, 0 without. A change rebuilds the swapchain at the next frame
+			 * boundary. */
 			int presentVsync{1};
 
 			/** Whether the validation layers are on: asked for (debug builds, or

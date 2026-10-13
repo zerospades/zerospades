@@ -69,30 +69,34 @@ namespace spades {
 			"VK_LAYER_KHRONOS_validation"
 		};
 
-		// `r_vsync` as GL's swap interval reads it (SDLRunner): 1 waits for the
-		// vertical blank, -1 waits unless the frame is late, 0 never waits
+		// `r_vsync` as GL's swap interval reads it (SDLRunner): 0 never waits for
+		// the vertical blank, anything else waits unless the frame is late
 		static int GetVsyncSetting() {
 			const int vsync = r_vsync;
-			return vsync > 0 ? 1 : (vsync < 0 ? -1 : 0);
+			return vsync != 0 ? 1 : 0;
 		}
 
-		// The present mode for `vsync` among those the surface offers. FIFO is the
-		// only one every surface has, so it is what any choice falls back to.
+		// The present mode for `vsync` among those the surface offers: with vsync,
+		// the relaxed kind, which shows a late frame at once rather than holding it
+		// to the next vertical blank and halving the frame rate, as GL prefers
+		// adaptive vsync. FIFO is the only one every surface has, so it is what any
+		// choice falls back to.
 		static VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR>& modes,
 		                                          int vsync) {
 			auto offered = [&](VkPresentModeKHR mode) {
 				return std::find(modes.begin(), modes.end(), mode) != modes.end();
 			};
-			if (vsync < 0 && offered(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
-				return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
-			if (vsync == 0) {
-				// Without vsync GL tears rather than waits; mailbox at least does not
-				// wait where the surface cannot tear
-				if (offered(VK_PRESENT_MODE_IMMEDIATE_KHR))
-					return VK_PRESENT_MODE_IMMEDIATE_KHR;
-				if (offered(VK_PRESENT_MODE_MAILBOX_KHR))
-					return VK_PRESENT_MODE_MAILBOX_KHR;
+			if (vsync != 0) {
+				if (offered(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
+					return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+				return VK_PRESENT_MODE_FIFO_KHR;
 			}
+			// Without vsync GL tears rather than waits; mailbox at least does not
+			// wait where the surface cannot tear
+			if (offered(VK_PRESENT_MODE_IMMEDIATE_KHR))
+				return VK_PRESENT_MODE_IMMEDIATE_KHR;
+			if (offered(VK_PRESENT_MODE_MAILBOX_KHR))
+				return VK_PRESENT_MODE_MAILBOX_KHR;
 			return VK_PRESENT_MODE_FIFO_KHR;
 		}
 
