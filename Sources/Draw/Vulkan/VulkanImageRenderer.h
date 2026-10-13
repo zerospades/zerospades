@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "VulkanPushConstants.h"
+
 #include <cstdint>
 #include <vector>
 #include <vulkan/vulkan.h>
@@ -54,6 +56,8 @@ namespace spades {
 				float clipCircleRadius;
 				float _pad;
 			};
+			static_assert(sizeof(PushConstants) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 			// 2D clipping applied to a batch. The image renderer records its
 			// draws long after the client issued them, so the clip in effect at

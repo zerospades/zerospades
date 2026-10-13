@@ -23,6 +23,7 @@
 #include <cstring>
 
 #include "VulkanCameraBlurFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -41,6 +42,8 @@ namespace spades {
 				float reverseMatrix[16];
 				float shutterTimeScale;
 			};
+			static_assert(sizeof(CameraBlurPC) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 			// Rotation-only "reverse" of the view difference matrix; straight
 			// port of GLCameraBlurFilter's ReverseMatrix.

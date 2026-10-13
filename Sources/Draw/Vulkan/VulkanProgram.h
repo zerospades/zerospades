@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "VulkanPushConstants.h"
+
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -33,10 +35,6 @@ namespace spades {
 
 	namespace draw {
 		class VulkanShader;
-
-		/** The push constant space every Vulkan device has (`maxPushConstantsSize`
-		 * is at least this): no program may declare more. */
-		constexpr uint32_t kPortablePushConstantsSize = 128;
 
 		// Represents uniform buffer binding information
 		struct VulkanUniformBlock {

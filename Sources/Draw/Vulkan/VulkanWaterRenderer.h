@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "VulkanPushConstants.h"
+
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <Client/IGameMapListener.h>
@@ -69,6 +71,8 @@ namespace spades {
 			static_assert(sizeof(WaterPushConstants) == 128,
 			              "WaterPushConstants must stay 128 bytes; the shader push_constant "
 			              "block and the reflected pipeline range depend on this std430 layout");
+			static_assert(sizeof(WaterPushConstants) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 		public:
 			VulkanWaterRenderer(VulkanRenderer& r, client::GameMap* map);

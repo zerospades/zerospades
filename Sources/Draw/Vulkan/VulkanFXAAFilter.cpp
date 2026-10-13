@@ -19,6 +19,7 @@
  */
 
 #include "VulkanFXAAFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -31,6 +32,11 @@
 
 namespace spades {
 	namespace draw {
+
+		namespace {
+			// FXAA.vk.fs's push constants: one over the viewport's size
+			struct FXAAPushConstants { float inverseViewport[2]; };
+		}
 
 		VulkanFXAAFilter::VulkanFXAAFilter(VulkanRenderer& r)
 		    : VulkanPostProcessFilter(r),
@@ -187,7 +193,7 @@ namespace spades {
 			blend.attachmentCount = 1;
 			blend.pAttachments = &noBlend;
 
-			VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 2};
+			const VkPushConstantRange pcr = PushConstantRange<FXAAPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 			VkPipelineLayoutCreateInfo li{};
 			li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			li.setLayoutCount = 1;
@@ -318,9 +324,8 @@ namespace spades {
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			                        fxaaLayout, 0, 1, &ds, 0, nullptr);
 
-			float invVP[2] = {1.0f / (float)w, 1.0f / (float)h};
-			vkCmdPushConstants(cmd, fxaaLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(invVP), invVP);
+			PushConstants(cmd, fxaaLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+			              FXAAPushConstants{{1.0f / (float)w, 1.0f / (float)h}});
 
 			vkCmdDraw(cmd, 3, 1, 0, 0);
 

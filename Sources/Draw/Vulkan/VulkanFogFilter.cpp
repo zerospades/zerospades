@@ -19,6 +19,7 @@
  */
 
 #include "VulkanFogFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanBuffer.h"
 #include "VulkanAmbientShadowRenderer.h"
 #include "VulkanFramebufferManager.h"
@@ -69,6 +70,8 @@ namespace spades {
 			                          //           z = zNear, w = zFar
 			float fogColorDist[4];    // [80..95] xyz = fogColor (linear), w = fogDistance
 		};
+		static_assert(sizeof(FogClassicPushConstants) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 		static_assert(sizeof(FogClassicPushConstants) == 96, "FogClassicPushConstants must be 96 bytes");
 
 		// ─────────────────────────────────────────────────────────────────────────

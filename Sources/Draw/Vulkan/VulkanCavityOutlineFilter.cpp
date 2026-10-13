@@ -19,6 +19,7 @@
  */
 
 #include "VulkanCavityOutlineFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -46,6 +47,8 @@ namespace spades {
 			float zNearFarFogStrength[4];   // [16..31] x=zNear, y=zFar, z=fogDistance, w=strength
 			float thresholds[4];            // [32..47] x=relative depth threshold
 		};
+		static_assert(sizeof(CavityPushConstants) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 		static_assert(sizeof(CavityPushConstants) == 48, "CavityPushConstants must be 48 bytes");
 
 		VulkanCavityOutlineFilter::VulkanCavityOutlineFilter(VulkanRenderer& r)

@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "VulkanPushConstants.h"
+
 #include <vector>
 #include <vulkan/vulkan.h>
 #include "VulkanModel.h"
@@ -46,14 +48,16 @@ namespace spades {
 			Vector3 modelOrigin;   float fogDensity;
 			Vector3 customColor;   float opacity; // a ghost's
 		};
-		static_assert(sizeof(ModelDrawConstants) <= 128, "push constants past 128 bytes are not portable");
+		static_assert(sizeof(ModelDrawConstants) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 		struct ModelXRayDrawConstants {
 			Matrix4 modelMatrix;
 			Vector3 modelOrigin;    float _pad0;
 			Vector3 xrayColor;      float _pad1;
 			Vector3 customColor;    float _pad2;
 		};
-		static_assert(sizeof(ModelXRayDrawConstants) <= 128, "push constants past 128 bytes are not portable");
+		static_assert(sizeof(ModelXRayDrawConstants) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 		class VulkanOptimizedVoxelModel : public VulkanModel {
 			struct Vertex {

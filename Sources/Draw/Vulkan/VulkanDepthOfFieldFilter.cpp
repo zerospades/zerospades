@@ -19,6 +19,7 @@
  */
 
 #include "VulkanDepthOfFieldFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -40,6 +41,14 @@ SPADES_SETTING(r_depthOfFieldMaxCoc);
 namespace spades {
 	namespace draw {
 
+		// Push constants of the passes declaring a single value, as their shaders
+		// do; each pipeline layout's range and its pushes are sized from the type.
+		namespace {
+			struct Gauss1DPushConstants { float unitShift[2]; }; // Gauss1D.vk.fs
+			struct BlurPushConstants { float offset[2]; };       // DoFBlur(2).vk.fs
+			struct MixPushConstants { std::int32_t blurredOnly; }; // DoFMix.vk.fs
+		}
+
 		// CoC generation push constants (48 bytes, FS only).
 		struct DoFCoCGenParams {
 			float pixelShiftX, pixelShiftY;     // offset 0
@@ -52,6 +61,8 @@ namespace spades {
 			float farBlur;                      // offset 40 (already negated)
 			float _pad;                         // offset 44
 		};
+		static_assert(sizeof(DoFCoCGenParams) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 		static_assert(sizeof(DoFCoCGenParams) == 48, "DoFCoCGenParams size mismatch");
 
 		// ─────────────────────────────────────────────────────────────────────
@@ -297,7 +308,7 @@ namespace spades {
 					SPRaise("Failed to create DoF cocGen layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 2 * sizeof(float)}; // vec2 unitShift
+				const VkPushConstantRange pcr = PushConstantRange<Gauss1DPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -316,7 +327,7 @@ namespace spades {
 					SPRaise("Failed to create DoF dual layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 2 * sizeof(float)}; // vec2 offset
+				const VkPushConstantRange pcr = PushConstantRange<BlurPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -327,7 +338,7 @@ namespace spades {
 					SPRaise("Failed to create DoF blur layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(int)}; // int blurredOnly
+				const VkPushConstantRange pcr = PushConstantRange<MixPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -523,9 +534,8 @@ namespace spades {
 				VkSampler    s = linearSampler;
 				VkDescriptorSet ds = BindImages(frameSlot, singleSamplerDSL, &v, &s, 1);
 				VkFramebuffer   fb = MakeFramebuffer(cocRenderPass, tempX.GetPointerOrNull(), frameSlot);
-				float unitShift[2] = {spread / (float)w, 0.0f};
-				vkCmdPushConstants(cmd, gauss1DLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(unitShift), unitShift);
+				PushConstants(cmd, gauss1DLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              Gauss1DPushConstants{{spread / (float)w, 0.0f}});
 				DrawFullscreen(cmd, cocRenderPass, fb, w, h, gauss1DPipeline, gauss1DLayout, ds);
 			}
 
@@ -536,9 +546,8 @@ namespace spades {
 				VkSampler    s = linearSampler;
 				VkDescriptorSet ds = BindImages(frameSlot, singleSamplerDSL, &v, &s, 1);
 				VkFramebuffer   fb = MakeFramebuffer(cocRenderPass, result.GetPointerOrNull(), frameSlot);
-				float unitShift[2] = {0.0f, spread / (float)h};
-				vkCmdPushConstants(cmd, gauss1DLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(unitShift), unitShift);
+				PushConstants(cmd, gauss1DLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              Gauss1DPushConstants{{0.0f, spread / (float)h}});
 				DrawFullscreen(cmd, cocRenderPass, fb, w, h, gauss1DPipeline, gauss1DLayout, ds);
 			}
 
@@ -570,9 +579,8 @@ namespace spades {
 				VkDescriptorSet ds      = BindImages(frameSlot, dualSamplerDSL, views, smpls, 2);
 				VkFramebuffer   fb      = MakeFramebuffer(colorRenderPass, dst.GetPointerOrNull(), frameSlot);
 
-				float texOffset[2] = {offsetPixX / (float)w, offsetPixY / (float)h};
-				vkCmdPushConstants(cmd, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(texOffset), texOffset);
+				PushConstants(cmd, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              BlurPushConstants{{offsetPixX / (float)w, offsetPixY / (float)h}});
 				DrawFullscreen(cmd, colorRenderPass, fb, w, h, usePipeline, blurLayout, ds);
 
 				// Previous source is no longer needed: defer return (but not the original buffer).
@@ -786,9 +794,8 @@ namespace spades {
 				VkDescriptorSet ds     = BindImages(frameSlot, quadSamplerDSL, views, smpls, 4);
 				VkFramebuffer   fb     = MakeFramebuffer(colorRenderPass, output, frameSlot);
 
-				int blurredOnly = highQ ? 1 : 0;
-				vkCmdPushConstants(cmd, doFMixLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(blurredOnly), &blurredOnly);
+				PushConstants(cmd, doFMixLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              MixPushConstants{highQ ? 1 : 0});
 				DrawFullscreen(cmd, colorRenderPass, fb,
 				               static_cast<uint32_t>(output->GetWidth()),
 				               static_cast<uint32_t>(output->GetHeight()),
