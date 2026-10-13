@@ -121,7 +121,9 @@ namespace spades {
 			/** On the worker: recomputes a batch of dirty chunks, those around
 			 * `eyeChunk` first */
 			void UpdateDirtyChunks(IntVector3 eyeChunk);
-			int GetNumDirtyChunks();
+			/** Dirty chunks the worker can take: not those whose last result is
+			 * still waiting to be uploaded */
+			int GetNumAvailableChunks();
 
 			std::uint32_t EncodeValue(Vector3 vec);
 			float CompressDynamicRange(float v);
