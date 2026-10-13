@@ -192,7 +192,6 @@ namespace spades {
 			 */
 			BufferHandle CreateBufferHandle(int w, int h, VkFormat colorFormat);
 
-			void CopyToMirrorImage(VkCommandBuffer commandBuffer, VkFramebuffer srcFb = VK_NULL_HANDLE);
 			void ClearMirrorImage(VkCommandBuffer commandBuffer, Vector3 bgCol);
 			Handle<VulkanImage> GetMirrorColorImage() { return mirrorColorImage; }
 			Handle<VulkanImage> GetMirrorDepthImage() { return mirrorDepthImage; }
@@ -217,11 +216,13 @@ namespace spades {
 			Handle<VulkanImage> GetWaterRefractionDepthImage() {
 				return useMSAA ? renderDepthResolveImage : screenCopyDepthImage;
 			}
+			// The mirror the water reflects, at r_water >= 2 only: null below.
 			Handle<VulkanImage> GetWaterMirrorColorImage() {
-				return useMSAA ? mirrorColorResolveImage : mirrorColorImage;
+				return mirrorColorResolveImage ? mirrorColorResolveImage : mirrorColorImage;
 			}
+			// r_water >= 3 only
 			Handle<VulkanImage> GetWaterMirrorDepthImage() {
-				return useMSAA ? mirrorDepthResolveImage : mirrorDepthImage;
+				return mirrorDepthResolveImage ? mirrorDepthResolveImage : mirrorDepthImage;
 			}
 			Handle<VulkanImage> GetMirrorColorResolveImage() { return mirrorColorResolveImage; }
 			Handle<VulkanImage> GetMirrorDepthResolveImage() { return mirrorDepthResolveImage; }
