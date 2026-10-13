@@ -337,10 +337,11 @@ namespace spades {
 					}
 		}
 
-		int VulkanAmbientShadowRenderer::GetNumDirtyChunks() {
+		int VulkanAmbientShadowRenderer::GetNumAvailableChunks() {
 			std::lock_guard<std::mutex> lock(dirtyMutex);
-			return (int)std::count_if(chunks.begin(), chunks.end(),
-			                          [](const Chunk& c) { return c.dirty; });
+			return (int)std::count_if(chunks.begin(), chunks.end(), [](const Chunk& c) {
+				return c.dirty && c.transferDone.load(std::memory_order_acquire);
+			});
 		}
 
 		void VulkanAmbientShadowRenderer::Update(VkCommandBuffer cmd, std::size_t frameSlot) {
@@ -348,7 +349,9 @@ namespace spades {
 			if (!active)
 				return;
 
-			if (GetNumDirtyChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
+			// A batch only for chunks the worker can take: those waiting to be
+			// uploaded would have it start and find nothing, every frame
+			if (GetNumAvailableChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
 				if (dispatch) {
 					dispatch->Join();
 					delete dispatch;
