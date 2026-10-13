@@ -100,6 +100,9 @@ namespace spades {
 			// (re)created post-construction — e.g. when the map loads after the
 			// renderer, which otherwise leaves mainTexture unbound (black water).
 			void RebindStaticTextures();
+			/** Makes what the water draws from the map with: its colour image, the
+			 * wave tanks, images and staging */
+			void CreateMapResources();
 			void CreateUniformBuffers();
 			void UpdateUniformBuffers(uint32_t frameIndex);
 			void CleanupDescriptorResources();
@@ -127,6 +130,7 @@ namespace spades {
 			std::vector<void*> waveTanksPlaceholder;
 
 			// Staging buffer pool for wave uploads
+			// Per frame in flight, then per layer
 			std::vector<Handle<VulkanBuffer>> waveStagingBufferPool;
 			size_t waveStagingBufferSize;
 		};
