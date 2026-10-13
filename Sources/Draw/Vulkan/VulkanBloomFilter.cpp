@@ -608,7 +608,8 @@ namespace spades {
 
 			// ── 2. Upsample composite (smallest → largest) ────────────
 			// For each step, blend the smaller level into the larger using:
-			//   outColor = mix(large, small, alpha), alpha = sqrt(cnt/(cnt+1))
+			//   outColor = mix(large, small, alpha), alpha = cnt/(cnt+1),
+			// GL's SRC_ALPHA blend of each level over the next larger one
 			//
 			// Superseded images are collected and returned only after all command
 			// recording is done, preventing the pool from reusing an image still
@@ -619,7 +620,7 @@ namespace spades {
 
 			for (int i = numLevels - 1; i >= 1; --i) {
 				int   cnt   = numLevels - i;
-				float alpha = std::sqrt((float)cnt / (float)(cnt + 1));
+				float alpha = (float)cnt / (float)(cnt + 1);
 
 				VulkanImage* large = levels[i - 1].GetPointerOrNull();
 				VulkanImage* small = levels[i].GetPointerOrNull();

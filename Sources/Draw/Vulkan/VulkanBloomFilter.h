@@ -38,7 +38,7 @@ namespace spades {
 		//      from it, each half the last and blurred, from a quarter of the
 		//      input down to a texel (at most 10), as GL does.
 		//   2. Composite levels back from smallest to second-largest using
-		//      mix(large, small, alpha) where alpha = sqrt(cnt/(cnt+1)).
+		//      mix(large, small, alpha) where alpha = cnt/(cnt+1), as GL blends them.
 		//   3. LensDust composite: scene * 0.95 + dust² * bloom * 2 + grain,
 		//      with the dust overlay texture and a per-frame 128×128 noise
 		//      texture for film grain, matching GL's LensDust.fs.
