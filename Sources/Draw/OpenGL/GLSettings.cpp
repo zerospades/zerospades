@@ -41,8 +41,6 @@ DEFINE_SPADES_SETTING(r_debugTimingFlush, "0");
 // FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_debugTimingFillGap, "0");
 // FIXME: not yet implemented in Vulkan
-DEFINE_SPADES_SETTING(r_occlusionQuery, "0");
-// FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_sparseShadowMaps, "1");
 // FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_srgb2D, "1");
