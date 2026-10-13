@@ -19,6 +19,7 @@
  */
 
 #include "VulkanBloomFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanBuffer.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanFramebufferManager.h"
@@ -36,6 +37,14 @@
 
 namespace spades {
 	namespace draw {
+
+		// Push constants, as the shaders declare them; each pipeline layout's range
+		// and its pushes are sized from the same type.
+		namespace {
+			struct GaussPushConstants { float unitShift[2]; };     // Gauss1DRGBA.vk.fs
+			struct UpsamplePushConstants { float alpha; };         // BloomUpsample.vk.fs
+			struct CompositePushConstants { float noiseFactor[4]; }; // BloomComposite.vk.fs
+		}
 
 		// ─────────────────────────────────────────────────────────────
 		//  Construction / destruction
@@ -254,7 +263,7 @@ namespace spades {
 					SPRaise("Failed to create downsample pipeline layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 2};
+				const VkPushConstantRange pcr = PushConstantRange<GaussPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -265,7 +274,7 @@ namespace spades {
 					SPRaise("Failed to create gauss pipeline layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)};
+				const VkPushConstantRange pcr = PushConstantRange<UpsamplePushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -276,7 +285,7 @@ namespace spades {
 					SPRaise("Failed to create upsample pipeline layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 4};
+				const VkPushConstantRange pcr = PushConstantRange<CompositePushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -559,10 +568,9 @@ namespace spades {
 				// every downsample level; without it the bloom is noticeably
 				// harder-edged than GL.
 				for (int pass = 0; pass < 2; ++pass) {
-					float unitShift[2] = {pass == 0 ? 1.0f / (float)nw : 0.0f,
-					                      pass == 0 ? 0.0f : 1.0f / (float)nh};
-					vkCmdPushConstants(cmd, gaussLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-					                   0, sizeof(unitShift), unitShift);
+					const GaussPushConstants gauss{{pass == 0 ? 1.0f / (float)nw : 0.0f,
+					                                pass == 0 ? 0.0f : 1.0f / (float)nh}};
+					PushConstants(cmd, gaussLayout, VK_SHADER_STAGE_FRAGMENT_BIT, gauss);
 
 					Handle<VulkanImage> blurred = pool->Acquire(nw, nh, colorFormat);
 					VkFramebuffer bfb   = MakeFramebuffer(ppRenderPass,
@@ -603,8 +611,8 @@ namespace spades {
 				uint32_t nh = static_cast<uint32_t>(large->GetHeight());
 
 				// Push constant before the draw inside DrawFullscreen.
-				vkCmdPushConstants(cmd, upsampleLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-				                   0, sizeof(float), &alpha);
+				PushConstants(cmd, upsampleLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              UpsamplePushConstants{alpha});
 
 				Handle<VulkanImage> blended = pool->Acquire(nw, nh, colorFormat);
 				VkFramebuffer fb   = MakeFramebuffer(ppRenderPass, blended.GetPointerOrNull(), frameSlot);
@@ -645,9 +653,8 @@ namespace spades {
 			// noiseTexCoordFactor, exactly as GLLensDustFilter computes it.
 			float facX = renderer.GetRenderWidth() / 128.0f;
 			float facY = renderer.GetRenderHeight() / 128.0f;
-			float noiseFactor[4] = {facX, facY, facX / 128.0f, facY / 128.0f};
-			vkCmdPushConstants(cmd, compositeLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(noiseFactor), noiseFactor);
+			const CompositePushConstants composite{{facX, facY, facX / 128.0f, facY / 128.0f}};
+			PushConstants(cmd, compositeLayout, VK_SHADER_STAGE_FRAGMENT_BIT, composite);
 
 			DrawFullscreen(cmd, ppRenderPass, fb, rw, rh,
 			               compositePipeline, compositeLayout, ds);

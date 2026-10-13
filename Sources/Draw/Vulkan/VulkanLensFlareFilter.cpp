@@ -19,6 +19,7 @@
  */
 
 #include "VulkanLensFlareFilter.h"
+#include "VulkanPushConstants.h"
 
 #include <algorithm>
 #include <cmath>
@@ -58,15 +59,21 @@ namespace spades {
 				float scanRange[4]; // xy = min, zw = max  (uv in depth texture)
 				float scanZ;
 			};
+			static_assert(sizeof(ScannerPC) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 			struct BlurPC {
 				float unitShift[2];
 			};
+			static_assert(sizeof(BlurPC) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 			struct FlareDrawPC {
 				float drawRange[4]; // xy = min, zw = max  (clip space, +Y down)
 				float color[4];     // rgb tint, a unused
 			};
+			static_assert(sizeof(FlareDrawPC) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 
 			VulkanImage* GetVulkanImage(const Handle<client::IImage>& h) {
 				auto* wrapper = dynamic_cast<VulkanImageWrapper*>(h.GetPointerOrNull());

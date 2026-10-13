@@ -19,6 +19,7 @@
  */
 
 #include "VulkanColorCorrectionFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -46,6 +47,22 @@ SPADES_SETTING(r_radiosity);
 
 namespace spades {
 	namespace draw {
+
+		namespace {
+			// ColorCorrection.vk.fs's push constants: the tint and the enhancement,
+			// the saturation, HDR and the sharpening, and the blur's shift
+			struct CorrectionPushConstants {
+				float tintAndEnhancement[4];
+				float saturation, useHdr, sharpening, sharpeningFinalGain;
+				float blurShift[4];
+			};
+			// ColorCorrectionBlur.vk.fs's: the blur's step, and whether the input
+			// is sRGB-decoded
+			struct BlurPushConstants {
+				float unitShift[2];
+				float useHdr;
+			};
+		}
 
 		VulkanColorCorrectionFilter::VulkanColorCorrectionFilter(VulkanRenderer& r)
 		    : VulkanPostProcessFilter(r),
@@ -248,9 +265,8 @@ namespace spades {
 		void VulkanColorCorrectionFilter::InitPipeline() {
 			VkDevice dev = device->GetDevice();
 
-			// Three vec4s: the tint and the enhancement, the saturation, HDR and the
-			// sharpening, and the blur's shift
-			VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 12};
+			const VkPushConstantRange pcr =
+			  PushConstantRange<CorrectionPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 			VkPipelineLayoutCreateInfo li{};
 			li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			li.setLayoutCount = 1;
@@ -261,8 +277,8 @@ namespace spades {
 				SPRaise("Failed to create ColorCorrection pipeline layout");
 			pipeline = BuildPipeline("Shaders/Vulkan/PostFilters/ColorCorrection.vk.fs.spv", layout);
 
-			// The blur's step, and whether the input is sRGB-decoded
-			VkPushConstantRange blurRange{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 3};
+			const VkPushConstantRange blurRange =
+			  PushConstantRange<BlurPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 			li.pSetLayouts = &singleSamplerDSL;
 			li.pPushConstantRanges = &blurRange;
 			if (vkCreatePipelineLayout(dev, &li, nullptr, &blurLayout) != VK_SUCCESS)
@@ -439,10 +455,10 @@ namespace spades {
 			uint32_t w = static_cast<uint32_t>(output->GetWidth());
 			uint32_t h = static_cast<uint32_t>(output->GetHeight());
 
-			float pc[12] = {
-			    tint.x, tint.y, tint.z, enhancement,
+			CorrectionPushConstants pc{
+			    {tint.x, tint.y, tint.z, enhancement},
 			    saturation, useHdr, sharpening, sharpeningFinalGain,
-			    1.0F / (float)input->GetHeight(), 0.0F, 0.0F, 0.0F
+			    {1.0F / (float)input->GetHeight(), 0.0F, 0.0F, 0.0F}
 			};
 
 			// The tint eases towards the scene's fog, as GL's.
@@ -471,14 +487,13 @@ namespace spades {
 				const VkDescriptorSet blurSet = BindTexture(frameSlot, input->GetImageView());
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blurLayout, 0, 1,
 				                        &blurSet, 0, nullptr);
-				const float blurParams[3] = {1.0F / (float)input->GetWidth(), 0.0F, useHdr};
-				vkCmdPushConstants(cmd, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-				                   sizeof(blurParams), blurParams);
+				PushConstants(cmd, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              BlurPushConstants{{1.0F / (float)input->GetWidth(), 0.0F}, useHdr});
 				vkCmdDraw(cmd, 3, 1, 0, 0);
 				vkCmdEndRenderPass(cmd);
 			} else {
 				// Nothing to sharpen: the shader leaves the blur unread.
-				pc[7] = 0.0F;
+				pc.sharpeningFinalGain = 0.0F;
 			}
 
 			VkFramebuffer fb = MakeFramebuffer(output, frameSlot);
@@ -502,8 +517,7 @@ namespace spades {
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			                        layout, 0, 1, &dsSet, 0, nullptr);
-			vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(pc), pc);
+			PushConstants(cmd, layout, VK_SHADER_STAGE_FRAGMENT_BIT, pc);
 
 			vkCmdDraw(cmd, 3, 1, 0, 0);
 

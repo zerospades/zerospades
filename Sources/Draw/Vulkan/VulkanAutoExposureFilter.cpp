@@ -19,6 +19,7 @@
  */
 
 #include "VulkanAutoExposureFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -41,6 +42,18 @@ SPADES_SETTING(r_hdrGamma);
 
 namespace spades {
 	namespace draw {
+		// Push constants, as the shaders declare them. Each pipeline layout's range
+		// and its pushes are sized from the same type (`PushConstantRange`).
+		namespace {
+			// The gain pass's (AutoExposure.vk.fs)
+			struct GainParams {
+				float minGain, maxGain, rate;
+			};
+			// The apply pass's: one over r_hdrGamma
+			struct ApplyParams {
+				float invGamma;
+			};
+		}
 
 		// ─────────────────────────────────────────────────────────────
 		//  Construction / destruction
@@ -276,7 +289,7 @@ namespace spades {
 					SPRaise("Failed to create preprocess pipeline layout");
 			}
 			{
-				VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 3};
+				const VkPushConstantRange pcr = PushConstantRange<GainParams>(VK_SHADER_STAGE_FRAGMENT_BIT);
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				li.setLayoutCount         = 1;
@@ -291,10 +304,8 @@ namespace spades {
 				// 1.0 / r_hdrGamma, used to encode the linear HDR scene for
 				// display (mirrors GL's GLNonlinearizeFilter, folded in here so
 				// it is one less full-screen pass).
-				VkPushConstantRange pcr{};
-				pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-				pcr.offset     = 0;
-				pcr.size       = sizeof(float);
+				const VkPushConstantRange pcr =
+				  PushConstantRange<ApplyParams>(VK_SHADER_STAGE_FRAGMENT_BIT);
 
 				VkPipelineLayoutCreateInfo li{};
 				li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -634,7 +645,7 @@ namespace spades {
 			float speed  = std::max((float)r_hdrAutoExposureSpeed, 0.0f);
 			float rate   = 1.0f - std::pow(0.01f, dt * speed);
 
-			struct GainParams { float minGain, maxGain, rate; } gainPC{
+			GainParams gainPC{
 			    std::pow(2.0f, minExp),
 			    std::pow(2.0f, maxExp),
 			    rate
@@ -666,8 +677,7 @@ namespace spades {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, computeGainPipeline);
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        computeGainLayout, 0, 1, &gainDS, 0, nullptr);
-				vkCmdPushConstants(cmd, computeGainLayout,
-				                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(gainPC), &gainPC);
+				PushConstants(cmd, computeGainLayout, VK_SHADER_STAGE_FRAGMENT_BIT, gainPC);
 				vkCmdDraw(cmd, 3, 1, 0, 0);
 				vkCmdEndRenderPass(cmd);
 
@@ -711,8 +721,7 @@ namespace spades {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, computeGainPipeline);
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        computeGainLayout, 0, 1, &gainDS, 0, nullptr);
-				vkCmdPushConstants(cmd, computeGainLayout,
-				                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(gainPC), &gainPC);
+				PushConstants(cmd, computeGainLayout, VK_SHADER_STAGE_FRAGMENT_BIT, gainPC);
 				vkCmdDraw(cmd, 3, 1, 0, 0);
 				vkCmdEndRenderPass(cmd);
 			}
@@ -760,9 +769,8 @@ namespace spades {
 				vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, applyPipeline);
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 				                        applyLayout, 0, 1, &applyDS, 0, nullptr);
-				vkCmdPushConstants(cmd, applyLayout,
-				                   VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-				                   sizeof(invGamma), &invGamma);
+				PushConstants(cmd, applyLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              ApplyParams{invGamma});
 				vkCmdDraw(cmd, 3, 1, 0, 0);
 
 				vkCmdEndRenderPass(cmd);

@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "VulkanPushConstants.h"
+
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <Client/IGameMapListener.h>
@@ -45,7 +47,8 @@ namespace spades {
 			Vector3 modelOrigin;
 			float _pad; // to the block's std430 size
 		};
-		static_assert(sizeof(MapDrawConstants) <= 128, "push constants past 128 bytes are not portable");
+		static_assert(sizeof(MapDrawConstants) <= kPortablePushConstantsSize,
+		              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 		class VulkanMapRenderer {
 
 			friend class VulkanMapChunk;

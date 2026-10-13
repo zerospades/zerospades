@@ -22,6 +22,7 @@
 #include <chrono>
 #include <thread>
 #include "VulkanRenderer.h"
+#include "VulkanPushConstants.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanMapRenderer.h"
 #include "VulkanModelRenderer.h"
@@ -99,10 +100,17 @@ namespace {
 		float fovX;
 		float fovY;
 	};
+	static_assert(sizeof(SkyPushConstants) <= spades::draw::kPortablePushConstantsSize,
+	              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 } // namespace
 
 namespace spades {
 	namespace draw {
+
+		namespace {
+			// MultiplyColor.frag's push constants: the colour to multiply by
+			struct MultiplyColorPushConstants { float color[3]; };
+		}
 
 		VulkanRenderer::VulkanRenderer(Handle<gui::SDLVulkanDevice> dev)
 		: device(std::move(dev)),
@@ -3209,11 +3217,8 @@ namespace spades {
 			dynamicState.dynamicStateCount = 2;
 			dynamicState.pDynamicStates = dynamicStates;
 
-			// Push constant: vec3 color (fragment stage)
-			VkPushConstantRange pushConstantRange{};
-			pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			pushConstantRange.offset = 0;
-			pushConstantRange.size = sizeof(float) * 3;
+			const VkPushConstantRange pushConstantRange =
+			  PushConstantRange<MultiplyColorPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 
 			VkPipelineLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -3289,9 +3294,9 @@ namespace spades {
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
 			for (const Vector3& color : pendingMultiplyColors) {
-				float pushConstants[3] = {color.x, color.y, color.z};
-				vkCmdPushConstants(commandBuffer, multiplyColorPipelineLayout,
-				                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstants), pushConstants);
+				PushConstants(commandBuffer, multiplyColorPipelineLayout,
+				              VK_SHADER_STAGE_FRAGMENT_BIT,
+				              MultiplyColorPushConstants{{color.x, color.y, color.z}});
 				vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 			}
 

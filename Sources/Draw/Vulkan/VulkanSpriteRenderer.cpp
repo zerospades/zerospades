@@ -19,6 +19,7 @@
  */
 
 #include "VulkanSpriteRenderer.h"
+#include "VulkanPushConstants.h"
 
 #include <algorithm>
 #include <array>
@@ -45,6 +46,11 @@ SPADES_SETTING(r_softParticles);
 
 namespace spades {
 	namespace draw {
+
+		namespace {
+			// The quarter-resolution layer's blur's push constants (Gauss1DRGBA.vk.fs)
+			struct BlurPushConstants { float unitShift[2]; };
+		}
 		namespace {
 			/** `SpriteView` of `SpriteView.glsl`, std140 */
 			struct GpuView {
@@ -489,7 +495,8 @@ namespace spades {
 				SPRaise("Failed to create the sprite layer descriptor set layout");
 
 			// The blur takes the step between its taps, along one axis or the other.
-			const VkPushConstantRange blurPush{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 2};
+			const VkPushConstantRange blurPush =
+			  PushConstantRange<BlurPushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 			VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 			pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			pipelineLayoutInfo.setLayoutCount = 1;
@@ -867,9 +874,8 @@ namespace spades {
 				const VkDescriptorSet set = MakeTextureSet(frame, source);
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, blurLayout, 0,
 				                        1, &set, 0, nullptr);
-				const float unitShift[2] = {shiftX, shiftY};
-				vkCmdPushConstants(commandBuffer, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-				                   sizeof(unitShift), unitShift);
+				PushConstants(commandBuffer, blurLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+				              BlurPushConstants{{shiftX, shiftY}});
 				vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 				vkCmdEndRenderPass(commandBuffer);
 			};

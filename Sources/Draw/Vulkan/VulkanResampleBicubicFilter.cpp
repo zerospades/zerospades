@@ -19,6 +19,7 @@
  */
 
 #include "VulkanResampleBicubicFilter.h"
+#include "VulkanPushConstants.h"
 #include "VulkanFramebufferManager.h"
 #include "VulkanImage.h"
 #include "VulkanRenderer.h"
@@ -31,6 +32,11 @@
 
 namespace spades {
 	namespace draw {
+
+		namespace {
+			// ResampleBicubic.vk.fs's push constants: one over the source's size
+			struct ResamplePushConstants { float inverseSourceSize[2]; };
+		}
 
 		VulkanResampleBicubicFilter::VulkanResampleBicubicFilter(VulkanRenderer& r)
 		    : VulkanPostProcessFilter(r),
@@ -187,7 +193,7 @@ namespace spades {
 			blend.attachmentCount = 1;
 			blend.pAttachments = &noBlend;
 
-			VkPushConstantRange pcr{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float) * 2};
+			const VkPushConstantRange pcr = PushConstantRange<ResamplePushConstants>(VK_SHADER_STAGE_FRAGMENT_BIT);
 			VkPipelineLayoutCreateInfo li{};
 			li.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			li.setLayoutCount = 1;
@@ -320,10 +326,9 @@ namespace spades {
 
 			// inverseVP = 1 / SOURCE size (shader converts output UV to
 			// source pixel coords with it), matching GLResampleBicubicFilter.
-			float invVP[2] = {1.0f / (float)input->GetWidth(),
-			                  1.0f / (float)input->GetHeight()};
-			vkCmdPushConstants(cmd, resampleLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-			                   0, sizeof(invVP), invVP);
+			PushConstants(cmd, resampleLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+			              ResamplePushConstants{{1.0f / (float)input->GetWidth(),
+			                                     1.0f / (float)input->GetHeight()}});
 
 			vkCmdDraw(cmd, 3, 1, 0, 0);
 
