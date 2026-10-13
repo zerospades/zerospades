@@ -56,10 +56,11 @@ namespace spades {
 		static constexpr std::uint32_t kNeutralPixel = 0x20080200u;
 
 		VulkanRadiosityRenderer::VulkanRadiosityRenderer(VulkanRenderer& r,
-		                                                 client::GameMap& m)
+		                                                 client::GameMap& m, bool active)
 		    : renderer(r),
 		      device(r.GetDevice()),
 		      map(&m),
+		      active(active),
 		      imageFlat(VK_NULL_HANDLE), imageX(VK_NULL_HANDLE),
 		      imageY(VK_NULL_HANDLE), imageZ(VK_NULL_HANDLE),
 		      allocFlat(VK_NULL_HANDLE), allocX(VK_NULL_HANDLE),
@@ -83,7 +84,8 @@ namespace spades {
 			chunkH = h / ChunkSize;
 			chunkD = d / ChunkSize;
 
-			chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
+			if (active)
+				chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
 			for (Chunk& c : chunks) {
 				std::fill(reinterpret_cast<VoxelType*>(c.dataFlat),
 				          reinterpret_cast<VoxelType*>(c.dataFlat) + ChunkSize * ChunkSize * ChunkSize,
@@ -126,7 +128,8 @@ namespace spades {
 				imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 				imageInfo.imageType = VK_IMAGE_TYPE_3D;
 				imageInfo.format = kFormat;
-				imageInfo.extent = {(uint32_t)w, (uint32_t)h, (uint32_t)d};
+				imageInfo.extent = active ? VkExtent3D{(uint32_t)w, (uint32_t)h, (uint32_t)d}
+				                          : VkExtent3D{1, 1, 1};
 				imageInfo.mipLevels = 1;
 				imageInfo.arrayLayers = 1;
 				imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -166,26 +169,28 @@ namespace spades {
 			if (vkCreateSampler(dev, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
 				SPRaise("Failed to create radiosity sampler");
 
-			// Staging: each slot fits all four (flat/X/Y/Z) packed-uint32 chunks
-			// back to back, kStagingSlotsPerFrame of them per frame in flight
-			stagingPerTextureSize = ChunkSize * ChunkSize * ChunkSize * sizeof(VoxelType);
-			stagingSlotSize = stagingPerTextureSize * 4;
+			if (active) {
+				// Staging: each slot fits all four (flat/X/Y/Z) packed-uint32 chunks
+				// back to back, kStagingSlotsPerFrame of them per frame in flight
+				stagingPerTextureSize = ChunkSize * ChunkSize * ChunkSize * sizeof(VoxelType);
+				stagingSlotSize = stagingPerTextureSize * 4;
 
-			VkBufferCreateInfo bufInfo{};
-			bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
-			bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+				VkBufferCreateInfo bufInfo{};
+				bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
+				bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+				bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-			VmaAllocationCreateInfo bufAllocInfo{};
-			bufAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-			bufAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+				VmaAllocationCreateInfo bufAllocInfo{};
+				bufAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+				bufAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-			VmaAllocationInfo allocResult{};
-			if (vmaCreateBuffer(alloc, &bufInfo, &bufAllocInfo,
-			                    &stagingBuffer, &stagingAllocation, &allocResult) != VK_SUCCESS)
-				SPRaise("Failed to create radiosity staging buffer");
-			stagingMapped = allocResult.pMappedData;
+				VmaAllocationInfo allocResult{};
+				if (vmaCreateBuffer(alloc, &bufInfo, &bufAllocInfo,
+				                    &stagingBuffer, &stagingAllocation, &allocResult) != VK_SUCCESS)
+					SPRaise("Failed to create radiosity staging buffer");
+				stagingMapped = allocResult.pMappedData;
+			}
 
 			// One-time submit: clear all four images to the neutral fill so
 			// the first frames before any chunk has been recomputed see ~0
@@ -262,7 +267,10 @@ namespace spades {
 			vkQueueWaitIdle(device->GetGraphicsQueue());
 			vkFreeCommandBuffers(dev, device->GetCommandPool(), 1, &cb);
 
-			SPLog("Vulkan radiosity renderer created (%dx%dx%d × 4)", w, h, d);
+			if (active)
+				SPLog("Vulkan radiosity renderer created (%dx%dx%d × 4)", w, h, d);
+			else
+				SPLog("Vulkan radiosity disabled: placeholder volumes only");
 		}
 
 		VulkanRadiosityRenderer::~VulkanRadiosityRenderer() {
@@ -384,7 +392,7 @@ namespace spades {
 
 		void VulkanRadiosityRenderer::GameMapChanged(int x, int y, int z, client::GameMap* m) {
 			SPADES_MARK_FUNCTION_DEBUG();
-			if (m != map.GetPointerOrNull())
+			if (!active || m != map.GetPointerOrNull())
 				return;
 			Invalidate(x - Envelope, y - Envelope, z - Envelope,
 			           x + Envelope, y + Envelope, z + Envelope);
@@ -446,6 +454,8 @@ namespace spades {
 
 		void VulkanRadiosityRenderer::Update(VkCommandBuffer cmd, std::size_t frameSlot) {
 			SPADES_MARK_FUNCTION();
+			if (!active)
+				return;
 
 			if (GetNumDirtyChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
 				if (dispatch) {
