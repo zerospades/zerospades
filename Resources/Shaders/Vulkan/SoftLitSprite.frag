@@ -26,9 +26,6 @@
 // light, and the dynamic lights the vertices scattered, on its colour, then
 // fogged and faded where the scene's depth cuts into it like a soft sprite.
 
-// Selects the radiosity's ambient light, as the map's shaders do (r_radiosity).
-layout(constant_id = 0) const int USE_RADIOSITY = 0;
-
 #define SCENE_LIGHT_SET 2
 #include "SceneLight/SunSky.glsl"
 #include "SceneLight/MapLight.glsl"
@@ -64,16 +61,10 @@ float depthAt(vec2 pt) {
 	return decodeDepth(w, spriteView.nearFar.x, spriteView.nearFar.y);
 }
 
-/** The sky's light reaching the volume, facing `nrm` (GL EvaluateAmbientLight(1)). */
+/** The sky's light reaching the volume, facing `nrm` (GL EvaluateAmbientLight(1)):
+ * a volume has no ambient occlusion of its own. */
 vec3 SkyLight(vec3 nrm) {
-	if (USE_RADIOSITY != 0) {
-		float aoFactor = MapAmbientShadow(aoCoord);
-		float amb = mix(sqrt(aoFactor), min(aoFactor, 1.0), 0.5) * (0.8 - nrm.z * 0.2);
-		return MapRadiosity(radiosityTextureCoord, nrm) +
-		       amb * (sceneSunSky.ambientLight * sceneSunSky.daylight);
-	}
-	float hemisphere = 1.0 - nrm.z * 0.2;
-	return mix(sceneSunSky.skyLight, vec3(1.0), 0.5) * (0.5 * hemisphere * sceneSunSky.daylight);
+	return MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, 1.0);
 }
 
 void main() {

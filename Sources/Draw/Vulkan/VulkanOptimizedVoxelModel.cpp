@@ -1097,9 +1097,10 @@ namespace spades {
 			fragShaderStageInfo.module = fragShaderModule;
 			fragShaderStageInfo.pName = "main";
 
-			// Specialization constant: USE_RADIOSITY for BasicModelVertexColor.frag —
-			// picks the MapRadiosityNull-style 2D-AO ambient when r_radiosity == 0,
-			// the radiosity-style 3D-ambient branch otherwise.  Mirrors the map renderer.
+			// Specialization constant: USE_RADIOSITY (SceneLight/MapLight.glsl), for
+			// the physical shader as for the basic one — picks the MapRadiosityNull
+			// ambient when r_radiosity == 0, the radiosity one otherwise. Mirrors the
+			// map renderer.
 			SPADES_SETTING(r_radiosity);
 			int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
 			VkSpecializationMapEntry specEntry{};
@@ -1111,9 +1112,7 @@ namespace spades {
 			specInfo.pMapEntries = &specEntry;
 			specInfo.dataSize = sizeof(int32_t);
 			specInfo.pData = &useRadiosity;
-			if (!sharedPipeline.physicalLighting) {
-				fragShaderStageInfo.pSpecializationInfo = &specInfo;
-			}
+			fragShaderStageInfo.pSpecializationInfo = &specInfo;
 
 			VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 

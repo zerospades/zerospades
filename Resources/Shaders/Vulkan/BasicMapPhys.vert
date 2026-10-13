@@ -48,6 +48,7 @@ layout(location = 9) out vec3 radiosityTextureCoord; // 3D coords into radiosity
 layout(location = 10) out vec3 normalVarying;   // world-space surface normal
 // World-space position, where the fragment shader evaluates the dynamic lights
 layout(location = 11) out vec3 worldPosition;
+layout(location = 12) out vec2 ambientOcclusionCoord; // 2D coords into the AO atlas
 
 void main() {
 	vec3 position = vec3(positionAttribute);
@@ -102,6 +103,8 @@ void main() {
 
 	// Radiosity 3D-texture coords (matches GL MapRadiosity.vs).
 	radiosityTextureCoord = wPos / vec3(512.0, 512.0, 64.0);
+	// The face's own ambient occlusion, from the atlas (GL BasicBlockPhys.vs)
+	ambientOcclusionCoord = (vec2(aoCoordAttribute) + 0.5) * (1.0 / 256.0);
 	normalVarying = normalFloat;
 	worldPosition = worldPos.xyz;
 }
