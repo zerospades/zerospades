@@ -76,7 +76,6 @@ namespace spades {
 
 			// Shared pipeline cache across all model instances
 			struct PipelineCache {
-				VkRenderPass renderPass = VK_NULL_HANDLE;
 				VkPipeline pipeline = VK_NULL_HANDLE;
 				VkPipeline mirroredPipeline = VK_NULL_HANDLE; // same as pipeline, VK_CULL_MODE_FRONT_BIT
 				// The depth pre-pass's: the lit pipelines' vertex stage, and a
@@ -94,8 +93,6 @@ namespace spades {
 				VkPipelineLayout xrayPipelineLayout = VK_NULL_HANDLE;
 				VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 				VkPipelineLayout shadowMapPipelineLayout = VK_NULL_HANDLE;
-				// render pass shadowMapPipeline was built against
-				VkRenderPass shadowMapRenderPass = VK_NULL_HANDLE;
 				VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 				bool physicalLighting = false;
 
@@ -161,6 +158,12 @@ namespace spades {
 			VulkanOptimizedVoxelModel(VoxelModel*, VulkanRenderer& r);
 
 			static void PreloadShaders(VulkanRenderer&);
+			/**
+			 * Drops the pipelines every model shares, remade on the next draw: when
+			 * what their layout is made from goes, the map's model-shadow sampling
+			 * layout (set 1) on a map change, and at shutdown. Never needed for a new
+			 * scene render pass, which is always compatible. With the device idle.
+			 */
 			static void InvalidateSharedPipeline(gui::SDLVulkanDevice* device);
 
 			void Prerender(VkCommandBuffer commandBuffer,
