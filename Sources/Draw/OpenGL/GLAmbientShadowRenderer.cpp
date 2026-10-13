@@ -32,14 +32,16 @@ namespace spades {
 	namespace draw {
 		class GLAmbientShadowRenderer::UpdateDispatch : public ConcurrentDispatch {
 			GLAmbientShadowRenderer& renderer;
+			// Where the eye was when it started: the scene changes as the worker runs.
+			const Vector3 eye;
 
 		public:
 			std::atomic<bool> done{false};
-			UpdateDispatch(GLAmbientShadowRenderer& r) : renderer(r) {}
+			UpdateDispatch(GLAmbientShadowRenderer& r, const Vector3& eye) : renderer(r), eye(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
 
-				renderer.UpdateDirtyChunks();
+				renderer.UpdateDirtyChunks(eye);
 
 				done = true;
 			}
@@ -180,6 +182,8 @@ namespace spades {
 			int cy2 = maxY >> ChunkSizeBits;
 			int cz2 = maxZ >> ChunkSizeBits;
 
+			// The worker takes these as it runs.
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			for (int cx = cx1; cx <= cx2; cx++) {
 				for (int cy = cy1; cy <= cy2; cy++) {
 					for (int cz = cz1; cz <= cz2; cz++) {
@@ -217,6 +221,7 @@ namespace spades {
 		}
 
 		int GLAmbientShadowRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			return (int)std::count_if(chunks.begin(), chunks.end(),
 			                          [](const Chunk& c) { return c.dirty; });
 		}
@@ -227,7 +232,7 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				dispatch = new UpdateDispatch(*this, renderer.GetSceneDef().viewOrigin);
 				dispatch->Start();
 			}
 
@@ -241,24 +246,31 @@ namespace spades {
 
 			device.BindTexture(IGLDevice::Texture3D, texture);
 			for (Chunk& c : chunks) {
-				if (!c.transferDone.exchange(true)) {
+				if (!c.transferDone.load()) {
 					device.TexSubImage3D(IGLDevice::Texture3D, 0, c.cx * ChunkSize,
 					                     c.cy * ChunkSize, c.cz * ChunkSize + 1, ChunkSize,
 					                     ChunkSize, ChunkSize, IGLDevice::RG, IGLDevice::FloatType,
 					                     c.data);
+
+					// Copied out: the worker may compute it again.
+					c.transferDone.store(true);
 				}
 			}
 		}
 
-		void GLAmbientShadowRenderer::UpdateDirtyChunks() {
+		void GLAmbientShadowRenderer::UpdateDirtyChunks(const Vector3& eye) {
 			std::array<std::size_t, 256> dirtyChunkIds;
 			std::size_t numDirtyChunks = 0;
 
+			// The chunks to compute are chosen at once, while edits wait; one still
+			// waiting for its last result to be uploaded is left for later.
+			std::unique_lock<std::mutex> lock(dirtyMutex);
+			auto isPending = [](const Chunk& c) { return c.dirty && c.transferDone.load(); };
+
 			// first, check only chunks in near range
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			int eyeX = (int)(eye.x) >> ChunkSizeBits;
+			int eyeY = (int)(eye.y) >> ChunkSizeBits;
+			int eyeZ = (int)(eye.z) >> ChunkSizeBits;
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -271,7 +283,7 @@ namespace spades {
 					continue;
 				if (dz >= 6 || dz <= -6)
 					continue;
-				if (c.dirty) {
+				if (isPending(c)) {
 					dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 					if (numDirtyChunks >= dirtyChunkIds.size())
 						break;
@@ -282,13 +294,15 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (isPending(c)) {
 						dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 						if (numDirtyChunks >= dirtyChunkIds.size())
 							break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			// limit update count per frame
 			for (int i = 0; i < 8; i++) {
@@ -306,9 +320,20 @@ namespace spades {
 			}
 		}
 
+		bool GLAmbientShadowRenderer::TakeDirtyRange(Chunk& c, DirtyRange& range) {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
+			if (!c.dirty || !c.transferDone.load())
+				return false;
+			range = DirtyRange{c.dirtyMinX, c.dirtyMaxX, c.dirtyMinY,
+			                   c.dirtyMaxY, c.dirtyMinZ, c.dirtyMaxZ};
+			c.dirty = false;
+			return true;
+		}
+
 		void GLAmbientShadowRenderer::UpdateChunk(int cx, int cy, int cz) {
 			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
+			DirtyRange range;
+			if (!TakeDirtyRange(c, range))
 				return;
 
 			int originX = cx * ChunkSize;
@@ -322,12 +347,12 @@ namespace spades {
 			int wOriginX = originX - padding;
 			int wOriginY = originY - padding;
 			int wOriginZ = originZ - padding;
-			int wDirtyMinX = c.dirtyMinX;
-			int wDirtyMinY = c.dirtyMinY;
-			int wDirtyMinZ = c.dirtyMinZ;
-			int wDirtyMaxX = c.dirtyMaxX + padding * 2;
-			int wDirtyMaxY = c.dirtyMaxY + padding * 2;
-			int wDirtyMaxZ = c.dirtyMaxZ + padding * 2;
+			int wDirtyMinX = range.minX;
+			int wDirtyMinY = range.minY;
+			int wDirtyMinZ = range.minZ;
+			int wDirtyMaxX = range.maxX + padding * 2;
+			int wDirtyMaxY = range.maxY + padding * 2;
+			int wDirtyMaxZ = range.maxZ + padding * 2;
 
 			auto b = [](int i) -> std::uint8_t { return (std::uint8_t)1 << i; };
 			auto to_b = [](bool b, int i) -> std::uint8_t { return (std::uint8_t)b << i; };
@@ -465,14 +490,14 @@ namespace spades {
 			}
 
 			// Copy the result to `c.data`
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-			for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-			for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = range.minZ; z <= range.maxZ; z++)
+			for (int y = range.minY; y <= range.maxY; y++)
+			for (int x = range.minX; x <= range.maxX; x++) {
 				c.data[z][y][x][0] = wData[z + padding][y + padding][x + padding][0];
 				c.data[z][y][x][1] = wData[z + padding][y + padding][x + padding][1];
 			}
 
-			c.dirty = false;
+			// The render thread's to upload, now
 			c.transferDone = false;
 		}
 	} // namespace draw
