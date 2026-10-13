@@ -737,10 +737,6 @@ namespace spades {
 		SPLog("VulkanWaterRenderer pipeline and descriptors created");
 		}
 
-		void VulkanWaterRenderer::Prerender() {
-			SPADES_MARK_FUNCTION();
-		}
-
 	void VulkanWaterRenderer::RenderSunlightPass(VkCommandBuffer commandBuffer) {
 		SPADES_MARK_FUNCTION();
 
