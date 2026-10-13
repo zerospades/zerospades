@@ -39,6 +39,7 @@ layout(location = 13) in vec3 worldPosition;
 
 layout(location = 0) out vec4 fragColor;
 
+#include "SceneView.glsl"
 #include "SceneLight/Lights.glsl"
 #include "SceneLight/MapLight.glsl"
 #include "SceneAmbientOcclusion.glsl"
