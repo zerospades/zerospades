@@ -43,6 +43,8 @@ namespace spades {
 		      mirrorFramebuffer(VK_NULL_HANDLE),
 		      renderPass(VK_NULL_HANDLE),
 		      continueRenderPass(VK_NULL_HANDLE),
+		      mirrorRenderPass(VK_NULL_HANDLE),
+		      mirrorContinueRenderPass(VK_NULL_HANDLE),
 		      spriteRenderPass(VK_NULL_HANDLE),
 		      spriteFramebuffer(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
@@ -121,7 +123,7 @@ namespace spades {
 				}
 			}
 
-			CreateRenderPass();
+			CreateRenderPass((int)settings.r_water >= 3);
 
 			// Create main render framebuffer
 			SPLog("Creating main render framebuffer");
@@ -420,6 +422,10 @@ namespace spades {
 				vkDestroyRenderPass(vkDevice, continueRenderPass, nullptr);
 			}
 
+			for (VkRenderPass pass : {mirrorRenderPass, mirrorContinueRenderPass})
+				if (pass != VK_NULL_HANDLE)
+					vkDestroyRenderPass(vkDevice, pass, nullptr);
+
 			if (spriteRenderPass != VK_NULL_HANDLE) {
 				vkDestroyRenderPass(vkDevice, spriteRenderPass, nullptr);
 			}
@@ -427,7 +433,7 @@ namespace spades {
 			buffers.clear();
 		}
 
-		void VulkanFramebufferManager::CreateRenderPass() {
+		void VulkanFramebufferManager::CreateRenderPass(bool mirrorDepthRead) {
 			SPADES_MARK_FUNCTION();
 
 			VkAttachmentDescription colorAttachment = {};
@@ -534,6 +540,27 @@ namespace spades {
 			if (vkCreateRenderPass(vkDevice, &continueRenderPassInfo, nullptr, &continueRenderPass) !=
 			    VK_SUCCESS) {
 				SPRaise("Failed to create the Vulkan scene continue render pass");
+			}
+
+			// The mirror's: the same two, storing no stencil, and its depth only
+			// where the water reads it. Only store ops differ, so they stay
+			// compatible with the mirror framebuffer and the scene pipelines.
+			const VkAttachmentStoreOp mirrorDepthStore =
+			  mirrorDepthRead ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			VkRenderPassCreateInfo mirrorRenderPassInfo = renderPassInfo;
+			VkAttachmentDescription mirrorAttachments[2];
+			mirrorRenderPassInfo.pAttachments = mirrorAttachments;
+			const VkAttachmentDescription* sources[2] = {attachments, continueAttachments};
+			VkRenderPass* passes[2] = {&mirrorRenderPass, &mirrorContinueRenderPass};
+			for (int i = 0; i < 2; i++) {
+				mirrorAttachments[0] = sources[i][0];
+				mirrorAttachments[1] = sources[i][1];
+				mirrorAttachments[1].storeOp = mirrorDepthStore;
+				mirrorAttachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+				if (vkCreateRenderPass(vkDevice, &mirrorRenderPassInfo, nullptr, passes[i]) !=
+				    VK_SUCCESS) {
+					SPRaise("Failed to create the Vulkan mirror render pass");
+				}
 			}
 
 			// Create sprite render pass (color-only, no depth attachment) for soft sprite rendering
