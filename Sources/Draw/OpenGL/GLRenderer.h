@@ -299,6 +299,8 @@ namespace spades {
 			/** This frame's dynamic lights, as the lighting shaders look them up. Made
 			 * for the first frame with dynamic lights on, as are the occlusion maps. */
 			GLDynamicLightTable* GetDynamicLightTable() { return dynamicLightTable.get(); }
+			/** This frame's dynamic lights, in the order the table lists them. */
+			const std::vector<GLDynamicLight>& GetDynamicLights() const { return lights; }
 			/** Where the map stops this frame's spotlights. */
 			GLDynamicLightOcclusionMaps* GetDynamicLightOcclusionMaps() {
 				return dynamicLightOcclusionMaps.get();

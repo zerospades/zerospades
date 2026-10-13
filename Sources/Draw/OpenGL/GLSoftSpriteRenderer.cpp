@@ -84,16 +84,9 @@ namespace spades {
 					color.z *= color.z * rcp;
 				}
 			}
-			if (!emissive) {
-				// These sprites are not lit, so a scattering one would glow in the dark:
-				// the daylight dims it as it dims the world, in linear light (hence the
-				// root for a gamma-encoded colour).
-				const float daylight = renderer.GetDaylight();
-				const float scale = settings.r_hdr ? daylight : std::sqrt(daylight);
-				color.x *= scale;
-				color.y *= scale;
-				color.z *= scale;
-			}
+			// One that scatters light is lit by the daylight and the dynamic lights
+			// (`SpriteLight.glsl`), so that it doesn't glow in the dark.
+			spr.scattering = !emissive;
 			spr.color = color;
 			spr.area = rad * rad * 4.0F / std::max(Vector3::Dot(center - def.viewOrigin, def.viewAxis[2]), 0.01F);
 			sprites.push_back(spr);
@@ -159,7 +152,8 @@ namespace spades {
 			device.ActiveTexture(1);
 			device.BindTexture(IGLDevice::Texture2D,
 			                   renderer.GetFramebufferManager()->GetDepthTexture());
-			device.ActiveTexture(0);
+
+			spriteLight.SetUp(renderer, program);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
 			device.EnableVertexAttribArray(spritePosAttribute(), true);
@@ -192,6 +186,7 @@ namespace spades {
 					v.g = spr.color.y;
 					v.b = spr.color.z;
 					v.a = spr.color.w;
+					v.scattering = spr.scattering ? 1.0F : 0.0F;
 
 					float fade = 1.f - layer;
 					v.r *= fade;
@@ -260,6 +255,7 @@ namespace spades {
 					v.g = spr.color.y;
 					v.b = spr.color.z;
 					v.a = spr.color.w;
+					v.scattering = spr.scattering ? 1.0F : 0.0F;
 
 					float fade = layer;
 					v.r *= fade;
