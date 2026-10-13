@@ -63,7 +63,7 @@ namespace spades {
 
 		std::vector<GLShader*> GLShadowShader::RegisterShader(spades::draw::GLProgramManager* r,
 		                                                      GLSettings& settings, bool variance,
-		                                                      bool skipSSAO) {
+		                                                      bool skipSSAO, bool facingUp) {
 			std::vector<GLShader*> shaders;
 
 			if (skipSSAO)
@@ -94,7 +94,8 @@ namespace spades {
 			}
 
 			if (settings.r_radiosity) {
-				shaders.push_back(r->RegisterShader("Shaders/OpenGL/Shadow/MapRadiosity.fs"));
+				shaders.push_back(r->RegisterShader(facingUp ? "Shaders/OpenGL/Shadow/MapRadiosityUp.fs"
+				                                             : "Shaders/OpenGL/Shadow/MapRadiosity.fs"));
 				shaders.push_back(r->RegisterShader("Shaders/OpenGL/Shadow/MapRadiosity.vs"));
 			} else {
 				shaders.push_back(r->RegisterShader("Shaders/OpenGL/Shadow/MapRadiosityNull.fs"));

@@ -25,6 +25,12 @@ uniform sampler3D radiosityTextureFlat;
 uniform sampler3D radiosityTextureX;
 uniform sampler3D radiosityTextureY;
 uniform sampler3D radiosityTextureZ;
+
+// Set for a surface facing straight up, -Z (`MapRadiosityUp.fs`)
+#ifndef MAP_RADIOSITY_FACING_UP
+#define MAP_RADIOSITY_FACING_UP 0
+#endif
+
 varying vec3 radiosityTextureCoord;
 varying vec3 ambientShadowTextureCoord;
 varying vec3 normalVarying;
@@ -46,13 +52,22 @@ vec3 DecodeRadiosityValue(vec3 val) {
 	return val;
 }
 
-vec3 EvaluateRadiosity(float detailAmbientOcclusion, float ssao) {
+/** The light the map bounces onto the surface. */
+vec3 EvaluateRadiosityBounce() {
 	vec3 col = DecodeRadiosityValue(texture3D(radiosityTextureFlat, radiosityTextureCoord).xyz);
+#if MAP_RADIOSITY_FACING_UP
+	col -= DecodeRadiosityValue(texture3D(radiosityTextureZ, radiosityTextureCoord).xyz);
+#else
 	vec3 normal = normalize(normalVarying);
 	col += normal.x * DecodeRadiosityValue(texture3D(radiosityTextureX, radiosityTextureCoord).xyz);
 	col += normal.y * DecodeRadiosityValue(texture3D(radiosityTextureY, radiosityTextureCoord).xyz);
 	col += normal.z * DecodeRadiosityValue(texture3D(radiosityTextureZ, radiosityTextureCoord).xyz);
-	col = max(col, 0.0);
+#endif
+	return max(col, 0.0);
+}
+
+vec3 EvaluateRadiosity(float detailAmbientOcclusion, float ssao) {
+	vec3 col = EvaluateRadiosityBounce();
 	col *= 1.5 * ssao * sunlight;
 
 	detailAmbientOcclusion *= ssao;
@@ -72,12 +87,7 @@ vec3 EvaluateRadiosity(float detailAmbientOcclusion, float ssao) {
 }
 
 vec3 EvaluateSoftReflections(float detailAmbientOcclusion, vec3 direction, float ssao) {
-	vec3 col = DecodeRadiosityValue(texture3D(radiosityTextureFlat, radiosityTextureCoord).xyz);
-	vec3 normal = normalize(normalVarying);
-	col += normal.x * DecodeRadiosityValue(texture3D(radiosityTextureX, radiosityTextureCoord).xyz);
-	col += normal.y * DecodeRadiosityValue(texture3D(radiosityTextureY, radiosityTextureCoord).xyz);
-	col += normal.z * DecodeRadiosityValue(texture3D(radiosityTextureZ, radiosityTextureCoord).xyz);
-	col = max(col, 0.0);
+	vec3 col = EvaluateRadiosityBounce();
 	col *= 1.5 * ssao * sunlight;
 
 	detailAmbientOcclusion *= ssao;
