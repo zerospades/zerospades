@@ -100,7 +100,11 @@ namespace spades {
 			BatchClip currentClip;
 
 			void CreatePipeline();
-			void CreateDescriptorSet();
+			/** Makes the per-swapchain-image pools, buffers and image lists for
+			 * the swapchain's current image count */
+			void CreatePerImageResources();
+			/** Lets go of them: only once no frame using them is in flight */
+			void DestroyPerImageResources();
 
 			// Close the batch being accumulated, if any, so that a following
 			// image or clip change starts a new one. Ordering between draws and
@@ -115,6 +119,13 @@ namespace spades {
 			~VulkanImageRenderer();
 
 			void Flush(VkCommandBuffer commandBuffer, uint32_t frameIndex);
+
+			/** Drops what was queued for a frame that is not drawn */
+			void Discard();
+
+			/** Follows a recreated swapchain, whose image count may differ: called
+			 * with the device idle, and keeps what is queued for the frame */
+			void SwapchainRecreated();
 			void SetImage(VulkanImage* img);
 
 			// 2D clipping. Circle and rect cannot be nested or combined, which

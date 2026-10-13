@@ -44,14 +44,8 @@ namespace spades {
 		      descriptorSetLayout(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
 
-			// Initialize per-frame buffer storage for each swapchain image
-			const auto& swapchainImageViews = device->GetSwapchainImageViews();
-			perFrameBuffers.resize(swapchainImageViews.size());
-			perFrameImages.resize(swapchainImageViews.size());
-			perFrameDescriptorPools.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
-
 			CreatePipeline();
-			CreateDescriptorSet();
+			CreatePerImageResources();
 		}
 
 		VulkanImageRenderer::~VulkanImageRenderer() {
@@ -59,11 +53,8 @@ namespace spades {
 
 			VkDevice vkDevice = device->GetDevice();
 
-			for (auto pool : perFrameDescriptorPools) {
-				if (pool != VK_NULL_HANDLE) {
-					vkDestroyDescriptorPool(vkDevice, pool, nullptr);
-				}
-			}
+			Discard();
+			DestroyPerImageResources();
 			if (pipeline != VK_NULL_HANDLE) {
 				vkDestroyPipeline(vkDevice, pipeline, nullptr);
 			}
@@ -74,9 +65,39 @@ namespace spades {
 				vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout, nullptr);
 			}
 
+		}
+
+		void VulkanImageRenderer::Discard() {
+			currentClip = BatchClip{};
+			for (Batch& batch : batches)
+				batch.image->Release();
+			batches.clear();
+			vertices.clear();
+			indices.clear();
 			if (image) {
 				image->Release();
+				image = nullptr;
 			}
+		}
+
+		void VulkanImageRenderer::DestroyPerImageResources() {
+			for (std::vector<VulkanImage*>& images : perFrameImages) {
+				for (VulkanImage* img : images)
+					img->Release();
+			}
+			perFrameImages.clear();
+			perFrameBuffers.clear();
+			for (VkDescriptorPool pool : perFrameDescriptorPools) {
+				if (pool != VK_NULL_HANDLE)
+					vkDestroyDescriptorPool(device->GetDevice(), pool, nullptr);
+			}
+			perFrameDescriptorPools.clear();
+		}
+
+		void VulkanImageRenderer::SwapchainRecreated() {
+			SPADES_MARK_FUNCTION();
+			DestroyPerImageResources();
+			CreatePerImageResources();
 		}
 
 		void VulkanImageRenderer::CreatePipeline() {
@@ -257,10 +278,17 @@ namespace spades {
 
 		}
 
-		void VulkanImageRenderer::CreateDescriptorSet() {
+		void VulkanImageRenderer::CreatePerImageResources() {
 			SPADES_MARK_FUNCTION();
 
 			VkDevice vkDevice = device->GetDevice();
+
+			// One set of each per swapchain image: a frame's are reused only once
+			// the image comes round again, by then done with on the GPU
+			const std::size_t imageCount = device->GetSwapchainImageViews().size();
+			perFrameBuffers.resize(imageCount);
+			perFrameImages.resize(imageCount);
+			perFrameDescriptorPools.assign(imageCount, VK_NULL_HANDLE);
 
 			VkDescriptorPoolSize poolSize{};
 			poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
