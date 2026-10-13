@@ -346,13 +346,15 @@ namespace spades {
 		void VulkanBloomFilter::InitDescriptorPools() {
 			VkDevice dev = device->GetDevice();
 
-			// 6 downsample + 5 upsample + 1 composite + padding = ~32 sets per frame.
+			// 11 downsamples (the half-size source and up to 10 levels) of 3 sets
+			// each, 9 upsamples of 2 samplers and the composite of 4: 43 sets and
+			// 55 samplers per frame at most.
 			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 64};
 			VkDescriptorPoolCreateInfo info{};
 			info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			info.poolSizeCount = 1;
 			info.pPoolSizes    = &size;
-			info.maxSets       = 32;
+			info.maxSets       = 48;
 
 			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
 				if (vkCreateDescriptorPool(dev, &info, nullptr, &perFrameDescPool[i]) != VK_SUCCESS)
@@ -538,35 +540,29 @@ namespace spades {
 
 			VulkanTemporaryImagePool* pool = renderer.GetTemporaryImagePool();
 
-			// ── 1. Downsample 6 levels ────────────────────────────────
-			// levels[i] holds the temp image at half^(i+1) of the input resolution.
+			// ── 1. Downsample ─────────────────────────────────────────
+			// As GLLensDustFilter: the input at half size, blurred, is only the
+			// source of the pyramid, whose levels start at a quarter and halve while
+			// both sides stay above a texel (at most 10 levels).
 
-			static constexpr int NUM_LEVELS = 6;
+			static constexpr int MAX_LEVELS = 10;
 			std::vector<Handle<VulkanImage>> levels;
-			levels.reserve(NUM_LEVELS);
-
-			uint32_t prevW = static_cast<uint32_t>(input->GetWidth());
-			uint32_t prevH = static_cast<uint32_t>(input->GetHeight());
-			VkImageView srcView = input->GetImageView();
+			levels.reserve(MAX_LEVELS);
 
 			// Superseded gauss ping images; returned after recording (see below).
 			std::vector<Handle<VulkanImage>> gaussTrash;
-			gaussTrash.reserve(NUM_LEVELS);
+			gaussTrash.reserve(2 * (MAX_LEVELS + 1) + 1);
 
-			for (int i = 0; i < NUM_LEVELS; ++i) {
-				uint32_t nw = (prevW + 1) / 2;
-				uint32_t nh = (prevH + 1) / 2;
-
+			// `src` at half its size (rounded up), blurred: a downsample then a
+			// Gauss1D H+V pass, as GL does for the source and every level
+			auto downsampleBlurred = [&](VkImageView src, uint32_t nw, uint32_t nh) {
 				Handle<VulkanImage> dst = pool->Acquire(nw, nh, colorFormat);
 				VkFramebuffer fb        = MakeFramebuffer(ppRenderPass, dst.GetPointerOrNull(), frameSlot);
-				VkDescriptorSet ds      = BindTexture(frameSlot, singleSamplerDSL, srcView);
+				VkDescriptorSet ds      = BindTexture(frameSlot, singleSamplerDSL, src);
 
 				DrawFullscreen(cmd, ppRenderPass, fb, nw, nh,
 				               downsamplePipeline, downsampleLayout, ds);
 
-				// GL parity: GLLensDustFilter runs a Gauss1D H+V blur on
-				// every downsample level; without it the bloom is noticeably
-				// harder-edged than GL.
 				for (int pass = 0; pass < 2; ++pass) {
 					const GaussPushConstants gauss{{pass == 0 ? 1.0f / (float)nw : 0.0f,
 					                                pass == 0 ? 0.0f : 1.0f / (float)nh}};
@@ -583,11 +579,32 @@ namespace spades {
 					gaussTrash.push_back(std::move(dst));
 					dst = std::move(blurred);
 				}
+				return dst;
+			};
 
-				srcView = dst->GetImageView();
-				levels.push_back(std::move(dst));
+			uint32_t prevW = (static_cast<uint32_t>(input->GetWidth()) + 1) / 2;
+			uint32_t prevH = (static_cast<uint32_t>(input->GetHeight()) + 1) / 2;
+			Handle<VulkanImage> source = downsampleBlurred(input->GetImageView(), prevW, prevH);
+			VkImageView srcView = source->GetImageView();
+
+			for (int i = 0; i < MAX_LEVELS; ++i) {
+				uint32_t nw = (prevW + 1) / 2;
+				uint32_t nh = (prevH + 1) / 2;
+				if (nw <= 1 || nh <= 1)
+					break;
+
+				Handle<VulkanImage> level = downsampleBlurred(srcView, nw, nh);
+				srcView = level->GetImageView();
+				levels.push_back(std::move(level));
 				prevW = nw;  prevH = nh;
 			}
+
+			// A target too small for even one level blooms from the source
+			if (levels.empty())
+				levels.push_back(std::move(source));
+			else
+				gaussTrash.push_back(std::move(source));
+			const int numLevels = static_cast<int>(levels.size());
 
 			// ── 2. Upsample composite (smallest → largest) ────────────
 			// For each step, blend the smaller level into the larger using:
@@ -598,10 +615,10 @@ namespace spades {
 			// referenced in the command buffer.
 
 			std::vector<Handle<VulkanImage>> toReturn;
-			toReturn.reserve(NUM_LEVELS - 1);
+			toReturn.reserve(numLevels - 1);
 
-			for (int i = NUM_LEVELS - 1; i >= 1; --i) {
-				int   cnt   = NUM_LEVELS - i;
+			for (int i = numLevels - 1; i >= 1; --i) {
+				int   cnt   = numLevels - i;
 				float alpha = std::sqrt((float)cnt / (float)(cnt + 1));
 
 				VulkanImage* large = levels[i - 1].GetPointerOrNull();
