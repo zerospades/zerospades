@@ -607,6 +607,8 @@ namespace spades {
 		// framebuffer manager's images, so they go first and are made again after.
 		waterRenderer.reset();
 		ambientOcclusion.reset();
+		if (depthResolveFilter)
+			depthResolveFilter->ReleaseTargets();
 		framebufferManager =
 		  stmp::make_unique<VulkanFramebufferManager>(device, settings, renderWidth, renderHeight);
 		waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
@@ -2026,6 +2028,10 @@ namespace spades {
 			// Process deferred deletions at the start of each frame
 			ProcessDeferredDeletions();
 
+			// The depth copies of the last frame are not this one's
+			if (framebufferManager)
+				framebufferManager->InvalidateDepthSamples();
+
 			VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
 
 			VkCommandBufferBeginInfo beginInfo{};
@@ -2313,6 +2319,14 @@ namespace spades {
 
 			// Ghost model pass: depth prepass then semi-transparent color pass
 		if (modelRenderer) {
+			// The ghosts write depth the pre-pass did not: what was copied or
+			// resolved from it for the ambient occlusion no longer serves later
+			// readers, which copy or resolve it again
+			if (modelRenderer->HasGhosts()) {
+				framebufferManager->InvalidateDepthSamples();
+				if (depthResolveFilter)
+					depthResolveFilter->Invalidate();
+			}
 			modelRenderer->Prerender(commandBuffer, true);
 			modelRenderer->RenderSunlightPass(commandBuffer, true);
 		}

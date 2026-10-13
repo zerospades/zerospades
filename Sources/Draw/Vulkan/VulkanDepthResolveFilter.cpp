@@ -38,18 +38,14 @@ namespace spades {
 		      ppRenderPass(VK_NULL_HANDLE),
 		      msDepthDSL(VK_NULL_HANDLE),
 		      resolveLayout(VK_NULL_HANDLE),
-		      resolvePipeline(VK_NULL_HANDLE) {
+		      resolvePipeline(VK_NULL_HANDLE),
+		      descPool(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
-
-			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
-				perFrameDescPool[i] = VK_NULL_HANDLE;
-				slotResetFrame[i] = UINT32_MAX;
-			}
 
 			InitRenderPass();
 			InitDescriptorSetLayout();
 			InitPipeline();
-			InitDescriptorPools();
+			InitDescriptorPool();
 		}
 
 		VulkanDepthResolveFilter::~VulkanDepthResolveFilter() {
@@ -57,12 +53,10 @@ namespace spades {
 
 			VkDevice dev = device->GetDevice();
 
-			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
-				for (VkFramebuffer fb : perFrameFramebuffers[i])
-					vkDestroyFramebuffer(dev, fb, nullptr);
-				if (perFrameDescPool[i] != VK_NULL_HANDLE)
-					vkDestroyDescriptorPool(dev, perFrameDescPool[i], nullptr);
-			}
+			for (const Target& t : targets)
+				vkDestroyFramebuffer(dev, t.framebuffer, nullptr);
+			if (descPool != VK_NULL_HANDLE)
+				vkDestroyDescriptorPool(dev, descPool, nullptr);
 
 			if (resolvePipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, resolvePipeline, nullptr);
 			if (resolveLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, resolveLayout, nullptr);
@@ -222,58 +216,79 @@ namespace spades {
 			vkDestroyShaderModule(dev, fs, nullptr);
 		}
 
-		void VulkanDepthResolveFilter::InitDescriptorPools() {
-			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4};
+		void VulkanDepthResolveFilter::InitDescriptorPool() {
+			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTargets};
 			VkDescriptorPoolCreateInfo info{};
 			info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			info.poolSizeCount = 1;
 			info.pPoolSizes = &size;
-			info.maxSets = 4;
-
-			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
-				if (vkCreateDescriptorPool(device->GetDevice(), &info, nullptr, &perFrameDescPool[i]) != VK_SUCCESS)
-					SPRaise("Failed to create depth-resolve descriptor pool");
-			}
+			info.maxSets = kMaxTargets;
+			if (vkCreateDescriptorPool(device->GetDevice(), &info, nullptr, &descPool) != VK_SUCCESS)
+				SPRaise("Failed to create depth-resolve descriptor pool");
 		}
 
-		VkFramebuffer VulkanDepthResolveFilter::MakeFramebuffer(VulkanImage* image, int frameSlot) {
-			VkImageView view = image->GetImageView();
+		VulkanDepthResolveFilter::Target&
+		VulkanDepthResolveFilter::GetTarget(VulkanImage* msaaDepth, VulkanImage* output) {
+			const VkImageView depthView = msaaDepth->GetImageView();
+			for (Target& t : targets)
+				if (t.output == output && t.depthView == depthView)
+					return t;
+
+			// The scene's and the mirror's: anything past that means targets were
+			// replaced without `ReleaseTargets`
+			if (targets.size() >= kMaxTargets)
+				SPRaise("Too many depth-resolve targets (%u)", (unsigned)targets.size());
+
+			Target t{};
+			t.output = output;
+			t.depthView = depthView;
+			t.resolvedFrame = UINT32_MAX;
+
+			VkImageView outputView = output->GetImageView();
 			VkFramebufferCreateInfo fbInfo{};
 			fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			fbInfo.renderPass = ppRenderPass;
 			fbInfo.attachmentCount = 1;
-			fbInfo.pAttachments = &view;
-			fbInfo.width = image->GetWidth();
-			fbInfo.height = image->GetHeight();
+			fbInfo.pAttachments = &outputView;
+			fbInfo.width = output->GetWidth();
+			fbInfo.height = output->GetHeight();
 			fbInfo.layers = 1;
-
-			VkFramebuffer fb;
-			if (vkCreateFramebuffer(device->GetDevice(), &fbInfo, nullptr, &fb) != VK_SUCCESS)
+			if (vkCreateFramebuffer(device->GetDevice(), &fbInfo, nullptr, &t.framebuffer) != VK_SUCCESS)
 				SPRaise("Failed to create depth-resolve framebuffer");
-			perFrameFramebuffers[frameSlot].push_back(fb);
-			return fb;
-		}
 
-		VkDescriptorSet VulkanDepthResolveFilter::BindDepth(int frameSlot, VkImageView view) {
 			VkDescriptorSetAllocateInfo ai{};
 			ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			ai.descriptorPool = perFrameDescPool[frameSlot];
+			ai.descriptorPool = descPool;
 			ai.descriptorSetCount = 1;
 			ai.pSetLayouts = &msDepthDSL;
-			VkDescriptorSet set;
-			if (vkAllocateDescriptorSets(device->GetDevice(), &ai, &set) != VK_SUCCESS)
+			if (vkAllocateDescriptorSets(device->GetDevice(), &ai, &t.set) != VK_SUCCESS)
 				SPRaise("Failed to allocate depth-resolve descriptor set");
 
-			VkDescriptorImageInfo img{depthSampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+			VkDescriptorImageInfo img{depthSampler, depthView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
 			VkWriteDescriptorSet w{};
 			w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			w.dstSet = set;
+			w.dstSet = t.set;
 			w.dstBinding = 0;
 			w.descriptorCount = 1;
 			w.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			w.pImageInfo = &img;
 			vkUpdateDescriptorSets(device->GetDevice(), 1, &w, 0, nullptr);
-			return set;
+
+			targets.push_back(t);
+			return targets.back();
+		}
+
+		void VulkanDepthResolveFilter::Invalidate() {
+			for (Target& t : targets)
+				t.resolvedFrame = UINT32_MAX;
+		}
+
+		void VulkanDepthResolveFilter::ReleaseTargets() {
+			VkDevice dev = device->GetDevice();
+			for (const Target& t : targets)
+				vkDestroyFramebuffer(dev, t.framebuffer, nullptr);
+			targets.clear();
+			vkResetDescriptorPool(dev, descPool, 0);
 		}
 
 		void VulkanDepthResolveFilter::Resolve(VkCommandBuffer cmd,
@@ -281,32 +296,21 @@ namespace spades {
 		                                       VulkanImage* output) {
 			SPADES_MARK_FUNCTION();
 
-			int frameSlot = static_cast<int>(renderer.GetCurrentFrameIndex());
-
-			// Reset this slot's pool/framebuffers only on its first Resolve() this
-			// frame; subsequent resolves in the same frame (e.g. mirror depth then
-			// scene depth) allocate additional sets without freeing the earlier ones,
-			// which are still referenced by the in-flight command buffer.
-			std::uint32_t frame = renderer.GetFrameNumber();
-			if (slotResetFrame[frameSlot] != frame) {
-				VkDevice dev = device->GetDevice();
-				for (VkFramebuffer fb : perFrameFramebuffers[frameSlot])
-					vkDestroyFramebuffer(dev, fb, nullptr);
-				perFrameFramebuffers[frameSlot].clear();
-				vkResetDescriptorPool(dev, perFrameDescPool[frameSlot], 0);
-				slotResetFrame[frameSlot] = frame;
-			}
+			// The ambient occlusion's resolve after the depth pre-pass serves what
+			// reads the depth later in the frame, unless something wrote it since
+			Target& target = GetTarget(msaaDepth, output);
+			const std::uint32_t frame = renderer.GetFrameNumber();
+			if (target.resolvedFrame == frame)
+				return;
+			target.resolvedFrame = frame;
 
 			uint32_t w = static_cast<uint32_t>(output->GetWidth());
 			uint32_t h = static_cast<uint32_t>(output->GetHeight());
 
-			VkFramebuffer fb = MakeFramebuffer(output, frameSlot);
-			VkDescriptorSet ds = BindDepth(frameSlot, msaaDepth->GetImageView());
-
 			VkRenderPassBeginInfo rpBegin{};
 			rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			rpBegin.renderPass = ppRenderPass;
-			rpBegin.framebuffer = fb;
+			rpBegin.framebuffer = target.framebuffer;
 			rpBegin.renderArea.extent = {w, h};
 
 			vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
@@ -318,7 +322,7 @@ namespace spades {
 
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, resolvePipeline);
 			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-			                        resolveLayout, 0, 1, &ds, 0, nullptr);
+			                        resolveLayout, 0, 1, &target.set, 0, nullptr);
 
 			vkCmdDraw(cmd, 3, 1, 0, 0);
 

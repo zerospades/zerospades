@@ -55,6 +55,10 @@ namespace spades {
 			                         const Matrix4& lightMatrix,
 			                         VkRenderPass shadowRenderPass);
 
+			/** Whether any model is drawn as a ghost: the ghost pass then writes
+			 * depth after the depth pre-pass */
+			bool HasGhosts() const;
+
 			void Prerender(VkCommandBuffer commandBuffer, bool ghostPass);
 			void RenderSunlightPass(VkCommandBuffer commandBuffer, bool ghostPass);
 			void RenderXRayPass(VkCommandBuffer commandBuffer);
