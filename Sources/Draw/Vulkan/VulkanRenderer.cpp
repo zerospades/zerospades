@@ -1619,7 +1619,9 @@ namespace spades {
 				currentImageIndex =
 				  frameImageUnavailable ? UINT32_MAX : AcquireFrameImage();
 				if (currentImageIndex == UINT32_MAX) {
+					// Everything the frame queued goes with it
 					if (imageRenderer) { imageRenderer->Discard(); }
+					pendingMultiplyColors.clear();
 					if (temporaryImagePool) { temporaryImagePool->ReleaseAll(); }
 					frameImageUnavailable = false;
 					return;
