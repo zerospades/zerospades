@@ -5,29 +5,6 @@ Open work only; what is done is in the git history. The GL renderer in
 
 ## Critical
 
-- [ ] **Crash on every map load at `r_radiosity` 0 (the default)** — df56f06f leaves
-      `chunks` empty for the 1x1x1 placeholders, but the loop setting each chunk's
-      `cx/cy/cz` still runs, writing past the empty vector
-      (`VulkanRadiosityRenderer.cpp:103`, `VulkanAmbientShadowRenderer.cpp:85`).
-      Move that loop under `if (active)` in both.
-- [ ] **Null dereference when `r_water` is raised from the console** — 7f1bd99b sizes
-      the mirror and screen copies from `r_water` at creation, while the renderer and
-      the water renderer read it live (0 → 1: null `screenCopyColorImage`; 1 → 2: null
-      mirror framebuffer and images). Latch `r_water` once, in one member, read
-      everywhere.
-- [ ] **Shared model pipelines leak on every render pass change** —
-      `VulkanOptimizedVoxelModel::CreatePipeline` (around :867) destroys only the lit
-      pipeline, its layout and the x-ray objects before rebuilding; the mirrored,
-      depth, ghost pipelines and the set layout are overwritten. Call
-      `sharedPipeline.Destroy()` there. Every resize and `r_scale` change makes a new
-      render pass now.
-- [ ] **Glare offset, and seen through walls, at `r_scale` < 1** — the `r_scale`
-      commit (6cdda895) gave `VulkanGlareRenderer` the render size as its viewport,
-      but the glare is recorded in the swapchain (UI) pass, which is window-sized:
-      its quads land squeezed towards the top left, and each lamp's depth taps read
-      the depth at the wrong place. The viewport must be the swapchain's again (the
-      depth taps already use normalized coordinates, right at any render size).
-      Repro: `--override-cvar "r_ssao=1" --override-cvar "r_scale=0.7"`.
 - [ ] **Longer freeze between the server list and the map loading view** (seen with
       `r_radiosity` 1). Leaving the title map joins its radiosity worker, whose batch
       of up to 128 chunks (GL: 8) cannot be interrupted: likely the bulk of it.
@@ -37,13 +14,6 @@ Open work only; what is done is in the git history. The GL renderer in
 
 ## Wrong results
 
-- [ ] **Screen tints pile up while frames are skipped** — the skipped-frame path in
-      `Flip` discards the 2D batches but not `pendingMultiplyColors`; restoring a
-      minimised window multiplies every queued tint at once. Clear it there too.
-- [ ] **Settings read live against resources sized at map load** — `r_modelShadows`
-      (cascades 1x1 when off at load, rendered into if turned on) and `r_radiosity`
-      (pipelines specialized on the live value, volumes placeholders until the next
-      map). Latch both with what they size.
 - [ ] **`r_vsync` ignored by Vulkan** — the present mode always prefers MAILBOX (GL
       applies `r_vsync` through `SDL_GL_SetSwapInterval` only). Choose FIFO at 1,
       IMMEDIATE (else MAILBOX, else FIFO) at 0, and mark the swapchain stale when it
