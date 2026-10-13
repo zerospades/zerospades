@@ -169,6 +169,17 @@ namespace spades {
 					const spirv_cross::SPIRType& type = compiler.get_type(pc.type_id);
 					uint32_t size = (uint32_t)compiler.get_declared_struct_size(type);
 
+					// 128 bytes is all Vulkan guarantees. A larger block works only
+					// on the GPUs whose limit happens to be higher, so it is refused
+					// here, the one place every program's shaders pass, rather than
+					// left to fail on the others: anything larger belongs in a
+					// uniform buffer.
+					if (size > kPortablePushConstantsSize) {
+						SPRaise("Program '%s' declares %u bytes of push constants, past the "
+						        "%u Vulkan guarantees",
+						        name.c_str(), size, kPortablePushConstantsSize);
+					}
+
 					VkPushConstantRange range;
 					range.stageFlags = stageFlags;
 					range.offset = 0;
