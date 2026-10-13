@@ -105,7 +105,7 @@ namespace spades {
 
 			// Sampled copy of the scene depth (the 1x attachment has no SAMPLED usage)
 			Handle<VulkanImage> sceneDepthSampleImage;
-			// The mirror's, at 1x with SSAO
+			// The mirror's, at 1x with SSAO or r_water 3
 			Handle<VulkanImage> mirrorDepthSampleImage;
 			// What the copies into those pass through, at 1x
 			Handle<VulkanBuffer> depthCopyBuffer;
@@ -181,7 +181,8 @@ namespace spades {
 
 			// Depth in/out: ATTACHMENT_OPTIMAL; copy ends SHADER_READ_ONLY. No-op under MSAA.
 			void CopySceneDepthForSampling(VkCommandBuffer commandBuffer);
-			/** The mirror's depth into its single-sample copy, at 1x with SSAO */
+			/** The mirror's depth into its single-sample copy, at 1x with SSAO or
+			 * r_water 3 */
 			void CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer);
 			/** The mirror's depth sampled as the scene's (`GetResolvedDepthImage`): its
 			 * resolve under MSAA, its copy at 1x; R32F, read in SHADER_READ_ONLY */
@@ -245,9 +246,9 @@ namespace spades {
 			Handle<VulkanImage> GetWaterMirrorColorImage() {
 				return mirrorColorResolveImage ? mirrorColorResolveImage : mirrorColorImage;
 			}
-			// r_water >= 3 only
+			// r_water >= 3 only: the mirror's depth resolved, or copied at 1x
 			Handle<VulkanImage> GetWaterMirrorDepthImage() {
-				return mirrorDepthResolveImage ? mirrorDepthResolveImage : mirrorDepthImage;
+				return GetMirrorResolvedDepthImage();
 			}
 			Handle<VulkanImage> GetMirrorColorResolveImage() { return mirrorColorResolveImage; }
 			Handle<VulkanImage> GetMirrorDepthResolveImage() { return mirrorDepthResolveImage; }

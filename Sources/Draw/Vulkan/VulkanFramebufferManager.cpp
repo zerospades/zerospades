@@ -275,11 +275,16 @@ namespace spades {
 				mirrorColorImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
 				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
+				// SAMPLED only under MSAA, where the depth-resolve filter reads it; at
+				// 1x it is read through its copy, `mirrorDepthSampleImage`, for the
+				// MoltenVK issue the scene's depth avoids (see `renderDepthImage`)
+				VkImageUsageFlags mirrorDepthUsage =
+				  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+				if (useMSAA)
+					mirrorDepthUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 				mirrorDepthImage = Handle<VulkanImage>::New(
 				    device, renderWidth, renderHeight, fbDepthFormat,
-				    VK_IMAGE_TILING_OPTIMAL,
-				    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-				        VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+				    VK_IMAGE_TILING_OPTIMAL, mirrorDepthUsage,
 				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, sampleCount);
 				mirrorDepthImage->CreateImageView(VK_IMAGE_ASPECT_DEPTH_BIT);
 				mirrorDepthImage->CreateAttachmentImageView();
@@ -304,9 +309,10 @@ namespace spades {
 					SPRaise("Failed to create Vulkan mirror framebuffer");
 				}
 
-				// At 1x the mirror's ambient occlusion reads a copy of its depth,
-				// as the scene's does (`sceneDepthSampleImage`)
-				if (!useMSAA && (int)settings.r_ssao != 0) {
+				// At 1x the mirror's ambient occlusion and the water's depth-aware
+				// reflections (r_water 3) read a copy of its depth, as the scene's
+				// readers do (`sceneDepthSampleImage`)
+				if (!useMSAA && ((int)settings.r_ssao != 0 || waterQuality >= 3)) {
 					mirrorDepthSampleImage = Handle<VulkanImage>::New(
 					    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
 					    VK_IMAGE_TILING_OPTIMAL,

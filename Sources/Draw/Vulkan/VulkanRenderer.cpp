@@ -2210,22 +2210,27 @@ namespace spades {
 			mirrorBarriers[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			mirrorBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+			// The depth is sampled only by the depth-resolve filter under MSAA; at
+			// 1x, not being SAMPLED, it stays an attachment and is copied
+			const bool msaa = framebufferManager->IsMSAA();
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				0, 0, nullptr, 0, nullptr, 2, mirrorBarriers);
+				0, 0, nullptr, 0, nullptr, msaa ? 2 : 1, mirrorBarriers);
 
 			// Under MSAA the mirror attachments are multisampled (for pipeline
 			// compatibility with the scene), but the water shader samples reflections
 			// as a regular sampler2D. Resolve colour (and depth at r_water >= 3) into
 			// the single-sample images the water shader binds via GetWaterMirror*().
-			if (framebufferManager->IsMSAA()) {
+			if (msaa) {
 				framebufferManager->ResolveMirrorColor(commandBuffer,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 				if ((int)settings.r_water >= 3 && depthResolveFilter) {
 					depthResolveFilter->Resolve(commandBuffer, mirrorDepth.GetPointerOrNull(),
 						framebufferManager->GetMirrorDepthResolveImage().GetPointerOrNull());
 				}
+			} else if ((int)settings.r_water >= 3) {
+				framebufferManager->CopyMirrorDepthForSampling(commandBuffer);
 			}
 		}
 
