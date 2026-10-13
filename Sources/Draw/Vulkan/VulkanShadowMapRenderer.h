@@ -86,6 +86,8 @@ namespace spades {
 			~VulkanShadowMapRenderer();
 
 			void Render(VkCommandBuffer commandBuffer);
+			/** The pass the cascades are drawn in, models' included */
+			VkRenderPass GetRenderPass() const { return renderPass; }
 			// Mark the sampling UBO disabled for frames the cascade isn't rendered.
 			void SetSamplingDisabled();
 

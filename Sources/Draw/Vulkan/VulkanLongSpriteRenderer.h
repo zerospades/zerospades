@@ -122,6 +122,13 @@ namespace spades {
 			VulkanLongSpriteRenderer(VulkanRenderer&);
 			~VulkanLongSpriteRenderer();
 
+			/** Makes the pipelines now, rather than on the first frame drawing a
+			 * sprite */
+			void PreparePipeline() {
+				if (pipeline == VK_NULL_HANDLE)
+					CreatePipeline();
+			}
+
 			void Add(VulkanImage* img, Vector3 p1, Vector3 p2, float rad, Vector4 color);
 			void Clear();
 

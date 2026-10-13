@@ -390,7 +390,7 @@ namespace spades {
 			// translation-only push constant). Build a dedicated one carrying the full
 			// per-instance MVP, on first use: every shadow pass is compatible with it.
 			if (sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE)
-				CreateShadowPipeline(shadowRenderPass);
+				CreateShadowPipeline(renderer, shadowRenderPass);
 			if (sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE)
 				return;
 
@@ -421,9 +421,23 @@ namespace spades {
 			}
 		}
 
-		void VulkanOptimizedVoxelModel::CreateShadowPipeline(VkRenderPass shadowRenderPass) {
+		void VulkanOptimizedVoxelModel::PrepareSharedPipelines(VulkanRenderer& renderer) {
 			SPADES_MARK_FUNCTION();
 
+			if (sharedPipeline.pipeline == VK_NULL_HANDLE)
+				CreatePipeline(renderer, renderer.GetOffscreenRenderPass());
+
+			VulkanShadowMapRenderer* shadowMapRenderer = renderer.GetShadowMapRenderer();
+			if (shadowMapRenderer && (int)renderer.GetSettings().r_modelShadows &&
+			    sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE)
+				CreateShadowPipeline(renderer, shadowMapRenderer->GetRenderPass());
+		}
+
+		void VulkanOptimizedVoxelModel::CreateShadowPipeline(VulkanRenderer& renderer,
+		                                                     VkRenderPass shadowRenderPass) {
+			SPADES_MARK_FUNCTION();
+
+			Handle<gui::SDLVulkanDevice> device = renderer.GetDevice();
 			VkDevice vkDevice = device->GetDevice();
 
 			// Tear down a stale pipeline/layout if the render pass changed.
@@ -628,7 +642,7 @@ namespace spades {
 			// renderer's life. Remade only with what their layout depends on
 			// (`InvalidateSharedPipeline`).
 			if (sharedPipeline.pipeline == VK_NULL_HANDLE)
-				CreatePipeline(renderer.GetOffscreenRenderPass());
+				CreatePipeline(renderer, renderer.GetOffscreenRenderPass());
 
 			const VkPipeline activePipeline = sharedPipeline.*pipelineMember;
 			const VkPipeline activeMirroredPipeline = sharedPipeline.*mirroredPipelineMember;
@@ -854,9 +868,11 @@ namespace spades {
 			}
 		}
 
-		void VulkanOptimizedVoxelModel::CreatePipeline(VkRenderPass renderPass) {
+		void VulkanOptimizedVoxelModel::CreatePipeline(VulkanRenderer& renderer,
+		                                               VkRenderPass renderPass) {
 			SPADES_MARK_FUNCTION();
 
+			Handle<gui::SDLVulkanDevice> device = renderer.GetDevice();
 			VkDevice vkDevice = device->GetDevice();
 
 			{
