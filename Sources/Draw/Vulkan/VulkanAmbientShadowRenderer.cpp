@@ -49,10 +49,11 @@ namespace spades {
 		};
 
 		VulkanAmbientShadowRenderer::VulkanAmbientShadowRenderer(VulkanRenderer& r,
-		                                                         client::GameMap& m)
+		                                                         client::GameMap& m, bool active)
 		    : renderer(r),
 		      device(r.GetDevice()),
 		      map(&m),
+		      active(active),
 		      image(VK_NULL_HANDLE),
 		      imageAllocation(VK_NULL_HANDLE),
 		      imageView(VK_NULL_HANDLE),
@@ -75,7 +76,8 @@ namespace spades {
 			chunkH = h / ChunkSize;
 			chunkD = d / ChunkSize;
 
-			chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
+			if (active)
+				chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
 			for (Chunk& c : chunks) {
 				float* data = (float*)c.data;
 				std::fill(data, data + ChunkSize * ChunkSize * ChunkSize * 2, 1.0F);
@@ -97,7 +99,8 @@ namespace spades {
 			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 			imageInfo.imageType = VK_IMAGE_TYPE_3D;
 			imageInfo.format = VK_FORMAT_R32G32_SFLOAT;
-			imageInfo.extent = {(uint32_t)w, (uint32_t)h, (uint32_t)(d + 1)};
+			imageInfo.extent = active ? VkExtent3D{(uint32_t)w, (uint32_t)h, (uint32_t)(d + 1)}
+			                          : VkExtent3D{1, 1, 1};
 			imageInfo.mipLevels = 1;
 			imageInfo.arrayLayers = 1;
 			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -136,25 +139,27 @@ namespace spades {
 			if (vkCreateSampler(dev, &samplerInfo, nullptr, &sampler) != VK_SUCCESS)
 				SPRaise("Failed to create AO sampler");
 
-			// Staging: kStagingSlotsPerFrame slots per frame in flight, each
-			// holding one ChunkSize^3 RG float region.
-			stagingSlotSize = ChunkSize * ChunkSize * ChunkSize * 2 * sizeof(float);
+			if (active) {
+				// Staging: kStagingSlotsPerFrame slots per frame in flight, each
+				// holding one ChunkSize^3 RG float region.
+				stagingSlotSize = ChunkSize * ChunkSize * ChunkSize * 2 * sizeof(float);
 
-			VkBufferCreateInfo bufInfo{};
-			bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
-			bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+				VkBufferCreateInfo bufInfo{};
+				bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufInfo.size = stagingSlotSize * kStagingSlotsPerFrame * device->GetMaxFramesInFlight();
+				bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+				bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-			VmaAllocationCreateInfo bufAllocInfo{};
-			bufAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-			bufAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+				VmaAllocationCreateInfo bufAllocInfo{};
+				bufAllocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+				bufAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-			VmaAllocationInfo allocResult{};
-			if (vmaCreateBuffer(alloc, &bufInfo, &bufAllocInfo,
-			                    &stagingBuffer, &stagingAllocation, &allocResult) != VK_SUCCESS)
-				SPRaise("Failed to create AO staging buffer");
-			stagingMapped = allocResult.pMappedData;
+				VmaAllocationInfo allocResult{};
+				if (vmaCreateBuffer(alloc, &bufInfo, &bufAllocInfo,
+				                    &stagingBuffer, &stagingAllocation, &allocResult) != VK_SUCCESS)
+					SPRaise("Failed to create AO staging buffer");
+				stagingMapped = allocResult.pMappedData;
+			}
 
 			// One-time submit: clear the whole 3D image to (1, 1) so the first
 			// frames that sample it before any chunk has been uploaded see a
@@ -222,7 +227,10 @@ namespace spades {
 			vkQueueWaitIdle(device->GetGraphicsQueue());
 			vkFreeCommandBuffers(dev, device->GetCommandPool(), 1, &cb);
 
-			SPLog("Vulkan ambient-shadow renderer created (%dx%dx%d)", w, h, d + 1);
+			if (active)
+				SPLog("Vulkan ambient-shadow renderer created (%dx%dx%d)", w, h, d + 1);
+			else
+				SPLog("Vulkan ambient shadow disabled: placeholder volume only");
 		}
 
 		VulkanAmbientShadowRenderer::~VulkanAmbientShadowRenderer() {
@@ -271,7 +279,7 @@ namespace spades {
 
 		void VulkanAmbientShadowRenderer::GameMapChanged(int x, int y, int z, client::GameMap* m) {
 			SPADES_MARK_FUNCTION_DEBUG();
-			if (m != map.GetPointerOrNull())
+			if (!active || m != map.GetPointerOrNull())
 				return;
 			Invalidate(x - RayLength, y - RayLength, z - RayLength,
 			           x + RayLength, y + RayLength, z + RayLength);
@@ -333,6 +341,8 @@ namespace spades {
 
 		void VulkanAmbientShadowRenderer::Update(VkCommandBuffer cmd, std::size_t frameSlot) {
 			SPADES_MARK_FUNCTION();
+			if (!active)
+				return;
 
 			if (GetNumDirtyChunks() > 0 && (dispatch == nullptr || dispatch->done)) {
 				if (dispatch) {

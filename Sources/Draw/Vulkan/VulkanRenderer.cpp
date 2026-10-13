@@ -833,8 +833,13 @@ namespace spades {
 			// Initialize map shadow renderer (heightmap shadow) BEFORE map renderer
 			if (map) {
 				mapShadowRenderer = stmp::make_unique<VulkanMapShadowRenderer>(*this, map);
-				ambientShadowRenderer = stmp::make_unique<VulkanAmbientShadowRenderer>(*this, *map);
-				radiosityRenderer = stmp::make_unique<VulkanRadiosityRenderer>(*this, *map);
+				// Whole-map volumes only when radiosity lights the scene, as GL makes
+				// these renderers only then; otherwise placeholders for the lit
+				// pipelines' descriptors
+				const bool radiosity = (int)r_radiosity != 0;
+				ambientShadowRenderer =
+				  stmp::make_unique<VulkanAmbientShadowRenderer>(*this, *map, radiosity);
+				radiosityRenderer = stmp::make_unique<VulkanRadiosityRenderer>(*this, *map, radiosity);
 				mapOccupancy = stmp::make_unique<VulkanMapOccupancy>(
 				  *this, *map, device->GetMaxFramesInFlight());
 			}

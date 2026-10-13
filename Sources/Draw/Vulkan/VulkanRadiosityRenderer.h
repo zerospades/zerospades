@@ -56,6 +56,11 @@ namespace spades {
 			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 			Handle<client::GameMap> map;
+			/** Whether it lights the scene (`r_radiosity`). Otherwise its volumes
+			 * are 1x1x1 placeholders, for the descriptors the lit pipelines declare
+			 * but the shaders, specialized without radiosity, never read: no
+			 * whole-map volumes, chunks or worker. */
+			const bool active;
 
 			struct Chunk {
 				int cx, cy, cz;
@@ -123,7 +128,7 @@ namespace spades {
 				Vector3 base, x, y, z;
 			};
 
-			VulkanRadiosityRenderer(VulkanRenderer& renderer, client::GameMap& map);
+			VulkanRadiosityRenderer(VulkanRenderer& renderer, client::GameMap& map, bool active);
 			~VulkanRadiosityRenderer();
 
 			Result Evaluate(IntVector3);
