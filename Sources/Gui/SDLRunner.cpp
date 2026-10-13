@@ -531,9 +531,19 @@ namespace spades {
 					Handle<client::IAudioDevice> audio(CreateAudioDevice(), false);
 
 					if (rtype == RendererType::GL) {
-						int vsync = r_vsync;
-						if (SDL_GL_SetSwapInterval(vsync) != 0)
-							SPRaise("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
+						// Vsync prefers its adaptive kind, which shows a frame that misses
+						// the display's refresh at once, tearing, instead of holding it
+						// to the next one and halving the frame rate. Where the platform
+						// has none (SDL's macOS backend), plain vsync.
+						const int vsync = r_vsync;
+						const bool adaptive = vsync == 1 && SDL_GL_SetSwapInterval(-1) == 0;
+						if (!adaptive && SDL_GL_SetSwapInterval(vsync) != 0)
+							SPLog("Couldn't set the swap interval to %d: %s", vsync,
+							      SDL_GetError());
+						else
+							SPLog("Swap interval: %s", adaptive ? "adaptive vsync"
+							                           : vsync ? "vsync"
+							                                   : "immediate");
 					}
 
 					RunClientLoop(window, renderer.GetPointerOrNull(), audio.GetPointerOrNull());
