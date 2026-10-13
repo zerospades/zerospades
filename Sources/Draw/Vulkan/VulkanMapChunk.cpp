@@ -23,6 +23,7 @@
 #include <cstddef>
 
 #include "VulkanMapChunk.h"
+#include <cstring>
 #include "VulkanMapRenderer.h"
 #include "VulkanRenderer.h"
 #include "VulkanBuffer.h"
@@ -281,57 +282,26 @@ namespace spades {
 				}
 			}
 
-			// Upload vertex buffer (reuse if size matches to reduce memory allocations)
-			if (!vertices.empty()) {
-				size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
-
-				if (!vertexBuffer || vertexBuffer->GetSize() != vertexBufferSize) {
-					// Queue old buffer for deferred deletion to ensure GPU is done with it
-					if (vertexBuffer) {
-						renderer.GetRenderer().QueueBufferForDeletion(vertexBuffer);
-					}
-					vertexBuffer.Set(nullptr, false);
-					vertexBuffer = Handle<VulkanBuffer>::New(
-					    device, vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-					    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-				}
-
-				void* data = vertexBuffer->Map();
-				memcpy(data, vertices.data(), vertexBufferSize);
-				vertexBuffer->Unmap();
-			} else {
-				// Queue old buffer for deferred deletion
-				if (vertexBuffer) {
-					renderer.GetRenderer().QueueBufferForDeletion(vertexBuffer);
-				}
-				vertexBuffer.Set(nullptr, false);
-			}
-
-			// Upload index buffer (reuse if size matches to reduce memory allocations)
-			if (!indices.empty()) {
-				size_t indexBufferSize = indices.size() * sizeof(uint16_t);
-
-				if (!indexBuffer || indexBuffer->GetSize() != indexBufferSize) {
-					// Queue old buffer for deferred deletion to ensure GPU is done with it
-					if (indexBuffer) {
-						renderer.GetRenderer().QueueBufferForDeletion(indexBuffer);
-					}
-					indexBuffer.Set(nullptr, false);
-					indexBuffer = Handle<VulkanBuffer>::New(
-					    device, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-					    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-				}
-
-				void* data = indexBuffer->Map();
-				memcpy(data, indices.data(), indexBufferSize);
-				indexBuffer->Unmap();
-			} else {
-				// Queue old buffer for deferred deletion
-				if (indexBuffer) {
-					renderer.GetRenderer().QueueBufferForDeletion(indexBuffer);
-				}
-				indexBuffer.Set(nullptr, false);
-			}
+			// Upload into buffers of their own. The previous ones may still be
+			// drawn from by a frame in flight, so they are never written again:
+			// they are retired, and freed once no frame can use them.
+			auto upload = [&](Handle<VulkanBuffer>& buffer, const void* data, std::size_t size,
+			                  VkBufferUsageFlags usage) {
+				if (buffer)
+					renderer.GetRenderer().QueueBufferForDeletion(buffer);
+				buffer.Set(nullptr, false);
+				if (size == 0)
+					return;
+				buffer = Handle<VulkanBuffer>::New(
+				  device, size, usage,
+				  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+				std::memcpy(buffer->Map(), data, size);
+				buffer->Unmap();
+			};
+			upload(vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex),
+			       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+			upload(indexBuffer, indices.data(), indices.size() * sizeof(uint16_t),
+			       VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
 			needsUpdate = false;
 		}
