@@ -79,12 +79,6 @@ namespace spades {
 			};
 			static_assert(sizeof(GpuSunSky) == 48, "GpuSunSky must match SceneSunSky");
 
-			/**
-			 * The widest a texel of a light's occlusion map may get at its reach, in
-			 * blocks: its width is how far off an edge of the beam's shadow can land.
-			 */
-			constexpr float kMaxOcclusionTexelWidth = 1.5F;
-
 			/** `kind.x` of a light, `DYNAMIC_LIGHT_POINT`, `_LINEAR` or `_SPOT` */
 			float KindOf(client::DynamicLightType type) {
 				switch (type) {
@@ -347,7 +341,7 @@ namespace spades {
 			const client::DynamicLightParam& param = light.GetParam();
 			if (param.type != client::DynamicLightTypeSpotlight)
 				return false;
-			return param.radius * GetOcclusionTexelSpread(light) <= kMaxOcclusionTexelWidth;
+			return param.radius * GetOcclusionTexelSpread(light) <= MaxOcclusionTexelWidth;
 		}
 
 		VkDescriptorSet VulkanSceneLights::GetDescriptorSet(std::size_t frameSlot) const {

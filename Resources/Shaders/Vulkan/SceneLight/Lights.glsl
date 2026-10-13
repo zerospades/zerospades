@@ -48,7 +48,8 @@ layout(set = SCENE_LIGHT_SET, binding = 5, r32f) uniform readonly image2D
 
 // The widest a texel may be at a point for its tile to prove the point lit, in
 // blocks: below `1 / sqrt(2)`, no block can stand in the way of the point without
-// crossing one of the four rays around it.
+// crossing one of the four rays around it. `VulkanSceneLights::
+// MaxOcclusionTexelWidth` only gives a tile to a spotlight whose texels stay within it.
 #define DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH 0.7
 // How far short of where it meets the point's surface a ray may stop and still
 // count as reaching it, in blocks
