@@ -23,6 +23,7 @@
 #include <cstddef>
 
 #include "VulkanMapChunk.h"
+#include "VulkanSettings.h"
 #include <cstring>
 #include "VulkanMapRenderer.h"
 #include "VulkanRenderer.h"
@@ -32,7 +33,6 @@
 #include <Core/Debug.h>
 #include <Core/Settings.h>
 
-SPADES_SETTING(r_water);
 
 namespace spades {
 	namespace draw {
@@ -208,7 +208,7 @@ namespace spades {
 			// when water is on, so coastal "water-surface" voxels get rendered
 			// (their above-water neighbor counts as solid) and pure-water
 			// columns drop out.
-			return map->IsSolid(x, y, (z == 63 && (int)r_water > 0) ? 62 : z);
+			return map->IsSolid(x, y, (z == 63 && (int)renderer.renderer.GetSettings().r_water > 0) ? 62 : z);
 		}
 
 		void VulkanMapChunk::Update() {

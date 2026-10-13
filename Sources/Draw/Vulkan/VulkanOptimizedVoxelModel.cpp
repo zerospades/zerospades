@@ -19,6 +19,7 @@
  */
 
 #include "VulkanOptimizedVoxelModel.h"
+#include "VulkanSettings.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanRenderer.h"
 #include "VulkanMapRenderer.h"
@@ -50,8 +51,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			SPLog("Preloading Vulkan model shaders");
 
-			SPADES_SETTING(r_physicalLighting);
-			if ((int)r_physicalLighting != 0) {
+			if ((int)renderer.GetSettings().r_physicalLighting != 0) {
 				SpirvCache::Preload({"Shaders/Vulkan/BasicModelVertexColorPhys.vert.spv",
 				                     "Shaders/Vulkan/BasicModelVertexColorPhys.frag.spv",
 				                     "Shaders/Vulkan/BasicModelVertexColorPhysGhost.frag.spv",
@@ -892,8 +892,7 @@ namespace spades {
 			sharedPipeline.renderPass = renderPass;
 
 			{
-				SPADES_SETTING(r_physicalLighting);
-				sharedPipeline.physicalLighting = (int)r_physicalLighting != 0;
+				sharedPipeline.physicalLighting = (int)renderer.GetSettings().r_physicalLighting != 0;
 			}
 
 			// Load SPIR-V shaders
@@ -951,8 +950,7 @@ namespace spades {
 			// the physical shader as for the basic one — picks the MapRadiosityNull
 			// ambient when r_radiosity == 0, the radiosity one otherwise. Mirrors the
 			// map renderer.
-			SPADES_SETTING(r_radiosity);
-			int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
+			int32_t useRadiosity = (int)renderer.GetSettings().r_radiosity != 0 ? 1 : 0;
 			VkSpecializationMapEntry specEntry{};
 			specEntry.constantID = 0;
 			specEntry.offset = 0;

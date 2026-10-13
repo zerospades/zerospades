@@ -34,6 +34,7 @@
 #include "VulkanDynamicLight.h"
 #include "VulkanSceneLights.h"
 #include "VulkanSceneView.h"
+#include "VulkanSettings.h"
 
 namespace spades {
 	namespace gui {
@@ -95,6 +96,8 @@ namespace spades {
 				Handle<VulkanBuffer> stagingBuffer;
 			};
 
+			// First, so that everything built from a latched setting sees one value
+			VulkanSettings settings;
 			Handle<gui::SDLVulkanDevice> device;
 			client::GameMap* map;
 			bool inited;
@@ -418,6 +421,9 @@ namespace spades {
 			 * swapchain, by `r_scaleFilter`. The 2D layer and `ScreenWidth` /
 			 * `ScreenHeight` stay in the window's units. */
 			int GetRenderWidth() const { return renderWidth; }
+
+			/** The settings latched for the renderer's life (`VulkanSettings`) */
+			VulkanSettings& GetSettings() { return settings; }
 			int GetRenderHeight() const { return renderHeight; }
 
 			void StartScene(const client::SceneDefinition& def) override;

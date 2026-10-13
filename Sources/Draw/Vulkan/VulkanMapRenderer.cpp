@@ -19,6 +19,7 @@
  */
 
 #include "VulkanMapRenderer.h"
+#include "VulkanSettings.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanMapChunk.h"
 #include "VulkanRenderer.h"
@@ -59,8 +60,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			{
-				SPADES_SETTING(r_physicalLighting);
-				physicalLighting = (int)r_physicalLighting != 0;
+				physicalLighting = (int)renderer.GetSettings().r_physicalLighting != 0;
 			}
 
 			SPLog("Initializing Vulkan map renderer (physicalLighting=%d)", (int)physicalLighting);
@@ -130,8 +130,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			SPLog("Preloading Vulkan map shaders");
 
-			SPADES_SETTING(r_physicalLighting);
-			if ((int)r_physicalLighting != 0) {
+			if ((int)r.GetSettings().r_physicalLighting != 0) {
 				SpirvCache::Preload({"Shaders/Vulkan/BasicMapPhys.vert.spv",
 				                     "Shaders/Vulkan/BasicMapPhys.frag.spv"});
 			} else {
@@ -374,8 +373,7 @@ namespace spades {
 			// Specialization constant: USE_RADIOSITY (SceneLight/MapLight.glsl),
 			// for the physical shader as for the basic one — picks the
 			// MapRadiosityNull vs MapRadiosity ambient permutation.
-			SPADES_SETTING(r_radiosity);
-			int32_t useRadiosity = (int)r_radiosity != 0 ? 1 : 0;
+			int32_t useRadiosity = (int)renderer.GetSettings().r_radiosity != 0 ? 1 : 0;
 			VkSpecializationMapEntry specEntry{};
 			specEntry.constantID = 0;
 			specEntry.offset = 0;

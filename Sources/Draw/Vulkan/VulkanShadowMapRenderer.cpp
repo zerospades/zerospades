@@ -19,6 +19,7 @@
  */
 
 #include "VulkanShadowMapRenderer.h"
+#include "VulkanSettings.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanRenderer.h"
 #include "VulkanMapRenderer.h"
@@ -38,8 +39,6 @@
 #include <cstring>
 #include <vector>
 
-SPADES_SETTING(r_shadowMapSize);
-SPADES_SETTING(r_modelShadows);
 
 namespace spades {
 	namespace draw {
@@ -68,13 +67,13 @@ namespace spades {
 		  samplingSampler(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
 
-			textureSize = (int)r_shadowMapSize;
+			textureSize = (int)renderer.GetSettings().r_shadowMapSize;
 			if (textureSize < 128) textureSize = 128;
 			if (textureSize > 4096) textureSize = 4096;
 			// Without model shadows (latched) the cascades are never drawn, and their
 			// sampling stays disabled: 1x1 placeholders for the descriptors the lit
 			// pipelines declare are all that is needed.
-			if (!(int)r_modelShadows)
+			if (!(int)renderer.GetSettings().r_modelShadows)
 				textureSize = 1;
 
 			SPLog("Creating shadow map renderer with size %dx%d", textureSize, textureSize);
@@ -905,7 +904,7 @@ namespace spades {
 				// matrix and the render pass for lazy pipeline creation. Gated on
 				// r_modelShadows to match GL (GLShadowMapShader skips models when off).
 				VulkanModelRenderer* modelRenderer = renderer.GetModelRenderer();
-				if (modelRenderer && (int)r_modelShadows) {
+				if (modelRenderer && (int)renderer.GetSettings().r_modelShadows) {
 					modelRenderer->RenderShadowMapPass(commandBuffer, matrices[i], renderPass);
 				}
 

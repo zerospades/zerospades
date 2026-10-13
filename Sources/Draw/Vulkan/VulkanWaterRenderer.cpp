@@ -1,4 +1,5 @@
 #include "VulkanWaterRenderer.h"
+#include "VulkanSettings.h"
 #include "VulkanSceneLights.h"
 #include "VulkanRenderer.h"
 #include "VulkanFramebufferManager.h"
@@ -14,8 +15,6 @@
 #include <kiss_fft130/kiss_fft.h>
 #include <cmath>
 
-SPADES_SETTING(r_water);
-SPADES_SETTING(r_maxAnisotropy);
 
 namespace spades {
 	namespace draw {
@@ -410,7 +409,7 @@ namespace spades {
 				std::vector<uint32_t> indices;
 
 				int meshSize = 16;
-				if ((int)r_water >= 2)
+				if ((int)renderer.GetSettings().r_water >= 2)
 					meshSize = 128;
 				float meshSizeInv = 1.0F / (float)meshSize;
 				for (int y = -meshSize; y <= meshSize; y++) {
@@ -506,10 +505,10 @@ namespace spades {
 			waveTanksPlaceholder.clear();
 			waveStagingBufferPool.clear();
 
-			const size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
+			const size_t numLayers = ((int)renderer.GetSettings().r_water >= 2) ? 3 : 1;
 			for (size_t i = 0; i < numLayers; i++) {
 				IWaveTank* tank;
-				if ((int)r_water >= 3)
+				if ((int)renderer.GetSettings().r_water >= 3)
 					tank = new FFTWaveTank<8>();
 				else
 					tank = new FFTWaveTank<7>();
@@ -527,7 +526,7 @@ namespace spades {
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
+					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(renderer.GetSettings().r_maxAnisotropy));
 			} else {
 				// Multiple layers - use 2D array texture with mipmaps
 				waveImageArray = Handle<VulkanImage>::New(device, size, size,
@@ -536,7 +535,7 @@ namespace spades {
 					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
+					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(renderer.GetSettings().r_maxAnisotropy));
 			}
 
 			// Staging for the wave uploads: a buffer per layer for each frame in
@@ -554,9 +553,9 @@ namespace spades {
 		void VulkanWaterRenderer::PreloadShaders(VulkanRenderer& r) {
 			SPADES_MARK_FUNCTION();
 		SPLog("Preloading Vulkan water shaders");
-		if ((int)r_water >= 3)
+		if ((int)r.GetSettings().r_water >= 3)
 			r.RegisterProgram("Shaders/Vulkan/Water3.vk.program");
-		else if ((int)r_water >= 2)
+		else if ((int)r.GetSettings().r_water >= 2)
 			r.RegisterProgram("Shaders/Vulkan/Water2.vk.program");
 		else
 			r.RegisterProgram("Shaders/Vulkan/Water.vk.program");
@@ -619,7 +618,7 @@ namespace spades {
 			std::vector<uint32_t> indices;
 
 			int meshSize = 16;
-			if ((int)r_water >= 2)
+			if ((int)renderer.GetSettings().r_water >= 2)
 				meshSize = 128;
 			float meshSizeInv = 1.0F / (float)meshSize;
 			for (int y = -meshSize; y <= meshSize; y++) {
@@ -669,9 +668,9 @@ namespace spades {
 
 		// Select program variant based on water quality setting (matches GL renderer)
 		std::string name;
-		if ((int)r_water >= 3)
+		if ((int)renderer.GetSettings().r_water >= 3)
 			name = "Shaders/Vulkan/Water3.vk.program";
-		else if ((int)r_water >= 2)
+		else if ((int)renderer.GetSettings().r_water >= 2)
 			name = "Shaders/Vulkan/Water2.vk.program";
 		else
 			name = "Shaders/Vulkan/Water.vk.program";
@@ -818,7 +817,7 @@ namespace spades {
 
 		// Binding 6: mirrorTexture (for reflections) - dynamic, only for r_water >= 2
 		// Binding 7: mirrorDepthTexture (for depth-aware reflections) - dynamic, only for r_water >= 3
-		if ((int)r_water >= 2) {
+		if ((int)renderer.GetSettings().r_water >= 2) {
 			Handle<VulkanImage> mirrorColorImage = fbManager->GetWaterMirrorColorImage();
 			if (mirrorColorImage) {
 				imageInfos.push_back({});
@@ -839,7 +838,7 @@ namespace spades {
 				SPLog("WARNING: mirrorColorImage is null, skipping binding 6");
 			}
 
-			if ((int)r_water >= 3) {
+			if ((int)renderer.GetSettings().r_water >= 3) {
 				Handle<VulkanImage> mirrorDepthImage = fbManager->GetWaterMirrorDepthImage();
 				if (mirrorDepthImage) {
 					imageInfos.push_back({});
@@ -1118,7 +1117,7 @@ namespace spades {
 		// Water3: 6 samplers (screen, depth, main, waveArray, mirror, mirrorDepth)
 		// Water2: 5 samplers (screen, depth, main, waveArray, mirror)
 		// Water:  4 samplers (screen, depth, main, wave)
-		uint32_t samplersPerFrame = ((int)r_water >= 3) ? 6 : (((int)r_water >= 2) ? 5 : 4);
+		uint32_t samplersPerFrame = ((int)renderer.GetSettings().r_water >= 3) ? 6 : (((int)renderer.GetSettings().r_water >= 2) ? 5 : 4);
 		std::vector<VkDescriptorPoolSize> poolSizes(2);
 		poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		poolSizes[0].descriptorCount = samplersPerFrame * frameCount;

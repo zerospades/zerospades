@@ -32,6 +32,7 @@ namespace spades {
 	}
 
 	namespace draw {
+		class VulkanSettings;
 		class VulkanImage;
 
 		class VulkanFramebufferManager {
@@ -145,7 +146,10 @@ namespace spades {
 			void CreateRenderPass();
 
 		public:
-			VulkanFramebufferManager(Handle<gui::SDLVulkanDevice> device, int renderWidth, int renderHeight);
+			/** Makes the targets, sized and formatted from the renderer's latched
+			 * `settings` */
+			VulkanFramebufferManager(Handle<gui::SDLVulkanDevice> device, VulkanSettings& settings,
+			                         int renderWidth, int renderHeight);
 			~VulkanFramebufferManager();
 
 			/** Sets up for scene rendering. */
