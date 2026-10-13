@@ -79,6 +79,7 @@ SPADES_SETTING(r_radiosity);
 SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
 SPADES_SETTING(r_cameraBlur);
+SPADES_SETTING(r_scale);
 SPADES_SETTING(r_scaleFilter);
 SPADES_SETTING(r_water);
 SPADES_SETTING(r_softParticles);
@@ -139,9 +140,11 @@ namespace spades {
 		multiplyColorPipelineLayout(VK_NULL_HANDLE),
 		debugLinePipeline(VK_NULL_HANDLE),
 		debugLinePipelineLayout(VK_NULL_HANDLE) {
-		renderWidth = device->ScreenWidth();
-		renderHeight = device->ScreenHeight();
-
+		{
+			const VkExtent2D renderExtent = DesiredRenderExtent();
+			renderWidth = static_cast<int>(renderExtent.width);
+			renderHeight = static_cast<int>(renderExtent.height);
+		}
 
 		// Initialize program manager, pipeline cache and model manager
 		try {
@@ -558,28 +561,55 @@ namespace spades {
 		}
 		swapchainFramebuffers.clear();
 
-		// Pull new dimensions from the swapchain.
-		renderWidth = device->ScreenWidth();
-		renderHeight = device->ScreenHeight();
-
 		// Rebuild swapchain-dependent renderer resources.
 		CreateFramebuffers();
 		CreateCommandBuffers();
 		if (imageRenderer)
 			imageRenderer->SwapchainRecreated();
 
-		// Rebuild the offscreen framebuffer manager, which is sized to render dimensions.
-		// The water renderer holds references into the framebuffer manager, so reset it first.
-		waterRenderer.reset();
-		framebufferManager = stmp::make_unique<VulkanFramebufferManager>(device, renderWidth, renderHeight);
-		waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
-
 		// Device was waited idle above, so no frame references any image. Re-size to
 		// the (possibly new) image count and clear stale per-image fence associations.
 		imagesInFlight.assign(device->GetSwapchainImageViews().size(), VK_NULL_HANDLE);
 
 		lastSwapchainGeneration = device->GetSwapchainGeneration();
-		SPLog("Swapchain dependencies recreated (%dx%d)", renderWidth, renderHeight);
+		SPLog("Swapchain dependencies recreated");
+
+		// The window's size changed with the swapchain's, and the render size with it
+		RecreateRenderTargets();
+	}
+
+	VkExtent2D VulkanRenderer::DesiredRenderExtent() const {
+		// As GL: the window's size scaled by r_scale, kept within [0.2, 1], and
+		// at least a pixel either way
+		const float scale = std::max(0.2F, std::min(1.0F, static_cast<float>(r_scale)));
+		const int width = std::max(1, static_cast<int>(device->ScreenWidth() * scale));
+		const int height = std::max(1, static_cast<int>(device->ScreenHeight() * scale));
+		return VkExtent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+	}
+
+	void VulkanRenderer::RecreateRenderTargets() {
+		SPADES_MARK_FUNCTION();
+
+		// Nothing in flight may still use the targets about to go
+		vkDeviceWaitIdle(device->GetDevice());
+
+		const VkExtent2D renderExtent = DesiredRenderExtent();
+		renderWidth = static_cast<int>(renderExtent.width);
+		renderHeight = static_cast<int>(renderExtent.height);
+
+		// The water renderer holds descriptors into the framebuffer manager's
+		// images, so it goes first and is made again after.
+		waterRenderer.reset();
+		framebufferManager =
+		  stmp::make_unique<VulkanFramebufferManager>(device, renderWidth, renderHeight);
+		waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
+
+		// The post-processing images pooled at the previous size would never be
+		// handed out again; none is in use between frames.
+		if (temporaryImagePool)
+			temporaryImagePool->Clear();
+
+		SPLog("Render targets recreated (%dx%d)", renderWidth, renderHeight);
 	}
 
 	void VulkanRenderer::BuildProjectionMatrix() {
@@ -992,8 +1022,15 @@ namespace spades {
 				std::this_thread::sleep_for(unpresentableFrameInterval);
 				return UINT32_MAX;
 			}
-			if (device->GetSwapchainGeneration() != lastSwapchainGeneration)
+			if (device->GetSwapchainGeneration() != lastSwapchainGeneration) {
 				RecreateSwapchainDependencies();
+			} else {
+				// r_scale is not latched: follow it as GL does, between frames
+				const VkExtent2D renderExtent = DesiredRenderExtent();
+				if (static_cast<int>(renderExtent.width) != renderWidth ||
+				    static_cast<int>(renderExtent.height) != renderHeight)
+					RecreateRenderTargets();
+			}
 
 			uint32_t imageIndex =
 			  device->AcquireNextImage(&imageAvailableSemaphore, &renderFinishedSemaphore);
@@ -1708,12 +1745,13 @@ namespace spades {
 			return bmp;
 		}
 
+		// The 2D layer's units: the window's, whatever the render size (GL's too)
 		float VulkanRenderer::ScreenWidth() {
-			return static_cast<float>(renderWidth);
+			return static_cast<float>(device->ScreenWidth());
 		}
 
 		float VulkanRenderer::ScreenHeight() {
-			return static_cast<float>(renderHeight);
+			return static_cast<float>(device->ScreenHeight());
 		}
 
 		void VulkanRenderer::GameMapChanged(int x, int y, int z, client::GameMap* map) {

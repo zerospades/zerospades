@@ -875,7 +875,9 @@ namespace spades {
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, waterPipeline->GetPipeline());
 
 		// Dynamic viewport/scissor
-		VkExtent2D extent = device->GetSwapchainExtent();
+		// Drawn into the scene, at its size
+		VkExtent2D extent{static_cast<uint32_t>(renderer.GetRenderWidth()),
+		                  static_cast<uint32_t>(renderer.GetRenderHeight())};
 		VkViewport vp{};
 		vp.x = 0.0f;
 		vp.y = (float)extent.height;

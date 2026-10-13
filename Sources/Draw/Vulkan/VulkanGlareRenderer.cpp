@@ -257,7 +257,9 @@ namespace spades {
 			const float ndcPerUnitX = 2.0F / renderer.ScreenWidth();
 			const float ndcPerUnitY = 2.0F / renderer.ScreenHeight();
 
-			const VkExtent2D extent = renderer.GetDevice()->GetSwapchainExtent();
+			// Drawn into the scene, at its size
+			const VkExtent2D extent{static_cast<uint32_t>(renderer.GetRenderWidth()),
+			                        static_cast<uint32_t>(renderer.GetRenderHeight())};
 			const VkViewport viewport{0.0F, 0.0F, (float)extent.width, (float)extent.height,
 			                          0.0F, 1.0F};
 			const VkRect2D scissor{{0, 0}, extent};
