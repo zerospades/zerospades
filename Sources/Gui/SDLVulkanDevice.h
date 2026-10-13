@@ -95,6 +95,9 @@ namespace spades {
 			/** Set when acquiring or presenting found the swapchain out of date or
 			 * suboptimal; acted on by the next `PrepareSwapchain` */
 			bool swapchainStale{false};
+			/** `r_vsync` as the swapchain's present mode was chosen from: 1, 0 or
+			 * -1. A change rebuilds the swapchain at the next frame boundary. */
+			int presentVsync{1};
 
 			/** Whether the validation layers are on: asked for (debug builds, or
 			 * `ZS_VULKAN_VALIDATION`) and found */
@@ -166,8 +169,9 @@ namespace spades {
 			/**
 			 * Brings the swapchain in line with the surface, at a frame boundary,
 			 * before an image is acquired: rebuilds it when acquiring or presenting
-			 * reported it out of date or suboptimal, or the window's drawable size
-			 * changed. Nothing recorded against the old one can be in use then.
+			 * reported it out of date or suboptimal, the window's drawable size
+			 * changed, or `r_vsync` did. Nothing recorded against the old one can be
+			 * in use then.
 			 *
 			 * Returns false while the surface has no area (a minimised window): no
 			 * swapchain can be made for it, and the frame is to be skipped.
