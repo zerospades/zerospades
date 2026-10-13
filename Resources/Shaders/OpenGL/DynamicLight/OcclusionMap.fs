@@ -22,8 +22,7 @@
 // `GLDynamicLightOcclusionMaps`: how far it gets from the light before it enters a
 // solid block, up to the light's reach.
 
-// MapOcclusion.fs
-float DynamicLightMapWalk(vec3 from, vec3 to, bool stopAtTarget);
+#include "MapOcclusion.glsl"
 
 uniform vec3 lightOrigin;
 // The light's image's axes and its own

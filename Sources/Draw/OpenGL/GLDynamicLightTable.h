@@ -31,7 +31,7 @@ namespace spades {
 
 		/**
 		 * The scene's dynamic lights, uploaded once a frame as a texture that the
-		 * lighting shaders look them up in, one row per light (`DynamicLight/Lights.fs`).
+		 * lighting shaders look them up in, one row per light (`DynamicLight/Lights.glsl`).
 		 *
 		 * A draw then only names the rows of the lights it takes, instead of sending
 		 * each light's parameters again for every chunk and model it reaches.

@@ -34,7 +34,7 @@ namespace spades {
 		/**
 		 * Where the map stops each spotlight's beam, traced once a frame so that the
 		 * lighting shaders look it up instead of walking the map for every fragment
-		 * (`DynamicLight/Lights.fs`).
+		 * (`DynamicLight/Lights.glsl`).
 		 *
 		 * Each spotlight with a map gets a square tile of a shared texture laid over
 		 * its image, every texel holding how far the ray through it gets from the

@@ -54,7 +54,6 @@ namespace spades {
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Lights.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/Common.vs"));
-			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapOcclusion.fs"));
 
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.fs"));
 			shaders.push_back(r->RegisterShader("Shaders/OpenGL/DynamicLight/MapNull.vs"));

@@ -44,7 +44,7 @@ namespace spades {
 			/**
 			 * How far past the edge of its image a spotlight still lights, as a
 			 * fraction of the image's half width: its cone fades out between `0.8`
-			 * and this (`DYNAMIC_LIGHT_SPOT_FADE_END` in `DynamicLight/Lights.fs`).
+			 * and this (`DYNAMIC_LIGHT_SPOT_FADE_END` in `DynamicLight/Lights.glsl`).
 			 */
 			static constexpr float SpotFadeEnd = 1.1F;
 
