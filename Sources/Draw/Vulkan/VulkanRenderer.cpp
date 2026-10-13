@@ -2150,8 +2150,7 @@ namespace spades {
 			// after water). Drawn here in the order particles -> long sprites -> debug.
 			// When the water pass will run, defer them to it (same render pass, the
 			// pipelines are render-pass-compatible); otherwise draw them here.
-			const bool willRenderWater = (int)r_water > 0 && waterRenderer && framebufferManager &&
-			                             framebufferManager->GetMirrorColorImage();
+			const bool willRenderWater = (int)r_water > 0 && waterRenderer && framebufferManager;
 
 			if (!willRenderWater) {
 				// Ahead of the transparent overlays, as in GL, so smoke and tracers
@@ -2261,15 +2260,10 @@ namespace spades {
 
 			// Water works under MSAA: the screen-copy / mirror paths resolve the
 			// multisampled scene into single-sample images the water shader samples
-			// (see CopySceneForWaterSampling / CopyToMirrorImage / ResolveMirrorColor
+			// (see CopySceneForWaterSampling / ResolveMirrorColor
 			// and the GetWater*() accessors), and refraction depth reuses the scene's
 			// resolved depth.
 			bool waterEnabled = (int)r_water > 0 && waterRenderer;
-
-			// Copy scene to mirror images for water refraction when no real mirror pass
-			if (waterEnabled && framebufferManager->GetMirrorColorImage() && (int)r_water < 2) {
-				framebufferManager->CopyToMirrorImage(commandBuffer);
-			}
 
 			// Copy scene to screen copy images for water refraction sampling
 			// (water renders to the same framebuffer, so it can't sample from it directly)
@@ -2277,7 +2271,7 @@ namespace spades {
 				framebufferManager->CopySceneForWaterSampling(commandBuffer);
 			}
 
-			if (waterEnabled && framebufferManager->GetMirrorColorImage()) {
+			if (waterEnabled) {
 
 				// Transition renderColorImage and renderDepthImage back to COLOR_ATTACHMENT_OPTIMAL
 				// for water rendering
