@@ -80,12 +80,13 @@ namespace spades {
 			h = map->Height();
 			d = map->Depth();
 
-			chunkW = w / ChunkSize;
-			chunkH = h / ChunkSize;
-			chunkD = d / ChunkSize;
+			// No chunks at all for the placeholders: chunks.size() is always
+			// chunkW * chunkH * chunkD, so every walk over them is empty too
+			chunkW = active ? w / ChunkSize : 0;
+			chunkH = active ? h / ChunkSize : 0;
+			chunkD = active ? d / ChunkSize : 0;
 
-			if (active)
-				chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
+			chunks = std::vector<Chunk>(static_cast<std::size_t>(chunkW * chunkH * chunkD));
 			for (Chunk& c : chunks) {
 				std::fill(reinterpret_cast<VoxelType*>(c.dataFlat),
 				          reinterpret_cast<VoxelType*>(c.dataFlat) + ChunkSize * ChunkSize * ChunkSize,
