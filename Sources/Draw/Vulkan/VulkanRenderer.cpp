@@ -1879,7 +1879,7 @@ namespace spades {
 
 		// Update map shadow heightmap texture (incremental updates from block changes)
 		if (sceneUsedInThisFrame && mapShadowRenderer) {
-			mapShadowRenderer->Update(commandBuffer);
+			mapShadowRenderer->Update(commandBuffer, currentFrameSlot);
 		}
 
 		// Upload any per-block ambient occlusion chunks that the background
