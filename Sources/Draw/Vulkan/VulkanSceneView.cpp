@@ -23,6 +23,7 @@
 #include <cstring>
 
 #include "VulkanBuffer.h"
+#include "VulkanImage.h"
 #include "VulkanRenderer.h"
 #include <Core/Debug.h>
 #include <Core/Exception.h>
@@ -38,8 +39,9 @@ namespace spades {
 				float eyeFogDistance[4];
 				float fogColorMirrorClipZ[4];
 				float sunDirection[4];
+				float ambientOcclusion[4];
 			};
-			static_assert(sizeof(GpuView) == 176, "GpuView must match SceneView");
+			static_assert(sizeof(GpuView) == 192, "GpuView must match SceneView");
 
 			void Store(float (&out)[4], const Vector3& v, float w) {
 				out[0] = v.x;
@@ -53,24 +55,28 @@ namespace spades {
 		    : device(renderer.GetDevice()->GetDevice()) {
 			SPADES_MARK_FUNCTION();
 
-			const VkDescriptorSetLayoutBinding binding{
-			  0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1,
-			  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+			const VkDescriptorSetLayoutBinding bindings[2] = {
+			  {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1,
+			   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+			  // The view's ambient occlusion
+			  {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+			   nullptr}};
 			VkDescriptorSetLayoutCreateInfo layoutInfo{};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			layoutInfo.bindingCount = 1;
-			layoutInfo.pBindings = &binding;
+			layoutInfo.bindingCount = 2;
+			layoutInfo.pBindings = bindings;
 			if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &setLayout) != VK_SUCCESS)
 				SPRaise("Failed to create the scene view descriptor set layout");
 
-			const std::uint32_t slotCount = static_cast<std::uint32_t>(framesInFlight);
-			const VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-			                                    slotCount};
+			const std::uint32_t setCount = static_cast<std::uint32_t>(framesInFlight) * ViewCount;
+			const VkDescriptorPoolSize poolSizes[2] = {
+			  {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, setCount},
+			  {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, setCount}};
 			VkDescriptorPoolCreateInfo poolInfo{};
 			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			poolInfo.maxSets = slotCount;
-			poolInfo.poolSizeCount = 1;
-			poolInfo.pPoolSizes = &poolSize;
+			poolInfo.maxSets = setCount;
+			poolInfo.poolSizeCount = 2;
+			poolInfo.pPoolSizes = poolSizes;
 			if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pool) != VK_SUCCESS)
 				SPRaise("Failed to create the scene view descriptor pool");
 
@@ -88,24 +94,28 @@ namespace spades {
 				  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 				std::memset(slot.buffer->Map(), 0, stride * ViewCount);
 
+				const VkDescriptorSetLayout layouts[ViewCount] = {setLayout, setLayout};
 				VkDescriptorSetAllocateInfo allocInfo{};
 				allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 				allocInfo.descriptorPool = pool;
-				allocInfo.descriptorSetCount = 1;
-				allocInfo.pSetLayouts = &setLayout;
-				if (vkAllocateDescriptorSets(device, &allocInfo, &slot.set) != VK_SUCCESS)
-					SPRaise("Failed to allocate a scene view descriptor set");
+				allocInfo.descriptorSetCount = ViewCount;
+				allocInfo.pSetLayouts = layouts;
+				if (vkAllocateDescriptorSets(device, &allocInfo, slot.sets) != VK_SUCCESS)
+					SPRaise("Failed to allocate the scene view descriptor sets");
 
+				// Every view's set reads the slot's buffer, at its own dynamic offset
 				const VkDescriptorBufferInfo bufferInfo{slot.buffer->GetBuffer(), 0,
 				                                        sizeof(GpuView)};
-				VkWriteDescriptorSet write{};
-				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				write.dstSet = slot.set;
-				write.dstBinding = 0;
-				write.descriptorCount = 1;
-				write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-				write.pBufferInfo = &bufferInfo;
-				vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+				for (VkDescriptorSet set : slot.sets) {
+					VkWriteDescriptorSet write{};
+					write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					write.dstSet = set;
+					write.dstBinding = 0;
+					write.descriptorCount = 1;
+					write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+					write.pBufferInfo = &bufferInfo;
+					vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+				}
 			}
 		}
 
@@ -127,6 +137,7 @@ namespace spades {
 			Store(out.eyeFogDistance, parameters.eye, parameters.fogDistance);
 			Store(out.fogColorMirrorClipZ, parameters.fogColor, parameters.mirrorClipZ);
 			Store(out.sunDirection, parameters.sunDirection, 0.0F);
+			out.ambientOcclusion[0] = parameters.ambientOcclusion ? 1.0F : 0.0F;
 
 			auto* mapped = static_cast<std::uint8_t*>(slots[frameSlot].buffer->Map());
 			std::memcpy(mapped + stride * static_cast<std::uint32_t>(view), &out, sizeof(out));
@@ -139,7 +150,22 @@ namespace spades {
 			const std::uint32_t offset =
 			  static_cast<std::uint32_t>(stride * static_cast<std::uint32_t>(view));
 			vkCmdBindDescriptorSets(commandBuffer, bindPoint, layout, Set, 1,
-			                        &slots[frameSlot].set, 1, &offset);
+			                        &slots[frameSlot].sets[static_cast<std::uint32_t>(view)], 1,
+			                        &offset);
+		}
+
+		void VulkanSceneView::SetAmbientOcclusion(std::size_t frameSlot, View view,
+		                                          VulkanImage& image, VkImageLayout layout) {
+			SPAssert(frameSlot < slots.size());
+			const VkDescriptorImageInfo imageInfo{image.GetSampler(), image.GetImageView(), layout};
+			VkWriteDescriptorSet write{};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = slots[frameSlot].sets[static_cast<std::uint32_t>(view)];
+			write.dstBinding = 1;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write.pImageInfo = &imageInfo;
+			vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 		}
 	} // namespace draw
 } // namespace spades

@@ -62,9 +62,10 @@ float depthAt(vec2 pt) {
 }
 
 /** The sky's light reaching the volume, facing `nrm` (GL EvaluateAmbientLight(1)):
- * a volume has no ambient occlusion of its own. */
+ * a volume has no ambient occlusion of its own, nor screen-space one (GL's
+ * sprites have none). */
 vec3 SkyLight(vec3 nrm) {
-	return MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, 1.0);
+	return MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, 1.0, 1.0);
 }
 
 void main() {
