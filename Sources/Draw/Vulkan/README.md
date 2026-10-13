@@ -37,8 +37,9 @@ on every machine, including the developer's.
   `PushConstants(..., const T&)`, which check the size at compile time. Older
   code uses `sizeof` of the struct on both sides, with a `static_assert` beside
   the struct against `kPortablePushConstantsSize`.
-- A vec3 in a push block takes 16 bytes (std430), so C++ structs pad each vec3
-  with a float.
+- A vec3 in a push block is aligned to 16 bytes (std430) but holds 12, so the
+  C++ structs follow each vec3 with a float (a value or padding) to keep their
+  offsets the same as the shader's.
 
 **If a shader ever needs more.** Should a shader measurably gain from a larger
 block on the devices that allow one, compile two variants from the one source: the
