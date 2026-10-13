@@ -30,6 +30,7 @@ SPADES_SETTING(r_highPrec);
 SPADES_SETTING(r_hdr);
 SPADES_SETTING(r_srgb);
 SPADES_SETTING(r_water);
+SPADES_SETTING(r_ssao);
 
 namespace spades {
 	namespace draw {
@@ -250,7 +251,8 @@ namespace spades {
 			// The water's mirror, by the water's quality (`r_water`, fixed for the
 			// session). At r_water >= 2 the reflected scene is drawn into targets
 			// of the scene's sample count, as the scene pipelines draw it, and
-			// resolved for the water shader under MSAA, depth too at r_water >= 3.
+			// resolved for the water shader under MSAA, depth too at r_water >= 3 or
+			// for SSAO.
 			// Below that the water reflects no scene, so there is no mirror.
 			const int waterQuality = (int)r_water;
 			if (waterQuality >= 2) {
@@ -294,6 +296,19 @@ namespace spades {
 					SPRaise("Failed to create Vulkan mirror framebuffer");
 				}
 
+				// At 1x the mirror's ambient occlusion reads a copy of its depth,
+				// as the scene's does (`sceneDepthSampleImage`)
+				if (!useMSAA && (int)r_ssao != 0) {
+					mirrorDepthSampleImage = Handle<VulkanImage>::New(
+					    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
+					    VK_IMAGE_TILING_OPTIMAL,
+					    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+					    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+					mirrorDepthSampleImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
+					mirrorDepthSampleImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+					                                      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+				}
+
 				if (useMSAA) {
 					// Single-sample resolves the water shader samples
 					mirrorColorResolveImage = Handle<VulkanImage>::New(
@@ -305,7 +320,9 @@ namespace spades {
 					mirrorColorResolveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
 					                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
-					if (waterQuality >= 3) {
+					// Its depth for the depth-aware reflections (r_water 3) and the
+					// mirror's screen-space ambient occlusion
+					if (waterQuality >= 3 || (int)r_ssao != 0) {
 						mirrorDepthResolveImage = Handle<VulkanImage>::New(
 						    device, renderWidth, renderHeight, VK_FORMAT_R32_SFLOAT,
 						    VK_IMAGE_TILING_OPTIMAL,
@@ -891,17 +908,28 @@ namespace spades {
 
 		void VulkanFramebufferManager::CopySceneDepthForSampling(VkCommandBuffer commandBuffer) {
 			SPADES_MARK_FUNCTION();
+			if (!useMSAA)
+				CopyDepthForSampling(commandBuffer, *renderDepthImage, *sceneDepthSampleImage);
+		}
 
-			if (useMSAA)
-				return;
+		void VulkanFramebufferManager::CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer) {
+			SPADES_MARK_FUNCTION();
+			SPAssert(mirrorDepthSampleImage);
+			CopyDepthForSampling(commandBuffer, *mirrorDepthImage, *mirrorDepthSampleImage);
+		}
 
+		void VulkanFramebufferManager::CopyDepthForSampling(VkCommandBuffer commandBuffer,
+		                                                    VulkanImage& depth,
+		                                                    VulkanImage& sample) {
+			// The target was last read by a fragment shader or compute (the ambient
+			// occlusion), and is read by either after
 			VkImageMemoryBarrier pre[2]{};
 			pre[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			pre[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			pre[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 			pre[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			pre[0].image = renderDepthImage->GetImage();
+			pre[0].image = depth.GetImage();
 			pre[0].subresourceRange = {DepthStencilBarrierAspects(fbDepthFormat), 0, 1, 0, 1};
 			pre[0].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			pre[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
@@ -911,14 +939,15 @@ namespace spades {
 			pre[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 			pre[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			pre[1].image = sceneDepthSampleImage->GetImage();
-			// R32F color target (not D32 depth) — see creation comment above.
+			pre[1].image = sample.GetImage();
+			// R32F color target (not D32 depth) — see the sample images' creation.
 			pre[1].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 			pre[1].srcAccessMask = 0;
 			pre[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
 			vkCmdPipelineBarrier(commandBuffer,
-				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+				  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				0, 0, nullptr, 0, nullptr, 2, pre);
 
@@ -929,8 +958,8 @@ namespace spades {
 			depthCopy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
 			depthCopy.extent = {(uint32_t)renderWidth, (uint32_t)renderHeight, 1};
 			vkCmdCopyImage(commandBuffer,
-			               renderDepthImage->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			               sceneDepthSampleImage->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			               depth.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			               sample.GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			               1, &depthCopy);
 
 			VkImageMemoryBarrier post[2]{};
@@ -949,7 +978,8 @@ namespace spades {
 
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+				  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 				0, 0, nullptr, 0, nullptr, 2, post);
 		}
 

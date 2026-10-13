@@ -46,6 +46,7 @@ namespace spades {
 		class VulkanSpriteRenderer;
 		class VulkanLongSpriteRenderer;
 		class VulkanGlareRenderer;
+		class VulkanScreenSpaceAmbientOcclusion;
 		class VulkanMapOccupancy;
 		class VulkanImageRenderer;
 		class VulkanWaterRenderer;
@@ -192,6 +193,8 @@ namespace spades {
 		// R32F resolved-depth image that soft sprites, water and the depth-reading
 		// post filters sample. Null when MSAA is off.
 		std::unique_ptr<VulkanDepthResolveFilter> depthResolveFilter;
+			/** Screen-space ambient occlusion (`r_ssao`), with the render targets */
+			std::unique_ptr<VulkanScreenSpaceAmbientOcclusion> ambientOcclusion;
 
 			Handle<VulkanImage> whiteImage; // 1x1 white image for solid color rendering
 
@@ -250,9 +253,20 @@ namespace spades {
 			 * up GL's does */
 			void SetSceneViewport(VkCommandBuffer commandBuffer) const;
 
-			/** Whether the scene's views start with a depth pre-pass of the map, as
-			 * GL's at `r_depthPrepass` */
+			/** Whether the scene's views start with a depth pre-pass, as GL's: of the
+			 * map at `r_depthPrepass`, of the models too for SSAO, which reads the
+			 * depth of everything opaque before anything is lit */
 			bool UsesDepthPrepass() const;
+			bool UsesFullDepthPrepass() const;
+
+			/** Makes the screen-space ambient occlusion for the render targets, if
+			 * `r_ssao` asks for it, and points the scene views at it: with the
+			 * device idle */
+			void ConfigureAmbientOcclusion();
+
+			/** Records `view`'s ambient occlusion from its depth pre-pass, between the
+			 * pre-pass and the lit pass, leaving the depth an attachment again */
+			void RenderAmbientOcclusion(VkCommandBuffer commandBuffer, VulkanSceneView::View view);
 
 			/**
 			 * Records the depth pre-pass of the view being drawn into `framebuffer`:

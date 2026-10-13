@@ -75,18 +75,20 @@ vec3 MapRadiosity(vec3 radiosityCoord, vec3 normal) {
 
 /**
  * The diffuse light the map and the sky shed on a surface facing `normal`,
- * with `detailAO` its own (per-vertex) ambient occlusion: GL's
- * EvaluateRadiosity, from MapRadiosity.fs or, without radiosity,
- * MapRadiosityNull.fs.
+ * with `detailAO` its own (per-vertex) ambient occlusion and `ssao` the
+ * screen-space one, 1 without: GL's EvaluateRadiosity, from MapRadiosity.fs or,
+ * without radiosity, MapRadiosityNull.fs.
  */
-vec3 MapAmbientLight(vec3 radiosityCoord, vec3 aoCoord, vec3 normal, float detailAO) {
+vec3 MapAmbientLight(vec3 radiosityCoord, vec3 aoCoord, vec3 normal, float detailAO,
+                     float ssao) {
+	detailAO *= ssao;
 	if (USE_RADIOSITY != 0) {
 		// Mix the two ambient occlusions, the map's coarse one and the
 		// surface's detail, as GL does
 		float amb = MapAmbientShadow(aoCoord);
 		amb = mix(sqrt(amb * detailAO), min(amb, detailAO), 0.5);
 		amb *= (0.8 - normal.z * 0.2) * sceneSunSky.daylight;
-		return MapRadiosity(radiosityCoord, normal) + amb * sceneSunSky.ambientLight;
+		return MapRadiosity(radiosityCoord, normal) * ssao + amb * sceneSunSky.ambientLight;
 	}
 	float hemisphere = 1.0 - normal.z * 0.2;
 	return mix(sceneSunSky.skyLight, vec3(1.0), 0.5) *
@@ -95,17 +97,19 @@ vec3 MapAmbientLight(vec3 radiosityCoord, vec3 aoCoord, vec3 normal, float detai
 
 /**
  * The light the map and the sky reflect off a glossy surface facing `normal`
- * towards the eye, reflected along `direction`: GL's EvaluateSoftReflections,
- * from MapRadiosity.fs or, without radiosity, MapRadiosityNull.fs.
+ * towards the eye, reflected along `direction`, through `detailAO` and `ssao`
+ * as `MapAmbientLight`: GL's EvaluateSoftReflections, from MapRadiosity.fs or,
+ * without radiosity, MapRadiosityNull.fs.
  */
 vec3 MapSoftReflections(vec3 radiosityCoord, vec3 aoCoord, vec3 normal, vec3 direction,
-                        float detailAO) {
+                        float detailAO, float ssao) {
+	detailAO *= ssao;
 	if (USE_RADIOSITY != 0) {
 		float amb = max(texture(ambientShadowTexture, aoCoord).x, 0.0);
 		amb *= amb; // darken
 		amb = mix(sqrt(amb * detailAO), min(amb, detailAO), 0.5);
 		amb *= (0.8 - normal.z * 0.2) * sceneSunSky.daylight;
-		return MapRadiosity(radiosityCoord, normal) + sceneSunSky.skyLight * amb;
+		return MapRadiosity(radiosityCoord, normal) * ssao + sceneSunSky.skyLight * amb;
 	}
 	return sceneSunSky.skyLight * ((direction.z * -0.5 + 0.5) * detailAO * sceneSunSky.daylight);
 }

@@ -36,6 +36,13 @@ layout(set = 3, binding = 0, std140) uniform SceneView {
 	vec4 fogColorMirrorClipZ;
 	// xyz: towards the sun
 	vec4 sunDirection;
+	// x: 1 where the view's screen-space ambient occlusion (r_ssao) is to be read,
+	// 0 where there is none
+	vec4 ambientOcclusion;
 } sceneView;
+
+// The view's screen-space ambient occlusion, at the render size: one texel per
+// pixel of the pass (`SceneAmbientOcclusion.glsl`)
+layout(set = 3, binding = 1) uniform sampler2D sceneAmbientOcclusionTexture;
 
 #endif

@@ -35,6 +35,11 @@ namespace spades {
 		class VulkanImage;
 
 		class VulkanFramebufferManager {
+			/** Copies `depth`, an attachment, into `sample`, an R32F image sampled by
+			 * fragment shaders and compute; `depth` stays an attachment */
+			void CopyDepthForSampling(VkCommandBuffer commandBuffer, VulkanImage& depth,
+			                          VulkanImage& sample);
+
 		public:
 			class BufferHandle {
 				VulkanFramebufferManager *manager;
@@ -98,6 +103,8 @@ namespace spades {
 
 			// Sampled copy of the scene depth (the 1x attachment has no SAMPLED usage)
 			Handle<VulkanImage> sceneDepthSampleImage;
+			// The mirror's, at 1x with SSAO
+			Handle<VulkanImage> mirrorDepthSampleImage;
 
 			// Single-sample resolve targets for the scene attachments. Only created
 			// when useMSAA; the post-process chain and any code that *reads* the
@@ -167,6 +174,13 @@ namespace spades {
 
 			// Depth in/out: ATTACHMENT_OPTIMAL; copy ends SHADER_READ_ONLY. No-op under MSAA.
 			void CopySceneDepthForSampling(VkCommandBuffer commandBuffer);
+			/** The mirror's depth into its single-sample copy, at 1x with SSAO */
+			void CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer);
+			/** The mirror's depth sampled as the scene's (`GetResolvedDepthImage`): its
+			 * resolve under MSAA, its copy at 1x; R32F, read in SHADER_READ_ONLY */
+			Handle<VulkanImage> GetMirrorResolvedDepthImage() {
+				return useMSAA ? mirrorDepthResolveImage : mirrorDepthSampleImage;
+			}
 			VkSampleCountFlagBits GetSampleCount() const { return sampleCount; }
 
 			// Resolves the multisampled scene colour into renderColorResolveImage

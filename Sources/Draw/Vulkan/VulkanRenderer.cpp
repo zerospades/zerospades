@@ -38,6 +38,7 @@
 #include "VulkanSceneLights.h"
 #include "VulkanMapOccupancy.h"
 #include "VulkanSceneView.h"
+#include "VulkanScreenSpaceAmbientOcclusion.h"
 #include "VulkanSceneStencil.h"
 #include "VulkanImageWrapper.h"
 #include "VulkanImageManager.h"
@@ -81,6 +82,7 @@ SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
 SPADES_SETTING(r_cameraBlur);
 SPADES_SETTING(r_depthPrepass);
+SPADES_SETTING(r_ssao);
 SPADES_SETTING(r_scale);
 SPADES_SETTING(r_scaleFilter);
 SPADES_SETTING(r_water);
@@ -231,6 +233,7 @@ namespace spades {
 			lensFlareFilter = stmp::make_unique<VulkanLensFlareFilter>(*this);
 			if (framebufferManager->IsMSAA())
 				depthResolveFilter = stmp::make_unique<VulkanDepthResolveFilter>(*this);
+			ConfigureAmbientOcclusion();
 
 			inited = true;
 			lastSwapchainGeneration = device->GetSwapchainGeneration();
@@ -283,6 +286,7 @@ namespace spades {
 			fogFilter.reset();
 			bloomFilter.reset();
 			autoExposureFilter.reset();
+			ambientOcclusion.reset();
 			framebufferManager.reset();
 			programManager = nullptr;
 
@@ -606,12 +610,14 @@ namespace spades {
 		renderWidth = static_cast<int>(renderExtent.width);
 		renderHeight = static_cast<int>(renderExtent.height);
 
-		// The water renderer holds descriptors into the framebuffer manager's
-		// images, so it goes first and is made again after.
+		// The water renderer and the ambient occlusion hold descriptors into the
+		// framebuffer manager's images, so they go first and are made again after.
 		waterRenderer.reset();
+		ambientOcclusion.reset();
 		framebufferManager =
 		  stmp::make_unique<VulkanFramebufferManager>(device, renderWidth, renderHeight);
 		waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
+		ConfigureAmbientOcclusion();
 
 		// The post-processing images pooled at the previous size would never be
 		// handed out again; none is in use between frames.
@@ -954,6 +960,10 @@ namespace spades {
 			// The water's reflection keeps what lies above the water plane at 63.
 			parameters.mirrorClipZ = renderingMirror ? 63.0F : 1.0e9F;
 			parameters.sunDirection = GetSunDirection();
+			parameters.ambientOcclusion =
+			  ambientOcclusion &&
+			  ambientOcclusion->HasView(renderingMirror ? VulkanSceneView::View::Mirror
+			                                            : VulkanSceneView::View::Main);
 			return parameters;
 		}
 
@@ -1031,7 +1041,96 @@ namespace spades {
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 		}
 
-		bool VulkanRenderer::UsesDepthPrepass() const { return (int)r_depthPrepass != 0; }
+		bool VulkanRenderer::UsesDepthPrepass() const {
+			return (int)r_depthPrepass != 0 || UsesFullDepthPrepass();
+		}
+
+		bool VulkanRenderer::UsesFullDepthPrepass() const { return ambientOcclusion != nullptr; }
+
+		void VulkanRenderer::ConfigureAmbientOcclusion() {
+			SPADES_MARK_FUNCTION();
+
+			ambientOcclusion.reset();
+			if ((int)r_ssao != 0)
+				ambientOcclusion = stmp::make_unique<VulkanScreenSpaceAmbientOcclusion>(
+				  *this, device->GetMaxFramesInFlight());
+
+			// Every view of every frame slot reads its occlusion, or a placeholder it
+			// never reads (`SceneView::ambientOcclusion` says so)
+			for (std::size_t slot = 0; slot < device->GetMaxFramesInFlight(); slot++) {
+				for (VulkanSceneView::View view :
+				     {VulkanSceneView::View::Main, VulkanSceneView::View::Mirror}) {
+					VulkanImage& image = ambientOcclusion && ambientOcclusion->HasView(view)
+					                       ? ambientOcclusion->GetOutput(slot, view)
+					                       : *whiteImage;
+					sceneView->SetAmbientOcclusion(slot, view, image,
+					                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+				}
+			}
+		}
+
+		void VulkanRenderer::RenderAmbientOcclusion(VkCommandBuffer commandBuffer,
+		                                            VulkanSceneView::View view) {
+			SPADES_MARK_FUNCTION();
+
+			if (!ambientOcclusion || !ambientOcclusion->HasView(view))
+				return;
+
+			const bool mirror = view == VulkanSceneView::View::Mirror;
+			if (framebufferManager->IsMSAA()) {
+				// The multisampled depth, resolved by a fragment pass: never sampled
+				// at 1x, where a copy is (MoltenVK on Intel Macs loses a depth
+				// attachment that is also sampled)
+				VulkanImage& depth = mirror ? *framebufferManager->GetMirrorDepthImage()
+				                            : *framebufferManager->GetDepthImage();
+				VkImageMemoryBarrier depthBarrier{};
+				depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				depthBarrier.image = depth.GetImage();
+				depthBarrier.subresourceRange = {DepthStencilBarrierAspects(depth.GetFormat()), 0,
+				                                 1, 0, 1};
+				depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				depthBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				depthBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
+				                     nullptr, 1, &depthBarrier);
+
+				SPAssert(depthResolveFilter);
+				VulkanImage& resolved = mirror ? *framebufferManager->GetMirrorResolvedDepthImage()
+				                               : *framebufferManager->GetResolvedDepthImage();
+				depthResolveFilter->Resolve(commandBuffer, &depth, &resolved);
+				VkMemoryBarrier resolvedToCompute{};
+				resolvedToCompute.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+				resolvedToCompute.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+				resolvedToCompute.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				                     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1,
+				                     &resolvedToCompute, 0, nullptr, 0, nullptr);
+
+				ambientOcclusion->Render(commandBuffer, currentFrameSlot, view, sceneDef);
+
+				// Back to an attachment, for the lit pass to meet
+				depthBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				depthBarrier.srcAccessMask = 0;
+				depthBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+				                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+				vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				                     VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+				                       VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+				                     0, 0, nullptr, 0, nullptr, 1, &depthBarrier);
+			} else {
+				// A copy of the depth, which stays an attachment
+				if (mirror)
+					framebufferManager->CopyMirrorDepthForSampling(commandBuffer);
+				else
+					framebufferManager->CopySceneDepthForSampling(commandBuffer);
+				ambientOcclusion->Render(commandBuffer, currentFrameSlot, view, sceneDef);
+			}
+		}
 
 		void VulkanRenderer::RecordDepthPrepass(VkCommandBuffer commandBuffer,
 		                                        VkFramebuffer framebuffer,
@@ -2037,11 +2136,13 @@ namespace spades {
 			mirrorClearValues[0].color = {{bgColor.x, bgColor.y, bgColor.z, 1.0f}};
 			mirrorClearValues[1].depthStencil = {1.0f, 0};
 
-			// The depth pre-pass, as GL draws one for the mirror too
+			// The depth pre-pass and its ambient occlusion, as GL's for the mirror too
 			const bool mirrorDepthPrepass = UsesDepthPrepass();
-			if (mirrorDepthPrepass)
+			if (mirrorDepthPrepass) {
 				RecordDepthPrepass(commandBuffer, framebufferManager->GetMirrorFramebuffer(),
-				                   mirrorClearValues, false);
+				                   mirrorClearValues, UsesFullDepthPrepass());
+				RenderAmbientOcclusion(commandBuffer, VulkanSceneView::View::Mirror);
+			}
 
 			// Begin mirror render pass: clearing, or continuing the pre-pass
 			VkRenderPassBeginInfo mirrorRenderPassInfo{};
@@ -2142,11 +2243,14 @@ namespace spades {
 			clearValues[0].color = {{bgColor.x, bgColor.y, bgColor.z, 1.0f}};
 			clearValues[1].depthStencil = {1.0f, 0};
 
-			// The depth pre-pass, as GL's (r_depthPrepass)
+			// The depth pre-pass and its ambient occlusion, as GL's (r_depthPrepass,
+			// r_ssao)
 			const bool depthPrepass = UsesDepthPrepass();
-			if (depthPrepass)
+			if (depthPrepass) {
 				RecordDepthPrepass(commandBuffer, framebufferManager->GetRenderFramebuffer(),
-				                   clearValues, false);
+				                   clearValues, UsesFullDepthPrepass());
+				RenderAmbientOcclusion(commandBuffer, VulkanSceneView::View::Main);
+			}
 
 			// Begin offscreen render pass (to framebuffer manager's render target):
 			// clearing, or continuing the pre-pass
