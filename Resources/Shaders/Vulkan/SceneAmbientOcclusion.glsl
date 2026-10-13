@@ -29,7 +29,7 @@
 /** How much of the ambient light reaches this fragment past what is around it,
  * from 0 to 1: 1 where the view has no ambient occlusion */
 float SceneAmbientOcclusion() {
-	if (sceneView.ambientOcclusion.x == 0.0)
+	if (sceneView.options.x == 0.0)
 		return 1.0;
 	return texelFetch(sceneAmbientOcclusionTexture, ivec2(gl_FragCoord.xy), 0).x;
 }
