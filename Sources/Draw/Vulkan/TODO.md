@@ -8,7 +8,13 @@ GL renderer in `Sources/Draw/OpenGL/` is the reference for everything below.
 MSAA is done (`r_multisamples`, incl. water + soft particles + setup-menu
 capability). Remaining:
 
-- [ ] **Temporal AA** — `GLTemporalAAFilter` not ported.
+- [ ] **Temporal AA** (`r_temporalAA`) — `GLTemporalAAFilter` not ported. Plan: Halton
+      sub-pixel jitter in the main view's projection (`VulkanSceneView`, not the
+      mirror nor the shadow cascades); a compute resolve reprojecting through the
+      depth and last frame's unjittered view-projection, neighbourhood-clamped in
+      YCoCg, into two history images used in turn (one queue: barriers, no copies);
+      first-person pixels (depth < `kFirstPersonDepthEnd`) treated as fixed to the
+      screen; history reset on cuts, resizes and `r_scale` changes.
 
 ## Post-processing filters
 
@@ -30,7 +36,7 @@ Fog → DoF → CameraBlur → Bloom → FXAA → LensFlare → AutoExposure →
 | `GLLensFlareFilter` | `VulkanLensFlareFilter` | wired sun path (`r_lensFlare`) + per-light flares (`r_lensFlareDynamic`, capped at 9 flares/frame — sun + up to 8 dynamic lights — to bound the per-frame descriptor pool) |
 | `GLNonlinearizeFilter` | — | not needed — sRGB swapchain blit encodes for display |
 | `GLResampleBicubicFilter` | `VulkanResampleBicubicFilter` | wired (`r_scaleFilter == 2`); `r_scaleFilter == 0` now also honored via nearest blit |
-| `GLSSAOFilter` | — | **missing** (`r_ssao`) — big: needs full map+model depth prepass, mid-frame depth resolve/pass split, and an SSAO sampler binding (= new set layout) in every lit map/model pipeline + shader |
+| `GLSSAOFilter` | `VulkanScreenSpaceAmbientOcclusion` | wired (`r_ssao`): compute from the full depth pre-pass, both views; the lit map/model shaders read it through the scene view's set |
 | `GLTemporalAAFilter` | — | **missing** (see AA gap above) |
 | (n/a — cavity is Vulkan-only) | `VulkanCavityOutlineFilter` | wired (`r_outlines`) |
 
@@ -161,3 +167,25 @@ once defaults are confirmed across maps.
 - [x] **Committed `.spv` files drift from the GLSL** — untracked
       (`git rm --cached`) and gitignored; `glslangValidator` is a hard build
       requirement so CMake always regenerates them in-tree.
+
+## Parity with GL — remaining
+
+- [ ] **Glare behind models in GL and SW** — Vulkan hides the flashlight glare
+      behind models (the scene's depth); GL and SW still apply the map-only rule of
+      93eaed00. Bring them in line: GL's Glare.vs tests the scene depth (first-person
+      range excluded), SW tests its depth buffer; keep "drawn under the first-person
+      view".
+- [ ] **Lit particles at night in GL** — GL still blacks out unlit particles at
+      night; Vulkan lights them per corner (`SpriteLight.glsl`). Port that model to
+      GL's sprite shaders: sun at the daylight, sky, minimum ambient, dynamic lights.
+- [ ] **Water mirror skipped when the water is out of sight** (GL `r_occlusionQuery`)
+      — one occlusion query per frame in flight, reset outside the pass, read once
+      that slot's fence has signalled (or `VK_EXT_conditional_rendering`).
+- [ ] **Physical lighting's model shadows** — `BasicModelVertexColorPhys` has no
+      model-shadow cascades (the basic shader does).
+
+## Notes
+
+- The lit map and model fragment shaders bind 16 sampled images with SSAO: exactly
+  the per-stage minimum Vulkan guarantees. Anything more they sample must free one
+  first (e.g. the four radiosity volumes packed into fewer images).
