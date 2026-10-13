@@ -175,6 +175,36 @@ namespace spades {
 			}
 			SPLog("------------------");
 
+			// The limits a program only finds it is past when it fails to link on
+			// some GPU, which `Tools/gl_shader_audit.py --log` checks the shaders
+			// against.
+			{
+				const struct {
+					GLenum name;
+					const char* label;
+				} limits[] = {
+				  {GL_MAX_TEXTURE_IMAGE_UNITS, "GL_MAX_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_VERTEX_UNIFORM_COMPONENTS, "GL_MAX_VERTEX_UNIFORM_COMPONENTS"},
+				  {GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, "GL_MAX_FRAGMENT_UNIFORM_COMPONENTS"},
+				  {GL_MAX_VARYING_FLOATS, "GL_MAX_VARYING_FLOATS"},
+				  {GL_MAX_VERTEX_ATTRIBS, "GL_MAX_VERTEX_ATTRIBS"},
+				  {GL_MAX_DRAW_BUFFERS, "GL_MAX_DRAW_BUFFERS"},
+				  {GL_MAX_TEXTURE_SIZE, "GL_MAX_TEXTURE_SIZE"},
+				  {GL_MAX_3D_TEXTURE_SIZE, "GL_MAX_3D_TEXTURE_SIZE"},
+				};
+				for (const auto& limit : limits) {
+					GLint value = 0;
+					glGetIntegerv(limit.name, &value);
+					SPLog("GL limit %s: %d", limit.label, (int)value);
+				}
+				// A limit the context doesn't know leaves an error behind.
+				while (glGetError() != GL_NO_ERROR) {
+				}
+			}
+			SPLog("------------------");
+
 			CheckExistence(glFrontFace);
 			glFrontFace(GL_CW);
 
