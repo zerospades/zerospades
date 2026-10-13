@@ -883,7 +883,10 @@ namespace spades {
 			}
 
 			// Initialize shadow map renderer first: the map/model sunlight pipeline
-			// layouts reference its sampling descriptor-set layout (set 1).
+			// layouts reference its sampling descriptor-set layout (set 1). The models'
+			// shared pipelines were made with the previous map's (or none): remade on
+			// their next draw with this one's.
+			VulkanOptimizedVoxelModel::InvalidateSharedPipeline(device.GetPointerOrNull());
 			if (map) {
 				shadowMapRenderer = stmp::make_unique<VulkanShadowMapRenderer>(*this);
 			}

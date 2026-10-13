@@ -86,8 +86,6 @@ namespace spades {
 			if (descriptorSetLayout != VK_NULL_HANDLE)
 				vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 			descriptorSetLayout = VK_NULL_HANDLE;
-			renderPass = VK_NULL_HANDLE;
-			shadowMapRenderPass = VK_NULL_HANDLE;
 		}
 
 		void VulkanOptimizedVoxelModel::InvalidateSharedPipeline(gui::SDLVulkanDevice* device) {
@@ -389,13 +387,10 @@ namespace spades {
 				return;
 
 			// Models can't share the map-chunk shadow pipeline (chunk vertex stride +
-			// translation-only push constant). Build/refresh a dedicated one carrying
-			// the full per-instance MVP. Lazy + rebuilt only if the shadow render pass
-			// changed (e.g. shadow map recreated).
-			if (sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE ||
-			    sharedPipeline.shadowMapRenderPass != shadowRenderPass) {
+			// translation-only push constant). Build a dedicated one carrying the full
+			// per-instance MVP, on first use: every shadow pass is compatible with it.
+			if (sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE)
 				CreateShadowPipeline(shadowRenderPass);
-			}
 			if (sharedPipeline.shadowMapPipeline == VK_NULL_HANDLE)
 				return;
 
@@ -604,7 +599,6 @@ namespace spades {
 				SPRaise("Failed to create model shadow graphics pipeline");
 			}
 
-			sharedPipeline.shadowMapRenderPass = shadowRenderPass;
 		}
 
 		void VulkanOptimizedVoxelModel::RenderSunlightPass(VkCommandBuffer commandBuffer,
@@ -629,11 +623,12 @@ namespace spades {
 			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
 				return;
 
-			// Lazy pipeline creation on first render (shared across all instances)
-			VkRenderPass renderPass = renderer.GetOffscreenRenderPass();
-			if (sharedPipeline.pipeline == VK_NULL_HANDLE || sharedPipeline.renderPass != renderPass) {
-				CreatePipeline(renderPass);
-			}
+			// Made on first use, shared by every model, valid for every scene pass:
+			// those are all compatible, their formats and samples latched for the
+			// renderer's life. Remade only with what their layout depends on
+			// (`InvalidateSharedPipeline`).
+			if (sharedPipeline.pipeline == VK_NULL_HANDLE)
+				CreatePipeline(renderer.GetOffscreenRenderPass());
 
 			const VkPipeline activePipeline = sharedPipeline.*pipelineMember;
 			const VkPipeline activeMirroredPipeline = sharedPipeline.*mirroredPipelineMember;
@@ -862,34 +857,7 @@ namespace spades {
 		void VulkanOptimizedVoxelModel::CreatePipeline(VkRenderPass renderPass) {
 			SPADES_MARK_FUNCTION();
 
-			// Clean up old pipeline if render pass changed
 			VkDevice vkDevice = device->GetDevice();
-			if (sharedPipeline.pipeline != VK_NULL_HANDLE && sharedPipeline.renderPass != renderPass) {
-				// Wait for GPU to finish using the old pipeline before destroying it
-				vkDeviceWaitIdle(vkDevice);
-				vkDestroyPipeline(vkDevice, sharedPipeline.pipeline, nullptr);
-				sharedPipeline.pipeline = VK_NULL_HANDLE;
-				if (sharedPipeline.pipelineLayout != VK_NULL_HANDLE) {
-					vkDestroyPipelineLayout(vkDevice, sharedPipeline.pipelineLayout, nullptr);
-					sharedPipeline.pipelineLayout = VK_NULL_HANDLE;
-				}
-				// The x-ray objects are rebuilt unconditionally below, so they have to
-				// go here or the handles are overwritten and lost.
-				if (sharedPipeline.xrayPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.xrayPipeline, nullptr);
-					sharedPipeline.xrayPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.mirroredXRayPipeline != VK_NULL_HANDLE) {
-					vkDestroyPipeline(vkDevice, sharedPipeline.mirroredXRayPipeline, nullptr);
-					sharedPipeline.mirroredXRayPipeline = VK_NULL_HANDLE;
-				}
-				if (sharedPipeline.xrayPipelineLayout != VK_NULL_HANDLE) {
-					vkDestroyPipelineLayout(vkDevice, sharedPipeline.xrayPipelineLayout, nullptr);
-					sharedPipeline.xrayPipelineLayout = VK_NULL_HANDLE;
-				}
-			}
-
-			sharedPipeline.renderPass = renderPass;
 
 			{
 				sharedPipeline.physicalLighting = (int)renderer.GetSettings().r_physicalLighting != 0;
