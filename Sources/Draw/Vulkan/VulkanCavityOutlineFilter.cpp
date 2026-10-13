@@ -34,8 +34,8 @@
 #include <algorithm>
 #include <cstring>
 
-DEFINE_SPADES_SETTING(r_outlinesStrength, "1");
-DEFINE_SPADES_SETTING(r_outlinesDepthThreshold, "0.05");
+SPADES_SETTING(r_outlinesStrength);
+SPADES_SETTING(r_outlinesDepthThreshold);
 
 namespace spades {
 	namespace draw {
