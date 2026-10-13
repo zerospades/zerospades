@@ -50,22 +50,29 @@ namespace spades {
 			VkPipelineLayout resolveLayout;
 			VkPipeline resolvePipeline;
 
-			static constexpr int MAX_FRAME_SLOTS = 2;
-			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
-			std::vector<VkFramebuffer> perFrameFramebuffers[MAX_FRAME_SLOTS];
-			// Monotonic frame number a slot was last reset on, so we reset a slot's
-			// pool/framebuffers only on its first Resolve() each frame and can safely
-			// resolve more than once per frame (e.g. mirror depth + scene depth).
-			std::uint32_t slotResetFrame[MAX_FRAME_SLOTS];
+			// A depth resolved into an output: the scene's, the mirror's. Its
+			// framebuffer and descriptor set are made on its first resolve and kept
+			// until the targets go (`ReleaseTargets`); they never change, so frames in
+			// flight share them.
+			struct Target {
+				VulkanImage* output;
+				VkImageView depthView;
+				VkFramebuffer framebuffer;
+				VkDescriptorSet set;
+				// The frame it was last resolved in, while the depth stays as it was
+				std::uint32_t resolvedFrame;
+			};
+			static constexpr std::uint32_t kMaxTargets = 4;
+			std::vector<Target> targets;
+			VkDescriptorPool descPool;
 
 			void InitRenderPass();
 			void InitDescriptorSetLayout();
 			void InitPipeline();
-			void InitDescriptorPools();
+			void InitDescriptorPool();
 
 			VkShaderModule LoadSPIRV(const char* path);
-			VkFramebuffer MakeFramebuffer(VulkanImage* image, int frameSlot);
-			VkDescriptorSet BindDepth(int frameSlot, VkImageView view);
+			Target& GetTarget(VulkanImage* msaaDepth, VulkanImage* output);
 
 			void CreatePipeline() override {}
 			void CreateRenderPass() override {}
@@ -80,7 +87,15 @@ namespace spades {
 			VulkanDepthResolveFilter(VulkanRenderer& renderer);
 			~VulkanDepthResolveFilter();
 
+			/** Resolves `msaaDepth` into `output`, unless it already did this frame
+			 * and the depth has not changed since (`Invalidate`) */
 			void Resolve(VkCommandBuffer cmd, VulkanImage* msaaDepth, VulkanImage* output);
+			/** The depths may have changed since their last resolve: each is
+			 * resolved again */
+			void Invalidate();
+			/** Lets go of the framebuffers and sets made for the targets, before
+			 * those are replaced. Nothing may be in flight. */
+			void ReleaseTargets();
 		};
 
 	} // namespace draw

@@ -61,6 +61,14 @@ namespace spades {
 			}
 		}
 
+		bool VulkanModelRenderer::HasGhosts() const {
+			for (const auto& m : models)
+				for (const auto& param : m.params)
+					if (param.ghost)
+						return true;
+			return false;
+		}
+
 		void VulkanModelRenderer::Prerender(VkCommandBuffer commandBuffer, bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
