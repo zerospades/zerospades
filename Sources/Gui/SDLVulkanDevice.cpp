@@ -34,6 +34,7 @@
 #include <SDL2/SDL_vulkan.h>
 
 SPADES_SETTING(r_multisamples);
+SPADES_SETTING(r_vsync);
 
 #if defined(__APPLE__) && defined(__x86_64__)
 // MoltenVK global-configuration API, used to disable MTLHeap on Intel Macs.
@@ -67,6 +68,33 @@ namespace spades {
 		static const std::vector<const char*> validationLayers = {
 			"VK_LAYER_KHRONOS_validation"
 		};
+
+		// `r_vsync` as GL's swap interval reads it (SDLRunner): 1 waits for the
+		// vertical blank, -1 waits unless the frame is late, 0 never waits
+		static int GetVsyncSetting() {
+			const int vsync = r_vsync;
+			return vsync > 0 ? 1 : (vsync < 0 ? -1 : 0);
+		}
+
+		// The present mode for `vsync` among those the surface offers. FIFO is the
+		// only one every surface has, so it is what any choice falls back to.
+		static VkPresentModeKHR ChoosePresentMode(const std::vector<VkPresentModeKHR>& modes,
+		                                          int vsync) {
+			auto offered = [&](VkPresentModeKHR mode) {
+				return std::find(modes.begin(), modes.end(), mode) != modes.end();
+			};
+			if (vsync < 0 && offered(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
+				return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+			if (vsync == 0) {
+				// Without vsync GL tears rather than waits; mailbox at least does not
+				// wait where the surface cannot tear
+				if (offered(VK_PRESENT_MODE_IMMEDIATE_KHR))
+					return VK_PRESENT_MODE_IMMEDIATE_KHR;
+				if (offered(VK_PRESENT_MODE_MAILBOX_KHR))
+					return VK_PRESENT_MODE_MAILBOX_KHR;
+			}
+			return VK_PRESENT_MODE_FIFO_KHR;
+		}
 
 		// Debug callback for validation layers
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -678,14 +706,9 @@ namespace spades {
 				}
 			}
 
-			// Choose present mode (prefer MAILBOX for lower latency, fall back to FIFO)
-			VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-			for (const auto& availablePresentMode : presentModes) {
-				if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-					presentMode = availablePresentMode;
-					break;
-				}
-			}
+			// Waiting for the vertical blank or not, as `r_vsync` asks
+			presentVsync = GetVsyncSetting();
+			const VkPresentModeKHR presentMode = ChoosePresentMode(presentModes, presentVsync);
 
 			swapchainExtent = extent;
 
@@ -749,8 +772,9 @@ namespace spades {
 
 			swapchainImageFormat = surfaceFormat.format;
 
-			SPLog("Vulkan swapchain created (%ux%u, %u images)",
-				swapchainExtent.width, swapchainExtent.height, imageCount);
+			SPLog("Vulkan swapchain created (%ux%u, %u images, present mode %d)",
+				swapchainExtent.width, swapchainExtent.height, imageCount,
+				static_cast<int>(presentMode));
 		}
 
 		void SDLVulkanDevice::CreateImageViews() {
@@ -918,6 +942,10 @@ namespace spades {
 			SDL_Vulkan_GetDrawableSize(window, &width, &height);
 			if (width <= 0 || height <= 0)
 				return false;
+
+			// `r_vsync` is followed between frames, as the window's size is
+			if (GetVsyncSetting() != presentVsync)
+				swapchainStale = true;
 
 			if (!swapchainStale && static_cast<uint32_t>(width) == swapchainExtent.width &&
 			    static_cast<uint32_t>(height) == swapchainExtent.height)
