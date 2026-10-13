@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Client/IImage.h>
@@ -73,10 +74,12 @@ namespace spades {
 			// LensDust composite inputs
 			Handle<client::IImage> dustImage;      // Textures/LensDustTexture.jpg
 			Handle<VulkanImage> noiseImage;        // 128×128 RGBA8, refreshed per frame
-			Handle<VulkanBuffer> noiseStaging;
+			// One per frame in flight: a frame rewrites only its own, which the
+			// GPU is done copying from once that frame slot's fence was waited on
+			std::vector<Handle<VulkanBuffer>> noiseStaging;
 			std::vector<uint32_t> noiseData;
 
-			void UpdateNoise(VkCommandBuffer cmd);
+			void UpdateNoise(VkCommandBuffer cmd, std::size_t frameSlot);
 
 			void InitRenderPass();
 			void InitDescriptorSetLayouts();

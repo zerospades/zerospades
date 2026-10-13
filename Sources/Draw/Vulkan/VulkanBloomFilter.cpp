@@ -78,9 +78,10 @@ namespace spades {
 			    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			noiseImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 			                          VK_SAMPLER_ADDRESS_MODE_REPEAT);
-			noiseStaging = Handle<VulkanBuffer>::New(
-			    device, (VkDeviceSize)(128 * 128 * 4), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+			for (std::uint32_t i = 0; i < device->GetMaxFramesInFlight(); i++)
+				noiseStaging.push_back(Handle<VulkanBuffer>::New(
+				  device, (VkDeviceSize)(128 * 128 * 4), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+				  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 			noiseData.resize(128 * 128);
 		}
 
@@ -456,16 +457,16 @@ namespace spades {
 			return set;
 		}
 
-		void VulkanBloomFilter::UpdateNoise(VkCommandBuffer cmd) {
+		void VulkanBloomFilter::UpdateNoise(VkCommandBuffer cmd, std::size_t frameSlot) {
 			// Fresh 128x128 random grain every frame, like GL's UpdateNoise.
 			for (size_t i = 0; i < noiseData.size(); i++)
 				noiseData[i] = static_cast<uint32_t>(SampleRandom());
-			noiseStaging->UpdateData(noiseData.data(), noiseData.size() * sizeof(uint32_t));
+			noiseStaging[frameSlot]->UpdateData(noiseData.data(), noiseData.size() * sizeof(uint32_t));
 
 			noiseImage->TransitionLayout(cmd, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			    VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
 			    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-			noiseImage->CopyFromBuffer(cmd, noiseStaging->GetBuffer());
+			noiseImage->CopyFromBuffer(cmd, noiseStaging[frameSlot]->GetBuffer());
 			noiseImage->TransitionLayout(cmd, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			    VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
 			    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -524,7 +525,7 @@ namespace spades {
 				vkResetDescriptorPool(dev, perFrameDescPool[frameSlot], 0);
 			}
 
-			UpdateNoise(cmd);
+			UpdateNoise(cmd, frameSlot);
 
 			VulkanTemporaryImagePool* pool = renderer.GetTemporaryImagePool();
 
