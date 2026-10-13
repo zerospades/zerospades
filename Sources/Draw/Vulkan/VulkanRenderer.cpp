@@ -80,6 +80,7 @@ SPADES_SETTING(r_radiosity);
 SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
 SPADES_SETTING(r_cameraBlur);
+SPADES_SETTING(r_depthPrepass);
 SPADES_SETTING(r_scale);
 SPADES_SETTING(r_scaleFilter);
 SPADES_SETTING(r_water);
@@ -1017,6 +1018,44 @@ namespace spades {
 			// Without this, MAILBOX (AMD) can reset descriptors the GPU is still
 			// reading, dropping a HUD image for a frame.
 			WaitForImageInFlight();
+		}
+
+		void VulkanRenderer::SetSceneViewport(VkCommandBuffer commandBuffer) const {
+			const VkViewport viewport{0.0F, static_cast<float>(renderHeight),
+			                          static_cast<float>(renderWidth),
+			                          -static_cast<float>(renderHeight), 0.0F, 1.0F};
+			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+			const VkRect2D scissor{{0, 0},
+			                       {static_cast<uint32_t>(renderWidth),
+			                        static_cast<uint32_t>(renderHeight)}};
+			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+		}
+
+		bool VulkanRenderer::UsesDepthPrepass() const { return (int)r_depthPrepass != 0; }
+
+		void VulkanRenderer::RecordDepthPrepass(VkCommandBuffer commandBuffer,
+		                                        VkFramebuffer framebuffer,
+		                                        const VkClearValue (&clearValues)[2],
+		                                        bool withModels) {
+			SPADES_MARK_FUNCTION();
+
+			VkRenderPassBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			beginInfo.renderPass = framebufferManager->GetRenderPass();
+			beginInfo.framebuffer = framebuffer;
+			beginInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth),
+			                               static_cast<uint32_t>(renderHeight)};
+			beginInfo.clearValueCount = 2;
+			beginInfo.pClearValues = clearValues;
+			vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+			SetSceneViewport(commandBuffer);
+
+			if (mapRenderer && (renderingMirror || !sceneDef.skipWorld))
+				mapRenderer->RenderDepthPrepass(commandBuffer);
+			if (withModels && modelRenderer)
+				modelRenderer->Prerender(commandBuffer, false);
+
+			vkCmdEndRenderPass(commandBuffer);
 		}
 
 		uint32_t VulkanRenderer::AcquireFrameImage() {
@@ -1994,39 +2033,30 @@ namespace spades {
 			Vector3 bgColor = GetFogColorForSolidPass();
 			bgColor *= bgColor; // linearize
 
-			// Clear mirror framebuffer
-			framebufferManager->ClearMirrorImage(commandBuffer, bgColor);
-
-			// Begin mirror render pass
-			VkRenderPassBeginInfo mirrorRenderPassInfo{};
-			mirrorRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			mirrorRenderPassInfo.renderPass = framebufferManager->GetRenderPass();
-			mirrorRenderPassInfo.framebuffer = framebufferManager->GetMirrorFramebuffer();
-			mirrorRenderPassInfo.renderArea.offset = {0, 0};
-			mirrorRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
-
 			VkClearValue mirrorClearValues[2];
 			mirrorClearValues[0].color = {{bgColor.x, bgColor.y, bgColor.z, 1.0f}};
 			mirrorClearValues[1].depthStencil = {1.0f, 0};
-			mirrorRenderPassInfo.clearValueCount = 2;
-			mirrorRenderPassInfo.pClearValues = mirrorClearValues;
+
+			// The depth pre-pass, as GL draws one for the mirror too
+			const bool mirrorDepthPrepass = UsesDepthPrepass();
+			if (mirrorDepthPrepass)
+				RecordDepthPrepass(commandBuffer, framebufferManager->GetMirrorFramebuffer(),
+				                   mirrorClearValues, false);
+
+			// Begin mirror render pass: clearing, or continuing the pre-pass
+			VkRenderPassBeginInfo mirrorRenderPassInfo{};
+			mirrorRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			mirrorRenderPassInfo.renderPass = mirrorDepthPrepass
+			                                    ? framebufferManager->GetContinueRenderPass()
+			                                    : framebufferManager->GetRenderPass();
+			mirrorRenderPassInfo.framebuffer = framebufferManager->GetMirrorFramebuffer();
+			mirrorRenderPassInfo.renderArea.offset = {0, 0};
+			mirrorRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
+			mirrorRenderPassInfo.clearValueCount = mirrorDepthPrepass ? 0 : 2;
+			mirrorRenderPassInfo.pClearValues = mirrorDepthPrepass ? nullptr : mirrorClearValues;
 
 			vkCmdBeginRenderPass(commandBuffer, &mirrorRenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			// Set viewport with flipped Y for Vulkan
-			VkViewport mirrorViewport{};
-			mirrorViewport.x = 0.0f;
-			mirrorViewport.y = static_cast<float>(renderHeight);
-			mirrorViewport.width = static_cast<float>(renderWidth);
-			mirrorViewport.height = -static_cast<float>(renderHeight);
-			mirrorViewport.minDepth = 0.0f;
-			mirrorViewport.maxDepth = 1.0f;
-			vkCmdSetViewport(commandBuffer, 0, 1, &mirrorViewport);
-
-			VkRect2D mirrorScissor{};
-			mirrorScissor.offset = {0, 0};
-			mirrorScissor.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
-			vkCmdSetScissor(commandBuffer, 0, 1, &mirrorScissor);
+			SetSceneViewport(commandBuffer);
 
 			// Note: Don't render sky in mirror pass - OpenGL just uses fog color clear
 			// Rendering sky here with non-reflected view axes causes incorrect reflections
@@ -2108,37 +2138,31 @@ namespace spades {
 			Vector3 bgColor = GetFogColorForSolidPass();
 			bgColor *= bgColor; // linearize
 
-			// Begin offscreen render pass (to framebuffer manager's render target)
-			VkRenderPassBeginInfo offscreenRenderPassInfo{};
-			offscreenRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			offscreenRenderPassInfo.renderPass = framebufferManager->GetRenderPass();
-			offscreenRenderPassInfo.framebuffer = framebufferManager->GetRenderFramebuffer();
-			offscreenRenderPassInfo.renderArea.offset = {0, 0};
-			offscreenRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
-
 			VkClearValue clearValues[2];
 			clearValues[0].color = {{bgColor.x, bgColor.y, bgColor.z, 1.0f}};
 			clearValues[1].depthStencil = {1.0f, 0};
-			offscreenRenderPassInfo.clearValueCount = 2;
-			offscreenRenderPassInfo.pClearValues = clearValues;
+
+			// The depth pre-pass, as GL's (r_depthPrepass)
+			const bool depthPrepass = UsesDepthPrepass();
+			if (depthPrepass)
+				RecordDepthPrepass(commandBuffer, framebufferManager->GetRenderFramebuffer(),
+				                   clearValues, false);
+
+			// Begin offscreen render pass (to framebuffer manager's render target):
+			// clearing, or continuing the pre-pass
+			VkRenderPassBeginInfo offscreenRenderPassInfo{};
+			offscreenRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			offscreenRenderPassInfo.renderPass = depthPrepass
+			                                       ? framebufferManager->GetContinueRenderPass()
+			                                       : framebufferManager->GetRenderPass();
+			offscreenRenderPassInfo.framebuffer = framebufferManager->GetRenderFramebuffer();
+			offscreenRenderPassInfo.renderArea.offset = {0, 0};
+			offscreenRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
+			offscreenRenderPassInfo.clearValueCount = depthPrepass ? 0 : 2;
+			offscreenRenderPassInfo.pClearValues = depthPrepass ? nullptr : clearValues;
 
 			vkCmdBeginRenderPass(commandBuffer, &offscreenRenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-			// Set viewport and scissor for 3D rendering
-			// Vulkan has inverted Y-axis compared to OpenGL, so we need to flip the viewport
-			VkViewport viewport{};
-			viewport.x = 0.0f;
-			viewport.y = static_cast<float>(renderHeight);
-			viewport.width = static_cast<float>(renderWidth);
-			viewport.height = -static_cast<float>(renderHeight);
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-			VkRect2D scissor{};
-			scissor.offset = {0, 0};
-			scissor.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
-			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+			SetSceneViewport(commandBuffer);
 
 			// Render the 3D scene
 
@@ -2358,7 +2382,7 @@ namespace spades {
 				// Begin water render pass with LOAD_OP to preserve scene content
 				VkRenderPassBeginInfo waterRenderPassInfo{};
 				waterRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				waterRenderPassInfo.renderPass = framebufferManager->GetWaterRenderPass();
+				waterRenderPassInfo.renderPass = framebufferManager->GetContinueRenderPass();
 				waterRenderPassInfo.framebuffer = framebufferManager->GetRenderFramebuffer();
 				waterRenderPassInfo.renderArea.offset = {0, 0};
 				waterRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};

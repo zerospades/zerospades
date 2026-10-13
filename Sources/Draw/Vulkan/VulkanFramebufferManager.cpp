@@ -43,7 +43,7 @@ namespace spades {
 		      renderFramebuffer(VK_NULL_HANDLE),
 		      mirrorFramebuffer(VK_NULL_HANDLE),
 		      renderPass(VK_NULL_HANDLE),
-		      waterRenderPass(VK_NULL_HANDLE),
+		      continueRenderPass(VK_NULL_HANDLE),
 		      spriteRenderPass(VK_NULL_HANDLE),
 		      spriteFramebuffer(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
@@ -385,8 +385,8 @@ namespace spades {
 				vkDestroyRenderPass(vkDevice, renderPass, nullptr);
 			}
 
-			if (waterRenderPass != VK_NULL_HANDLE) {
-				vkDestroyRenderPass(vkDevice, waterRenderPass, nullptr);
+			if (continueRenderPass != VK_NULL_HANDLE) {
+				vkDestroyRenderPass(vkDevice, continueRenderPass, nullptr);
 			}
 
 			if (spriteRenderPass != VK_NULL_HANDLE) {
@@ -480,25 +480,29 @@ namespace spades {
 				SPRaise("Failed to create Vulkan render pass");
 			}
 
-			// Create water render pass with LOAD_OP to preserve existing framebuffer content
-			VkAttachmentDescription waterColorAttachment = colorAttachment;
-			waterColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			waterColorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			// The continue pass: the scene pass again, loading what is in its targets
+			// instead of clearing them. The water's, and the lit pass's after a depth
+			// pre-pass. Only load ops and layouts differ, so it stays compatible.
+			VkAttachmentDescription continueColorAttachment = colorAttachment;
+			continueColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			continueColorAttachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-			VkAttachmentDescription waterDepthAttachment = depthAttachment;
-			waterDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			VkAttachmentDescription continueDepthAttachment = depthAttachment;
+			continueDepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			// Keep the world marks the scene pass stamped: the x-ray pass runs at the
 			// end of this pass whenever water is enabled.
-			waterDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			waterDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			continueDepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			continueDepthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-			VkAttachmentDescription waterAttachments[] = {waterColorAttachment, waterDepthAttachment};
+			VkAttachmentDescription continueAttachments[] = {continueColorAttachment,
+			                                                 continueDepthAttachment};
 
-			VkRenderPassCreateInfo waterRenderPassInfo = renderPassInfo;
-			waterRenderPassInfo.pAttachments = waterAttachments;
+			VkRenderPassCreateInfo continueRenderPassInfo = renderPassInfo;
+			continueRenderPassInfo.pAttachments = continueAttachments;
 
-			if (vkCreateRenderPass(vkDevice, &waterRenderPassInfo, nullptr, &waterRenderPass) != VK_SUCCESS) {
-				SPRaise("Failed to create Vulkan water render pass");
+			if (vkCreateRenderPass(vkDevice, &continueRenderPassInfo, nullptr, &continueRenderPass) !=
+			    VK_SUCCESS) {
+				SPRaise("Failed to create the Vulkan scene continue render pass");
 			}
 
 			// Create sprite render pass (color-only, no depth attachment) for soft sprite rendering
@@ -568,27 +572,6 @@ namespace spades {
 			// (Implementation depends on how water rendering works)
 
 			return handle;
-		}
-
-		void VulkanFramebufferManager::ClearMirrorImage(VkCommandBuffer commandBuffer, Vector3 bgCol) {
-			SPADES_MARK_FUNCTION();
-
-			VkRenderPassBeginInfo renderPassInfo = {};
-			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			renderPassInfo.renderPass = renderPass;
-			renderPassInfo.framebuffer = mirrorFramebuffer;
-			renderPassInfo.renderArea.offset = {0, 0};
-			renderPassInfo.renderArea.extent = {(uint32_t)renderWidth, (uint32_t)renderHeight};
-
-			VkClearValue clearValues[2];
-			clearValues[0].color = {{bgCol.x, bgCol.y, bgCol.z, 1.0f}};
-			clearValues[1].depthStencil = {1.0f, 0};
-
-			renderPassInfo.clearValueCount = 2;
-			renderPassInfo.pClearValues = clearValues;
-
-			vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-			vkCmdEndRenderPass(commandBuffer);
 		}
 
 		void VulkanFramebufferManager::ResolveScene(VkCommandBuffer commandBuffer,
