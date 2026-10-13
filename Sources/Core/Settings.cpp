@@ -139,7 +139,11 @@ namespace spades {
 
 					std::string val = readString(false);
 					auto* item = GetItem(key, nullptr);
-					item->Set(val);
+					// An empty value is no value: it is what a setting nothing had
+					// set yet was written as, and taking it would override the
+					// setting's default with nothing, however it is defined later.
+					if (!val.empty())
+						item->Set(val);
 
 					line++;
 				}
@@ -225,6 +229,10 @@ namespace spades {
 
 			for (const auto& item : items) {
 				Item* itm = item.second;
+
+				// Nothing defines it and nothing set it: there is nothing to keep
+				if (itm->defaults && !itm->descriptor)
+					continue;
 
 				emitString(itm->name, true);
 				buffer += ": ";
