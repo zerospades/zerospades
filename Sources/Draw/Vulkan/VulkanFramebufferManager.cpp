@@ -920,16 +920,28 @@ namespace spades {
 				0, 0, nullptr, 0, nullptr, 4, postBarriers);
 		}
 
+		void VulkanFramebufferManager::InvalidateDepthSamples() {
+			sceneDepthSampleCurrent = false;
+			mirrorDepthSampleCurrent = false;
+		}
+
 		void VulkanFramebufferManager::CopySceneDepthForSampling(VkCommandBuffer commandBuffer) {
 			SPADES_MARK_FUNCTION();
-			if (!useMSAA)
-				CopyDepthForSampling(commandBuffer, *renderDepthImage, *sceneDepthSampleImage);
+			// Copied once a frame unless the depth changed since: the ambient
+			// occlusion's copy after the pre-pass serves the post filters too
+			if (useMSAA || sceneDepthSampleCurrent)
+				return;
+			CopyDepthForSampling(commandBuffer, *renderDepthImage, *sceneDepthSampleImage);
+			sceneDepthSampleCurrent = true;
 		}
 
 		void VulkanFramebufferManager::CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer) {
 			SPADES_MARK_FUNCTION();
 			SPAssert(mirrorDepthSampleImage);
+			if (mirrorDepthSampleCurrent)
+				return;
 			CopyDepthForSampling(commandBuffer, *mirrorDepthImage, *mirrorDepthSampleImage);
+			mirrorDepthSampleCurrent = true;
 		}
 
 		void VulkanFramebufferManager::CopyDepthForSampling(VkCommandBuffer commandBuffer,

@@ -97,6 +97,10 @@ namespace spades {
 			// single-sample *Resolve images below before post-processing.
 			VkSampleCountFlagBits sampleCount;
 			bool useMSAA;
+			// Whether the 1x depth copies hold the depth as it is now: set by a
+			// copy, cleared by `InvalidateDepthSamples`
+			bool sceneDepthSampleCurrent = false;
+			bool mirrorDepthSampleCurrent = false;
 
 			// Main render framebuffer
 			VkFramebuffer renderFramebuffer;
@@ -178,6 +182,10 @@ namespace spades {
 				return useMSAA ? renderDepthResolveImage : sceneDepthSampleImage;
 			}
 			bool IsMSAA() const { return useMSAA; }
+			/** Tells the depth copies below the depth may have changed since they
+			 * last ran (a new frame, or a draw writing depth after the pre-pass),
+			 * so that each copies again; until then a repeated copy is skipped */
+			void InvalidateDepthSamples();
 
 			// Depth in/out: ATTACHMENT_OPTIMAL; copy ends SHADER_READ_ONLY. No-op under MSAA.
 			void CopySceneDepthForSampling(VkCommandBuffer commandBuffer);
