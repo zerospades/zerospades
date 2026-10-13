@@ -138,3 +138,11 @@ float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) 
 		return 1.0;
 	return DynamicLightMapWalk(position + normal * 0.01, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
+
+/** 1 if `lightPosition` is seen from `position`, inside a volume such as a puff of
+ * smoke, and 0 if a solid block is in the way. */
+float DynamicLightMapVolumeVisibility(vec3 position, vec3 lightPosition) {
+	if (dynamicLightMapOcclusion < 0.5)
+		return 1.0;
+	return DynamicLightMapWalk(position, lightPosition, true) > 1.0 ? 1.0 : 0.0;
+}

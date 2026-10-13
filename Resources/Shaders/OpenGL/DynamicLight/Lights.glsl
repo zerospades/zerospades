@@ -168,7 +168,8 @@ bool DynamicLightOcclusionMapReaches(float tile, mat4 spotMatrix, float texelSpr
  * before the next part is read. The spotlight image has no mipmaps for the same
  * reason: it is sampled where only some fragments of a quad got that far.
  */
-vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction) {
+vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, bool volume,
+                           out vec3 direction) {
 	direction = vec3(0.0, 0.0, 1.0);
 
 	float row = DynamicLightRow(i);
@@ -192,8 +193,9 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 
 	direction = lightPos / max(distance, 1.0e-6);
 
-	// A surface facing away gets nothing: no need to walk the map for it.
-	if (dot(direction, normal) <= 0.0)
+	// A surface facing away gets nothing, and needs no walk through the map; a
+	// volume takes light from all around.
+	if (!volume && dot(direction, normal) <= 0.0)
 		return vec3(0.0);
 
 	vec3 texValue = vec3(1.0);
@@ -225,13 +227,16 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 	float reachLeft = max(1.0 - distance * colorReachInversed.w, 0.0);
 	float attenuation = reachLeft * reachLeft;
 
-	// The first-person view's models are lit as if at the eye, which no tile
-	// looks from; any light without a tile walks the map itself, and so does one
-	// whose tile can't prove the point lit, in and around a shadow.
+	// A volume has no surface for a tile to prove lit. The first-person view's
+	// models are lit as if at the eye, which no tile looks from; any light without
+	// a tile walks the map itself, and so does one whose tile can't prove the point
+	// lit, in and around a shadow.
 	float visibility = 1.0;
-	if (kind.z < 0.0 || dynamicLightOccludedFromEye ||
-	    !DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position, normal,
-	                                     lightPosition))
+	if (volume)
+		visibility = DynamicLightMapVolumeVisibility(position, lightPosition);
+	else if (kind.z < 0.0 || dynamicLightOccludedFromEye ||
+	         !DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position, normal,
+	                                          lightPosition))
 		visibility = DynamicLightMapVisibility(
 		  dynamicLightOccludedFromEye ? dynamicLightEye : position, normal, lightPosition);
 
@@ -240,7 +245,7 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, out vec3 direction
 
 vec3 EvaluateDynamicLight(int i, vec3 position, vec3 normal) {
 	vec3 direction;
-	vec3 incidence = DynamicLightIncidence(i, position, normal, direction);
+	vec3 incidence = DynamicLightIncidence(i, position, normal, false, direction);
 
 	// diffuse lighting
 	return incidence * max(dot(direction, normal), 0.0);
@@ -254,6 +259,24 @@ vec3 EvaluateDynamicLights(vec3 position, vec3 normal) {
 		if (i >= dynamicLightCount)
 			break;
 		light += EvaluateDynamicLight(i, position, normal);
+	}
+	return light;
+}
+
+/**
+ * The light every dynamic light of the draw scatters through a translucent volume
+ * at `position`, such as a puff of smoke, whose bulge faces `normal` (unit length)
+ * there, where the map doesn't hide it: wrapping around it, brightest on the side
+ * facing the light and half as bright square to it.
+ */
+vec3 EvaluateDynamicLightsScattered(vec3 position, vec3 normal) {
+	vec3 light = vec3(0.0);
+	for (int i = 0; i < DYNAMIC_LIGHT_MAX; i++) {
+		if (i >= dynamicLightCount)
+			break;
+		vec3 direction;
+		vec3 incidence = DynamicLightIncidence(i, position, normal, true, direction);
+		light += incidence * (dot(direction, normal) * 0.5 + 0.5);
 	}
 	return light;
 }
