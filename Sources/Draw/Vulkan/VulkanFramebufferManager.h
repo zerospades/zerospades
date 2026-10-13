@@ -145,12 +145,18 @@ namespace spades {
 			// stencil loaded from where the scene's pass left them. Compatible with
 			// renderPass, so every scene pipeline draws in it.
 			VkRenderPass continueRenderPass;
+			// The mirror's lit pass, clearing or continuing its pre-pass: the scene
+			// pass and its continue pass storing only what is read after it. Its
+			// stencil never is (the x-ray reveal is the main view's), its depth
+			// only by the water's depth-aware reflections (r_water 3).
+			VkRenderPass mirrorRenderPass;
+			VkRenderPass mirrorContinueRenderPass;
 			VkRenderPass spriteRenderPass; // Color-only render pass for soft sprite rendering
 			VkFramebuffer spriteFramebuffer;
 
 			std::vector<Buffer> buffers;
 
-			void CreateRenderPass();
+			void CreateRenderPass(bool mirrorDepthRead);
 
 		public:
 			/** Makes the targets, sized and formatted from the renderer's latched
@@ -213,6 +219,10 @@ namespace spades {
 			/** The scene pass continuing what is in its targets (`LOAD`): the
 			 * water's, and the lit pass's after a depth pre-pass */
 			VkRenderPass GetContinueRenderPass() { return continueRenderPass; }
+			/** The mirror's lit pass, after a depth pre-pass or not */
+			VkRenderPass GetMirrorRenderPass(bool continuePrepass) {
+				return continuePrepass ? mirrorContinueRenderPass : mirrorRenderPass;
+			}
 			VkRenderPass GetSpriteRenderPass() { return spriteRenderPass; }
 			VkFramebuffer GetRenderFramebuffer() { return renderFramebuffer; }
 			VkFramebuffer GetSpriteFramebuffer() { return spriteFramebuffer; }

@@ -2153,9 +2153,7 @@ namespace spades {
 			// Begin mirror render pass: clearing, or continuing the pre-pass
 			VkRenderPassBeginInfo mirrorRenderPassInfo{};
 			mirrorRenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			mirrorRenderPassInfo.renderPass = mirrorDepthPrepass
-			                                    ? framebufferManager->GetContinueRenderPass()
-			                                    : framebufferManager->GetRenderPass();
+			mirrorRenderPassInfo.renderPass = framebufferManager->GetMirrorRenderPass(mirrorDepthPrepass);
 			mirrorRenderPassInfo.framebuffer = framebufferManager->GetMirrorFramebuffer();
 			mirrorRenderPassInfo.renderArea.offset = {0, 0};
 			mirrorRenderPassInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth), static_cast<uint32_t>(renderHeight)};
