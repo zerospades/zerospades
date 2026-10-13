@@ -139,6 +139,29 @@ float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) 
 	return DynamicLightMapWalk(position + normal * 0.01, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
 
+/**
+ * `DynamicLightMapVisibility`, knowing the way from the light clear as far as
+ * `clear`: only the rest of it is walked, from the light's side, so that a point in
+ * a shadow meets what casts it within a step or two.
+ */
+float DynamicLightMapVisibilityBeyond(vec3 position, vec3 normal, vec3 lightPosition,
+                                      float clear) {
+	if (dynamicLightMapOcclusion < 0.5)
+		return 1.0;
+
+	// The block in front of the surface, which the walk stops at
+	vec3 surface = position + normal * 0.01;
+	if (clear <= 0.0)
+		return DynamicLightMapWalk(surface, lightPosition, true) > 1.0 ? 1.0 : 0.0;
+
+	vec3 toSurface = surface - lightPosition;
+	float length = length(toSurface);
+	if (clear >= length)
+		return 1.0;
+	vec3 from = lightPosition + toSurface * (clear / length);
+	return DynamicLightMapWalk(from, surface, true) > 1.0 ? 1.0 : 0.0;
+}
+
 /** 1 if `lightPosition` is seen from `position`, inside a volume such as a puff of
  * smoke, and 0 if a solid block is in the way. */
 float DynamicLightMapVolumeVisibility(vec3 position, vec3 lightPosition) {

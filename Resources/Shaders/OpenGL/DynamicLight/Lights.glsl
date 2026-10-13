@@ -89,6 +89,10 @@ uniform sampler2D dynamicLightOcclusionMaps;
 // How far short of where it meets the point's surface a ray may stop and still
 // count as reaching it, in blocks: the rays' reaches are half floats.
 #define DYNAMIC_LIGHT_OCCLUSION_TOLERANCE 0.1
+// How much nearer the light than the rays around a point stop the way to the point
+// is known clear, in blocks: a block a ray stops in may stand as far along the ray
+// as its diagonal (sqrt(3)), and the reaches are half floats.
+#define DYNAMIC_LIGHT_OCCLUSION_CLEAR_MARGIN 2.0
 
 /** How far from the light the ray through texel `texel` of tile `tileOrigin` gets. */
 float DynamicLightOcclusionReach(vec2 tileOrigin, vec2 texel) {
@@ -106,11 +110,17 @@ float DynamicLightOcclusionReach(vec2 tileOrigin, vec2 texel) {
  *
  * Rays that all stop short don't prove the point dark: it may be seen through a
  * gap that, taken at a slant, is narrower than the rays are apart, such as the
- * edge of a block just past a wall. `spotMatrix` projects onto the light's image,
- * and `texelSpread` is how much wider a texel gets per block from the light.
+ * edge of a block just past a wall. They do prove the way to it clear as far as
+ * `clear` from the light, so that only the rest of it has to be walked: no block
+ * stands on it nearer than the nearest of them stops, less the most of a block a
+ * ray can cross. `spotMatrix` projects onto the light's image, and `texelSpread`
+ * is how much wider a texel gets per block from the light.
  */
 bool DynamicLightOcclusionMapReaches(float tile, mat4 spotMatrix, float texelSpread,
-                                       vec3 position, vec3 normal, vec3 lightPosition) {
+                                     vec3 position, vec3 normal, vec3 lightPosition,
+                                     out float clear) {
+	clear = 0.0;
+
 	vec3 toPoint = position - lightPosition;
 	float distance = length(toPoint);
 	if (distance * texelSpread > DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH)
@@ -132,14 +142,21 @@ bool DynamicLightOcclusionMapReaches(float tile, mat4 spotMatrix, float texelSpr
 	  (coord.xy / max(coord.z, 1.0e-6) - 0.5) * (1.0 / DYNAMIC_LIGHT_SPOT_FADE_END) + 0.5;
 	vec2 base = floor(onTile * DYNAMIC_LIGHT_OCCLUSION_TILE - 0.5);
 
+	// The four rays have to surround the point's own to prove anything of it, which
+	// they don't at the tile's edge.
+	if (any(lessThan(base, vec2(0.0))) ||
+	    any(greaterThan(base, vec2(DYNAMIC_LIGHT_OCCLUSION_TILE - 2.0))))
+		return false;
+
 	vec2 tileOrigin =
 	  vec2(mod(tile, DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW),
 	       floor(tile / DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW)) * DYNAMIC_LIGHT_OCCLUSION_TILE;
 	float surfaceOffset = dot(normal, toPoint);
 
+	bool reaches = true;
+	float nearestStop = distance;
 	for (int k = 0; k < 4; k++) {
-		vec2 texel = clamp(base + vec2(float(k - (k / 2) * 2), float(k / 2)), vec2(0.0),
-		                   vec2(DYNAMIC_LIGHT_OCCLUSION_TILE - 1.0));
+		vec2 texel = base + vec2(float(k - (k / 2) * 2), float(k / 2));
 
 		// The ray through the texel's centre, as the tile was traced
 		vec2 slope = ((texel + 0.5) * (1.0 / DYNAMIC_LIGHT_OCCLUSION_TILE) - 0.5) * spread;
@@ -150,11 +167,14 @@ bool DynamicLightOcclusionMapReaches(float tile, mat4 spotMatrix, float texelSpr
 		float facing = dot(normal, direction);
 		float target = facing < -1.0e-4 ? min(surfaceOffset / facing, distance) : distance;
 
-		if (DynamicLightOcclusionReach(tileOrigin, texel) <
-		    target - DYNAMIC_LIGHT_OCCLUSION_TOLERANCE)
-			return false;
+		float reach = DynamicLightOcclusionReach(tileOrigin, texel);
+		nearestStop = min(nearestStop, reach);
+		if (reach < target - DYNAMIC_LIGHT_OCCLUSION_TOLERANCE)
+			reaches = false;
 	}
-	return true;
+
+	clear = max(nearestStop - DYNAMIC_LIGHT_OCCLUSION_CLEAR_MARGIN, 0.0);
+	return reaches;
 }
 
 /**
@@ -228,17 +248,22 @@ vec3 DynamicLightIncidence(int i, vec3 position, vec3 normal, bool volume,
 	float attenuation = reachLeft * reachLeft;
 
 	// A volume has no surface for a tile to prove lit. The first-person view's
-	// models are lit as if at the eye, which no tile looks from; any light without
-	// a tile walks the map itself, and so does one whose tile can't prove the point
-	// lit, in and around a shadow.
+	// models are lit as if at the eye, which no tile looks from. Any other point a
+	// tile can't prove lit, in and around a shadow, walks the map, from as far
+	// along the way as the tile proves clear; one with no tile walks all of it.
 	float visibility = 1.0;
-	if (volume)
+	if (volume) {
 		visibility = DynamicLightMapVolumeVisibility(position, lightPosition);
-	else if (kind.z < 0.0 || dynamicLightOccludedFromEye ||
-	         !DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position, normal,
-	                                          lightPosition))
-		visibility = DynamicLightMapVisibility(
-		  dynamicLightOccludedFromEye ? dynamicLightEye : position, normal, lightPosition);
+	} else if (dynamicLightOccludedFromEye) {
+		visibility = DynamicLightMapVisibility(dynamicLightEye, normal, lightPosition);
+	} else {
+		float clear = 0.0;
+		bool reaches = kind.z >= 0.0 &&
+		               DynamicLightOcclusionMapReaches(kind.z, spotMatrix, kind.w, position,
+		                                               normal, lightPosition, clear);
+		if (!reaches)
+			visibility = DynamicLightMapVisibilityBeyond(position, normal, lightPosition, clear);
+	}
 
 	return colorReachInversed.xyz * (attenuation * coneFalloff) * texValue * visibility;
 }
