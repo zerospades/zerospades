@@ -210,6 +210,11 @@ namespace spades {
 			VulkanOptimizedVoxelModel::PreloadShaders(*this);
 			VulkanWaterRenderer::PreloadShaders(*this);
 
+			// The sprites' pipelines, now that what they are made against is,
+			// rather than on the first frame that draws a sprite
+			spriteRenderer->PreparePipeline();
+			longSpriteRenderer->PreparePipeline();
+
 			// Post-process filters. fogFilter is created unconditionally —
 			// the mapShadowRenderer it samples is created lazily on SetGameMap,
 			// which runs AFTER initialization; the runtime gate in the
@@ -921,6 +926,11 @@ namespace spades {
 			if (waterRenderer) {
 				waterRenderer->SetGameMap(map);
 			}
+
+			// The models' pipelines for this map, made from its renderers' layouts:
+			// here, not while the first frame on it records
+			if (map)
+				VulkanOptimizedVoxelModel::PrepareSharedPipelines(*this);
 		}
 
 		void VulkanRenderer::SetFogDistance(float distance) {

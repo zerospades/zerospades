@@ -148,8 +148,8 @@ namespace spades {
 			                 int ux, int uy, int uz, int vx, int vy, int vz);
 			void BuildVertices(VoxelModel*);
 			void GenerateTexture();
-			void CreatePipeline(VkRenderPass renderPass);
-			void CreateShadowPipeline(VkRenderPass shadowRenderPass);
+			static void CreatePipeline(VulkanRenderer& renderer, VkRenderPass renderPass);
+			static void CreateShadowPipeline(VulkanRenderer& renderer, VkRenderPass shadowRenderPass);
 
 		protected:
 			~VulkanOptimizedVoxelModel();
@@ -165,6 +165,13 @@ namespace spades {
 			 * scene render pass, which is always compatible. With the device idle.
 			 */
 			static void InvalidateSharedPipeline(gui::SDLVulkanDevice* device);
+			/**
+			 * Makes the pipelines every model shares that are not there yet, the
+			 * model-shadow one too while models cast shadows, so that the first
+			 * frame drawing a model does not stall on compiling them. Once the map's
+			 * renderers are made, which their layout is made from.
+			 */
+			static void PrepareSharedPipelines(VulkanRenderer& renderer);
 
 			void Prerender(VkCommandBuffer commandBuffer,
 			               std::vector<client::ModelRenderParam> params,
