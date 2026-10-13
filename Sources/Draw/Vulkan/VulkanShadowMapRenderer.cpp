@@ -71,6 +71,11 @@ namespace spades {
 			textureSize = (int)r_shadowMapSize;
 			if (textureSize < 128) textureSize = 128;
 			if (textureSize > 4096) textureSize = 4096;
+			// Without model shadows (latched) the cascades are never drawn, and their
+			// sampling stays disabled: 1x1 placeholders for the descriptors the lit
+			// pipelines declare are all that is needed.
+			if (!(int)r_modelShadows)
+				textureSize = 1;
 
 			SPLog("Creating shadow map renderer with size %dx%d", textureSize, textureSize);
 
