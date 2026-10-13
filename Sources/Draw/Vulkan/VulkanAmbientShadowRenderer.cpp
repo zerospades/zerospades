@@ -236,6 +236,9 @@ namespace spades {
 
 		VulkanAmbientShadowRenderer::~VulkanAmbientShadowRenderer() {
 			SPADES_MARK_FUNCTION();
+			// Leaving a map waits for the worker: what is left of its batch is for
+			// a map that is going away
+			stopping.store(true, std::memory_order_relaxed);
 			if (dispatch) {
 				dispatch->Join();
 				delete dispatch;
@@ -475,7 +478,8 @@ namespace spades {
 			lock.unlock();
 
 			for (int i = 0; i < 8; i++) {
-				if (numDirtyChunks <= 0) break;
+				if (numDirtyChunks <= 0 || stopping.load(std::memory_order_relaxed))
+					break;
 				std::size_t idx = SampleRandomInt(std::size_t{0}, numDirtyChunks - 1);
 				Chunk& c = chunks[dirtyChunkIds[idx]];
 				if (idx < numDirtyChunks - 1)

@@ -103,6 +103,9 @@ namespace spades {
 			std::size_t stagingSlotSize;
 
 			UpdateDispatch* dispatch;
+			/** Set before the worker is joined for good: it stops at the next chunk
+			 * rather than finishing its batch */
+			std::atomic<bool> stopping{false};
 
 			Chunk& GetChunk(int cx, int cy, int cz) {
 				return chunks[(cx + cy * chunkW) * chunkD + cz];
