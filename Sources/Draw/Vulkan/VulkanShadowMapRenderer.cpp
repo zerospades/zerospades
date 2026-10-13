@@ -84,6 +84,7 @@ namespace spades {
 			try {
 				CreateRenderPass();
 				CreateFramebuffers();
+				InitializeLayouts();
 				CreatePipeline();
 				CreateDescriptorSets();
 				CreateSamplingResources();
@@ -186,6 +187,54 @@ namespace spades {
 					SPRaise("Failed to create shadow map framebuffer %d", i);
 				}
 			}
+		}
+
+		void VulkanShadowMapRenderer::InitializeLayouts() {
+			SPADES_MARK_FUNCTION();
+
+			// The sampling descriptors declare the cascades read-only. They hold
+			// that layout from the start, before any frame draws them (night, or
+			// model shadows off), and between draws, as each draw ends in it.
+			VkDevice vkDevice = device->GetDevice();
+			VkCommandBufferAllocateInfo allocInfo{};
+			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandPool = device->GetCommandPool();
+			allocInfo.commandBufferCount = 1;
+			VkCommandBuffer commandBuffer;
+			if (vkAllocateCommandBuffers(vkDevice, &allocInfo, &commandBuffer) != VK_SUCCESS)
+				SPRaise("Failed to allocate the shadow map layout command buffer");
+
+			VkCommandBufferBeginInfo beginInfo{};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+			vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+			VkImageMemoryBarrier barriers[NumSlices]{};
+			for (int i = 0; i < NumSlices; i++) {
+				barriers[i].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+				barriers[i].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+				barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barriers[i].image = shadowMapImages[i]->GetImage();
+				barriers[i].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+				barriers[i].srcAccessMask = 0;
+				barriers[i].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			}
+			vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+			                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			                     0, 0, nullptr, 0, nullptr, NumSlices, barriers);
+			vkEndCommandBuffer(commandBuffer);
+
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &commandBuffer;
+			vkQueueSubmit(device->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+			vkQueueWaitIdle(device->GetGraphicsQueue());
+			vkFreeCommandBuffers(vkDevice, device->GetCommandPool(), 1, &commandBuffer);
 		}
 
 		void VulkanShadowMapRenderer::CreatePipeline() {
