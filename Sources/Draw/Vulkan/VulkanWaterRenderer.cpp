@@ -402,69 +402,7 @@ namespace spades {
 			if (!map)
 				return;
 
-			// Create water color image
-			w = map->Width();
-			h = map->Height();
-			updateBitmapPitch = (w + 31) / 32;
-			updateBitmap.resize(updateBitmapPitch * h);
-			bitmap.resize(w * h);
-			std::fill(updateBitmap.begin(), updateBitmap.end(), 0xffffffffUL);
-			std::fill(bitmap.begin(), bitmap.end(), 0xffffffffUL);
-
-			textureImage = Handle<VulkanImage>::New(device, w, h, VK_FORMAT_R8G8B8A8_UNORM,
-				VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			// VulkanImage's constructor only creates the view; sampler stays VK_NULL_HANDLE
-			// until we call CreateSampler. Skipping this binds a null sampler in the water
-			// descriptor set, and the shader reads zero from mainTexture/waveTexture.
-			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT);
-
-			// Create wave tanks using FFT solver for realistic waves
-			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
-			for (size_t i = 0; i < numLayers; i++) {
-				IWaveTank* tank;
-				if ((int)r_water >= 3)
-					tank = new FFTWaveTank<8>();
-				else
-					tank = new FFTWaveTank<7>();
-				waveTanksPlaceholder.push_back((void*)tank);
-			}
-
-			// Create wave image(s)
-			if (!waveTanksPlaceholder.empty()) {
-				IWaveTank* tank = (IWaveTank*)waveTanksPlaceholder[0];
-				uint32_t size = tank->GetSize();
-				uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
-
-				if (numLayers == 1) {
-					// Single layer - use 2D texture with mipmaps
-					waveImage = Handle<VulkanImage>::New(device, size, size, 1, mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				} else {
-					// Multiple layers - use 2D array texture with mipmaps
-					waveImageArray = Handle<VulkanImage>::New(device, size, size,
-						static_cast<uint32_t>(numLayers), mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				}
-
-				// Pre-allocate staging buffers for wave uploads
-				waveStagingBufferSize = size * size * sizeof(uint32_t);
-				for (size_t i = 0; i < numLayers; i++) {
-					waveStagingBufferPool.push_back(Handle<VulkanBuffer>::New(
-						device, waveStagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-				}
-			}
+			CreateMapResources();
 
 			// Build mesh
 			{
@@ -538,6 +476,81 @@ namespace spades {
 			CleanupDescriptorResources();
 		}
 
+		void VulkanWaterRenderer::CreateMapResources() {
+			SPADES_MARK_FUNCTION();
+			SPAssert(gameMap);
+
+			// The water's colour, from the map, refreshed in full on the next upload
+			w = gameMap->Width();
+			h = gameMap->Height();
+			updateBitmapPitch = (w + 31) / 32;
+			updateBitmap.assign(updateBitmapPitch * h, 0xffffffffUL);
+			bitmap.assign(w * h, 0xffffffffUL);
+
+			textureImage = Handle<VulkanImage>::New(device, w, h, VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			// VulkanImage's constructor only creates the view; sampler stays VK_NULL_HANDLE
+			// until we call CreateSampler. Skipping this binds a null sampler in the water
+			// descriptor set, and the shader reads zero from mainTexture/waveTexture.
+			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+				VK_SAMPLER_ADDRESS_MODE_REPEAT);
+
+			// Wave tanks (FFT solvers), replacing any there were
+			for (void* p : waveTanksPlaceholder) {
+				IWaveTank* t = (IWaveTank*)p;
+				t->Join();
+				delete t;
+			}
+			waveTanksPlaceholder.clear();
+			waveStagingBufferPool.clear();
+
+			const size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
+			for (size_t i = 0; i < numLayers; i++) {
+				IWaveTank* tank;
+				if ((int)r_water >= 3)
+					tank = new FFTWaveTank<8>();
+				else
+					tank = new FFTWaveTank<7>();
+				waveTanksPlaceholder.push_back((void*)tank);
+			}
+
+			IWaveTank* tank = (IWaveTank*)waveTanksPlaceholder[0];
+			uint32_t size = tank->GetSize();
+			uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
+
+			if (numLayers == 1) {
+				// Single layer - use 2D texture with mipmaps
+				waveImage = Handle<VulkanImage>::New(device, size, size, 1, mipLevels,
+					VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
+			} else {
+				// Multiple layers - use 2D array texture with mipmaps
+				waveImageArray = Handle<VulkanImage>::New(device, size, size,
+					static_cast<uint32_t>(numLayers), mipLevels,
+					VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+					VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
+			}
+
+			// Staging for the wave uploads: a buffer per layer for each frame in
+			// flight, as a frame rewrites its own while the GPU may still be
+			// copying from the previous frame's
+			waveStagingBufferSize = size * size * sizeof(uint32_t);
+			const size_t stagingCount = numLayers * device->GetMaxFramesInFlight();
+			for (size_t i = 0; i < stagingCount; i++) {
+				waveStagingBufferPool.push_back(Handle<VulkanBuffer>::New(
+					device, waveStagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+			}
+		}
+
 		void VulkanWaterRenderer::PreloadShaders(VulkanRenderer& r) {
 			SPADES_MARK_FUNCTION();
 		SPLog("Preloading Vulkan water shaders");
@@ -580,79 +593,7 @@ namespace spades {
 		// If we now have a valid map and textures don't exist, create them
 		if (gameMap && !textureImage) {
 			SPLog("SetGameMap: Creating water resources for new map");
-			w = gameMap->Width();
-			h = gameMap->Height();
-			updateBitmapPitch = (w + 31) / 32;
-			updateBitmap.resize(updateBitmapPitch * h);
-			bitmap.resize(w * h);
-			std::fill(updateBitmap.begin(), updateBitmap.end(), 0xffffffffUL);
-			std::fill(bitmap.begin(), bitmap.end(), 0xffffffffUL);
-
-			textureImage = Handle<VulkanImage>::New(device, w, h, VK_FORMAT_R8G8B8A8_UNORM,
-				VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT);
-
-			// Create wave tanks using FFT solver for realistic waves
-			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
-
-			// Clear existing wave tanks if any
-			for (void* p : waveTanksPlaceholder) {
-				IWaveTank* t = (IWaveTank*)p;
-				t->Join();
-				delete t;
-			}
-			waveTanksPlaceholder.clear();
-			waveStagingBufferPool.clear();
-
-			for (size_t i = 0; i < numLayers; i++) {
-				IWaveTank* tank;
-				if ((int)r_water >= 3)
-					tank = new FFTWaveTank<8>();
-				else
-					tank = new FFTWaveTank<7>();
-				waveTanksPlaceholder.push_back((void*)tank);
-			}
-
-			// Create wave image(s)
-			if (!waveTanksPlaceholder.empty()) {
-				IWaveTank* tank = (IWaveTank*)waveTanksPlaceholder[0];
-				uint32_t size = tank->GetSize();
-				uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
-
-				if (numLayers == 1) {
-					// Single layer - use 2D texture with mipmaps
-					waveImage = Handle<VulkanImage>::New(device, size, size, 1, mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				} else {
-					// Multiple layers - use 2D array texture with mipmaps
-					waveImageArray = Handle<VulkanImage>::New(device, size, size,
-						static_cast<uint32_t>(numLayers), mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				}
-
-				// Pre-allocate staging buffers for wave uploads
-				waveStagingBufferSize = size * size * sizeof(uint32_t);
-				for (size_t i = 0; i < numLayers; i++) {
-					waveStagingBufferPool.push_back(Handle<VulkanBuffer>::New(
-						device, waveStagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-				}
-			}
-
-			// Trigger full update of water color texture
-			for (size_t i = 0; i < updateBitmap.size(); i++)
-				updateBitmap[i] = 0xffffffffUL;
+			CreateMapResources();
 
 			// The descriptor sets may already have been created (with no images,
 			// because the map loaded after the renderer) — point them at the
@@ -668,65 +609,7 @@ namespace spades {
 		// Create water resources if not already created (in case constructor returned early due to null map)
 		if (!textureImage && gameMap) {
 			SPLog("Creating water resources (textures, wave images)");
-			w = gameMap->Width();
-			h = gameMap->Height();
-			updateBitmapPitch = (w + 31) / 32;
-			updateBitmap.resize(updateBitmapPitch * h);
-			bitmap.resize(w * h);
-			std::fill(updateBitmap.begin(), updateBitmap.end(), 0xffffffffUL);
-			std::fill(bitmap.begin(), bitmap.end(), 0xffffffffUL);
-
-			textureImage = Handle<VulkanImage>::New(device, w, h, VK_FORMAT_R8G8B8A8_UNORM,
-				VK_IMAGE_TILING_OPTIMAL,
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-			textureImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_REPEAT);
-
-			// Create wave tanks using FFT solver for realistic waves
-			size_t numLayers = ((int)r_water >= 2) ? 3 : 1;
-			for (size_t i = 0; i < numLayers; i++) {
-				IWaveTank* tank;
-				if ((int)r_water >= 3)
-					tank = new FFTWaveTank<8>();
-				else
-					tank = new FFTWaveTank<7>();
-				waveTanksPlaceholder.push_back((void*)tank);
-			}
-
-			// Create wave image(s)
-			if (!waveTanksPlaceholder.empty()) {
-				IWaveTank* tank = (IWaveTank*)waveTanksPlaceholder[0];
-				uint32_t size = tank->GetSize();
-				uint32_t mipLevels = static_cast<uint32_t>(std::floor(std::log2(size))) + 1;
-
-				if (numLayers == 1) {
-					// Single layer - use 2D texture with mipmaps
-					waveImage = Handle<VulkanImage>::New(device, size, size, 1, mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImage->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				} else {
-					// Multiple layers - use 2D array texture with mipmaps
-					waveImageArray = Handle<VulkanImage>::New(device, size, size,
-						static_cast<uint32_t>(numLayers), mipLevels,
-						VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-						VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-					waveImageArray->CreateSampler(VK_FILTER_LINEAR, VK_FILTER_LINEAR,
-						VK_SAMPLER_ADDRESS_MODE_REPEAT, static_cast<float>(r_maxAnisotropy));
-				}
-
-				// Pre-allocate staging buffers for wave uploads
-				waveStagingBufferSize = size * size * sizeof(uint32_t);
-				for (size_t i = 0; i < numLayers; i++) {
-					waveStagingBufferPool.push_back(Handle<VulkanBuffer>::New(
-						device, waveStagingBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-						VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-				}
-			}
+			CreateMapResources();
 		}
 
 		// Build mesh if not already built (in case constructor returned early due to null map)
@@ -1077,7 +960,9 @@ namespace spades {
 				// Upload each layer using pooled staging buffers
 				for (size_t i = 0; i < waveTanksPlaceholder.size(); i++) {
 					IWaveTank* tank = (IWaveTank*)waveTanksPlaceholder[i];
-					Handle<VulkanBuffer>& staging = waveStagingBufferPool[i];
+					// This frame slot's staging for the layer
+					Handle<VulkanBuffer>& staging = waveStagingBufferPool[
+					  renderer.GetCurrentFrameIndex() * waveTanksPlaceholder.size() + i];
 					void* data = staging->Map();
 					memcpy(data, tank->GetBitmap(), bmpSize);
 					staging->Unmap();
