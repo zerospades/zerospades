@@ -46,6 +46,7 @@ layout(location = 0) out vec4 fragColor;
 #include "SceneLight/Lights.glsl"
 #include "SceneLight/MapLight.glsl"
 #include "SceneAmbientOcclusion.glsl"
+#include "SceneLight/ModelShadow.glsl"
 
 // Oren-Nayar diffuse BRDF
 float OrenNayar(float sigma, float dotLight, float dotEye) {
@@ -107,6 +108,7 @@ void main() {
 
 	// Evaluate map shadow
 	float shadow = MapShadowVisibility(shadowCoord);
+	shadow *= ModelShadowVisibilityAt(worldPosition); // model-on-model cascades (set 1), as the basic shader does
 
 	vec3 vertexColor = color.xyz;
 
