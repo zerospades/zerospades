@@ -61,6 +61,10 @@ layout(location = 12) out float shadowViewDepth;
 // World-space position, where the fragment shader evaluates the dynamic lights
 layout(location = 13) out vec3 worldPosition;
 
+// Keep gl_Position bit-identical across the pipelines drawing the map with this
+// shader: the lit pass meets the depth its depth pre-pass wrote, by equality.
+invariant gl_Position;
+
 void main() {
 	// Convert uint8 position to float
 	vec3 position = vec3(positionAttribute);

@@ -384,24 +384,6 @@ namespace spades {
 			vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
 		}
 
-		void VulkanMapChunk::RenderDepthPass(VkCommandBuffer commandBuffer) {
-			SPADES_MARK_FUNCTION_DEBUG();
-
-			if (indices.empty() || !vertexBuffer || !indexBuffer)
-				return;
-
-			// Bind vertex buffer
-			VkBuffer vb = vertexBuffer->GetBuffer();
-			VkDeviceSize offsets[] = {0};
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
-
-			// Bind index buffer
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT16);
-
-			// Draw
-			vkCmdDrawIndexed(commandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
-		}
-
 		void VulkanMapChunk::RenderShadowMapPass(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout) {
 			SPADES_MARK_FUNCTION_DEBUG();
 

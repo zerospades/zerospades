@@ -93,7 +93,6 @@ namespace spades {
 			float DistanceFromEye(const Vector3& eye);
 
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
-			void RenderDepthPass(VkCommandBuffer commandBuffer);
 			void RenderShadowMapPass(VkCommandBuffer commandBuffer, VkPipelineLayout pipelineLayout);
 
 			uint32_t GetIndexCount() const { return (uint32_t)indices.size(); }

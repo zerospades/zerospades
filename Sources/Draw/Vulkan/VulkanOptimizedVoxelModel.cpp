@@ -54,11 +54,13 @@ namespace spades {
 			if ((int)r_physicalLighting != 0) {
 				SpirvCache::Preload({"Shaders/Vulkan/BasicModelVertexColorPhys.vert.spv",
 				                     "Shaders/Vulkan/BasicModelVertexColorPhys.frag.spv",
-				                     "Shaders/Vulkan/BasicModelVertexColorPhysGhost.frag.spv"});
+				                     "Shaders/Vulkan/BasicModelVertexColorPhysGhost.frag.spv",
+			                     "Shaders/Vulkan/ModelDepthPhys.frag.spv"});
 			} else {
 				SpirvCache::Preload({"Shaders/Vulkan/BasicModelVertexColor.vert.spv",
 				                     "Shaders/Vulkan/BasicModelVertexColor.frag.spv",
-				                     "Shaders/Vulkan/BasicModelVertexColorGhost.frag.spv"});
+				                     "Shaders/Vulkan/BasicModelVertexColorGhost.frag.spv",
+			                     "Shaders/Vulkan/ModelDepth.frag.spv"});
 			}
 			SpirvCache::Preload({"Shaders/Vulkan/ModelShadowMap.vert.spv",
 			                     "Shaders/Vulkan/ShadowMap.frag.spv",
@@ -68,9 +70,10 @@ namespace spades {
 
 		void VulkanOptimizedVoxelModel::PipelineCache::Destroy(VkDevice device) {
 			for (VkPipeline* p :
-			     {&pipeline, &mirroredPipeline, &shadowMapPipeline, &ghostDepthPipeline,
-			      &mirroredGhostDepthPipeline, &ghostColorPipeline, &mirroredGhostColorPipeline,
-			      &xrayPipeline, &mirroredXRayPipeline}) {
+			     {&pipeline, &mirroredPipeline, &depthPipeline, &mirroredDepthPipeline,
+			      &shadowMapPipeline, &ghostDepthPipeline, &mirroredGhostDepthPipeline,
+			      &ghostColorPipeline, &mirroredGhostColorPipeline, &xrayPipeline,
+			      &mirroredXRayPipeline}) {
 				if (*p != VK_NULL_HANDLE)
 					vkDestroyPipeline(device, *p, nullptr);
 				*p = VK_NULL_HANDLE;
@@ -363,112 +366,14 @@ namespace spades {
 		                                          bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
-			// Depth prerender writes only to depth buffer, no color output
-			// This is used for early-Z optimization and occlusion culling
-
-			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
-				return;
-
-			// Skip if no instances to render
-			if (params.empty())
-				return;
-
-			VkRenderPass renderPass = renderer.GetOffscreenRenderPass();
-			if (sharedPipeline.pipeline == VK_NULL_HANDLE || sharedPipeline.renderPass != renderPass) {
-				CreatePipeline(renderPass);
-			}
-
-			// Select pipeline: ghost depth prepass or opaque depth prepass
-			VkPipeline activePipeline = ghostPass ? sharedPipeline.ghostDepthPipeline : sharedPipeline.pipeline;
-			VkPipeline activeMirroredPipeline = ghostPass ? sharedPipeline.mirroredGhostDepthPipeline : sharedPipeline.mirroredPipeline;
-			if (activePipeline == VK_NULL_HANDLE)
-				return;
-
-			VkPipeline boundPipeline = VK_NULL_HANDLE;
-			auto bindPipeline = [&](VkPipeline p) {
-				if (p != boundPipeline) {
-					vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, p);
-					boundPipeline = p;
-				}
-			};
-			bindPipeline(activePipeline);
-
-			// Bind shadow map descriptor set
-			VulkanMapRenderer* mapRendererPrerender = renderer.GetMapRenderer();
-			if (mapRendererPrerender) {
-				VkDescriptorSet shadowDs = mapRendererPrerender->GetShadowDescriptorSet();
-				if (shadowDs != VK_NULL_HANDLE) {
-					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					                        sharedPipeline.pipelineLayout, 0, 1,
-					                        &shadowDs, 0, nullptr);
-				}
-			}
-			{
-				VulkanShadowMapRenderer* smr = renderer.GetShadowMapRenderer();
-				if (smr && smr->GetSamplingDescriptorSet() != VK_NULL_HANDLE) {
-					VkDescriptorSet samplingSet = smr->GetSamplingDescriptorSet();
-					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					                        sharedPipeline.pipelineLayout, 1, 1,
-					                        &samplingSet, 0, nullptr);
-				}
-			}
-			{
-				// The frame's dynamic lights (set 2), lit in this pass
-				VkDescriptorSet lightSet = renderer.GetSceneLights().GetDescriptorSet(
-				  renderer.GetCurrentFrameIndex());
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-				                        sharedPipeline.pipelineLayout, 2, 1, &lightSet, 0, nullptr);
-				// The view the pass sees the world through (set 3)
-				renderer.BindSceneView(commandBuffer, sharedPipeline.pipelineLayout);
-			}
-
-			// Bind vertex buffer
-			VkBuffer vb = vertexBuffer->GetBuffer();
-			VkDeviceSize offsets[] = {0};
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vb, offsets);
-
-			// Bind index buffer
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
-
-			// The pass's view, the fog's colour included, is the scene view's; the fog
-			// density is the model's own, from where it stands.
-			const auto& eye = renderer.GetSceneDef().viewOrigin;
-			float fogDist = renderer.GetFogDistance();
-
-			for (const auto& param : params) {
-				if (ghostPass != param.ghost)
-					continue;
-
-				// Switch to mirrored pipeline when the model matrix has a negative determinant
-				{
-					const auto& ax = param.matrix.GetAxis(0);
-					const auto& ay = param.matrix.GetAxis(1);
-					const auto& az = param.matrix.GetAxis(2);
-					bool isMirrored = Vector3::Dot(Vector3::Cross(ax, ay), az) < 0.0F;
-					bindPipeline(isMirrored ? activeMirroredPipeline : activePipeline);
-				}
-
-
-				// Compute fog density from model's world position
-				Vector4 modelWorldPos4 = param.matrix * MakeVector4(origin.x, origin.y, origin.z, 1.0f);
-				float dx = modelWorldPos4.x - eye.x;
-				float dy = modelWorldPos4.y - eye.y;
-				float horzDistSq = dx * dx + dy * dy;
-				float fogDensity = std::min(horzDistSq / (fogDist * fogDist), 1.0f);
-
-				ModelDrawConstants drawConstants{};
-				drawConstants.modelMatrix = param.matrix;
-				drawConstants.modelOrigin = origin;
-				drawConstants.fogDensity = fogDensity;
-				drawConstants.customColor = param.customColor;
-				// The ghost depth prepass writes it whole (blend is off).
-				drawConstants.opacity = ghostPass ? 1.0f : 0.0f;
-				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout,
-				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-				                   sizeof(drawConstants), &drawConstants);
-
-				vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
-			}
+			// Depth alone: the ghosts' before their colour (EQUAL), the rest's for the
+			// depth pre-pass, which the lit pass then meets
+			if (ghostPass)
+				DrawInstances(commandBuffer, params, true, &PipelineCache::ghostDepthPipeline,
+				              &PipelineCache::mirroredGhostDepthPipeline, PushedOpacity::Whole);
+			else
+				DrawInstances(commandBuffer, params, false, &PipelineCache::depthPipeline,
+				              &PipelineCache::mirroredDepthPipeline, PushedOpacity::Opaque);
 		}
 
 		void VulkanOptimizedVoxelModel::RenderShadowMapPass(VkCommandBuffer commandBuffer,
@@ -707,6 +612,20 @@ namespace spades {
 		                                                   bool ghostPass) {
 			SPADES_MARK_FUNCTION();
 
+			if (ghostPass)
+				DrawInstances(commandBuffer, params, true, &PipelineCache::ghostColorPipeline,
+				              &PipelineCache::mirroredGhostColorPipeline, PushedOpacity::Instance);
+			else
+				DrawInstances(commandBuffer, params, false, &PipelineCache::pipeline,
+				              &PipelineCache::mirroredPipeline, PushedOpacity::Opaque);
+		}
+
+		void VulkanOptimizedVoxelModel::DrawInstances(
+		  VkCommandBuffer commandBuffer, const std::vector<client::ModelRenderParam>& params,
+		  bool ghostPass, VkPipeline PipelineCache::*pipelineMember,
+		  VkPipeline PipelineCache::*mirroredPipelineMember, PushedOpacity pushedOpacity) {
+			SPADES_MARK_FUNCTION();
+
 			if (numIndices == 0 || !vertexBuffer || !indexBuffer)
 				return;
 
@@ -716,9 +635,8 @@ namespace spades {
 				CreatePipeline(renderPass);
 			}
 
-			// Select pipeline: ghost color pass or opaque pass
-			VkPipeline activePipeline = ghostPass ? sharedPipeline.ghostColorPipeline : sharedPipeline.pipeline;
-			VkPipeline activeMirroredPipeline = ghostPass ? sharedPipeline.mirroredGhostColorPipeline : sharedPipeline.mirroredPipeline;
+			const VkPipeline activePipeline = sharedPipeline.*pipelineMember;
+			const VkPipeline activeMirroredPipeline = sharedPipeline.*mirroredPipelineMember;
 			if (activePipeline == VK_NULL_HANDLE)
 				return;
 
@@ -819,8 +737,13 @@ namespace spades {
 				drawConstants.modelOrigin = origin;
 				drawConstants.fogDensity = fogDensity;
 				drawConstants.customColor = param.customColor;
-				// A ghost's opacity, its alpha
-				drawConstants.opacity = ghostPass ? param.opacity : 0.0f;
+				switch (pushedOpacity) {
+					case PushedOpacity::Opaque: drawConstants.opacity = 0.0f; break;
+					// The ghost depth prepass writes it whole (blend is off)
+					case PushedOpacity::Whole: drawConstants.opacity = 1.0f; break;
+					// A ghost's opacity, its alpha
+					case PushedOpacity::Instance: drawConstants.opacity = param.opacity; break;
+				}
 				vkCmdPushConstants(commandBuffer, sharedPipeline.pipelineLayout,
 				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
 				                   sizeof(drawConstants), &drawConstants);
@@ -1130,7 +1053,9 @@ namespace spades {
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
 			depthStencil.depthWriteEnable = VK_TRUE;
-			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+			// Less or equal, as GL's sunlight pass: after a depth pre-pass the lit
+			// pass meets the very depth its own vertex stage wrote there
+			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
 			depthStencil.stencilTestEnable = VK_TRUE;
 			depthStencil.front = MakeWorldStampStencilOp(0);
@@ -1246,12 +1171,63 @@ namespace spades {
 			result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1, &pipelineInfo, nullptr, &sharedPipeline.pipeline);
 
 			// Mirrored variant: same pipeline, front-face culled (for models with negative-scale matrices)
+			VkPipelineRasterizationStateCreateInfo mirroredRasterizer = rasterizer;
+			mirroredRasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
 			if (result == VK_SUCCESS) {
-				VkPipelineRasterizationStateCreateInfo mirroredRasterizer = rasterizer;
-				mirroredRasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;
 				pipelineInfo.pRasterizationState = &mirroredRasterizer;
-				vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1, &pipelineInfo, nullptr, &sharedPipeline.mirroredPipeline);
+				result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+				                                   &pipelineInfo, nullptr, &sharedPipeline.mirroredPipeline);
 				pipelineInfo.pRasterizationState = &rasterizer;
+			}
+
+			// The depth pre-pass's: the same vertex stage (`invariant gl_Position`,
+			// so the depth matches the lit pass's bit for bit) and a fragment stage
+			// clipping away just what the lit one does, below the mirror's water
+			// plane. No colour, no stencil: the lit pass stamps the world's mark.
+			if (result == VK_SUCCESS) {
+				const std::vector<uint32_t> depthFragCode =
+				  LoadSPIRVFile(sharedPipeline.physicalLighting
+				                  ? "Shaders/Vulkan/ModelDepthPhys.frag.spv"
+				                  : "Shaders/Vulkan/ModelDepth.frag.spv");
+				VkShaderModuleCreateInfo depthFragInfo{};
+				depthFragInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+				depthFragInfo.codeSize = depthFragCode.size() * sizeof(uint32_t);
+				depthFragInfo.pCode = depthFragCode.data();
+				VkShaderModule depthFragModule = VK_NULL_HANDLE;
+				result = vkCreateShaderModule(vkDevice, &depthFragInfo, nullptr, &depthFragModule);
+				if (result == VK_SUCCESS) {
+					VkPipelineShaderStageCreateInfo depthStages[2] = {vertShaderStageInfo,
+					                                                  fragShaderStageInfo};
+					depthStages[1].module = depthFragModule;
+					depthStages[1].pSpecializationInfo = nullptr;
+
+					VkPipelineDepthStencilStateCreateInfo prepassDepthStencil{};
+					prepassDepthStencil.sType =
+					  VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+					prepassDepthStencil.depthTestEnable = VK_TRUE;
+					prepassDepthStencil.depthWriteEnable = VK_TRUE;
+					prepassDepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+					VkPipelineColorBlendAttachmentState noColor{};
+					noColor.colorWriteMask = 0;
+					VkPipelineColorBlendStateCreateInfo noColorBlending = colorBlending;
+					noColorBlending.pAttachments = &noColor;
+
+					VkGraphicsPipelineCreateInfo prepassInfo = pipelineInfo;
+					prepassInfo.pStages = depthStages;
+					prepassInfo.pDepthStencilState = &prepassDepthStencil;
+					prepassInfo.pColorBlendState = &noColorBlending;
+					result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+					                                   &prepassInfo, nullptr,
+					                                   &sharedPipeline.depthPipeline);
+					if (result == VK_SUCCESS) {
+						prepassInfo.pRasterizationState = &mirroredRasterizer;
+						result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+						                                   &prepassInfo, nullptr,
+						                                   &sharedPipeline.mirroredDepthPipeline);
+					}
+					vkDestroyShaderModule(vkDevice, depthFragModule, nullptr);
+				}
 			}
 
 			// Cleanup shader modules

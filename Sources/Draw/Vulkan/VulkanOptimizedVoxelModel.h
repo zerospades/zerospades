@@ -79,6 +79,10 @@ namespace spades {
 				VkRenderPass renderPass = VK_NULL_HANDLE;
 				VkPipeline pipeline = VK_NULL_HANDLE;
 				VkPipeline mirroredPipeline = VK_NULL_HANDLE; // same as pipeline, VK_CULL_MODE_FRONT_BIT
+				// The depth pre-pass's: the lit pipelines' vertex stage, and a
+				// fragment stage that only clips away what the lit pass clips
+				VkPipeline depthPipeline = VK_NULL_HANDLE;
+				VkPipeline mirroredDepthPipeline = VK_NULL_HANDLE;
 				VkPipeline shadowMapPipeline = VK_NULL_HANDLE;
 				VkPipeline ghostDepthPipeline = VK_NULL_HANDLE;
 				VkPipeline mirroredGhostDepthPipeline = VK_NULL_HANDLE; // VK_CULL_MODE_FRONT_BIT
@@ -100,6 +104,25 @@ namespace spades {
 			};
 
 			static PipelineCache sharedPipeline;
+
+			/** What the draws push as a model's opacity */
+			enum class PushedOpacity {
+				Opaque,  // 0: not a ghost
+				Whole,   // 1: a ghost's depth, written whole
+				Instance // the ghost's own
+			};
+
+			/**
+			 * Draws the instances in `params` a pass draws (the ghosts, or the
+			 * rest) with the shared pipeline `pipelineMember` names, or its mirrored
+			 * sibling where the winding is reversed. The one loop every pass shares,
+			 * so that each draws the very same fragments: the depth pre-pass, the
+			 * lit pass, the ghosts' depth and colour.
+			 */
+			void DrawInstances(VkCommandBuffer, const std::vector<client::ModelRenderParam>& params,
+			                   bool ghostPass, VkPipeline PipelineCache::*pipelineMember,
+			                   VkPipeline PipelineCache::*mirroredPipelineMember,
+			                   PushedOpacity pushedOpacity);
 			static int pipelineRefCount;
 
 			VulkanRenderer& renderer;
