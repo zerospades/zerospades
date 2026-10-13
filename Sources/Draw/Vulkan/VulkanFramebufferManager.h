@@ -34,6 +34,7 @@ namespace spades {
 	namespace draw {
 		class VulkanSettings;
 		class VulkanImage;
+		class VulkanBuffer;
 
 		class VulkanFramebufferManager {
 			/** Copies `depth`, an attachment, into `sample`, an R32F image sampled by
@@ -106,6 +107,8 @@ namespace spades {
 			Handle<VulkanImage> sceneDepthSampleImage;
 			// The mirror's, at 1x with SSAO
 			Handle<VulkanImage> mirrorDepthSampleImage;
+			// What the copies into those pass through, at 1x
+			Handle<VulkanBuffer> depthCopyBuffer;
 
 			// Single-sample resolve targets for the scene attachments. Only created
 			// when useMSAA; the post-process chain and any code that *reads* the
