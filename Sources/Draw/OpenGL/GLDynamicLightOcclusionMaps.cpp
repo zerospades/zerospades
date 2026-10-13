@@ -33,14 +33,6 @@
 
 namespace spades {
 	namespace draw {
-		namespace {
-			/**
-			 * The widest a texel may get at a light's reach, in blocks. Its width is
-			 * how far off an edge of the beam's shadow can land.
-			 */
-			constexpr float kMaxTexelWidth = 1.5F;
-		} // namespace
-
 		float GLDynamicLightOcclusionMaps::GetTexelSpread(const GLDynamicLight& light) {
 			return 2.0F * light.GetSpotTangent() * GLDynamicLight::SpotFadeEnd / (float)TileSize;
 		}
@@ -49,7 +41,7 @@ namespace spades {
 			const client::DynamicLightParam& param = light.GetParam();
 			if (param.type != client::DynamicLightTypeSpotlight)
 				return false;
-			return param.radius * GetTexelSpread(light) <= kMaxTexelWidth;
+			return param.radius * GetTexelSpread(light) <= MaxTexelWidth;
 		}
 
 		GLDynamicLightOcclusionMaps::GLDynamicLightOcclusionMaps(GLRenderer& renderer)

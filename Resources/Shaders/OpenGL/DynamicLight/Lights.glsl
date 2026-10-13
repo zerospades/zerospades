@@ -83,13 +83,14 @@ uniform float dynamicLightTileOnly;
 // each, `DYNAMIC_LIGHT_OCCLUSION_ATLAS` texels across, each texel holding how far
 // from its light the ray through it gets before it enters a solid block.
 uniform sampler2D dynamicLightOcclusionMaps;
-#define DYNAMIC_LIGHT_OCCLUSION_TILE 128.0
+#define DYNAMIC_LIGHT_OCCLUSION_TILE 256.0
 #define DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW 8.0
-#define DYNAMIC_LIGHT_OCCLUSION_ATLAS 1024.0
+#define DYNAMIC_LIGHT_OCCLUSION_ATLAS 2048.0
 
 // The widest a texel may be at a point for its tile to prove the point lit, in
 // blocks: below `1 / sqrt(2)`, no block can stand in the way of the point without
-// crossing one of the four rays around it.
+// crossing one of the four rays around it. `GLDynamicLightOcclusionMaps::
+// MaxTexelWidth` only gives a tile to a light whose texels stay within it.
 #define DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH 0.7
 // How far short of where it meets the point's surface a ray may stop and still
 // count as reaching it, in blocks: the rays' reaches are half floats.

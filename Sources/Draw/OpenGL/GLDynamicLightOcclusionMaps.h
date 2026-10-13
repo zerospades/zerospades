@@ -48,13 +48,23 @@ namespace spades {
 		class GLDynamicLightOcclusionMaps {
 		public:
 			/** The texels along a tile's edge: `DYNAMIC_LIGHT_OCCLUSION_TILE` in the
-			 * shaders. */
-			static constexpr int TileSize = 128;
+			 * shaders. Enough for a flashlight of the default Light Config (a 90°
+			 * cone reaching 60 blocks) to keep its texels within `MaxTexelWidth`
+			 * all the way to its reach. */
+			static constexpr int TileSize = 256;
 			/** The tiles along the texture's edge. */
 			static constexpr int TilesPerRow = 8;
 			static constexpr int MaxTiles = TilesPerRow * TilesPerRow;
 			/** `DYNAMIC_LIGHT_OCCLUSION_ATLAS` in the shaders. */
 			static constexpr int AtlasSize = TileSize * TilesPerRow;
+
+			/**
+			 * The widest a texel may be, in blocks, for a tile to prove a point lit:
+			 * `DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH` in the shaders. A light only
+			 * gets a tile if its texels stay within it all the way to its reach, as
+			 * where they don't, its points are walked from the light as if it had none.
+			 */
+			static constexpr float MaxTexelWidth = 0.7F;
 
 			/**
 			 * How much wider a texel gets per block away from the light: the tile spans
