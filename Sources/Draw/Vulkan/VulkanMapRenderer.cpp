@@ -45,10 +45,10 @@ namespace spades {
 		    : renderer(r),
 		      device(r.GetDevice()),
 		      physicalLighting(false),
-		      depthonlyPipeline(VK_NULL_HANDLE),
 		      basicPipeline(VK_NULL_HANDLE),
 		      basicMirrorPipeline(VK_NULL_HANDLE),
-		      backfacePipeline(VK_NULL_HANDLE),
+		      depthPipeline(VK_NULL_HANDLE),
+		      depthMirrorPipeline(VK_NULL_HANDLE),
 		      pipelineLayout(VK_NULL_HANDLE),
 		      descriptorSetLayout(VK_NULL_HANDLE),
 		      descriptorPool(VK_NULL_HANDLE),
@@ -209,12 +209,6 @@ namespace spades {
 			}
 		}
 
-		void VulkanMapRenderer::Prerender() {
-			SPADES_MARK_FUNCTION();
-			// Depth-only prerender pass is now handled via RenderDepthPass
-			// This method can be used for other preprocessing if needed
-		}
-
 		void VulkanMapRenderer::RenderSunlightPass(VkCommandBuffer commandBuffer) {
 			SPADES_MARK_FUNCTION();
 
@@ -223,21 +217,33 @@ namespace spades {
 				return;
 			}
 
+			// The water reflection (mirror) pass reflects the scene across the
+			// water plane with a negative-Z scale, which reverses triangle winding —
+			// render it with the reversed-winding sibling so back-face culling stays
+			// correct (GL flips glFrontFace here).
+			DrawVisibleChunks(commandBuffer,
+			                  renderer.IsRenderingMirror() ? basicMirrorPipeline : basicPipeline);
+		}
+
+		void VulkanMapRenderer::RenderDepthPrepass(VkCommandBuffer commandBuffer) {
+			SPADES_MARK_FUNCTION();
+
+			if (depthPipeline == VK_NULL_HANDLE)
+				return;
+			DrawVisibleChunks(commandBuffer,
+			                  renderer.IsRenderingMirror() ? depthMirrorPipeline : depthPipeline);
+		}
+
+		void VulkanMapRenderer::DrawVisibleChunks(VkCommandBuffer commandBuffer, VkPipeline pipeline) {
+			SPADES_MARK_FUNCTION();
+
 			Vector3 viewOrigin = renderer.GetSceneDef().viewOrigin;
 			IntVector3 c = viewOrigin.Floor();
 			c.x >>= VulkanMapChunk::SizeBits;
 			c.y >>= VulkanMapChunk::SizeBits;
 			c.z >>= VulkanMapChunk::SizeBits;
 
-			// Bind the basic pipeline. The water reflection (mirror) pass reflects
-			// the scene across the water plane with a negative-Z scale, which
-			// reverses triangle winding — render it with the reversed-winding
-			// sibling so back-face culling stays correct (GL flips glFrontFace here).
-			VkPipeline sunlightPipeline =
-			  (renderer.IsRenderingMirror() && basicMirrorPipeline != VK_NULL_HANDLE)
-			    ? basicMirrorPipeline
-			    : basicPipeline;
-			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, sunlightPipeline);
+			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 			// Bind the model-shadow sampling set (set 1) once for the whole pass; the
 			// per-chunk set-0 binds don't disturb it. The UBO's enabled flag tells the
@@ -261,56 +267,21 @@ namespace spades {
 			// Draw from nearest to farthest for optimal depth testing
 			// Include all vertical chunks
 			for (int cz = 0; cz < numChunkDepth; cz++) {
-				DrawColumnSunlight(commandBuffer, c.x, c.y, cz, viewOrigin);
+				DrawColumn(commandBuffer, c.x, c.y, cz);
 			}
 
 			// Draw in a spiral pattern outward from the camera
 			for (int dist = 1; dist <= 128 / VulkanMapChunk::Size; dist++) {
 				for (int x = c.x - dist; x <= c.x + dist; x++) {
 					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnSunlight(commandBuffer, x, c.y + dist, cz, viewOrigin);
-						DrawColumnSunlight(commandBuffer, x, c.y - dist, cz, viewOrigin);
+						DrawColumn(commandBuffer, x, c.y + dist, cz);
+						DrawColumn(commandBuffer, x, c.y - dist, cz);
 					}
 				}
 				for (int y = c.y - dist + 1; y <= c.y + dist - 1; y++) {
 					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnSunlight(commandBuffer, c.x + dist, y, cz, viewOrigin);
-						DrawColumnSunlight(commandBuffer, c.x - dist, y, cz, viewOrigin);
-					}
-				}
-			}
-		}
-
-		void VulkanMapRenderer::RenderDepthPass(VkCommandBuffer commandBuffer) {
-			SPADES_MARK_FUNCTION();
-
-			// Depth-only pass for shadow mapping
-			// This renders all visible chunks to the depth buffer only
-
-			Vector3 viewOrigin = renderer.GetSceneDef().viewOrigin;
-			IntVector3 c = viewOrigin.Floor();
-			c.x >>= VulkanMapChunk::SizeBits;
-			c.y >>= VulkanMapChunk::SizeBits;
-			c.z >>= VulkanMapChunk::SizeBits;
-
-			// Draw from nearest to farthest for optimal depth testing
-			// Include all vertical chunks
-			for (int cz = 0; cz < numChunkDepth; cz++) {
-				DrawColumnDepth(commandBuffer, c.x, c.y, cz, viewOrigin);
-			}
-
-			// Draw in a spiral pattern outward from the camera
-			for (int dist = 1; dist <= 128 / VulkanMapChunk::Size; dist++) {
-				for (int x = c.x - dist; x <= c.x + dist; x++) {
-					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnDepth(commandBuffer, x, c.y + dist, cz, viewOrigin);
-						DrawColumnDepth(commandBuffer, x, c.y - dist, cz, viewOrigin);
-					}
-				}
-				for (int y = c.y - dist + 1; y <= c.y + dist - 1; y++) {
-					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnDepth(commandBuffer, c.x + dist, y, cz, viewOrigin);
-						DrawColumnDepth(commandBuffer, c.x - dist, y, cz, viewOrigin);
+						DrawColumn(commandBuffer, c.x + dist, y, cz);
+						DrawColumn(commandBuffer, c.x - dist, y, cz);
 					}
 				}
 			}
@@ -330,23 +301,7 @@ namespace spades {
 			}
 		}
 
-		void VulkanMapRenderer::DrawColumnDepth(VkCommandBuffer commandBuffer, int cx, int cy, int cz,
-		                                        Vector3 eye) {
-			SPADES_MARK_FUNCTION();
-
-			cx &= numChunkWidth - 1;
-			cy &= numChunkHeight - 1;
-			if (cz < 0 || cz >= numChunkDepth)
-				return;
-
-			VulkanMapChunk* chunk = GetChunk(cx, cy, cz);
-			if (chunk && chunk->IsRealized()) {
-				chunk->RenderDepthPass(commandBuffer);
-			}
-		}
-
-		void VulkanMapRenderer::DrawColumnSunlight(VkCommandBuffer commandBuffer, int cx, int cy, int cz,
-		                                           Vector3 eye) {
+		void VulkanMapRenderer::DrawColumn(VkCommandBuffer commandBuffer, int cx, int cy, int cz) {
 			SPADES_MARK_FUNCTION();
 
 			cx &= numChunkWidth - 1;
@@ -357,40 +312,6 @@ namespace spades {
 			VulkanMapChunk* chunk = GetChunk(cx, cy, cz);
 			if (chunk && chunk->IsRealized()) {
 				chunk->RenderSunlightPass(commandBuffer);
-			}
-		}
-
-		void VulkanMapRenderer::RenderBackface(VkCommandBuffer commandBuffer) {
-			SPADES_MARK_FUNCTION();
-
-			// Backface rendering is useful for water reflections and special effects
-			// Render map geometry with reversed front face (backface culling off or CW)
-
-			Vector3 viewOrigin = renderer.GetSceneDef().viewOrigin;
-			IntVector3 c = viewOrigin.Floor();
-			c.x >>= VulkanMapChunk::SizeBits;
-			c.y >>= VulkanMapChunk::SizeBits;
-			c.z >>= VulkanMapChunk::SizeBits;
-
-			// For backfaces, draw from farthest to nearest (reverse order)
-			// Draw in a reverse spiral pattern
-			for (int dist = 128 / VulkanMapChunk::Size; dist >= 1; dist--) {
-				for (int x = c.x - dist; x <= c.x + dist; x++) {
-					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnSunlight(commandBuffer, x, c.y + dist, cz, viewOrigin);
-						DrawColumnSunlight(commandBuffer, x, c.y - dist, cz, viewOrigin);
-					}
-				}
-				for (int y = c.y - dist + 1; y <= c.y + dist - 1; y++) {
-					for (int cz = 0; cz < numChunkDepth; cz++) {
-						DrawColumnSunlight(commandBuffer, c.x + dist, y, cz, viewOrigin);
-						DrawColumnSunlight(commandBuffer, c.x - dist, y, cz, viewOrigin);
-					}
-				}
-			}
-
-			for (int cz = 0; cz < numChunkDepth; cz++) {
-				DrawColumnSunlight(commandBuffer, c.x, c.y, cz, viewOrigin);
 			}
 		}
 
@@ -559,7 +480,9 @@ namespace spades {
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
 			depthStencil.depthWriteEnable = VK_TRUE;
-			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+			// Less or equal, as GL's sunlight pass: after a depth pre-pass the lit
+			// pass meets the very depth its own vertex stage wrote there
+			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
 			depthStencil.stencilTestEnable = VK_TRUE;
 			depthStencil.front = MakeWorldStampStencilOp(kStencilBitWorld);
@@ -702,6 +625,37 @@ namespace spades {
 				                                   &mirrorPipelineInfo, nullptr, &basicMirrorPipeline);
 			}
 
+			// The depth pre-pass's: the same vertex stage alone (with `invariant
+			// gl_Position`, so the depth matches the lit pass's bit for bit), no
+			// colour, no stencil: the lit pass stamps the world's mark.
+			if (result == VK_SUCCESS) {
+				VkPipelineDepthStencilStateCreateInfo prepassDepthStencil{};
+				prepassDepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+				prepassDepthStencil.depthTestEnable = VK_TRUE;
+				prepassDepthStencil.depthWriteEnable = VK_TRUE;
+				prepassDepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+				VkPipelineColorBlendAttachmentState noColor{};
+				noColor.colorWriteMask = 0;
+				VkPipelineColorBlendStateCreateInfo noColorBlending = colorBlending;
+				noColorBlending.pAttachments = &noColor;
+
+				VkGraphicsPipelineCreateInfo prepassInfo = pipelineInfo;
+				prepassInfo.stageCount = 1;
+				prepassInfo.pStages = &vertShaderStageInfo;
+				prepassInfo.pDepthStencilState = &prepassDepthStencil;
+				prepassInfo.pColorBlendState = &noColorBlending;
+				result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+				                                   &prepassInfo, nullptr, &depthPipeline);
+				if (result == VK_SUCCESS) {
+					VkPipelineRasterizationStateCreateInfo mirrorRasterizer = rasterizer;
+					mirrorRasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+					prepassInfo.pRasterizationState = &mirrorRasterizer;
+					result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
+					                                   &prepassInfo, nullptr, &depthMirrorPipeline);
+				}
+			}
+
 			// Cleanup shader modules
 			vkDestroyShaderModule(vkDevice, vertShaderModule, nullptr);
 			vkDestroyShaderModule(vkDevice, fragShaderModule, nullptr);
@@ -735,9 +689,11 @@ namespace spades {
 
 			VkDevice vkDevice = device->GetDevice();
 
-			if (depthonlyPipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, depthonlyPipeline, nullptr);
-				depthonlyPipeline = VK_NULL_HANDLE;
+			for (VkPipeline* p : {&depthPipeline, &depthMirrorPipeline}) {
+				if (*p != VK_NULL_HANDLE) {
+					vkDestroyPipeline(vkDevice, *p, nullptr);
+					*p = VK_NULL_HANDLE;
+				}
 			}
 
 			if (basicPipeline != VK_NULL_HANDLE) {
@@ -748,11 +704,6 @@ namespace spades {
 			if (basicMirrorPipeline != VK_NULL_HANDLE) {
 				vkDestroyPipeline(vkDevice, basicMirrorPipeline, nullptr);
 				basicMirrorPipeline = VK_NULL_HANDLE;
-			}
-
-			if (backfacePipeline != VK_NULL_HANDLE) {
-				vkDestroyPipeline(vkDevice, backfacePipeline, nullptr);
-				backfacePipeline = VK_NULL_HANDLE;
 			}
 
 			if (pipelineLayout != VK_NULL_HANDLE) {

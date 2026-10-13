@@ -50,6 +50,10 @@ layout(location = 10) out vec3 normalVarying;   // world-space surface normal
 layout(location = 11) out vec3 worldPosition;
 layout(location = 12) out vec2 ambientOcclusionCoord; // 2D coords into the AO atlas
 
+// Keep gl_Position bit-identical across the pipelines drawing the map with this
+// shader: the lit pass meets the depth its depth pre-pass wrote, by equality.
+invariant gl_Position;
+
 void main() {
 	vec3 position = vec3(positionAttribute);
 	vec4 worldPos = vec4(position + draw.modelOrigin, 1.0);

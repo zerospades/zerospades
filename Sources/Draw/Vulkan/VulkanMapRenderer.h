@@ -60,12 +60,14 @@ namespace spades {
 			bool physicalLighting;
 
 			// Shader programs/pipelines
-			VkPipeline depthonlyPipeline;
 			VkPipeline basicPipeline;
 			// Reversed-winding sibling of basicPipeline for the water reflection
 			// (mirror) pass, whose negative-Z scale flips triangle winding.
 			VkPipeline basicMirrorPipeline;
-			VkPipeline backfacePipeline;
+			// The depth pre-pass's: the lit pipelines' vertex stage alone, so the
+			// depth they write is the very depth the lit pass then meets
+			VkPipeline depthPipeline;
+			VkPipeline depthMirrorPipeline;
 
 			VkPipelineLayout pipelineLayout;
 			VkDescriptorSetLayout descriptorSetLayout;
@@ -98,10 +100,11 @@ namespace spades {
 
 			void RealizeChunks(Vector3 eye);
 
-			void DrawColumnDepth(VkCommandBuffer commandBuffer, int cx, int cy, int cz, Vector3 eye);
-			void DrawColumnSunlight(VkCommandBuffer commandBuffer, int cx, int cy, int cz, Vector3 eye);
+			void DrawColumn(VkCommandBuffer commandBuffer, int cx, int cy, int cz);
 
-			void RenderBackface(VkCommandBuffer commandBuffer);
+			/** Draws the chunks in view, nearest first, with `pipeline`, whose
+			 * layout is the lit pipelines' */
+			void DrawVisibleChunks(VkCommandBuffer commandBuffer, VkPipeline pipeline);
 
 		public:
 			VulkanMapRenderer(client::GameMap*, VulkanRenderer&);
@@ -117,9 +120,11 @@ namespace spades {
 			client::GameMap* GetMap() { return gameMap; }
 
 			void Realize();
-			void Prerender();
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
-			void RenderDepthPass(VkCommandBuffer commandBuffer);
+			/** Writes the depth of the chunks in view, and nothing else, into the
+			 * scene pass under way: the depth pre-pass, which the lit pass then
+			 * meets exactly */
+			void RenderDepthPrepass(VkCommandBuffer commandBuffer);
 			void RenderShadowMapPass(VkCommandBuffer commandBuffer, VkPipelineLayout shadowPipelineLayout);
 
 			void CreatePipelines(VkRenderPass renderPass);

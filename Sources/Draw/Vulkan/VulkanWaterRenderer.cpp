@@ -731,7 +731,7 @@ namespace spades {
 		CreateDescriptorSets();
 
 		// Create pipeline using water render pass (with LOAD_OP to preserve scene content)
-		VkRenderPass waterRenderPass = renderer.GetFramebufferManager()->GetWaterRenderPass();
+		VkRenderPass waterRenderPass = renderer.GetFramebufferManager()->GetContinueRenderPass();
 		waterPipeline = Handle<VulkanPipeline>::New(device, waterProgram, cfg, waterRenderPass, renderer.GetPipelineCache());
 
 		SPLog("VulkanWaterRenderer pipeline and descriptors created");

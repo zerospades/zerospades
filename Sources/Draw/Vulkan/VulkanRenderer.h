@@ -245,6 +245,24 @@ namespace spades {
 			 */
 			uint32_t AcquireFrameImage();
 
+			/** Sets the viewport and scissor every pass drawing into the scene's
+			 * targets uses: the render size, flipped so the scene comes out the way
+			 * up GL's does */
+			void SetSceneViewport(VkCommandBuffer commandBuffer) const;
+
+			/** Whether the scene's views start with a depth pre-pass of the map, as
+			 * GL's at `r_depthPrepass` */
+			bool UsesDepthPrepass() const;
+
+			/**
+			 * Records the depth pre-pass of the view being drawn into `framebuffer`:
+			 * the scene pass, clearing to `clearValues`, writing the depth of the map
+			 * (and the models' with `withModels`) and nothing else. The lit pass
+			 * then continues it (`GetContinueRenderPass`), meeting that depth.
+			 */
+			void RecordDepthPrepass(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer,
+			                        const VkClearValue (&clearValues)[2], bool withModels);
+
 			/** Whether this frame already found the swapchain unusable, so that
 			 * its 2D pass does not try (and wait) again */
 			bool frameImageUnavailable{false};

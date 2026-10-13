@@ -29,6 +29,7 @@ DEFINE_SPADES_SETTING(r_cameraBlur, "1");
 DEFINE_SPADES_SETTING(r_colorCorrection, "1");
 DEFINE_SPADES_SETTING(r_depthOfField, "0");
 DEFINE_SPADES_SETTING(r_depthOfFieldMaxCoc, "0.01");
+DEFINE_SPADES_SETTING(r_depthPrepass, "0");
 DEFINE_SPADES_SETTING(r_dlights, "1");
 DEFINE_SPADES_SETTING(r_exposureValue, "0");
 DEFINE_SPADES_SETTING(r_fogShadow, "0");

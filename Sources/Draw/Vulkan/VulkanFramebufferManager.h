@@ -126,7 +126,10 @@ namespace spades {
 
 			// Render pass used for all framebuffers
 			VkRenderPass renderPass;
-			VkRenderPass waterRenderPass; // Render pass with LOAD_OP for water rendering
+			// The scene pass continuing what is in its targets: colour, depth and
+			// stencil loaded from where the scene's pass left them. Compatible with
+			// renderPass, so every scene pipeline draws in it.
+			VkRenderPass continueRenderPass;
 			VkRenderPass spriteRenderPass; // Color-only render pass for soft sprite rendering
 			VkFramebuffer spriteFramebuffer;
 
@@ -177,7 +180,9 @@ namespace spades {
 
 			VkFormat GetMainColorFormat() { return fbColorFormat; }
 			VkRenderPass GetRenderPass() { return renderPass; }
-			VkRenderPass GetWaterRenderPass() { return waterRenderPass; }
+			/** The scene pass continuing what is in its targets (`LOAD`): the
+			 * water's, and the lit pass's after a depth pre-pass */
+			VkRenderPass GetContinueRenderPass() { return continueRenderPass; }
 			VkRenderPass GetSpriteRenderPass() { return spriteRenderPass; }
 			VkFramebuffer GetRenderFramebuffer() { return renderFramebuffer; }
 			VkFramebuffer GetSpriteFramebuffer() { return spriteFramebuffer; }
@@ -192,7 +197,6 @@ namespace spades {
 			 */
 			BufferHandle CreateBufferHandle(int w, int h, VkFormat colorFormat);
 
-			void ClearMirrorImage(VkCommandBuffer commandBuffer, Vector3 bgCol);
 			Handle<VulkanImage> GetMirrorColorImage() { return mirrorColorImage; }
 			Handle<VulkanImage> GetMirrorDepthImage() { return mirrorDepthImage; }
 			VkFramebuffer GetMirrorFramebuffer() { return mirrorFramebuffer; }
