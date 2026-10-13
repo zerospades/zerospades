@@ -92,6 +92,9 @@ namespace spades {
 
 			// Swapchain generation counter, incremented on every successful recreation
 		uint32_t swapchainGeneration{0};
+			/** Set when acquiring or presenting found the swapchain out of date or
+			 * suboptimal; acted on by the next `PrepareSwapchain` */
+			bool swapchainStale{false};
 
 			/** Whether the validation layers are on: asked for (debug builds, or
 			 * `ZS_VULKAN_VALIDATION`) and found */
@@ -106,7 +109,12 @@ namespace spades {
 			void ResolveSampleCount();
 			void CreateLogicalDevice();
 			void CreateAllocator();
-			void CreateSwapchain();
+			/** The extent a swapchain for `capabilities` gets: 0x0 while the
+			 * surface has no area */
+			VkExtent2D ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+			/** Creates the swapchain, handing `oldSwapchain` over to it if any */
+			void CreateSwapchain(VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE);
+			void RecreateSwapchain();
 			void CreateImageViews();
 			void CreateCommandPool();
 			void CreateSyncObjects();
@@ -155,8 +163,16 @@ namespace spades {
 			int ScreenWidth() const { return w; }
 			int ScreenHeight() const { return h; }
 
-			// Swapchain recreation (for window resize)
-			void RecreateSwapchain();
+			/**
+			 * Brings the swapchain in line with the surface, at a frame boundary,
+			 * before an image is acquired: rebuilds it when acquiring or presenting
+			 * reported it out of date or suboptimal, or the window's drawable size
+			 * changed. Nothing recorded against the old one can be in use then.
+			 *
+			 * Returns false while the surface has no area (a minimised window): no
+			 * swapchain can be made for it, and the frame is to be skipped.
+			 */
+			bool PrepareSwapchain();
 
 			// Returns a monotonically increasing counter, bumped on each swapchain recreation.
 			// Callers can compare against a cached value to detect when dependent resources

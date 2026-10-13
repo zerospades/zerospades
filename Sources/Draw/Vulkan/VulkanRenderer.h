@@ -229,6 +229,19 @@ namespace spades {
 			void CleanupVulkanResources();
 			void RecreateSwapchainDependencies();
 
+			/**
+			 * Begins a frame on the swapchain: brings it, and what the renderer
+			 * sizes from it, in line with the window, then acquires an image.
+			 * Returns UINT32_MAX when the frame cannot be drawn: the window is
+			 * minimised, or the swapchain went out of date; it is then dropped,
+			 * and a minimised window waits about a frame rather than spin.
+			 */
+			uint32_t AcquireFrameImage();
+
+			/** Whether this frame already found the swapchain unusable, so that
+			 * its 2D pass does not try (and wait) again */
+			bool frameImageUnavailable{false};
+
 			uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 			uint32_t FindMemoryTypeWithFallback(uint32_t typeFilter,
 			                                    VkMemoryPropertyFlags preferred,
