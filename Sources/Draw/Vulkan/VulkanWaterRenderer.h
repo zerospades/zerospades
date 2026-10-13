@@ -84,10 +84,8 @@ namespace spades {
 			void SetGameMap(client::GameMap* map);
 
 			void Realize();
-			void Prerender();
 
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
-			void RenderDepthPass(VkCommandBuffer commandBuffer);
 
 			// Water update tick
 			void UpdateSimulation(float dt);
