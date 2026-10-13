@@ -19,6 +19,7 @@
  */
 
 #include "VulkanGlareRenderer.h"
+#include "VulkanPushConstants.h"
 
 #include <array>
 #include <cmath>
@@ -46,6 +47,8 @@ namespace spades {
 				float zFar;
 				float outputIsLinear;
 			};
+			static_assert(sizeof(GlarePushConstants) <= kPortablePushConstantsSize,
+			              "push constants must fit the 128 bytes every device has (VulkanPushConstants.h)");
 			static_assert(sizeof(GlarePushConstants) <= 128,
 			              "push constants past 128 bytes are not portable");
 
