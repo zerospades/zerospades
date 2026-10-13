@@ -18,6 +18,8 @@
 
  */
 
+#include <cmath>
+
 #include "GLFramebufferManager.h"
 #include "GLGlareRenderer.h"
 #include "GLImage.h"
@@ -64,6 +66,10 @@ namespace spades {
 			static GLProgramUniform glareColor("glareColor");
 			static GLProgramUniform depthTexture("depthTexture");
 			static GLProgramUniform firstPersonDepthEnd("firstPersonDepthEnd");
+			static GLProgramUniform zNearFar("zNearFar");
+			static GLProgramUniform sourceCoord("sourceCoord");
+			static GLProgramUniform sourceSpread("sourceSpread");
+			static GLProgramUniform sourceDepth("sourceDepth");
 
 			program->Use();
 			positionAttribute(program);
@@ -72,6 +78,10 @@ namespace spades {
 			glareColor(program);
 			depthTexture(program);
 			firstPersonDepthEnd(program);
+			zNearFar(program);
+			sourceCoord(program);
+			sourceSpread(program);
+			sourceDepth(program);
 
 			device.ActiveTexture(1);
 			device.BindTexture(IGLDevice::Texture2D,
@@ -81,6 +91,10 @@ namespace spades {
 			glareTexture.SetValue(0);
 
 			firstPersonDepthEnd.SetValue(GLRenderer::kFirstPersonDepthEnd);
+			zNearFar.SetValue(def.zNear, def.zFar);
+
+			const float tanHalfX = std::tan(def.fovX * 0.5F);
+			const float tanHalfY = std::tan(def.fovY * 0.5F);
 
 			// Added onto the frame: what is underneath stays.
 			device.Enable(IGLDevice::Blend, true);
@@ -103,6 +117,13 @@ namespace spades {
 				const float halfHeight = param.radius * ndcPerUnitY;
 				drawRange.SetValue(centreX - halfWidth, centreY - halfHeight, centreX + halfWidth,
 				                   centreY + halfHeight);
+
+				// The light's lens, where the scene drawn in front of it hides it
+				sourceCoord.SetValue(centreX * 0.5F + 0.5F, centreY * 0.5F + 0.5F);
+				sourceSpread.SetValue(
+				  client::GlareParam::SourceRadius / (clip.w * tanHalfX) * 0.5F,
+				  client::GlareParam::SourceRadius / (clip.w * tanHalfY) * 0.5F);
+				sourceDepth.SetValue(clip.w - client::GlareParam::SourceOcclusionMargin);
 
 				glareColor.SetValue(param.color.x, param.color.y, param.color.z);
 				glare.image->Bind(IGLDevice::Texture2D);

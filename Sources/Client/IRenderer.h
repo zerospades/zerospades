@@ -141,11 +141,22 @@ namespace spades {
 
 		/**
 		 * The dazzle of a light the camera looks into: an image added onto the
-		 * finished frame, centred where the light projects. How much of it shows is
-		 * up to the caller; the renderer only keeps it under the first-person view's
-		 * models (`ModelRenderParam::depthHack`) where it can tell them apart.
+		 * finished frame, centred where the light projects.
+		 *
+		 * The renderer hides it as far as what it drew covers the light, a player as
+		 * much as a wall, so that it never gives away a lamp the camera can't see.
+		 * The first-person view's models (`ModelRenderParam::depthHack`) are drawn
+		 * over it instead, and say nothing of what stands before the light.
 		 */
 		struct GlareParam {
+			/** The radius of a glaring light's lens, in blocks: how much of the scene
+			 * around it is looked at to tell whether it is in sight. */
+			static constexpr float SourceRadius = 0.1F;
+
+			/** How far nearer than the light something has to be drawn to hide it, in
+			 * blocks: the headlamp it shines from is drawn about as far as it. */
+			static constexpr float SourceOcclusionMargin = 0.25F;
+
 			/** Where the light is. */
 			Vector3 origin;
 

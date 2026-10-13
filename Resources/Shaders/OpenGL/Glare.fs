@@ -27,6 +27,8 @@ uniform float firstPersonDepthEnd;
 
 varying vec2 texCoord;
 varying vec2 depthCoord;
+// How much of the light is in sight
+varying float visibility;
 
 void main() {
 	// Under the first-person view's hands and weapon, which are drawn over the
@@ -36,5 +38,5 @@ void main() {
 
 	// Alpha premultiplied as the 2D drawing does it, and added onto the frame
 	vec4 image = texture2D(glareTexture, texCoord);
-	gl_FragColor = vec4(glareColor * image.xyz * image.w, 0.0);
+	gl_FragColor = vec4(glareColor * image.xyz * (image.w * visibility), 0.0);
 }

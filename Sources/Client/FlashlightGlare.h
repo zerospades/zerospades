@@ -35,10 +35,12 @@ namespace spades {
 		 * white-hot core in a glow with a long, edgeless tail, which widens as the
 		 * camera turns down the beam and as the scene gets darker. It is drawn over
 		 * the finished frame, as it happens in the eye and not in the world, and
-		 * only the map standing between the camera and the lamp hides it: players
-		 * and models don't, so that every client gives a lit player away alike. It
-		 * is drawn under the camera's own hands and weapon, like the rest of the
-		 * screen in front of the eye.
+		 * whatever stands between the camera and the lamp hides it, so that it never
+		 * gives away a lamp the camera can't see: `Update` eases it out behind the
+		 * map, on screen or off, and the renderer hides it behind anything it drew in
+		 * front of the lamp, players included (`GlareParam`). It is drawn under the
+		 * camera's own hands and weapon, like the rest of the screen in front of the
+		 * eye.
 		 *
 		 * `Update` and then `AddToScene` run while the scene is built.
 		 */
