@@ -98,8 +98,10 @@ namespace spades {
 			static constexpr std::uint32_t ClusterGroupSize = 64;
 
 			/** The texels along an occlusion map tile's edge
-			 * (`DYNAMIC_LIGHT_OCCLUSION_TILE`) */
-			static constexpr std::uint32_t OcclusionTileSize = 128;
+			 * (`DYNAMIC_LIGHT_OCCLUSION_TILE`). Enough for a flashlight of the default
+			 * Light Config (a 90° cone reaching 60 blocks) to keep its texels within
+			 * `MaxOcclusionTexelWidth` all the way to its reach. */
+			static constexpr std::uint32_t OcclusionTileSize = 256;
 			/** The tiles along the atlas's edge (`DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW`) */
 			static constexpr std::uint32_t OcclusionTilesPerRow = 8;
 			/** `DYNAMIC_LIGHT_OCCLUSION_MAX_TILES`; any further spotlight walks the map. */
@@ -107,6 +109,13 @@ namespace spades {
 			  OcclusionTilesPerRow * OcclusionTilesPerRow;
 			static constexpr std::uint32_t OcclusionAtlasSize =
 			  OcclusionTileSize * OcclusionTilesPerRow;
+			/**
+			 * The widest a texel may be, in blocks, for a tile to prove a point lit:
+			 * `DYNAMIC_LIGHT_OCCLUSION_MAX_TEXEL_WIDTH` in the shaders. A spotlight
+			 * only gets a tile if its texels stay within it all the way to its reach,
+			 * as where they don't, its points walk the map as if it had none.
+			 */
+			static constexpr float MaxOcclusionTexelWidth = 0.7F;
 			/** `local_size_x` and `local_size_y` of `SceneLight/OcclusionMap.comp` */
 			static constexpr std::uint32_t OcclusionGroupSize = 8;
 

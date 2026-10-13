@@ -39,7 +39,7 @@
 // `DYNAMIC_LIGHT_OCCLUSION_TILE` texels each, `DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW`
 // to a row of the atlas, each texel holding how far from its light the ray through
 // it gets before it enters a solid block.
-#define DYNAMIC_LIGHT_OCCLUSION_TILE 128
+#define DYNAMIC_LIGHT_OCCLUSION_TILE 256
 #define DYNAMIC_LIGHT_OCCLUSION_TILES_PER_ROW 8
 #define DYNAMIC_LIGHT_OCCLUSION_MAX_TILES 64
 
