@@ -19,6 +19,8 @@
  */
 
 #include <algorithm>
+#include <chrono>
+#include <thread>
 #include "VulkanRenderer.h"
 #include "VulkanSpirvCache.h"
 #include "VulkanMapRenderer.h"
@@ -563,6 +565,8 @@ namespace spades {
 		// Rebuild swapchain-dependent renderer resources.
 		CreateFramebuffers();
 		CreateCommandBuffers();
+		if (imageRenderer)
+			imageRenderer->SwapchainRecreated();
 
 		// Rebuild the offscreen framebuffer manager, which is sized to render dimensions.
 		// The water renderer holds references into the framebuffer manager, so reset it first.
@@ -957,19 +961,10 @@ namespace spades {
 			currentFrameSlot = device->GetCurrentFrame();
 			vkWaitForFences(device->GetDevice(), 1, &inFlightFences[currentFrameSlot], VK_TRUE, UINT64_MAX);
 
-			// Acquire next swapchain image
-			currentImageIndex = device->AcquireNextImage(&imageAvailableSemaphore, &renderFinishedSemaphore);
-			if (currentImageIndex == UINT32_MAX) {
-				// Swapchain was recreated, try again
-				currentImageIndex = device->AcquireNextImage(&imageAvailableSemaphore, &renderFinishedSemaphore);
-			}
-			// A second failure (e.g. repeated OUT_OF_DATE mid-resize, or a 0x0
-			// minimised window) leaves no valid image. EndScene/Flip detect the
-			// UINT32_MAX sentinel and drop the frame instead of indexing past the
-			// command-buffer / framebuffer arrays.
-			if (currentImageIndex == UINT32_MAX) {
-				SPLog("[VulkanRenderer::StartScene] No swapchain image acquired; dropping frame");
-			}
+			// Without an image (a minimised window, or a swapchain gone out of
+			// date) EndScene and Flip see the UINT32_MAX sentinel and drop the
+			// frame instead of indexing past the per-image arrays.
+			currentImageIndex = AcquireFrameImage();
 
 			// The swapchain has more images than frame slots, and per-image resources
 			// (command buffer + the image renderer's descriptor pools / vertex buffers)
@@ -979,6 +974,27 @@ namespace spades {
 			// Without this, MAILBOX (AMD) can reset descriptors the GPU is still
 			// reading, dropping a HUD image for a frame.
 			WaitForImageInFlight();
+		}
+
+		uint32_t VulkanRenderer::AcquireFrameImage() {
+			// Rebuilt here, at a frame boundary, before anything of the frame is
+			// recorded against the swapchain's images
+			if (!device->PrepareSwapchain()) {
+				frameImageUnavailable = true;
+				// Nothing is presented, so nothing paces the game loop: wait about
+				// a frame, as presenting would have, instead of spinning
+				constexpr std::chrono::milliseconds unpresentableFrameInterval{16};
+				std::this_thread::sleep_for(unpresentableFrameInterval);
+				return UINT32_MAX;
+			}
+			if (device->GetSwapchainGeneration() != lastSwapchainGeneration)
+				RecreateSwapchainDependencies();
+
+			uint32_t imageIndex =
+			  device->AcquireNextImage(&imageAvailableSemaphore, &renderFinishedSemaphore);
+			if (imageIndex == UINT32_MAX)
+				frameImageUnavailable = true;
+			return imageIndex;
 		}
 
 		void VulkanRenderer::WaitForImageInFlight() {
@@ -1402,12 +1418,6 @@ namespace spades {
 				return;
 			}
 
-		// Rebuild swapchain-dependent resources if the swapchain was recreated since last frame
-		// (e.g. window resize triggered VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR).
-		if (device->GetSwapchainGeneration() != lastSwapchainGeneration) {
-			RecreateSwapchainDependencies();
-		}
-
 			if (sceneUsedInThisFrame) {
 				// Present the image (already rendered in EndScene)
 				VkSemaphore waitSemaphores[] = {renderFinishedSemaphore};
@@ -1421,11 +1431,13 @@ namespace spades {
 				currentFrameSlot = device->GetCurrentFrame();
 				vkWaitForFences(device->GetDevice(), 1, &inFlightFences[currentFrameSlot], VK_TRUE, UINT64_MAX);
 
-				// Acquire next swapchain image
-				currentImageIndex = device->AcquireNextImage(&imageAvailableSemaphore, &renderFinishedSemaphore);
+				// Unless the scene of this frame already found no image to draw on
+				currentImageIndex =
+				  frameImageUnavailable ? UINT32_MAX : AcquireFrameImage();
 				if (currentImageIndex == UINT32_MAX) {
-					SPLog("[VulkanRenderer::Flip] Failed to acquire swapchain image");
+					if (imageRenderer) { imageRenderer->Discard(); }
 					if (temporaryImagePool) { temporaryImagePool->ReleaseAll(); }
+					frameImageUnavailable = false;
 					return;
 				}
 
@@ -1472,6 +1484,7 @@ namespace spades {
 			if (temporaryImagePool) {
 				temporaryImagePool->ReleaseAll();
 			}
+			frameImageUnavailable = false;
 		}
 
 		Handle<Bitmap> VulkanRenderer::ReadBitmap() {
