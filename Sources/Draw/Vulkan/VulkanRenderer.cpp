@@ -817,28 +817,32 @@ namespace spades {
 				map->AddListener(this);
 			}
 
+			// The previous map's renderers go before any of the new map's are made,
+			// those that read others first. The radiosity and ambient-shadow
+			// renderers' worker threads read the map shadow renderer's bitmap and
+			// the map: replacing that renderer while a worker still ran would
+			// leave it reading freed memory. Destroying them joins their workers.
+			radiosityRenderer.reset();
+			ambientShadowRenderer.reset();
+			mapRenderer.reset();
+			flatMapRenderer.reset();
+			shadowMapRenderer.reset();
+			mapOccupancy.reset();
+			mapShadowRenderer.reset();
+
 			// Initialize map shadow renderer (heightmap shadow) BEFORE map renderer
 			if (map) {
 				mapShadowRenderer = stmp::make_unique<VulkanMapShadowRenderer>(*this, map);
 				ambientShadowRenderer = stmp::make_unique<VulkanAmbientShadowRenderer>(*this, *map);
 				radiosityRenderer = stmp::make_unique<VulkanRadiosityRenderer>(*this, *map);
-				// The previous map's goes first: they're both large.
-				mapOccupancy.reset();
 				mapOccupancy = stmp::make_unique<VulkanMapOccupancy>(
 				  *this, *map, device->GetMaxFramesInFlight());
-			} else {
-				mapShadowRenderer.reset();
-				ambientShadowRenderer.reset();
-				radiosityRenderer.reset();
-				mapOccupancy.reset();
 			}
 
 			// Initialize shadow map renderer first: the map/model sunlight pipeline
 			// layouts reference its sampling descriptor-set layout (set 1).
 			if (map) {
 				shadowMapRenderer = stmp::make_unique<VulkanShadowMapRenderer>(*this);
-			} else {
-				shadowMapRenderer.reset();
 			}
 
 			// Initialize map renderer
@@ -857,15 +861,11 @@ namespace spades {
 						radiosityRenderer->GetImageViewZ(),
 						radiosityRenderer->GetSampler());
 				}
-			} else {
-				mapRenderer.reset();
 			}
 
 			// Initialize flat map renderer (minimap)
 			if (map) {
 				flatMapRenderer = stmp::make_unique<VulkanFlatMapRenderer>(*this, *map);
-			} else {
-				flatMapRenderer.reset();
 			}
 
 			// Notify water renderer about map change
