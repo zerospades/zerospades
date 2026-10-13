@@ -1,191 +1,89 @@
 # Vulkan Renderer — TODO
 
-Base class for filters: [VulkanPostProcessFilter.h](VulkanPostProcessFilter.h).
-GL renderer in `Sources/Draw/OpenGL/` is the reference for everything below.
+Open work only; what is done is in the git history. The GL renderer in
+`Sources/Draw/OpenGL/` defines the visual result, not how Vulkan gets there.
 
-## Anti-aliasing
+## Critical
 
-MSAA is done (`r_multisamples`, incl. water + soft particles + setup-menu
-capability). Remaining:
+- [ ] **Glare offset, and seen through walls, at `r_scale` < 1** — the `r_scale`
+      commit (6cdda895) gave `VulkanGlareRenderer` the render size as its viewport,
+      but the glare is recorded in the swapchain (UI) pass, which is window-sized:
+      its quads land squeezed towards the top left, and each lamp's depth taps read
+      the depth at the wrong place. The viewport must be the swapchain's again (the
+      depth taps already use normalized coordinates, right at any render size).
+      Repro: `--override-cvar "r_ssao=1" --override-cvar "r_scale=0.7"`.
+- [ ] **Longer freeze between the server list and the map loading view** since the
+      unpushed commits (seen with `r_radiosity` 1). Cause not yet pinned down;
+      candidates: the extra pipelines built at map load (depth pre-pass, SSAO), the
+      radiosity / ambient-shadow `Invalidate` now taking a mutex per call (it runs
+      per changed block), one-time submits waiting on the queue. Measure before
+      changing anything.
 
-- [ ] **Temporal AA** (`r_temporalAA`) — `GLTemporalAAFilter` not ported. Plan: Halton
-      sub-pixel jitter in the main view's projection (`VulkanSceneView`, not the
-      mirror nor the shadow cascades); a compute resolve reprojecting through the
-      depth and last frame's unjittered view-projection, neighbourhood-clamped in
-      YCoCg, into two history images used in turn (one queue: barriers, no copies);
-      first-person pixels (depth < `kFirstPersonDepthEnd`) treated as fixed to the
-      screen; history reset on cuts, resizes and `r_scale` changes.
+## GL features still missing
 
-## Post-processing filters
-
-Wired into [VulkanRenderer.cpp](VulkanRenderer.cpp) pp-chain:
-Fog → DoF → CameraBlur → Bloom → FXAA → LensFlare → AutoExposure → ColorCorrection
-→ CavityOutline.
-
-| GL filter | Vulkan equivalent | Status |
-|---|---|---|
-| `GLAutoExposureFilter` | `VulkanAutoExposureFilter` | wired (`r_hdr`) |
-| `GLBloomFilter` | — | dead code in GL (instantiated nowhere) |
-| `GLLensDustFilter` (the real `r_bloom`) | `VulkanBloomFilter` | wired incl. dust texture + per-frame noise grain + Gauss1D H+V blur on every downsample level (`Gauss1DRGBA.vk.fs`). Delta: GL pre-blurs the first downsample level before building the pyramid; Vulkan skips that, so bloom is marginally sharper (needs a visual A/B before closing) |
-| `GLCameraBlurFilter` | `VulkanCameraBlurFilter` | wired (`r_cameraBlur` + `sceneDef.radialBlur`), between DoF and Bloom like GL |
-| `GLColorCorrectionFilter` | `VulkanColorCorrectionFilter` | wired (`r_colorCorrection`) |
-| `GLDepthOfFieldFilter` | `VulkanDepthOfFieldFilter` | wired (`r_depthOfField`) |
-| `GLFXAAFilter` | `VulkanFXAAFilter` | wired (`r_fxaa`) |
-| `GLFogFilter` / `GLFogFilter2` | `VulkanFogFilter` | wired (`r_fogShadow`) — see follow-ups below |
-| `GLLensFilter` | — | dead code in GL (unused) |
-| `GLLensFlareFilter` | `VulkanLensFlareFilter` | wired sun path (`r_lensFlare`) + per-light flares (`r_lensFlareDynamic`, capped at 9 flares/frame — sun + up to 8 dynamic lights — to bound the per-frame descriptor pool) |
-| `GLNonlinearizeFilter` | — | not needed — sRGB swapchain blit encodes for display |
-| `GLResampleBicubicFilter` | `VulkanResampleBicubicFilter` | wired (`r_scaleFilter == 2`); `r_scaleFilter == 0` now also honored via nearest blit |
-| `GLSSAOFilter` | `VulkanScreenSpaceAmbientOcclusion` | wired (`r_ssao`): compute from the full depth pre-pass, both views; the lit map/model shaders read it through the scene view's set |
-| `GLTemporalAAFilter` | — | **missing** (see AA gap above) |
-| (n/a — cavity is Vulkan-only) | `VulkanCavityOutlineFilter` | wired (`r_outlines`) |
-
-## Shadows — follow-ups
-
-Ground model shadows (player / grenade / other-players' weapons) are done:
-models render into a models-only cascaded shadow map and the map lit shader
-samples it (`BasicMap.frag` `EvaluteModelShadow()`). Remaining polish:
-
-- [x] **Model self-shadowing** — `BasicModelVertexColor.vert/frag` now
-      declare the set-1 cascade sampling (same layout as `BasicMap`), the
-      shared model pipeline layout carries both sets, and the prerender +
-      sunlight passes bind the sampling set (covering the ghost pipelines,
-      which draw from the same passes; their frag variants simply don't
-      declare set 1, which Vulkan permits against the wider layout). The
-      UBO `enabled` flag gates sampling when no cascade was rendered.
-- [ ] **Phys lit variants** — `BasicMapPhys`, `BasicModelVertexColorPhys`
-      (only active under `r_physicalLighting`).
-
-## Movable sun — follow-up
-
-`VulkanRenderer::GetSunDirection()` is the single source of truth for the sun.
-The shadow projection (`BuildMatrix`), the lens flare, the **map** lambert
-(`BasicMap.vert`) and now the **model** lambert (`BasicModelVertexColor.vert` +
-Phys vert/frag + ghost variants, via the `ModelSolidPushConstants.sunDirection`
-push field) all read it, so changing that one method moves the sun + its shadows
-+ ground/model lighting together. Still hardcoded `(0,-1,-1)`:
-
-The **Phys** map lambert (`BasicMapPhys.vert/frag` via
-`MapSolidPushConstants.sunDirection`) now reads it too.
-
-- [x] **Water + Fog2** — already wired: `Water/Water2/Water3.vk.fs` read
-      `WaterPushConstants.sunDirection` and `Fog2.vk.fs` reads the sun packed
-      into the scale `.w` slots, both fed from `GetSunDirection()`. The old
-      TODO pointed at `Water.frag`, which is a dead file (only `*.vk.fs` are
-      loaded via `Water*.vk.program`).
-- [x] Delete dead `Water.frag` / `Water.vert` — removed.
-
-## Stubs
-
-- [x] Map/model `PreloadShaders` — implemented; both warm the SPIR-V blob
-      cache (`VulkanSpirvCache`). Every Vulkan SPIR-V loader now routes through
-      that cache (map/model/shadow, image, sprite, long-sprite, sky,
-      multiply-color, debug-line), so a shader is read off disk at most once.
-- [ ] `PreloadShaders` only warms SPIR-V blobs, not `VkPipeline`s — pipelines
-      still compile lazily on first draw, so first-frame stutter is only
-      partially addressed. To close it, pre-create the pipelines (needs render
-      pass compat) or use `VK_EXT_graphics_pipeline_library` / a disk-warmed
-      pipeline cache.
-- [x] `VulkanWaterRenderer::RenderDynamicLightPass` — removed as dead code:
-      it was never called (GL water has no dynamic light pass either, so "no
-      reaction to dynamic lights" is parity). The prior no-op stub is gone.
-
-## Fog / sky parity follow-ups
-
-`VulkanFogFilter` covers Fog1 and Fog2; the items below are the
-remaining deltas vs GL.
-
-### `BasicMap.frag` (non-physical lighting)
-
-- [x] Missing terminal gamma encoding — sidestepped: the framebuffer
-      manager now prefers `A2B10G10R10_UNORM` whenever the hardware
-      supports it (attachment-blend + sampled), even with `r_highPrec=0`.
-      `R8G8B8A8_UNORM` remains only as a last-resort fallback on hardware
-      without 10-bit render targets.
-
-### Other
-
-- [ ] **Fog2 in-scatter dimmer than GL.** The flat `Sky.frag` fog-colour
-      fill is still drawn under Fog2 as a workaround. Drop once Fog2's
-      push-constant scales / integration curve match GL. Possibly caused
-      by the same depth-read bug fixed for the lens flare scanner (see
-      `VulkanFramebufferManager::sceneDepthSampleImage`): Fog2 samples
-      the same depth texture, and a D32 depth image read through
-      `sampler2D` silently returns 0 on MoltenVK — worth re-checking
-      after that fix before spending more time here.
-- [x] **Fog filter view ray glitches looking straight down** — fixed:
-      degenerate near-vertical rays now early-out (fog integral is ~0
-      there anyway) instead of snapping `dir.xy`, which made adjacent
-      fragments flip between real and snapped directions.
-- [x] **`VulkanMapShadowRenderer::Update` sub-rect upload** — dirty 32-texel
-      words coalesce into per-row spans, packed into staging and copied via
-      one multi-region `vkCmdCopyBufferToImage`. Falls back to full upload
-      when >25% dirty or >256 spans.
-
-## Outline tuning
-
-Done: `r_outlinesDepthThreshold` (default 0.05, clamped 0.001–1) and
-`r_outlinesStrength` (default 1, clamped 0–4) are cvars defined in
-[VulkanCavityOutlineFilter.cpp](VulkanCavityOutlineFilter.cpp) and read
-every frame. Remaining: expose them in the setup-menu preferences UI
-once defaults are confirmed across maps.
-
-## Performance / optimization
-
-### Memory
-
-- [ ] **Expand transient render-target aliasing** —
-      [VulkanTemporaryImagePool](VulkanTemporaryImagePool.h) currently
-      backs Bloom, DoF and LensFlare intermediates; other transient
-      targets could share allocations more aggressively.
-
-### Pipeline
-
-- [ ] **Pipeline derivatives** — Water/Water2/Water3 share most state.
-- [ ] **Specialization constants** — replace runtime conditionals in
-      shaders.
-
-### Render passes
-
-- [ ] **Merge compatible render passes into subpasses.**
-- [ ] **Audit load/store ops** — flag `LOAD_OP_LOAD` where `DONT_CARE`
-      would suffice and `STORE_OP_STORE` where `DONT_CARE` is acceptable.
-
-### Draw calls
-
-- [ ] **Indirect drawing** (`vkCmdDrawIndirect`) for terrain/world.
-- [ ] **Instancing** for repeated objects.
-- [ ] **GPU culling** via compute shaders.
-
-### Texture streaming
-
-- [ ] **Sparse textures** (`VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT`).
-- [ ] **Async texture uploads** on the transfer queue.
-
-## Build hygiene
-
-- [x] **Committed `.spv` files drift from the GLSL** — untracked
-      (`git rm --cached`) and gitignored; `glslangValidator` is a hard build
-      requirement so CMake always regenerates them in-tree.
-
-## Parity with GL — remaining
-
-- [ ] **Glare behind models in GL and SW** — Vulkan hides the flashlight glare
-      behind models (the scene's depth); GL and SW still apply the map-only rule of
-      93eaed00. Bring them in line: GL's Glare.vs tests the scene depth (first-person
-      range excluded), SW tests its depth buffer; keep "drawn under the first-person
-      view".
-- [ ] **Lit particles at night in GL** — GL still blacks out unlit particles at
-      night; Vulkan lights them per corner (`SpriteLight.glsl`). Port that model to
-      GL's sprite shaders: sun at the daylight, sky, minimum ambient, dynamic lights.
+- [ ] **Temporal AA** (`r_temporalAA`, `GLTemporalAAFilter`). Plan: Halton sub-pixel
+      jitter in the main view's projection (`VulkanSceneView`, not the mirror nor the
+      shadow cascades); a compute resolve reprojecting through the depth and last
+      frame's unjittered view-projection, neighbourhood-clamped in YCoCg, into two
+      history images used in turn (one queue: barriers, no copies); first-person
+      pixels (depth < `kFirstPersonDepthEnd`) treated as fixed to the screen;
+      history reset on cuts, resizes and `r_scale` changes.
+- [ ] **Model shadows under physical lighting** — `BasicMapPhys.frag` and
+      `BasicModelVertexColorPhys.frag` don't sample the model-shadow cascades
+      (`SceneLight/ModelShadow.glsl`); the basic shaders do.
 - [ ] **Water mirror skipped when the water is out of sight** (GL `r_occlusionQuery`)
       — one occlusion query per frame in flight, reset outside the pass, read once
       that slot's fence has signalled (or `VK_EXT_conditional_rendering`).
-- [ ] **Physical lighting's model shadows** — `BasicModelVertexColorPhys` has no
-      model-shadow cascades (the basic shader does).
+
+## Known deltas from GL
+
+- [ ] **Fog2 in-scatter dimmer than GL** — the flat `Sky.frag` fog-colour fill is
+      still drawn under Fog2 to compensate. Re-check against GL now that depth is
+      sampled through `sceneDepthSampleImage` (a D32 image read through `sampler2D`
+      returned 0 on MoltenVK), then drop the workaround once Fog2 matches.
+- [ ] **Bloom marginally sharper** — GL pre-blurs the first downsample level before
+      building the pyramid; `VulkanBloomFilter` doesn't. Needs a visual A/B.
+
+## Robustness / performance
+
+- [ ] **Pipelines compile on first draw** — `PreloadShaders` only warms the SPIR-V
+      blobs. Pre-create the pipelines at load (render passes are known then), so
+      neither the first frame nor a map change stalls on compilation.
+- [ ] **Audit load/store ops** — `LOAD` where `DONT_CARE` would do, `STORE` where
+      the contents are never read again.
+- [ ] **Outline tuning in the settings UI** — `r_outlinesDepthThreshold` and
+      `r_outlinesStrength` (`VulkanCavityOutlineFilter.cpp`) are cvars only.
+
+## Unscheduled ideas
+
+Pipeline derivatives for the three water programs; merging compatible render
+passes into subpasses; more transient targets through `VulkanTemporaryImagePool`;
+indirect drawing, instancing and GPU culling for the map; async uploads on a
+transfer queue.
+
+## OpenGL and software renderers (found while porting)
+
+- [ ] **Glare behind models in GL and SW** — Vulkan hides the flashlight glare
+      behind anything the scene draws in front of the lamp, players included; GL and
+      SW still apply the map-only rule of 93eaed00. GL's `Glare.vs` should test the
+      scene's depth (first-person range excluded), SW its depth buffer; keep "drawn
+      under the first-person view".
+- [ ] **Lit particles at night in GL** — GL still blacks out unlit particles at
+      night; Vulkan lights them per corner (`SpriteLight.glsl`): sun at the daylight,
+      sky, minimum ambient, dynamic lights. Port that model to GL's sprite shaders.
+- [ ] **GL radiosity / ambient-shadow worker races** — `GLRadiosityRenderer` and
+      `GLAmbientShadowRenderer` share chunk state with their worker threads unguarded:
+      `dirty` and the dirty ranges are written by map edits and taken by the worker
+      without a lock (edits can be lost), the worker reads `GetSceneDef()` while the
+      render thread rewrites it, and `transferDone.exchange(true)` hands the data back
+      before it is copied out, so the next batch can rewrite it mid-upload. The
+      Vulkan renderers' protocol (a mutex on the dirty state, the eye captured when a
+      batch starts, ownership passed by `transferDone` only after the copy) applies
+      as is.
 
 ## Notes
 
 - The lit map and model fragment shaders bind 16 sampled images with SSAO: exactly
   the per-stage minimum Vulkan guarantees. Anything more they sample must free one
   first (e.g. the four radiosity volumes packed into fewer images).
+- Push constants: 128 bytes at most, see `VulkanPushConstants.h`.
