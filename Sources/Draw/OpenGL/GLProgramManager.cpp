@@ -33,8 +33,60 @@
 #include <Core/Stopwatch.h>
 #include <Core/TMPUtils.h>
 
+#include <set>
+#include <sstream>
+
 namespace spades {
 	namespace draw {
+		namespace {
+			/** The deepest `#include`s may nest, which only a cycle reaches. */
+			constexpr int kMaxIncludeDepth = 16;
+
+			/** The directory `path` is in, with its trailing slash, or nothing. */
+			std::string DirectoryOf(const std::string& path) {
+				const std::size_t slash = path.find_last_of('/');
+				return slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
+			}
+
+			/**
+			 * `source`, read from `path`, with each `#include "file"` line replaced by
+			 * that file's own expanded source. A file is found relative to the one
+			 * including it, and goes in once per shader however often it is included,
+			 * as with `#pragma once`.
+			 */
+			std::string ExpandIncludes(const std::string& source, const std::string& path,
+			                           std::set<std::string>& included, int depth) {
+				if (depth > kMaxIncludeDepth)
+					SPRaise("GLSL includes nest too deep, in a cycle maybe, at '%s'",
+					        path.c_str());
+
+				std::istringstream lines(source);
+				std::string expanded;
+				std::string line;
+				while (std::getline(lines, line)) {
+					const std::size_t start = line.find_first_not_of(" \t");
+					if (start != std::string::npos && line.compare(start, 8, "#include") == 0) {
+						const std::size_t open = line.find('"', start + 8);
+						const std::size_t close =
+						  open == std::string::npos ? open : line.find('"', open + 1);
+						if (close == std::string::npos)
+							SPRaise("Malformed #include in '%s': %s", path.c_str(), line.c_str());
+
+						const std::string file =
+						  DirectoryOf(path) + line.substr(open + 1, close - open - 1);
+						if (included.insert(file).second)
+							expanded += ExpandIncludes(FileManager::ReadAllBytes(file.c_str()),
+							                           file, included, depth + 1);
+						expanded += '\n';
+						continue;
+					}
+					expanded += line;
+					expanded += '\n';
+				}
+				return expanded;
+			}
+		} // namespace
+
 		GLProgramManager::GLProgramManager(IGLDevice& d, GLSettings& settings)
 		    : device(d), settings(settings) {
 			SPADES_MARK_FUNCTION();
@@ -128,7 +180,9 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			SPLog("Loading GLSL shader '%s'", name.c_str());
-			std::string text = FileManager::ReadAllBytes(name.c_str());
+			std::set<std::string> included{name};
+			std::string text =
+			  ExpandIncludes(FileManager::ReadAllBytes(name.c_str()), name, included, 0);
 
 			GLShader::Type type;
 			if (name.find(".fs") != std::string::npos)
