@@ -22,6 +22,8 @@
 
 #include <array>
 #include <atomic>
+#include <cstddef>
+#include <mutex>
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Draw/Vulkan/VulkanMemoryAllocator.h>
@@ -62,12 +64,18 @@ namespace spades {
 			struct Chunk {
 				int cx, cy, cz;
 				float data[ChunkSize][ChunkSize][ChunkSize][2];
+				// What map edits left to recompute: written by the render thread,
+				// taken by the worker, both under `dirtyMutex`
 				bool dirty = true;
 				int dirtyMinX = 0, dirtyMaxX = ChunkSize - 1;
 				int dirtyMinY = 0, dirtyMaxY = ChunkSize - 1;
 				int dirtyMinZ = 0, dirtyMaxZ = ChunkSize - 1;
+				// Who owns the data: the worker while true, which then computes
+				// into it and hands it over by clearing this; the render thread
+				// while false, which copies it out and hands it back by setting it
 				std::atomic<bool> transferDone{true};
 			};
+			std::mutex dirtyMutex;
 
 			int w, h, d;
 			int chunkW, chunkH, chunkD;
@@ -79,14 +87,15 @@ namespace spades {
 			VkImageView imageView;
 			VkSampler sampler;
 
-			// Per-chunk staging buffer ring; large enough to hold any single chunk
-			// upload and reused across frames. (chunk = 16x16x16 RG float = 32 KB.)
-			static constexpr int kStagingSlotCount = 16;
+			// Staging, a slot per chunk uploaded (16x16x16 RG float = 32 KB), in
+			// a partition of its own for each frame in flight: a frame writes
+			// only its own, which the GPU is done with once that frame slot's
+			// fence was waited on.
+			static constexpr int kStagingSlotsPerFrame = 16;
 			VkBuffer stagingBuffer;
 			VmaAllocation stagingAllocation;
 			void* stagingMapped;
 			std::size_t stagingSlotSize;
-			int nextStagingSlot;
 
 			UpdateDispatch* dispatch;
 
@@ -100,8 +109,12 @@ namespace spades {
 
 			void Invalidate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
 
-			void UpdateChunk(int cx, int cy, int cz);
-			void UpdateDirtyChunks();
+			/** On the worker: recomputes what is dirty in `chunk`, whose data
+			 * it owns */
+			void UpdateChunk(Chunk& chunk);
+			/** On the worker: recomputes a batch of dirty chunks, those around
+			 * `eyeChunk` first */
+			void UpdateDirtyChunks(IntVector3 eyeChunk);
 			int GetNumDirtyChunks();
 
 			float Evaluate(IntVector3);
@@ -113,8 +126,9 @@ namespace spades {
 			void GameMapChanged(int x, int y, int z, client::GameMap*);
 
 			// Schedule a background recompute (if needed) and upload any chunks
-			// the previous dispatch finished. Must be called outside a render pass.
-			void Update(VkCommandBuffer commandBuffer);
+			// the previous dispatch finished, through frame slot `frameSlot`'s
+			// staging. Must be called outside a render pass.
+			void Update(VkCommandBuffer commandBuffer, std::size_t frameSlot);
 
 			VkImageView GetImageView() const { return imageView; }
 			VkSampler GetSampler() const { return sampler; }

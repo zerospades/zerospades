@@ -1885,13 +1885,13 @@ namespace spades {
 		// Upload any per-block ambient occlusion chunks that the background
 		// dispatch finished computing this frame.
 		if (sceneUsedInThisFrame && ambientShadowRenderer) {
-			ambientShadowRenderer->Update(commandBuffer);
+			ambientShadowRenderer->Update(commandBuffer, currentFrameSlot);
 		}
 
 		// Upload any radiosity (flat / X / Y / Z) chunks that finished
 		// recomputing on the worker thread this frame.
 		if (sceneUsedInThisFrame && radiosityRenderer) {
-			radiosityRenderer->Update(commandBuffer);
+			radiosityRenderer->Update(commandBuffer, currentFrameSlot);
 		}
 
 		// Render the cascaded shadow map BEFORE the main render pass. It is now a
