@@ -34,7 +34,9 @@ namespace spades {
 		// r_bloom — GLBloomFilter is dead code there).
 		//
 		// Algorithm:
-		//   1. Downsample 6 levels via bilinear passthrough.
+		//   1. Downsample the input to half size and blur it, then build levels
+		//      from it, each half the last and blurred, from a quarter of the
+		//      input down to a texel (at most 10), as GL does.
 		//   2. Composite levels back from smallest to second-largest using
 		//      mix(large, small, alpha) where alpha = sqrt(cnt/(cnt+1)).
 		//   3. LensDust composite: scene * 0.95 + dust² * bloom * 2 + grain,
