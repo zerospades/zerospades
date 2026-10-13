@@ -30,6 +30,9 @@ checks what a driver only reports at link time, on the machine that has the
 smallest limits:
 
   - the samplers each stage really uses, against the GPU's texture image units
+  - the samplers the program uses in all, against the texture units there are
+    (the renderer gives a unit only to a texture the program samples, and a
+    sampler both stages use takes one)
   - the uniform components each stage really uses
 
 The limits default to those of the macOS GL 2.1 context, and are read from a
@@ -58,6 +61,7 @@ RESOURCES = os.path.join(ROOT, "Resources")
 DEFAULT_LIMITS = {
     "GL_MAX_TEXTURE_IMAGE_UNITS": 16,
     "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS": 16,
+    "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS": 16,
     "GL_MAX_FRAGMENT_UNIFORM_COMPONENTS": 4096,
     "GL_MAX_VERTEX_UNIFORM_COMPONENTS": 4096,
 }
@@ -290,6 +294,16 @@ def main():
                     findings.setdefault((name, d), []).append(settings)
 
                 uniforms = parse_reflection(output)
+
+                units = sorted(u[0] for u in uniforms if u[1] in SAMPLER_TYPES)
+                key = (name, "program")
+                peak[key] = (max(peak.get(key, (0,))[0], len(units)), 0, None)
+                if len(units) > limits["GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS"]:
+                    findings.setdefault(
+                        (name, "program uses %d texture units, above "
+                         "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS %d: %s" %
+                         (len(units), limits["GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS"],
+                          ", ".join(units))), []).append(settings)
                 for stage, label, sampler_limit, component_limit in (
                     (STAGE_VERTEX, "vertex", "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS",
                      "GL_MAX_VERTEX_UNIFORM_COMPONENTS"),
