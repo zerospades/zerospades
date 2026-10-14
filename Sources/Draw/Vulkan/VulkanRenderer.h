@@ -143,9 +143,6 @@ namespace spades {
 			Vector3 fogColor;
 
 			Matrix4 projectionMatrix;
-			// The same without temporal AA's jitter, which only the main view is
-			// drawn with: the mirror's
-			Matrix4 unjitteredProjectionMatrix;
 			Matrix4 viewMatrix;
 			Matrix4 projectionViewMatrix;
 

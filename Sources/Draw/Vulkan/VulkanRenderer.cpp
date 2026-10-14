@@ -635,7 +635,6 @@ namespace spades {
 	void VulkanRenderer::BuildProjectionMatrix() {
 			SPADES_MARK_FUNCTION();
 			projectionMatrix = sceneDef.ToVulkanProjectionMatrix();
-			unjitteredProjectionMatrix = projectionMatrix;
 
 			// Temporal AA: the main view a sub-pixel off each frame (GL's
 			// BuildProjectionMatrix), in normalized device coordinates
@@ -2152,9 +2151,10 @@ namespace spades {
 			reflectedView = reflectedView * Matrix4::Scale(1, 1, -1);
 			reflectedView = reflectedView * Matrix4::Translate(0, 0, -63);
 			viewMatrix = reflectedView;
-			// Unjittered: the water samples the reflection, which temporal AA
-			// doesn't resolve
-			projectionViewMatrix = unjitteredProjectionMatrix * viewMatrix;
+			// Jittered as the main view, as GL's: the water samples the reflection
+			// where the jittered main view puts each of its pixels, so temporal AA
+			// resolves the reflection with the rest
+			projectionViewMatrix = projectionMatrix * viewMatrix;
 			sceneView->Write(currentFrameSlot, VulkanSceneView::View::Mirror,
 			                 GetSceneViewParameters());
 
