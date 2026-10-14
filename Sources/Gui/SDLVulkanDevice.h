@@ -28,6 +28,7 @@
 #include <vulkan/vulkan.h>
 #include <Imports/SDL.h>
 #include <Core/RefCountedObject.h>
+#include <Draw/Vulkan/VulkanFramesInFlight.h>
 #include <Draw/Vulkan/VulkanMemoryAllocator.h>
 
 namespace spades {
@@ -159,9 +160,9 @@ namespace spades {
 			void PresentImage(uint32_t imageIndex, VkSemaphore* waitSemaphores, uint32_t waitSemaphoreCount);
 			void WaitForFences();
 
-			// Frame index (cycles 0..MAX_FRAMES_IN_FLIGHT-1)
+			// Frame index (cycles 0..draw::MaxFramesInFlight-1)
 			uint32_t GetCurrentFrame() const { return currentFrame; }
-			uint32_t GetMaxFramesInFlight() const { return 2; }
+			uint32_t GetMaxFramesInFlight() const { return draw::MaxFramesInFlight; }
 
 			// Screen dimensions
 			int ScreenWidth() const { return w; }
