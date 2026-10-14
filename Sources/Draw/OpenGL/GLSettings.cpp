@@ -44,8 +44,6 @@ DEFINE_SPADES_SETTING(r_debugTimingFillGap, "0");
 DEFINE_SPADES_SETTING(r_sparseShadowMaps, "1");
 // FIXME: not yet implemented in Vulkan
 DEFINE_SPADES_SETTING(r_srgb2D, "1");
-// FIXME: not yet implemented in Vulkan
-DEFINE_SPADES_SETTING(r_temporalAA, "0");
 
 namespace spades {
 	namespace draw {

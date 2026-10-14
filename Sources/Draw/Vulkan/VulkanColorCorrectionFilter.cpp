@@ -41,6 +41,7 @@ SPADES_SETTING(r_colorCorrection);
 SPADES_SETTING(r_saturation);
 SPADES_SETTING(r_exposureValue);
 SPADES_SETTING(r_sharpen);
+SPADES_SETTING(r_temporalAA);
 
 namespace spades {
 	namespace draw {
@@ -438,15 +439,16 @@ namespace spades {
 
 			// The sharpening, as GLColorCorrectionFilter works it out: it recovers the
 			// contrast the fog takes away, so it grows with the fog's luminance as the
-			// scene shows it (none at night), and r_sharpen scales it. GL raises it to
-			// 1.5 at least under temporal AA, which this renderer doesn't have.
+			// scene shows it (none at night), and r_sharpen scales it. Under temporal
+			// AA it is 1.5 at least, as in GL, to make up for the AA's blur.
 			float fogLuminance = (sceneFogColor.x + sceneFogColor.y + sceneFogColor.z) / 3.0F;
 			if (renderer.GetSettings().UsesFog2()) {
 				// Fog2 adds a GI factor, so the fog receives some light even if the
 				// fog color is set to dark.
 				fogLuminance = fogLuminance * 0.9F + 0.2F;
 			}
-			const float sharpening = std::sqrt(fogLuminance) * 2.7F;
+			const float sharpening =
+			  std::max(std::sqrt(fogLuminance) * 2.7F, (int)r_temporalAA ? 1.5F : 0.0F);
 			const float sharpeningFinalGain = Clamp((float)r_sharpen, 0.0F, 1.0F);
 
 			uint32_t w = static_cast<uint32_t>(output->GetWidth());
