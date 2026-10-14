@@ -2050,9 +2050,11 @@ namespace spades {
 			// Process deferred deletions at the start of each frame
 			ProcessDeferredDeletions();
 
-			// The depth copies of the last frame are not this one's
+			// The depth copies and resolves of the last frame are not this one's
 			if (framebufferManager)
 				framebufferManager->InvalidateDepthSamples();
+			if (depthResolveFilter)
+				depthResolveFilter->Invalidate();
 
 			VkCommandBuffer commandBuffer = commandBuffers[imageIndex];
 
