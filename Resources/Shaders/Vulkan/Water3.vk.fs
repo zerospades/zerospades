@@ -65,6 +65,7 @@ layout(location = 1) in vec3 v_screenPosition;
 layout(location = 2) in vec3 v_viewPosition;
 layout(location = 3) in vec3 v_worldPosition;
 layout(location = 4) in vec2 v_worldPositionOriginal;
+layout(location = 5) in float v_surfaceHeight;
 
 layout(binding = 0) uniform sampler2D screenTexture;
 layout(binding = 1) uniform sampler2D depthTexture;
@@ -252,8 +253,12 @@ void main() {
 	vec2 subCoord = 1.0 - clamp((vec2(0.5) - startPos) / diffPos, 0.0, 1.0);
 	vec2 sampCoord = integralCoord + subCoord * blurDirSign;
 	vec3 waterColor = texture(mainTexture, sampCoord / 512.0).xyz;
+	// The dynamic lights fall on the water where it lies on its surface: the waves
+	// only move how it is drawn, and dip it into the map's bottom layer, whose
+	// blocks would otherwise shadow it at their edges.
+	vec3 litPosition = vec3(v_worldPosition.xy, v_surfaceHeight);
 	// The surface faces up, which is -Z in world space.
-	vec3 dynamicLight = EvaluateDynamicLights(v_worldPosition, vec3(0.0, 0.0, -1.0));
+	vec3 dynamicLight = EvaluateDynamicLights(litPosition, vec3(0.0, 0.0, -1.0));
 	waterColor *= sunlight + EvaluateAmbientLight(1.0) + dynamicLight;
 
 	// underwater object color
@@ -431,7 +436,7 @@ void main() {
 
 	/* ------- Dynamic Light Glint -------- */
 
-	fragColor.xyz += EvaluateWaterDynamicLightGlint(v_worldPosition, wave, ongoing) * att;
+	fragColor.xyz += EvaluateWaterDynamicLightGlint(litPosition, wave, ongoing) * att;
 
 #if !LINEAR_FRAMEBUFFER
 	fragColor.xyz = sqrt(fragColor.xyz);
