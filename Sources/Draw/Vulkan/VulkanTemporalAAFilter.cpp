@@ -56,16 +56,6 @@ namespace spades {
 						out[i][c] = m.m[c * 4 + rows[i]];
 			}
 
-			float Halton(std::uint32_t index, std::uint32_t base) {
-				float fraction = 1.0F, result = 0.0F;
-				while (index > 0) {
-					fraction /= (float)base;
-					result += fraction * (float)(index % base);
-					index /= base;
-				}
-				return result;
-			}
-
 			/** A move between frames past which the last frame is no history of
 			 * this one (a respawn, a spectator switching players), in blocks */
 			constexpr float kCutDistance = 8.0F;
@@ -109,13 +99,6 @@ namespace spades {
 			if (linearSampler != VK_NULL_HANDLE) vkDestroySampler(dev, linearSampler, nullptr);
 			if (nearestSampler != VK_NULL_HANDLE) vkDestroySampler(dev, nearestSampler, nullptr);
 			if (resolvePass != VK_NULL_HANDLE) vkDestroyRenderPass(dev, resolvePass, nullptr);
-		}
-
-		Vector2 VulkanTemporalAAFilter::NextJitter() {
-			// Halton (2, 3) over 8 frames, each within half a pixel of the centre
-			jitterIndex = jitterIndex % 8 + 1;
-			return MakeVector2(Halton((std::uint32_t)jitterIndex, 2) - 0.5F,
-			                   Halton((std::uint32_t)jitterIndex, 3) - 0.5F);
 		}
 
 		void VulkanTemporalAAFilter::InitRenderPass() {

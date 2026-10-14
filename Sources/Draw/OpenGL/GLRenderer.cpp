@@ -433,12 +433,9 @@ namespace spades {
 			Matrix4 mat = sceneDef.ToOpenGLProjectionMatrix();
 
 			if (settings.r_temporalAA && temporalAAFilter) {
-				float jitterX = 1.0F / GetRenderWidth();
-				float jitterY = 1.0F / GetRenderHeight();
-				Vector2 jitter = temporalAAFilter->GetProjectionMatrixJitter();
-				jitterX *= jitter.x * 1.3F;
-				jitterY *= jitter.y * 1.3F;
-				mat = Matrix4::Translate(jitterX, jitterY, 0.0F) * mat;
+				const Vector2 jitter =
+				  temporalAAFilter->NextJitter(GetRenderWidth(), GetRenderHeight());
+				mat = Matrix4::Translate(jitter.x, jitter.y, 0.0F) * mat;
 			}
 
 			projectionMatrix = mat;
