@@ -27,6 +27,7 @@
 #include "VulkanPostProcessFilter.h"
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+#include <Draw/TemporalAAJitter.h>
 
 namespace spades {
 	namespace draw {
@@ -34,7 +35,7 @@ namespace spades {
 		/**
 		 * Temporal anti-aliasing (`r_temporalAA`, GL's `GLTemporalAAFilter`).
 		 *
-		 * The main view is drawn with a sub-pixel jitter (`NextJitter`, Halton 2/3).
+		 * The main view is drawn with a sub-pixel jitter (`NextJitter`, GL's sequence).
 		 * `Filter` reprojects each pixel into the last frame through the scene's
 		 * depth and the last frame's unjittered view-projection, clamps the history
 		 * found there to the pixel's neighbourhood in YCoCg-like space, and blends
@@ -74,7 +75,7 @@ namespace spades {
 			Matrix4 prevMatrix;
 			Vector3 prevViewOrigin;
 
-			std::size_t jitterIndex = 0;
+			TemporalAAJitter jitter;
 
 			void InitRenderPass();
 			void InitDescriptorSetLayout();
@@ -90,9 +91,9 @@ namespace spades {
 			VulkanTemporalAAFilter(VulkanRenderer& renderer);
 			~VulkanTemporalAAFilter();
 
-			/** The next sub-pixel offset to draw the main view at, in pixels, each
-			 * within half a pixel of the centre */
-			Vector2 NextJitter();
+			/** The offset to draw the next frame's main view at
+			 * (`TemporalAAJitter::Next`) */
+			Vector2 NextJitter(int width, int height) { return jitter.Next(width, height); }
 
 			void Filter(VkCommandBuffer cmd, VulkanImage* input, VulkanImage* output) override;
 		};
