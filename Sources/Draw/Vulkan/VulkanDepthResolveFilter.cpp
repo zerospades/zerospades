@@ -242,7 +242,7 @@ namespace spades {
 			Target t{};
 			t.output = output;
 			t.depthView = depthView;
-			t.resolvedFrame = UINT32_MAX;
+			t.resolved = false;
 
 			VkImageView outputView = output->GetImageView();
 			VkFramebufferCreateInfo fbInfo{};
@@ -280,7 +280,7 @@ namespace spades {
 
 		void VulkanDepthResolveFilter::Invalidate() {
 			for (Target& t : targets)
-				t.resolvedFrame = UINT32_MAX;
+				t.resolved = false;
 		}
 
 		void VulkanDepthResolveFilter::ReleaseTargets() {
@@ -299,10 +299,9 @@ namespace spades {
 			// The ambient occlusion's resolve after the depth pre-pass serves what
 			// reads the depth later in the frame, unless something wrote it since
 			Target& target = GetTarget(msaaDepth, output);
-			const std::uint32_t frame = renderer.GetFrameNumber();
-			if (target.resolvedFrame == frame)
+			if (target.resolved)
 				return;
-			target.resolvedFrame = frame;
+			target.resolved = true;
 
 			uint32_t w = static_cast<uint32_t>(output->GetWidth());
 			uint32_t h = static_cast<uint32_t>(output->GetHeight());

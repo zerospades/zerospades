@@ -59,8 +59,9 @@ namespace spades {
 				VkImageView depthView;
 				VkFramebuffer framebuffer;
 				VkDescriptorSet set;
-				// The frame it was last resolved in, while the depth stays as it was
-				std::uint32_t resolvedFrame;
+				// Whether it holds the depth as it is now: set by a resolve, cleared
+				// by `Invalidate`
+				bool resolved;
 			};
 			static constexpr std::uint32_t kMaxTargets = 4;
 			std::vector<Target> targets;
@@ -87,8 +88,8 @@ namespace spades {
 			VulkanDepthResolveFilter(VulkanRenderer& renderer);
 			~VulkanDepthResolveFilter();
 
-			/** Resolves `msaaDepth` into `output`, unless it already did this frame
-			 * and the depth has not changed since (`Invalidate`) */
+			/** Resolves `msaaDepth` into `output`, unless it already did since the
+			 * depth last changed (`Invalidate`) */
 			void Resolve(VkCommandBuffer cmd, VulkanImage* msaaDepth, VulkanImage* output);
 			/** The depths may have changed since their last resolve: each is
 			 * resolved again */
