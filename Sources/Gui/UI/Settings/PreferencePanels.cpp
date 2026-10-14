@@ -394,8 +394,7 @@ namespace spades {
 				"fully hidden. Can improve FPS, but may crash some drivers."));
 			l.AddToggleField(_Tr("Preferences", "Object Outlines"), "r_outlines");
 			l.AddHelp(_Tr("Preferences",
-				"Draws cartoon-style outlines around players and map. "
-				"OpenGL renderer only."));
+				"Draws cartoon-style outlines around players and map."));
 			l.AddSliderField(_Tr("Preferences", "Outline Strength"), "r_outlinesStrength", 0, 4,
 			                 0.1F, NumberFormatter(1, ""));
 			l.AddHelp(_Tr("Preferences",
