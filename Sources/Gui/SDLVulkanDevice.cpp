@@ -47,7 +47,7 @@ SPADES_SETTING(r_vsync);
 namespace spades {
 	namespace gui {
 
-		static const int MAX_FRAMES_IN_FLIGHT = 2;
+		static const int MAX_FRAMES_IN_FLIGHT = draw::MaxFramesInFlight;
 
 		// Validation layers are on by default in debug builds, and can be turned
 		// on in any build by setting ZS_VULKAN_VALIDATION=1. Note that the layers
