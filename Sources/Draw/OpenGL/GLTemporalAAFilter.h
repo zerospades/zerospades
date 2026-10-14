@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <Draw/TemporalAAJitter.h>
 #include "GLFramebufferManager.h"
 
 namespace spades {
@@ -46,7 +47,7 @@ namespace spades {
 
 			Matrix4 prevMatrix;
 			Vector3 prevViewOrigin;
-			std::size_t jitterTableIndex = 0;
+			TemporalAAJitter jitter;
 
 			void DeleteHistoryBuffer();
 
@@ -54,7 +55,9 @@ namespace spades {
 			GLTemporalAAFilter(GLRenderer &);
 			~GLTemporalAAFilter();
 
-			Vector2 GetProjectionMatrixJitter();
+			/** The offset to draw the next frame's main view at
+			 * (`TemporalAAJitter::Next`) */
+			Vector2 NextJitter(int width, int height) { return jitter.Next(width, height); }
 
 			GLColorBuffer Filter(GLColorBuffer, bool useFxaa);
 		};

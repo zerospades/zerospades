@@ -639,11 +639,8 @@ namespace spades {
 			// Temporal AA: the main view a sub-pixel off each frame (GL's
 			// BuildProjectionMatrix), in normalized device coordinates
 			if ((int)r_temporalAA && temporalAAFilter && renderWidth > 0 && renderHeight > 0) {
-				const Vector2 jitter = temporalAAFilter->NextJitter();
-				projectionMatrix = Matrix4::Translate(jitter.x * 2.0F / (float)renderWidth,
-				                                      jitter.y * 2.0F / (float)renderHeight,
-				                                      0.0F) *
-				                   projectionMatrix;
+				const Vector2 jitter = temporalAAFilter->NextJitter(renderWidth, renderHeight);
+				projectionMatrix = Matrix4::Translate(jitter.x, jitter.y, 0.0F) * projectionMatrix;
 			}
 		}
 
