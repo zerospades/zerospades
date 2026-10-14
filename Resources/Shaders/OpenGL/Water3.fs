@@ -24,6 +24,7 @@ varying vec3 screenPosition;
 varying vec3 viewPosition;
 varying vec3 worldPosition;
 varying vec2 worldPositionOriginal;
+varying float surfaceHeight;
 
 uniform sampler2D screenTexture;
 uniform sampler2D depthTexture;
@@ -159,8 +160,12 @@ void main() {
 
 	vec3 diffuseShading = EvaluateAmbientLight(1.0);
 	vec3 sunlight = EvaluateSunLight();
+	// The dynamic lights fall on the water where it lies on its surface: the waves
+	// only move how it is drawn, and dip it into the map's bottom layer, whose
+	// blocks would otherwise shadow it at their edges.
+	vec3 litPosition = vec3(worldPosition.xy, surfaceHeight);
 	// The surface faces up, which is -Z in world space.
-	vec3 dynamicLight = EvaluateDynamicLights(worldPosition, vec3(0.0, 0.0, -1.0));
+	vec3 dynamicLight = EvaluateDynamicLights(litPosition, vec3(0.0, 0.0, -1.0));
 
 	// Blend the water color
 	// TODO: correct integral
@@ -343,7 +348,7 @@ void main() {
 
 	/* ------- Dynamic Light Glint -------- */
 
-	gl_FragColor.xyz += EvaluateWaterDynamicLightGlint(worldPosition, wave, ongoing) * att;
+	gl_FragColor.xyz += EvaluateWaterDynamicLightGlint(litPosition, wave, ongoing) * att;
 
 #if !LINEAR_FRAMEBUFFER
 	gl_FragColor.xyz = sqrt(gl_FragColor.xyz);
