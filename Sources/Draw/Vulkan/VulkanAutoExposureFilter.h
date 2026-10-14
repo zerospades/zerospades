@@ -23,6 +23,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Draw/Vulkan/VulkanMemoryAllocator.h>
+#include "VulkanFramesInFlight.h"
 #include "VulkanPostProcessFilter.h"
 
 namespace spades {
@@ -86,7 +87,7 @@ namespace spades {
 			// Descriptor sets and dynamic framebuffers are created each frame and
 			// must not be freed until the GPU has finished with them.  We keep two
 			// slots (matching maxFramesInFlight=2) and recycle them on next use.
-			static constexpr int MAX_FRAME_SLOTS = 2;
+			static constexpr int MAX_FRAME_SLOTS = MaxFramesInFlight;
 			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
 			std::vector<VkFramebuffer> perFrameFramebuffers[MAX_FRAME_SLOTS];
 

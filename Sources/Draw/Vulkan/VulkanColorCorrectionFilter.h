@@ -22,6 +22,7 @@
 
 #include <vector>
 #include <vulkan/vulkan.h>
+#include "VulkanFramesInFlight.h"
 #include "VulkanPostProcessFilter.h"
 #include <Core/Math.h>
 
@@ -62,7 +63,7 @@ namespace spades {
 			// little every frame as GL does; negative until the first frame
 			Vector3 smoothedFogColor{-1.0F, -1.0F, -1.0F};
 
-			static constexpr int MAX_FRAME_SLOTS = 2;
+			static constexpr int MAX_FRAME_SLOTS = MaxFramesInFlight;
 			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
 			std::vector<VkFramebuffer> perFrameFramebuffers[MAX_FRAME_SLOTS];
 

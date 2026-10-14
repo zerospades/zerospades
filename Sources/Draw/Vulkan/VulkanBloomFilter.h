@@ -24,6 +24,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 #include <Client/IImage.h>
+#include "VulkanFramesInFlight.h"
 #include "VulkanPostProcessFilter.h"
 
 namespace spades {
@@ -69,7 +70,7 @@ namespace spades {
 			VkPipeline upsamplePipeline;
 			VkPipeline compositePipeline;
 
-			static constexpr int MAX_FRAME_SLOTS = 2;
+			static constexpr int MAX_FRAME_SLOTS = MaxFramesInFlight;
 			VkDescriptorPool perFrameDescPool[MAX_FRAME_SLOTS];
 			std::vector<VkFramebuffer> perFrameFramebuffers[MAX_FRAME_SLOTS];
 
