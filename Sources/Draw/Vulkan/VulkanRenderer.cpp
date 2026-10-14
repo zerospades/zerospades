@@ -1162,7 +1162,8 @@ namespace spades {
 
 			VkRenderPassBeginInfo beginInfo{};
 			beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			beginInfo.renderPass = framebufferManager->GetRenderPass();
+			beginInfo.renderPass = renderingMirror ? framebufferManager->GetMirrorPrepassRenderPass()
+			                                       : framebufferManager->GetRenderPass();
 			beginInfo.framebuffer = framebuffer;
 			beginInfo.renderArea.extent = {static_cast<uint32_t>(renderWidth),
 			                               static_cast<uint32_t>(renderHeight)};
@@ -2251,13 +2252,16 @@ namespace spades {
 			mirrorBarriers[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			mirrorBarriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-			// The depth is sampled only by the depth-resolve filter under MSAA; at
-			// 1x, not being SAMPLED, it stays an attachment and is copied
+			// The depth is sampled only by the depth-resolve filter, under MSAA at
+			// r_water 3, the only case its pass stores it; otherwise it stays an
+			// attachment, copied at 1x and r_water 3, and every pass on it next
+			// starts from an undefined layout
 			const bool msaa = framebufferManager->IsMSAA();
+			const bool depthResolved = msaa && (int)settings.r_water >= 3;
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				0, 0, nullptr, 0, nullptr, msaa ? 2 : 1, mirrorBarriers);
+				0, 0, nullptr, 0, nullptr, depthResolved ? 2 : 1, mirrorBarriers);
 
 			// Under MSAA the mirror attachments are multisampled (for pipeline
 			// compatibility with the scene), but the water shader samples reflections
