@@ -69,6 +69,7 @@ namespace spades {
 		class VulkanFogFilter;
 		class VulkanDepthOfFieldFilter;
 		class VulkanFXAAFilter;
+		class VulkanTemporalAAFilter;
 		class VulkanCameraBlurFilter;
 		class VulkanResampleBicubicFilter;
 		class VulkanCavityOutlineFilter;
@@ -142,6 +143,9 @@ namespace spades {
 			Vector3 fogColor;
 
 			Matrix4 projectionMatrix;
+			// The same without temporal AA's jitter, which only the main view is
+			// drawn with: the mirror's
+			Matrix4 unjitteredProjectionMatrix;
 			Matrix4 viewMatrix;
 			Matrix4 projectionViewMatrix;
 
@@ -187,6 +191,7 @@ namespace spades {
 		std::unique_ptr<VulkanFogFilter> fogFilter;
 		std::unique_ptr<VulkanDepthOfFieldFilter> depthOfFieldFilter;
 		std::unique_ptr<VulkanFXAAFilter> fxaaFilter;
+		std::unique_ptr<VulkanTemporalAAFilter> temporalAAFilter;
 		std::unique_ptr<VulkanCameraBlurFilter> cameraBlurFilter;
 		std::unique_ptr<VulkanResampleBicubicFilter> resampleBicubicFilter;
 		std::unique_ptr<VulkanCavityOutlineFilter> cavityOutlineFilter;

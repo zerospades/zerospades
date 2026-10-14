@@ -55,6 +55,7 @@
 #include "VulkanFogFilter.h"
 #include "VulkanDepthOfFieldFilter.h"
 #include "VulkanFXAAFilter.h"
+#include "VulkanTemporalAAFilter.h"
 #include "VulkanCameraBlurFilter.h"
 #include "VulkanResampleBicubicFilter.h"
 #include "VulkanCavityOutlineFilter.h"
@@ -76,6 +77,7 @@
 SPADES_SETTING(r_dlights);
 SPADES_SETTING(r_depthOfField);
 SPADES_SETTING(r_fxaa);
+SPADES_SETTING(r_temporalAA);
 SPADES_SETTING(r_cameraBlur);
 SPADES_SETTING(r_depthPrepass);
 SPADES_SETTING(r_occlusionQuery);
@@ -225,6 +227,7 @@ namespace spades {
 			fogFilter = stmp::make_unique<VulkanFogFilter>(*this);
 			depthOfFieldFilter = stmp::make_unique<VulkanDepthOfFieldFilter>(*this);
 			fxaaFilter = stmp::make_unique<VulkanFXAAFilter>(*this);
+			temporalAAFilter = stmp::make_unique<VulkanTemporalAAFilter>(*this);
 			cameraBlurFilter = stmp::make_unique<VulkanCameraBlurFilter>(*this);
 			resampleBicubicFilter = stmp::make_unique<VulkanResampleBicubicFilter>(*this);
 			cavityOutlineFilter = stmp::make_unique<VulkanCavityOutlineFilter>(*this);
@@ -280,6 +283,7 @@ namespace spades {
 			depthResolveFilter.reset();
 			resampleBicubicFilter.reset();
 			cameraBlurFilter.reset();
+			temporalAAFilter.reset();
 			fxaaFilter.reset();
 			depthOfFieldFilter.reset();
 			fogFilter.reset();
@@ -631,6 +635,17 @@ namespace spades {
 	void VulkanRenderer::BuildProjectionMatrix() {
 			SPADES_MARK_FUNCTION();
 			projectionMatrix = sceneDef.ToVulkanProjectionMatrix();
+			unjitteredProjectionMatrix = projectionMatrix;
+
+			// Temporal AA: the main view a sub-pixel off each frame (GL's
+			// BuildProjectionMatrix), in normalized device coordinates
+			if ((int)r_temporalAA && temporalAAFilter && renderWidth > 0 && renderHeight > 0) {
+				const Vector2 jitter = temporalAAFilter->NextJitter();
+				projectionMatrix = Matrix4::Translate(jitter.x * 2.0F / (float)renderWidth,
+				                                      jitter.y * 2.0F / (float)renderHeight,
+				                                      0.0F) *
+				                   projectionMatrix;
+			}
 		}
 
 		void VulkanRenderer::BuildView() {
@@ -2137,7 +2152,9 @@ namespace spades {
 			reflectedView = reflectedView * Matrix4::Scale(1, 1, -1);
 			reflectedView = reflectedView * Matrix4::Translate(0, 0, -63);
 			viewMatrix = reflectedView;
-			projectionViewMatrix = projectionMatrix * viewMatrix;
+			// Unjittered: the water samples the reflection, which temporal AA
+			// doesn't resolve
+			projectionViewMatrix = unjitteredProjectionMatrix * viewMatrix;
 			sceneView->Write(currentFrameSlot, VulkanSceneView::View::Mirror,
 			                 GetSceneViewParameters());
 
@@ -2790,6 +2807,12 @@ namespace spades {
 					                            intensity, def.radialBlur))
 						advanceChain();
 				}
+			}
+
+			// Temporal AA, after the camera blur and before the bloom as in GL
+			if ((int)r_temporalAA && temporalAAFilter && currentInput && currentOutput) {
+				temporalAAFilter->Filter(commandBuffer, currentInput, currentOutput);
+				advanceChain();
 			}
 
 			// Bloom

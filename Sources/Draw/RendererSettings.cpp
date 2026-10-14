@@ -59,4 +59,5 @@ DEFINE_SPADES_SETTING(r_sharpen, "0");
 DEFINE_SPADES_SETTING(r_softParticles, "1");
 DEFINE_SPADES_SETTING(r_srgb, "0");
 DEFINE_SPADES_SETTING(r_ssao, "0");
+DEFINE_SPADES_SETTING(r_temporalAA, "0");
 DEFINE_SPADES_SETTING(r_water, "2");
