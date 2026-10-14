@@ -43,6 +43,7 @@ namespace spades {
 		      mirrorFramebuffer(VK_NULL_HANDLE),
 		      renderPass(VK_NULL_HANDLE),
 		      continueRenderPass(VK_NULL_HANDLE),
+		      mirrorPrepassRenderPass(VK_NULL_HANDLE),
 		      mirrorRenderPass(VK_NULL_HANDLE),
 		      mirrorContinueRenderPass(VK_NULL_HANDLE),
 		      spriteRenderPass(VK_NULL_HANDLE),
@@ -422,7 +423,8 @@ namespace spades {
 				vkDestroyRenderPass(vkDevice, continueRenderPass, nullptr);
 			}
 
-			for (VkRenderPass pass : {mirrorRenderPass, mirrorContinueRenderPass})
+			for (VkRenderPass pass :
+			     {mirrorPrepassRenderPass, mirrorRenderPass, mirrorContinueRenderPass})
 				if (pass != VK_NULL_HANDLE)
 					vkDestroyRenderPass(vkDevice, pass, nullptr);
 
@@ -542,20 +544,28 @@ namespace spades {
 				SPRaise("Failed to create the Vulkan scene continue render pass");
 			}
 
-			// The mirror's: the same two, storing no stencil, and its depth only
-			// where the water reads it. Only store ops differ, so they stay
-			// compatible with the mirror framebuffer and the scene pipelines.
+			// The mirror's: its depth pre-pass, and the same two, with neither
+			// loading nor storing stencil, which only the main view's x-ray reveal
+			// reads (the mirror's pipelines only stamp it, comparing nothing), and
+			// the lit pass storing depth only where the water reads it. Only load
+			// and store ops differ, so they stay compatible with the mirror
+			// framebuffer and the scene pipelines.
 			const VkAttachmentStoreOp mirrorDepthStore =
 			  mirrorDepthRead ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			VkRenderPassCreateInfo mirrorRenderPassInfo = renderPassInfo;
 			VkAttachmentDescription mirrorAttachments[2];
 			mirrorRenderPassInfo.pAttachments = mirrorAttachments;
-			const VkAttachmentDescription* sources[2] = {attachments, continueAttachments};
-			VkRenderPass* passes[2] = {&mirrorRenderPass, &mirrorContinueRenderPass};
-			for (int i = 0; i < 2; i++) {
+			const VkAttachmentDescription* sources[3] = {attachments, attachments,
+			                                             continueAttachments};
+			VkRenderPass* passes[3] = {&mirrorPrepassRenderPass, &mirrorRenderPass,
+			                           &mirrorContinueRenderPass};
+			for (int i = 0; i < 3; i++) {
 				mirrorAttachments[0] = sources[i][0];
 				mirrorAttachments[1] = sources[i][1];
-				mirrorAttachments[1].storeOp = mirrorDepthStore;
+				// The pre-pass's depth is the lit pass's to continue from
+				if (passes[i] != &mirrorPrepassRenderPass)
+					mirrorAttachments[1].storeOp = mirrorDepthStore;
+				mirrorAttachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 				mirrorAttachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 				if (vkCreateRenderPass(vkDevice, &mirrorRenderPassInfo, nullptr, passes[i]) !=
 				    VK_SUCCESS) {
