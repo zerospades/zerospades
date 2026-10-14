@@ -924,34 +924,55 @@ namespace spades {
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vbuf, &offset);
 		vkCmdBindIndexBuffer(commandBuffer, indexBuffer->GetBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-		// Draw, counting what passes the depth test for the next use of this
-		// frame slot (WasSeenInLastUse)
+		// Draw, counting what passes the depth test when the reflections ask for
+		// it (WasRecentlySeen)
 		const uint32_t querySlot = renderer.GetCurrentFrameIndex();
-		vkCmdBeginQuery(commandBuffer, occlusionQueryPool, querySlot, 0);
-		vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
-		vkCmdEndQuery(commandBuffer, occlusionQueryPool, querySlot);
-		occlusionQueryIssued[querySlot] = true;
+		if (countingThisFrame) {
+			vkCmdBeginQuery(commandBuffer, occlusionQueryPool, querySlot, 0);
+			vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+			vkCmdEndQuery(commandBuffer, occlusionQueryPool, querySlot);
+			occlusionQueryIssued[querySlot] = true;
+		} else {
+			vkCmdDrawIndexed(commandBuffer, numIndices, 1, 0, 0, 0);
+		}
 	}
 
-	void VulkanWaterRenderer::ResetOcclusionQuery(VkCommandBuffer commandBuffer) {
+	void VulkanWaterRenderer::BeginOcclusionQueryFrame(VkCommandBuffer commandBuffer,
+	                                                   bool count) {
 		const uint32_t slot = renderer.GetCurrentFrameIndex();
 		occlusionQueryIssuedLastUse[slot] = occlusionQueryIssued[slot];
 		occlusionQueryIssued[slot] = false;
-		vkCmdResetQueryPool(commandBuffer, occlusionQueryPool, slot, 1);
+		countingThisFrame = count;
+		if (count)
+			vkCmdResetQueryPool(commandBuffer, occlusionQueryPool, slot, 1);
 	}
 
-	bool VulkanWaterRenderer::WasSeenInLastUse() {
-		const uint32_t slot = renderer.GetCurrentFrameIndex();
-		if (!occlusionQueryIssuedLastUse[slot])
-			return true;
+	bool VulkanWaterRenderer::ReadOcclusionQuery(uint32_t slot, bool& seen) {
 		// The samples that passed, then whether that count is available
 		std::uint64_t result[2] = {0, 0};
 		const VkResult status = vkGetQueryPoolResults(
 		  device->GetDevice(), occlusionQueryPool, slot, 1, sizeof(result), result,
 		  sizeof(result), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
-		if (status != VK_SUCCESS || result[1] == 0)
-			return true;
-		return result[0] != 0;
+		if ((status != VK_SUCCESS && status != VK_NOT_READY) || result[1] == 0)
+			return false;
+		seen = result[0] != 0;
+		return true;
+	}
+
+	bool VulkanWaterRenderer::WasRecentlySeen() {
+		const uint32_t slots = static_cast<uint32_t>(occlusionQueryIssued.size());
+		const uint32_t slot = renderer.GetCurrentFrameIndex();
+		const uint32_t lastSlot = (slot + slots - 1) % slots;
+
+		bool seen = true;
+		// The last frame's count, as GL reads it, if the GPU has got that far
+		if (lastSlot != slot && occlusionQueryIssued[lastSlot] &&
+		    ReadOcclusionQuery(lastSlot, seen))
+			return seen;
+		// Else this frame slot's, from the frame before
+		if (occlusionQueryIssuedLastUse[slot] && ReadOcclusionQuery(slot, seen))
+			return seen;
+		return true;
 	}
 
 	void VulkanWaterRenderer::MarkUpdate(int x, int y) {
