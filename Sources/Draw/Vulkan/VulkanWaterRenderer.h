@@ -87,14 +87,19 @@ namespace spades {
 
 			void RenderSunlightPass(VkCommandBuffer commandBuffer);
 
-			/** Resets this frame slot's occlusion query, outside any render pass,
-			 * before the water is drawn in it (`RenderSunlightPass`) */
-			void ResetOcclusionQuery(VkCommandBuffer commandBuffer);
-			/** Whether any of the water passed the depth test the last time this
-			 * frame slot drew it, as GL's `r_occlusionQuery` asks before drawing
-			 * the reflections; unknown counts as seen. That frame's fence has been
-			 * waited on, so its result is there without waiting. */
-			bool WasSeenInLastUse();
+			/** Starts this frame's occlusion query when `count`, the reflections
+			 * asking for it (`WasRecentlySeen`): resets this frame slot's, outside
+			 * any render pass, before the water is drawn in it (`RenderSunlightPass`),
+			 * which then counts what of it passes the depth test. */
+			void BeginOcclusionQueryFrame(VkCommandBuffer commandBuffer, bool count);
+			/**
+			 * Whether any of the water passed the depth test when last counted, as
+			 * GL's `r_occlusionQuery` asks before drawing the reflections: the last
+			 * frame's count if the GPU is done with it already, else the older one
+			 * of this frame slot, whose frame has been waited on. Neither waits;
+			 * unknown counts as seen.
+			 */
+			bool WasRecentlySeen();
 
 			// Water update tick
 			void UpdateSimulation(float dt);
@@ -118,11 +123,17 @@ namespace spades {
 			void UpdateUniformBuffers(uint32_t frameIndex);
 			void CleanupDescriptorResources();
 
-			// One occlusion query per frame in flight around the water's draw, and
-			// whether a slot's query was drawn in its last use and in this one
+			// One occlusion query per frame in flight around the water's draw,
+			// whether a slot's query was drawn in its last use and in this one, and
+			// whether this frame counts
 			VkQueryPool occlusionQueryPool = VK_NULL_HANDLE;
 			std::vector<bool> occlusionQueryIssuedLastUse;
 			std::vector<bool> occlusionQueryIssued;
+			bool countingThisFrame = false;
+
+			/** The count of slot `slot`'s query into `seen`, if it is available;
+			 * never waits */
+			bool ReadOcclusionQuery(uint32_t slot, bool& seen);
 
 			// Mesh
 			Handle<VulkanBuffer> vertexBuffer;

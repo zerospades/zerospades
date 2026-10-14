@@ -2069,7 +2069,9 @@ namespace spades {
 
 			if (waterRenderer) {
 				waterRenderer->UploadWaveTextures(commandBuffer);
-				waterRenderer->ResetOcclusionQuery(commandBuffer);
+				// Counted only for the reflections, which ask for it
+				waterRenderer->BeginOcclusionQueryFrame(
+				  commandBuffer, (int)r_occlusionQuery && (int)settings.r_water >= 2);
 			}
 
 
@@ -2169,10 +2171,9 @@ namespace spades {
 			mirrorClearValues[1].depthStencil = {1.0f, 0};
 
 			// GL's r_occlusionQuery: no reflections for water none of which was
-			// seen the last time this frame slot drew it; the mirror is only
-			// cleared to the fog, as GL clears its texture
-			const bool mirrorDrawn =
-			  !(int)r_occlusionQuery || waterRenderer->WasSeenInLastUse();
+			// seen when last counted; the mirror is only cleared to the fog, as GL
+			// clears its texture
+			const bool mirrorDrawn = !(int)r_occlusionQuery || waterRenderer->WasRecentlySeen();
 
 			// The depth pre-pass and its ambient occlusion, as GL's for the mirror too
 			const bool mirrorDepthPrepass = mirrorDrawn && UsesDepthPrepass();
