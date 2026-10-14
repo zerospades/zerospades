@@ -2809,6 +2809,18 @@ namespace spades {
 				}
 			}
 
+			// Screen-space cavity / silhouette outline. GL draws its outlines into
+			// the scene, so every filter after this one, temporal AA first, takes
+			// them as part of it: drawn after temporal AA, the outlines would follow
+			// the jittered depth's edges from frame to frame and crawl. Reads the
+			// offscreen depth attachment that the fog / soft-particle path already
+			// transitions to SHADER_READ_ONLY above; takes its own distance fade so
+			// it works whether or not the fog filter is enabled / correct.
+			if ((int)r_outlines && cavityOutlineFilter && currentInput && currentOutput) {
+				cavityOutlineFilter->Filter(commandBuffer, currentInput, currentOutput);
+				advanceChain();
+			}
+
 			// Temporal AA, after the camera blur and before the bloom as in GL
 			if ((int)r_temporalAA && temporalAAFilter && currentInput && currentOutput) {
 				temporalAAFilter->Filter(commandBuffer, currentInput, currentOutput);
@@ -2849,17 +2861,6 @@ namespace spades {
 			// and a saturated fog-tinted cast.
 			if ((int)r_colorCorrection && colorCorrectionFilter && currentInput && currentOutput) {
 				colorCorrectionFilter->Filter(commandBuffer, currentInput, currentOutput);
-				advanceChain();
-			}
-
-			// Screen-space cavity / silhouette outline. Runs last so the
-			// outline is drawn on top of all colour grading at exactly screen-
-			// pixel boundaries. Reads the offscreen depth attachment that the
-			// fog / soft-particle path already transitions to SHADER_READ_ONLY
-			// above; takes its own distance fade so it works whether or not
-			// the fog filter is enabled / correct.
-			if ((int)r_outlines && cavityOutlineFilter && currentInput && currentOutput) {
-				cavityOutlineFilter->Filter(commandBuffer, currentInput, currentOutput);
 				advanceChain();
 			}
 
