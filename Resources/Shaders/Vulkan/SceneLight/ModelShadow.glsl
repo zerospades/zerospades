@@ -70,29 +70,40 @@ float SampleModelCascade(sampler2D tex, vec3 c) {
 // different cascade from one frame to the next and the shadow term flipped with
 // it. That is worst when the view axis lines up with the sun, which is when the
 // boxes are most elongated and their boundaries sweep fastest.
+/** The cascade a point `viewDepth` along the camera's axis samples */
+int ModelShadowCascade(float viewDepth) {
+	return viewDepth < 12.0 ? 0 : (viewDepth < 40.0 ? 1 : 2);
+}
+
 float ModelShadowVisibility(vec3 coord0, vec3 coord1, vec3 coord2, float viewDepth) {
 	if (shadowSampling.enabled == 0)
 		return 1.0;
-	if (viewDepth < 12.0)
+	int cascade = ModelShadowCascade(viewDepth);
+	if (cascade == 0)
 		return SampleModelCascade(modelShadowMap0, coord0);
-	else if (viewDepth < 40.0)
+	else if (cascade == 1)
 		return SampleModelCascade(modelShadowMap1, coord1);
 	else
 		return SampleModelCascade(modelShadowMap2, coord2);
 }
 
 #ifdef SCENE_VIEW_GLSL
-// The same for a point in the world, its cascade coordinates and camera-axis
-// depth worked out here: for the shaders with no input locations left for them
-// (the physically lit ones are near the 16 every device has)
+// The same for a point in the world, its camera-axis depth and its coordinates
+// in the one cascade that depth picks worked out here: for the shaders with no
+// input locations left for them (the physically lit ones are near the 16 every
+// device has)
 float ModelShadowVisibilityAt(vec3 worldPos) {
 	if (shadowSampling.enabled == 0)
 		return 1.0;
 	vec4 p = vec4(worldPos, 1.0);
-	return ModelShadowVisibility((shadowSampling.cascadeMatrix[0] * p).xyz,
-	                             (shadowSampling.cascadeMatrix[1] * p).xyz,
-	                             (shadowSampling.cascadeMatrix[2] * p).xyz,
-	                             (sceneView.projectionView * p).w);
+	int cascade = ModelShadowCascade((sceneView.projectionView * p).w);
+	vec3 coord = (shadowSampling.cascadeMatrix[cascade] * p).xyz;
+	if (cascade == 0)
+		return SampleModelCascade(modelShadowMap0, coord);
+	else if (cascade == 1)
+		return SampleModelCascade(modelShadowMap1, coord);
+	else
+		return SampleModelCascade(modelShadowMap2, coord);
 }
 #endif
 
