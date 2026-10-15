@@ -25,9 +25,12 @@
 #include <memory>
 #include <string>
 
+#include "DaytimeWeather.h"
+#include "Flashlight.h"
 #include "GameConstants.h"
 #include "Player.h"
 #include <Core/Math.h>
+#include <Core/TMPUtils.h>
 
 namespace spades {
 	namespace client {
@@ -108,6 +111,18 @@ namespace spades {
 			 * damage numbers shown and the client stops predicting its own.
 			 */
 			virtual bool ServerReportsDamage() const = 0;
+
+			// ── Flashlight extension ────────────────────────────────────────
+			/** Asks the server to switch the local player's flashlight. Whether it
+			 * happens is the server's call; nothing is sent without the extension. */
+			virtual void SendFlashlight(bool on) = 0;
+
+			/** The flashlight beams the server configured on this connection. */
+			virtual const FlashlightBeams& GetFlashlightBeams() = 0;
+
+			// ── Daytime and Weather extension ───────────────────────────────
+			/** The time of day the server set, or nothing when it sets none. */
+			virtual stmp::optional<TimeOfDay> GetTimeOfDay() = 0;
 
 		};
 

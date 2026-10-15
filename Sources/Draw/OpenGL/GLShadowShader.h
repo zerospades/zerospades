@@ -32,6 +32,9 @@ namespace spades {
 		class GLShadowShader {
 			GLProgramUniform mapShadowTexture;
 			GLProgramUniform fogColor;
+			GLProgramUniform daylight;
+			GLProgramUniform sunlight;
+			GLProgramUniform skyLightColor;
 			GLProgramUniform ambientColor;
 			GLProgramUniform cascadeSplit1;
 			GLProgramUniform cascadeSplit2;
@@ -59,9 +62,14 @@ namespace spades {
 			GLShadowShader();
 			~GLShadowShader() {}
 
+			/**
+			 * The shaders of the shadows and the ambient light. `facingUp` is for a
+			 * surface that faces straight up, which needs fewer samplers.
+			 */
 			static std::vector<GLShader *> RegisterShader(GLProgramManager *, GLSettings &,
 			                                              bool variance = false,
-			                                              bool skipSSAO = false);
+			                                              bool skipSSAO = false,
+			                                              bool facingUp = false);
 
 			/** setups shadow shader.
 			 * note that this function sets the current active texture

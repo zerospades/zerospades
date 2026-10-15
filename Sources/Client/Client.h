@@ -30,6 +30,7 @@
 
 #include "ClientCameraMode.h"
 #include "DemoNetClient.h"
+#include "FlashlightBudget.h"
 #include "INetClient.h"
 #include "NetClient.h"
 #include "ILocalEntity.h"
@@ -338,8 +339,6 @@ namespace spades {
 			bool scoreboardVisible;
 			bool netgraphVisible;
 			bool hudVisible;
-			bool flashlightOn;
-			float flashlightOnTime;
 
 			struct GrenadeTracer {
 				std::vector<Vector3> positions;
@@ -466,6 +465,10 @@ namespace spades {
 			// Enemies are excluded by default: naming whoever is under the crosshair
 			// would double as an aim aid. Opt in only where that is intended.
 			stmp::optional<std::tuple<Player&, hitTag_t>> HotTrackedPlayer(bool includeEnemies = false);
+
+			/** This frame's lit flashlights, offered by the players as the scene is
+			 * built and lit once every one is known. */
+			FlashlightBudget flashlightBudget;
 
 			// effects (local entity, etc)
 			std::vector<DynamicLightParam> flashDlights;
@@ -816,6 +819,9 @@ namespace spades {
 			void PlayerLeaving(Player&);
 			void PlayerJoinedTeam(Player&);
 			void PlayerSpawned(Player&);
+
+			/** Called after a player's flashlight was switched, to give the feedback. */
+			void PlayerSwitchedFlashlight(Player&);
 
 			// IWorldListener begin
 			void PlayerObjectSet(int) override;

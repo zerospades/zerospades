@@ -34,7 +34,7 @@ namespace spades {
 				SPInvalidArgument("prog");
 			if (prog != last) {
 				last = prog;
-				loc = last->GetDevice()->GetAttribLocation(last->GetHandle(), name.c_str());
+				loc = last->GetAttributeLocation(name);
 				if (loc == -1)
 					fprintf(stderr, "WARNING: GLSL attribute '%s' not found\n", name.c_str());
 			}
