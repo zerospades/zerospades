@@ -42,14 +42,16 @@ namespace spades {
 	namespace draw {
 		class GLRadiosityRenderer::UpdateDispatch : public ConcurrentDispatch {
 			GLRadiosityRenderer& renderer;
+			// Where the eye was when it started: the scene changes as the worker runs.
+			const Vector3 eye;
 
 		public:
 			std::atomic<bool> done{false};
-			UpdateDispatch(GLRadiosityRenderer& r) : renderer(r) {}
+			UpdateDispatch(GLRadiosityRenderer& r, const Vector3& eye) : renderer(r), eye(eye) {}
 			void Run() override {
 				SPADES_MARK_FUNCTION();
 
-				renderer.UpdateDirtyChunks();
+				renderer.UpdateDirtyChunks(eye);
 
 				done = true;
 			}
@@ -288,6 +290,8 @@ namespace spades {
 			int cy2 = maxY >> ChunkSizeBits;
 			int cz2 = maxZ >> ChunkSizeBits;
 
+			// The worker takes these as it runs.
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			for (int cx = cx1; cx <= cx2; cx++)
 			for (int cy = cy1; cy <= cy2; cy++)
 			for (int cz = cz1; cz <= cz2; cz++) {
@@ -323,6 +327,7 @@ namespace spades {
 		}
 
 		int GLRadiosityRenderer::GetNumDirtyChunks() {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
 			int cnt = 0;
 			for (const auto& c : chunks) {
 				if (c.dirty)
@@ -337,7 +342,7 @@ namespace spades {
 					dispatch->Join();
 					delete dispatch;
 				}
-				dispatch = new UpdateDispatch(*this);
+				dispatch = new UpdateDispatch(*this, renderer.GetSceneDef().viewOrigin);
 				dispatch->Start();
 			}
 
@@ -350,7 +355,7 @@ namespace spades {
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Radiosity [>= %d chunk(s)]", cnt);
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
-				if (!c.transferDone.exchange(true)) {
+				if (!c.transferDone.load()) {
 					device.BindTexture(IGLDevice::Texture3D, textureFlat);
 					device.TexSubImage3D(IGLDevice::Texture3D, 0, c.cx * ChunkSize,
 					                     c.cy * ChunkSize, c.cz * ChunkSize, ChunkSize, ChunkSize,
@@ -374,19 +379,26 @@ namespace spades {
 					                     c.cy * ChunkSize, c.cz * ChunkSize, ChunkSize, ChunkSize,
 					                     ChunkSize, IGLDevice::BGRA,
 					                     IGLDevice::UnsignedInt2101010Rev, c.dataZ);
+
+					// Copied out: the worker may compute it again.
+					c.transferDone.store(true);
 				}
 			}
 		}
 
-		void GLRadiosityRenderer::UpdateDirtyChunks() {
+		void GLRadiosityRenderer::UpdateDirtyChunks(const Vector3& eye) {
 			int dirtyChunkIds[256];
 			int numDirtyChunks = 0;
 
+			// The chunks to compute are chosen at once, while edits wait; one still
+			// waiting for its last result to be uploaded is left for later.
+			std::unique_lock<std::mutex> lock(dirtyMutex);
+			auto isPending = [](const Chunk& c) { return c.dirty && c.transferDone.load(); };
+
 			// first, check only chunks in near range
-			const auto& viewOrigin = renderer.GetSceneDef().viewOrigin;
-			int eyeX = (int)(viewOrigin.x) >> ChunkSizeBits;
-			int eyeY = (int)(viewOrigin.y) >> ChunkSizeBits;
-			int eyeZ = (int)(viewOrigin.z) >> ChunkSizeBits;
+			int eyeX = (int)(eye.x) >> ChunkSizeBits;
+			int eyeY = (int)(eye.y) >> ChunkSizeBits;
+			int eyeZ = (int)(eye.z) >> ChunkSizeBits;
 
 			for (size_t i = 0; i < chunks.size(); i++) {
 				Chunk& c = chunks[i];
@@ -399,7 +411,7 @@ namespace spades {
 					continue;
 				if (dz >= 6 || dz <= -6)
 					continue;
-				if (c.dirty) {
+				if (isPending(c)) {
 					dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 					if (numDirtyChunks >= 256)
 						break;
@@ -410,13 +422,15 @@ namespace spades {
 			if (numDirtyChunks == 0) {
 				for (size_t i = 0; i < chunks.size(); i++) {
 					Chunk& c = chunks[i];
-					if (c.dirty) {
+					if (isPending(c)) {
 						dirtyChunkIds[numDirtyChunks++] = static_cast<int>(i);
 						if (numDirtyChunks >= 256)
 							break;
 					}
 				}
 			}
+
+			lock.unlock();
 
 			// limit update count per frame
 			for (int i = 0; i < 8; i++) {
@@ -496,18 +510,29 @@ namespace spades {
 			return (uint32_t)out;
 		}
 
+		bool GLRadiosityRenderer::TakeDirtyRange(Chunk& c, DirtyRange& range) {
+			std::lock_guard<std::mutex> lock(dirtyMutex);
+			if (!c.dirty || !c.transferDone.load())
+				return false;
+			range = DirtyRange{c.dirtyMinX, c.dirtyMaxX, c.dirtyMinY,
+			                   c.dirtyMaxY, c.dirtyMinZ, c.dirtyMaxZ};
+			c.dirty = false;
+			return true;
+		}
+
 		void GLRadiosityRenderer::UpdateChunk(int cx, int cy, int cz) {
 			Chunk& c = GetChunk(cx, cy, cz);
-			if (!c.dirty)
+			DirtyRange range;
+			if (!TakeDirtyRange(c, range))
 				return;
 
 			int originX = cx * ChunkSize;
 			int originY = cy * ChunkSize;
 			int originZ = cz * ChunkSize;
 
-			for (int z = c.dirtyMinZ; z <= c.dirtyMaxZ; z++)
-			for (int y = c.dirtyMinY; y <= c.dirtyMaxY; y++)
-			for (int x = c.dirtyMinX; x <= c.dirtyMaxX; x++) {
+			for (int z = range.minZ; z <= range.maxZ; z++)
+			for (int y = range.minY; y <= range.maxY; y++)
+			for (int x = range.minX; x <= range.maxX; x++) {
 				IntVector3 pos;
 				pos.x = (x + originX);
 				pos.y = (y + originY);
@@ -520,7 +545,7 @@ namespace spades {
 				c.dataZ[z][y][x] = EncodeValue(res.z);
 			}
 
-			c.dirty = false;
+			// The render thread's to upload, now
 			c.transferDone = false;
 		}
 	} // namespace draw

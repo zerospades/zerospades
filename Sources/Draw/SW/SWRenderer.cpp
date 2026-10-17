@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cfenv>
+#include <cmath>
 #include <cstdlib>
 
 #include "SWFlatMapRenderer.h"
@@ -261,6 +262,11 @@ namespace spades {
 			int lightG = ToFixedFactor8(light.param.color.y);
 			int lightB = ToFixedFactor8(light.param.color.z);
 
+			// Dynamic lights are not dimmed: they light the world's own colours, which
+			// the frame no longer holds once the daylight has dimmed it.
+			const uint32_t* albedoPixels =
+			  albedoBuffer.empty() ? this->fb->GetPixels() : albedoBuffer.data();
+
 			float invRadius2 = 1.0F / (light.param.radius * light.param.radius);
 
 			InvokeParallel2([=](unsigned int threadId, unsigned int numThreads) {
@@ -271,8 +277,10 @@ namespace spades {
 
 				auto* fb = this->fb->GetPixels();
 				float* db = depthBuffer.data();
+				const uint32_t* albedo = albedoPixels;
 				fb += startY * fw + minX;
 				db += startY * fw + minX;
+				albedo += startY * fw + minX;
 
 				float vy = fovY + dvy * startY;
 				float vx = fovX + dvx * minX;
@@ -283,6 +291,7 @@ namespace spades {
 					float vx2 = vx;
 					auto* fb2 = fb;
 					auto* db2 = db;
+					const uint32_t* albedo2 = albedo;
 
 					for (int x = lightWidth; x > 0; x--) {
 						Vector3 pos;
@@ -312,9 +321,10 @@ namespace spades {
 							auto srcColorG = (srcColor >> 8) & 0xFF;
 							auto srcColorB = srcColor & 0xFF;
 
-							actualLightR *= srcColorR;
-							actualLightG *= srcColorG;
-							actualLightB *= srcColorB;
+							auto albedoColor = *albedo2;
+							actualLightR *= (albedoColor >> 16) & 0xFF;
+							actualLightG *= (albedoColor >> 8) & 0xFF;
+							actualLightB *= albedoColor & 0xFF;
 
 							auto destColorR = actualLightR >> 16;
 							auto destColorG = actualLightG >> 16;
@@ -333,11 +343,39 @@ namespace spades {
 						vx2 += dvx;
 						fb2++;
 						db2++;
+						albedo2++;
 					}
 
 					vy += dvy;
 					fb += fw;
 					db += fw;
+					albedo += fw;
+				}
+			});
+		}
+
+		void SWRenderer::ApplyDaylight() {
+			const int factor = ToFixedFactor8(sceneDef.daylight);
+			if (factor >= 256) {
+				albedoBuffer.clear();
+				return;
+			}
+
+			const int fw = this->fb->GetWidth();
+			const int fh = this->fb->GetHeight();
+			const uint32_t factor32 = static_cast<uint32_t>(factor);
+
+			const uint32_t* pixels = this->fb->GetPixels();
+			albedoBuffer.assign(pixels, pixels + fw * fh);
+
+			InvokeParallel2([&](unsigned int threadId, unsigned int numThreads) {
+				auto* px = this->fb->GetPixels() + fw * (fh * threadId / numThreads);
+				auto* end = this->fb->GetPixels() + fw * (fh * (threadId + 1) / numThreads);
+				for (; px != end; px++) {
+					uint32_t color = *px;
+					uint32_t v1 = ((color & 0xFF00FF) * factor32) & 0xFF00FF00;
+					uint32_t v2 = ((color & 0xFF00) * factor32) & 0xFF0000;
+					*px = (v1 | v2) >> 8;
 				}
 			});
 		}
@@ -352,6 +390,7 @@ namespace spades {
 			float dvx = -fovX * 2.0F / static_cast<float>(fw / 4);
 			float dvy = -fovY * 2.0F / static_cast<float>(fh / 4);
 
+			Vector3 fogColor = GetFogColor();
 			int fogR = ToFixed8(fogColor.x);
 			int fogG = ToFixed8(fogColor.y);
 			int fogB = ToFixed8(fogColor.z);
@@ -432,6 +471,7 @@ namespace spades {
 			float dvx = -fovX * 2.0F / static_cast<float>(fw / 4);
 			float dvy = -fovY * 2.0F / static_cast<float>(fh / 4);
 
+			Vector3 fogColor = GetFogColor();
 			int fogR = ToFixed8(fogColor.x);
 			int fogG = ToFixed8(fogColor.y);
 			int fogB = ToFixed8(fogColor.z);
@@ -679,6 +719,15 @@ namespace spades {
 			spr.radius = radius;
 			spr.rotation = rotation;
 			spr.color = drawColorAlphaPremultiplied;
+
+			// A scattering sprite reflects the world's light, which the daylight dims;
+			// an emissive one keeps its own.
+			Vector4& c = spr.color;
+			if (!(c.x > c.w || c.y > c.w || c.z > c.w)) {
+				c.x *= sceneDef.daylight;
+				c.y *= sceneDef.daylight;
+				c.z *= sceneDef.daylight;
+			}
 		}
 
 		void SWRenderer::AddLongSprite(client::IImage&, spades::Vector3 p1, spades::Vector3 p2,
@@ -687,6 +736,95 @@ namespace spades {
 			EnsureInitialized();
 			EnsureSceneStarted();
 			// TODO: long sprite
+		}
+
+		void SWRenderer::AddGlare(client::IImage& image, const client::GlareParam& param) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			Glare glare;
+			glare.img = dynamic_cast<SWImage&>(image);
+			glare.param = param;
+			glares.push_back(std::move(glare));
+		}
+
+		float SWRenderer::GetGlareVisibility(const Vector4& clip) {
+			// Without the world, nothing was drawn to be in front of it.
+			if (sceneDef.skipWorld)
+				return 1.0F;
+
+			const int fw = fb->GetWidth();
+			const int fh = fb->GetHeight();
+
+			// The depth buffer holds the distance along the view axis, as `clip.w` is.
+			const float sourceDepth = clip.w - client::GlareParam::SourceOcclusionMargin;
+
+			// Where the light is on the frame, and how far around that its lens
+			// reaches, at least a pixel
+			const float centreX = (clip.x / clip.w * 0.5F + 0.5F) * fw;
+			const float centreY = (0.5F - clip.y / clip.w * 0.5F) * fh;
+			const float spreadX = std::max(client::GlareParam::SourceRadius /
+			                                 (clip.w * std::tan(sceneDef.fovX * 0.5F)) * 0.5F * fw,
+			                               1.0F);
+			const float spreadY = std::max(client::GlareParam::SourceRadius /
+			                                 (clip.w * std::tan(sceneDef.fovY * 0.5F)) * 0.5F * fh,
+			                               1.0F);
+
+			// Over a 3x3 grid across its lens: anything the scene drew in front of it,
+			// a player as much as a wall, hides it, and one half in front of it hides
+			// half its glare.
+			int seen = 0;
+			for (int y = -1; y <= 1; y++) {
+				for (int x = -1; x <= 1; x++) {
+					const int px = static_cast<int>(std::floor(centreX + x * spreadX));
+					const int py = static_cast<int>(std::floor(centreY + y * spreadY));
+
+					// Off the frame, nothing is known to be in front of it.
+					if (px < 0 || py < 0 || px >= fw || py >= fh ||
+					    depthBuffer[px + py * fw] >= sourceDepth)
+						seen++;
+				}
+			}
+			return seen * (1.0F / 9.0F);
+		}
+
+		void SWRenderer::DrawGlares() {
+			if (glares.empty())
+				return;
+
+			// Drawn as 2D images in their own colours, leaving the caller's alone
+			const Vector4 savedColor = drawColorAlphaPremultiplied;
+			const bool savedLegacyColorPremultiply = legacyColorPremultiply;
+
+			const float sw = ScreenWidth();
+			const float sh = ScreenHeight();
+
+			for (const Glare& glare : glares) {
+				const client::GlareParam& param = glare.param;
+
+				// `w` is how far ahead of the camera the light is.
+				const Vector4 clip = projectionViewMatrix * param.origin;
+				if (clip.w <= sceneDef.zNear)
+					continue;
+
+				const float visibility = GetGlareVisibility(clip);
+				if (visibility <= 0.0F)
+					continue;
+
+				const float x = (clip.x / clip.w * 0.5F + 0.5F) * sw;
+				const float y = (0.5F - clip.y / clip.w * 0.5F) * sh;
+				const Vector3 color = param.color * visibility;
+
+				// Added onto the frame: a zero alpha keeps what is underneath.
+				SetColorAlphaPremultiplied(MakeVector4(color.x, color.y, color.z, 0.0F));
+				DrawImage(*glare.img, AABB2(x - param.radius, y - param.radius,
+				                            param.radius * 2.0F, param.radius * 2.0F));
+			}
+
+			drawColorAlphaPremultiplied = savedColor;
+			legacyColorPremultiply = savedLegacyColorPremultiply;
+			glares.clear();
 		}
 
 		static uint32_t ConvertColor32(Vector4 col) {
@@ -706,7 +844,7 @@ namespace spades {
 			EnsureInitialized();
 			EnsureSceneStarted();
 
-			// clear scene
+			// clear scene; the sky is dimmed with the world below
 			auto* px = this->fb->GetPixels();
 			std::fill(px, px + fb->GetWidth() * fb->GetHeight(),
 				ConvertColor32(MakeVector4(fogColor.x, fogColor.y, fogColor.z, 1.0F)));
@@ -724,6 +862,8 @@ namespace spades {
 				for (const auto& m : models)
 					modelRenderer->Render(*m.model, m.param);
 				models.clear();
+
+				ApplyDaylight();
 
 				// deferred lighting
 				for (const auto& light : lights)
@@ -912,6 +1052,9 @@ namespace spades {
 			// all objects were rendered
 
 			duringSceneRendering = false;
+
+			// The glares go onto the finished frame like the 2D drawing that follows.
+			DrawGlares();
 		}
 
 		void SWRenderer::MultiplyScreenColor(spades::Vector3 v) { EnsureSceneNotStarted(); }

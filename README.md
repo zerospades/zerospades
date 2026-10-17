@@ -80,17 +80,75 @@ openspades --replay /path/to/demo.dem
 
 Demos can also be played back using the external [aos_replay](https://github.com/BR-/aos_replay) tool.
 
-## How to Build/Install?
-See the [OpenSpades Building&Installing Guide](https://github.com/yvt/openspades#how-to-buildinstall)
+## How to Build
 
-Just a quick note when building on [Windows](https://github.com/yvt/openspades#on-windows-with-visual-studio) (with vcpkg):
+### Prerequisites (all platforms)
+```
+git clone --recurse-submodules https://github.com/Fran6nd/zerospades
+cd zerospades
+vcpkg/bootstrap-vcpkg.sh    # macOS/Linux
+vcpkg\bootstrap-vcpkg.bat   # Windows
+```
+vcpkg dependencies are installed automatically during cmake configure.
 
-On CMake, before you configure the project, you will need to add a new string entry:
+---
 
-* With the Name field: `VCPKG_TARGET_TRIPLET`
-* And the Value field: `x86-windows-static`
+### macOS — Apple Silicon
+```bash
+brew install molten-vk vulkan-headers glslang
+mkdir build && cd build
+cmake .. -G Ninja \
+  -D CMAKE_BUILD_TYPE=Release \
+  -D CMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -D VCPKG_TARGET_TRIPLET=arm64-osx \
+  -D VCPKG_OVERLAY_TRIPLETS=../cmake/triplets \
+  -D CMAKE_OSX_ARCHITECTURES=arm64 \
+  -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+  -D CMAKE_CXX_STANDARD=17
+cmake --build . --parallel
+```
 
-Then you're ready to configure & generate.
+### macOS — Intel
+Same as above but use:
+```
+  -D VCPKG_TARGET_TRIPLET=x64-osx \
+  -D CMAKE_OSX_ARCHITECTURES=x86_64 \
+```
+
+---
+
+### Windows (x64)
+Install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home), then from a Visual Studio command prompt:
+```bat
+mkdir build && cd build
+cmake .. -A x64 ^
+  -D CMAKE_BUILD_TYPE=Release ^
+  -D CMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -D VCPKG_TARGET_TRIPLET=x64-windows-static ^
+  -D CMAKE_CXX_STANDARD=17
+cmake --build . --config Release --parallel
+```
+For x86, replace `x64` with `Win32` and `x64-windows-static` with `x86-windows-static`.
+
+---
+
+### Linux — Ubuntu / Debian
+```bash
+sudo apt-get install -y build-essential cmake ninja-build \
+  libsdl2-dev libsdl2-image-dev libglew-dev libfreetype6-dev \
+  libcurl4-openssl-dev libogg-dev libopus-dev libopusfile-dev zlib1g-dev
+# Install Vulkan SDK from https://vulkan.lunarg.com/sdk/home
+mkdir build && cd build
+cmake .. -G Ninja \
+  -D CMAKE_BUILD_TYPE=Release \
+  -D CMAKE_CXX_STANDARD=17
+cmake --build . --parallel
+```
+
+### Linux — Nix
+```bash
+nix build
+```
 
 ## Tested Platforms
 * x86-64, EndeavourOS, Ryzen 7 7700X, RX9070XT, 32G RAM

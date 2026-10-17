@@ -1,0 +1,93 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ OpenSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ OpenSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with OpenSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+// One axis of the occlusion's depth-aware blur, as GL's BilateralFilter.fs: nine
+// taps along `axis`, each weighted down by how far it lies from the surface's
+// plane through the texel, so the blur stays on the surface it belongs to.
+// Writes at the full render size; reading an occlusion at half of it, each tap is
+// a source texel, weighed at the depth texel it was evaluated at (Evaluate.comp).
+
+#include "Common.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTexture;
+layout(set = 0, binding = 1, r32f) uniform readonly image2D source;
+layout(set = 0, binding = 2, r32f) uniform writeonly image2D target;
+
+layout(push_constant) uniform Params {
+	vec2 zNearFar;
+	ivec2 axis;
+	// Depth texels per source texel: 1 or 2
+	int sourceScale;
+} params;
+
+void main() {
+	ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+	if (any(greaterThanEqual(p, imageSize(target))))
+		return;
+
+	float centerRaw = DepthTexel(depthTexture, p);
+	if (centerRaw >= kBackgroundDepth) {
+		imageStore(target, p, vec4(1.0));
+		return;
+	}
+
+	// The depth's slope along the axis, on the side changing the least, to follow
+	// the surface's plane outwards
+	float forward = DepthTexel(depthTexture, p + params.axis) - centerRaw;
+	float backward = centerRaw - DepthTexel(depthTexture, p - params.axis);
+	float slope = abs(forward) < abs(backward) ? forward : backward;
+
+	ivec2 sourceLast = imageSize(source) - 1;
+	vec2 sum = vec2(0.0000001);
+	for (int k = -4; k <= 4; ++k) {
+		// The source texel, and the depth texel it stands for
+		ivec2 sourceTexel, depthTexel;
+		if (params.sourceScale == 1) {
+			sourceTexel = p + params.axis * k;
+			depthTexel = sourceTexel;
+		} else {
+			// Every other tap, as GL's upsampling: whole source texels
+			if ((k & 1) != 0)
+				continue;
+			sourceTexel = (p >> 1) + params.axis * (k / 2);
+			depthTexel = sourceTexel * 2 + 1;
+		}
+		sourceTexel = clamp(sourceTexel, ivec2(0), sourceLast);
+
+		float offset = float(dot(depthTexel - p, params.axis));
+		float planeDistance = LinearDepth(centerRaw + slope * offset, params.zNearFar);
+		float tapDistance = LinearDepth(DepthTexel(depthTexture, depthTexel), params.zNearFar);
+
+		float depthDifference = (tapDistance - planeDistance) * 8.0;
+		float weight = exp2(-depthDifference * depthDifference - offset * offset * 0.2);
+
+		// Blurred as its square root, which keeps corners from smearing (GL)
+		float value = sqrt(imageLoad(source, sourceTexel).x);
+		sum += vec2(value, 1.0) * weight;
+	}
+
+	float average = sum.x / sum.y;
+	imageStore(target, p, vec4(average * average));
+}
