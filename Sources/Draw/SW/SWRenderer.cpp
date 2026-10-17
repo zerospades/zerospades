@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cfenv>
+#include <cmath>
 #include <cstdlib>
 
 #include "SWFlatMapRenderer.h"
@@ -689,6 +690,95 @@ namespace spades {
 			// TODO: long sprite
 		}
 
+		void SWRenderer::AddGlare(client::IImage& image, const client::GlareParam& param) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			Glare glare;
+			glare.img = dynamic_cast<SWImage&>(image);
+			glare.param = param;
+			glares.push_back(std::move(glare));
+		}
+
+		float SWRenderer::GetGlareVisibility(const Vector4& clip) {
+			// Without the world, nothing was drawn to be in front of it.
+			if (sceneDef.skipWorld)
+				return 1.0F;
+
+			const int fw = fb->GetWidth();
+			const int fh = fb->GetHeight();
+
+			// The depth buffer holds the distance along the view axis, as `clip.w` is.
+			const float sourceDepth = clip.w - client::GlareParam::SourceOcclusionMargin;
+
+			// Where the light is on the frame, and how far around that its lens
+			// reaches, at least a pixel
+			const float centreX = (clip.x / clip.w * 0.5F + 0.5F) * fw;
+			const float centreY = (0.5F - clip.y / clip.w * 0.5F) * fh;
+			const float spreadX = std::max(client::GlareParam::SourceRadius /
+			                                 (clip.w * std::tan(sceneDef.fovX * 0.5F)) * 0.5F * fw,
+			                               1.0F);
+			const float spreadY = std::max(client::GlareParam::SourceRadius /
+			                                 (clip.w * std::tan(sceneDef.fovY * 0.5F)) * 0.5F * fh,
+			                               1.0F);
+
+			// Over a 3x3 grid across its lens: anything the scene drew in front of it,
+			// a player as much as a wall, hides it, and one half in front of it hides
+			// half its glare.
+			int seen = 0;
+			for (int y = -1; y <= 1; y++) {
+				for (int x = -1; x <= 1; x++) {
+					const int px = static_cast<int>(std::floor(centreX + x * spreadX));
+					const int py = static_cast<int>(std::floor(centreY + y * spreadY));
+
+					// Off the frame, nothing is known to be in front of it.
+					if (px < 0 || py < 0 || px >= fw || py >= fh ||
+					    depthBuffer[px + py * fw] >= sourceDepth)
+						seen++;
+				}
+			}
+			return seen * (1.0F / 9.0F);
+		}
+
+		void SWRenderer::DrawGlares() {
+			if (glares.empty())
+				return;
+
+			// Drawn as 2D images in their own colours, leaving the caller's alone
+			const Vector4 savedColor = drawColorAlphaPremultiplied;
+			const bool savedLegacyColorPremultiply = legacyColorPremultiply;
+
+			const float sw = ScreenWidth();
+			const float sh = ScreenHeight();
+
+			for (const Glare& glare : glares) {
+				const client::GlareParam& param = glare.param;
+
+				// `w` is how far ahead of the camera the light is.
+				const Vector4 clip = projectionViewMatrix * param.origin;
+				if (clip.w <= sceneDef.zNear)
+					continue;
+
+				const float visibility = GetGlareVisibility(clip);
+				if (visibility <= 0.0F)
+					continue;
+
+				const float x = (clip.x / clip.w * 0.5F + 0.5F) * sw;
+				const float y = (0.5F - clip.y / clip.w * 0.5F) * sh;
+				const Vector3 color = param.color * visibility;
+
+				// Added onto the frame: a zero alpha keeps what is underneath.
+				SetColorAlphaPremultiplied(MakeVector4(color.x, color.y, color.z, 0.0F));
+				DrawImage(*glare.img, AABB2(x - param.radius, y - param.radius,
+				                            param.radius * 2.0F, param.radius * 2.0F));
+			}
+
+			drawColorAlphaPremultiplied = savedColor;
+			legacyColorPremultiply = savedLegacyColorPremultiply;
+			glares.clear();
+		}
+
 		static uint32_t ConvertColor32(Vector4 col) {
 			auto convertColor = [](float f) {
 				int i = static_cast<int>(f * 255.0F + 0.5F);
@@ -912,6 +1002,9 @@ namespace spades {
 			// all objects were rendered
 
 			duringSceneRendering = false;
+
+			// The glares go onto the finished frame like the 2D drawing that follows.
+			DrawGlares();
 		}
 
 		void SWRenderer::MultiplyScreenColor(spades::Vector3 v) { EnsureSceneNotStarted(); }

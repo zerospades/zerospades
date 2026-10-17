@@ -21,6 +21,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include <cstdint>
 #include <vector>
 
@@ -53,11 +54,15 @@ namespace spades {
 				VoxelType dataX[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataY[ChunkSize][ChunkSize][ChunkSize];
 				VoxelType dataZ[ChunkSize][ChunkSize][ChunkSize];
+				// What changed since it was last computed: written by the map's edits
+				// on the render thread and taken by the worker, under `dirtyMutex`.
 				bool dirty = true;
 				int dirtyMinX = 0, dirtyMaxX = ChunkSize - 1;
 				int dirtyMinY = 0, dirtyMaxY = ChunkSize - 1;
 				int dirtyMinZ = 0, dirtyMaxZ = ChunkSize - 1;
 
+				// Who has the data: the render thread, to upload it, while false; the
+				// worker, to compute it again, once the upload is done.
 				std::atomic<bool> transferDone{true};
 			};
 
@@ -70,6 +75,19 @@ namespace spades {
 			int chunkW, chunkH, chunkD;
 
 			std::vector<Chunk> chunks;
+
+			/** Guards every chunk's dirty state. */
+			std::mutex dirtyMutex;
+
+			/** The part of a chunk to compute again. */
+			struct DirtyRange {
+				int minX, maxX, minY, maxY, minZ, maxZ;
+			};
+
+			/** Takes what of a chunk changed for the worker to compute it again, if
+			 * anything did and its last result is uploaded, and marks it clean: a
+			 * change made meanwhile marks it dirty again. */
+			bool TakeDirtyRange(Chunk&, DirtyRange&);
 
 			inline Chunk &GetChunk(int cx, int cy, int cz) {
 				SPAssert(cx >= 0);
@@ -89,7 +107,8 @@ namespace spades {
 			void Invalidate(int minX, int minY, int minZ, int maxX, int maxY, int maxZ);
 
 			void UpdateChunk(int cx, int cy, int cz);
-			void UpdateDirtyChunks();
+			/** Computes some dirty chunks again, nearest `eye` first. */
+			void UpdateDirtyChunks(const Vector3& eye);
 			int GetNumDirtyChunks();
 
 			uint32_t EncodeValue(Vector3 vec);

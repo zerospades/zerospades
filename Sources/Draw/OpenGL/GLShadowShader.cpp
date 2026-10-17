@@ -236,30 +236,21 @@ namespace spades {
 				// TODO: deal with the case that renderer->ambientShadowRenderer is null
 				SPAssert(renderer->ambientShadowRenderer != NULL);
 
-				dev->ActiveTexture(texStage);
-				dev->BindTexture(IGLDevice::Texture3D, renderer->ambientShadowRenderer->GetTexture());
-				ambientShadowTexture.SetValue(texStage);
-				texStage++;
-
-				dev->ActiveTexture(texStage);
-				dev->BindTexture(IGLDevice::Texture3D, renderer->radiosityRenderer->GetTextureFlat());
-				radiosityTextureFlat.SetValue(texStage);
-				texStage++;
-
-				dev->ActiveTexture(texStage);
-				dev->BindTexture(IGLDevice::Texture3D, renderer->radiosityRenderer->GetTextureX());
-				radiosityTextureX.SetValue(texStage);
-				texStage++;
-
-				dev->ActiveTexture(texStage);
-				dev->BindTexture(IGLDevice::Texture3D, renderer->radiosityRenderer->GetTextureY());
-				radiosityTextureY.SetValue(texStage);
-				texStage++;
-
-				dev->ActiveTexture(texStage);
-				dev->BindTexture(IGLDevice::Texture3D, renderer->radiosityRenderer->GetTextureZ());
-				radiosityTextureZ.SetValue(texStage);
-				texStage++;
+				// Only the textures the program samples take a texture unit: a GPU may
+				// have no more units than one program can sample (16 on macOS).
+				auto bind = [&](GLProgramUniform& uniform, IGLDevice::UInteger texture) {
+					if (!uniform.IsActive())
+						return;
+					dev->ActiveTexture(texStage);
+					dev->BindTexture(IGLDevice::Texture3D, texture);
+					uniform.SetValue(texStage);
+					texStage++;
+				};
+				bind(ambientShadowTexture, renderer->ambientShadowRenderer->GetTexture());
+				bind(radiosityTextureFlat, renderer->radiosityRenderer->GetTextureFlat());
+				bind(radiosityTextureX, renderer->radiosityRenderer->GetTextureX());
+				bind(radiosityTextureY, renderer->radiosityRenderer->GetTextureY());
+				bind(radiosityTextureZ, renderer->radiosityRenderer->GetTextureZ());
 			}
 
 			if (settings.r_ssao) {
