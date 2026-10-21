@@ -44,6 +44,11 @@ namespace spades {
 		Handle<client::IImage> VulkanImageManager::RegisterImage(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
+			// The default white image is built in memory. The legacy file name is
+			// kept as an alias so existing callers and mods keep working.
+			if (name == "*white" || name == "Gfx/White.tga")
+				return GetWhiteImage();
+
 			auto it = images.find(name);
 			if (it == images.end()) {
 				Handle<client::IImage> img = CreateImage(name);
@@ -57,7 +62,10 @@ namespace spades {
 
 		Handle<client::IImage> VulkanImageManager::GetWhiteImage() {
 			if (!whiteImage) {
-				whiteImage = RegisterImage("Gfx/White.tga");
+				// Build the 1x1 white default image in memory.
+				Handle<Bitmap> bmp = Handle<Bitmap>::New(1, 1);
+				bmp->SetPixel(0, 0, 0xFFFFFFFF);
+				whiteImage = CreateImage(*bmp, "*white");
 			}
 			return whiteImage;
 		}
@@ -65,15 +73,27 @@ namespace spades {
 		Handle<client::IImage> VulkanImageManager::CreateImage(const std::string& name) {
 			SPADES_MARK_FUNCTION();
 
+			Handle<Bitmap> bmp;
 			try {
-				Handle<Bitmap> bmp = Bitmap::Load(name);
-				if (!bmp) {
-					SPLog("VulkanImageManager: Failed to load bitmap '%s'", name.c_str());
-					return Handle<client::IImage>();
-				}
+				bmp = Bitmap::Load(name);
+			} catch (const std::exception& ex) {
+				SPLog("Failed to create Vulkan image '%s': %s", name.c_str(), ex.what());
+				return Handle<client::IImage>();
+			}
+			if (!bmp) {
+				SPLog("VulkanImageManager: Failed to load bitmap '%s'", name.c_str());
+				return Handle<client::IImage>();
+			}
+			return CreateImage(*bmp, name);
+		}
 
-				uint32_t width = static_cast<uint32_t>(bmp->GetWidth());
-				uint32_t height = static_cast<uint32_t>(bmp->GetHeight());
+		Handle<client::IImage> VulkanImageManager::CreateImage(Bitmap& bmp,
+		                                                       const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			try {
+				uint32_t width = static_cast<uint32_t>(bmp.GetWidth());
+				uint32_t height = static_cast<uint32_t>(bmp.GetHeight());
 
 				// Create Vulkan image
 				Handle<VulkanImage> vkImage(new VulkanImage(
@@ -91,7 +111,7 @@ namespace spades {
 					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT), false);
 
-				stagingBuffer->UpdateData(bmp->GetPixels(), imageSize);
+				stagingBuffer->UpdateData(bmp.GetPixels(), imageSize);
 
 				// Create temporary command buffer for upload
 				VkCommandBufferAllocateInfo allocInfo{};

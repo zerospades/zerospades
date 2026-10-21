@@ -181,12 +181,9 @@ namespace spades {
 			imageManager = stmp::make_unique<VulkanImageManager>(device);
 			waterRenderer = stmp::make_unique<VulkanWaterRenderer>(*this, map);
 
-			// Create a 1x1 white image for solid color rendering
+			// The 1x1 white image for solid color rendering, the one `*white` names
 			{
-				Handle<Bitmap> whiteBmp(new Bitmap(1, 1), false);
-				uint32_t* pixel = reinterpret_cast<uint32_t*>(whiteBmp->GetPixels());
-				*pixel = 0xFFFFFFFF; // White (RGBA)
-				Handle<client::IImage> imgHandle = CreateImage(*whiteBmp);
+				Handle<client::IImage> imgHandle = imageManager->GetWhiteImage();
 
 				// CreateImage always hands out a wrapper of the VulkanImage it made.
 				VulkanImageWrapper* wrapper = dynamic_cast<VulkanImageWrapper*>(imgHandle.GetPointerOrNull());
