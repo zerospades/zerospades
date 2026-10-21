@@ -2425,6 +2425,11 @@ namespace spades {
 
 				depthResolveFilter->Resolve(commandBuffer, offscreenDepth.GetPointerOrNull(),
 					framebufferManager->GetResolvedDepthImage().GetPointerOrNull());
+				// The outlines' stencil too, final as the depth is
+				if ((int)r_outlines)
+					depthResolveFilter->ResolveStencil(
+					  commandBuffer, offscreenDepth.GetPointerOrNull(),
+					  framebufferManager->GetResolvedStencilImage().GetPointerOrNull());
 			}
 
 			{
@@ -2470,9 +2475,12 @@ namespace spades {
 					0, 0, nullptr, 0, nullptr, 1u, barriers);
 			}
 
-			// Depth is final here (sprites are colour-only, water doesn't write depth).
+			// Depth is final here (sprites are colour-only, water doesn't write depth),
+			// and so is the stencil the outlines read
 			if (!msaaScene) {
 				framebufferManager->CopySceneDepthForSampling(commandBuffer);
+				if ((int)r_outlines)
+					framebufferManager->CopySceneStencilForSampling(commandBuffer);
 			}
 
 			// Clear transparent buffers once they've been drawn. Non-soft particles

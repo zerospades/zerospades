@@ -40,23 +40,32 @@ namespace spades {
 		//
 		// The output format (R32_SFLOAT) is the canonical resolved-depth format
 		// used across the renderer; exposed so callers can create matching images.
+		//
+		// ResolveStencil(cmd, msaaDepth, output) does the same for the stencil
+		// aspect, through its sampled view (VulkanImage::GetStencilImageView), into
+		// an R8_UINT image (VulkanFramebufferManager::kSampledStencilFormat).
 		class VulkanDepthResolveFilter : public VulkanPostProcessFilter {
 
 			VkSampler depthSampler; // nearest, clamp-to-edge (texelFetch ignores it)
 
 			VkRenderPass ppRenderPass;
+			VkRenderPass stencilRenderPass; // into an R8_UINT target
 			VkDescriptorSetLayout msDepthDSL;
 
 			VkPipelineLayout resolveLayout;
 			VkPipeline resolvePipeline;
+			VkPipeline stencilResolvePipeline;
 
-			// A depth resolved into an output: the scene's, the mirror's. Its
+			// A depth or stencil resolved into an output: the scene's depth and
+			// stencil, the mirror's depth. Its
 			// framebuffer and descriptor set are made on its first resolve and kept
 			// until the targets go (`ReleaseTargets`); they never change, so frames in
 			// flight share them.
 			struct Target {
 				VulkanImage* output;
-				VkImageView depthView;
+				// The multisampled aspect's sampled view
+				VkImageView sourceView;
+				bool stencil;
 				VkFramebuffer framebuffer;
 				VkDescriptorSet set;
 				// Whether it holds the depth as it is now: set by a resolve, cleared
@@ -73,7 +82,9 @@ namespace spades {
 			void InitDescriptorPool();
 
 			VkShaderModule LoadSPIRV(const char* path);
-			Target& GetTarget(VulkanImage* msaaDepth, VulkanImage* output);
+			VkPipeline CreateResolvePipeline(const char* fragmentShader, VkRenderPass renderPass);
+			Target& GetTarget(VkImageView sourceView, bool stencil, VulkanImage* output);
+			void Draw(VkCommandBuffer cmd, Target& target);
 
 			void CreatePipeline() override {}
 			void CreateRenderPass() override {}
@@ -91,6 +102,11 @@ namespace spades {
 			/** Resolves `msaaDepth` into `output`, unless it already did since the
 			 * depth last changed (`Invalidate`) */
 			void Resolve(VkCommandBuffer cmd, VulkanImage* msaaDepth, VulkanImage* output);
+			/** Resolves the stencil of `msaaDepth`, in SHADER_READ_ONLY_OPTIMAL, into
+			 * `output`, an R8_UINT image left in SHADER_READ_ONLY_OPTIMAL. Every
+			 * call resolves: call it once the stencil's last stamp is drawn. */
+			void ResolveStencil(VkCommandBuffer cmd, VulkanImage* msaaDepth,
+			                    VulkanImage* output);
 			/** The depths may have changed since their last resolve: each is
 			 * resolved again */
 			void Invalidate();

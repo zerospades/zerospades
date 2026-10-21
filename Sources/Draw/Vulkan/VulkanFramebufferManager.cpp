@@ -156,6 +156,9 @@ namespace spades {
 				// The framebuffer needs the stencil aspect too, and a sampled view
 				// may carry only one aspect, so the attachment gets its own view.
 				renderDepthImage->CreateAttachmentImageView();
+				// The stencil resolve samples the other aspect
+				if (useMSAA)
+					renderDepthImage->CreateStencilImageView();
 				renderDepthImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
@@ -178,11 +181,23 @@ namespace spades {
 				sceneDepthSampleImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                     VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 
+				// The scene's stencil, copied the same way: a stencil aspect is a byte
+				// a texel in a buffer, which goes into an R8_UINT image as it is.
+				sceneStencilSampleImage = Handle<VulkanImage>::New(
+				    device, renderWidth, renderHeight, kSampledStencilFormat,
+				    VK_IMAGE_TILING_OPTIMAL,
+				    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				sceneStencilSampleImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
+				// An integer image is never filtered
+				sceneStencilSampleImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
 				// Vulkan 1.0 copies an image's depth aspect into a buffer, and a buffer
 				// into a colour image, but never one straight into the other
 				// (VUID-vkCmdCopyImage-srcImage-01548): the copies go through this.
 				// A depth aspect is 4 bytes a texel in a buffer; the mirror's depth,
-				// the same size, shares it.
+				// the same size, and the scene's stencil, a byte a texel, share it.
 				depthCopyBuffer = Handle<VulkanBuffer>::New(
 				    device, (VkDeviceSize)renderWidth * (VkDeviceSize)renderHeight * 4,
 				    VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -216,6 +231,17 @@ namespace spades {
 				renderDepthResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
 				renderDepthResolveImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
 				                                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+				// Resolved stencil, sample 0's as the depth's, filled by the same
+				// filter (StencilResolve.vk.fs)
+				renderStencilResolveImage = Handle<VulkanImage>::New(
+				    device, renderWidth, renderHeight, kSampledStencilFormat,
+				    VK_IMAGE_TILING_OPTIMAL,
+				    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				renderStencilResolveImage->CreateImageView(VK_IMAGE_ASPECT_COLOR_BIT);
+				renderStencilResolveImage->CreateSampler(VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+				                                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 			}
 
 			VkImageView attachments[] = {
@@ -968,8 +994,17 @@ namespace spades {
 			// occlusion's copy after the pre-pass serves the post filters too
 			if (useMSAA || sceneDepthSampleCurrent)
 				return;
-			CopyDepthForSampling(commandBuffer, *renderDepthImage, *sceneDepthSampleImage);
+			CopyDepthForSampling(commandBuffer, *renderDepthImage, VK_IMAGE_ASPECT_DEPTH_BIT,
+			                     *sceneDepthSampleImage);
 			sceneDepthSampleCurrent = true;
+		}
+
+		void VulkanFramebufferManager::CopySceneStencilForSampling(VkCommandBuffer commandBuffer) {
+			SPADES_MARK_FUNCTION();
+			if (useMSAA)
+				return;
+			CopyDepthForSampling(commandBuffer, *renderDepthImage, VK_IMAGE_ASPECT_STENCIL_BIT,
+			                     *sceneStencilSampleImage);
 		}
 
 		void VulkanFramebufferManager::CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer) {
@@ -977,12 +1012,14 @@ namespace spades {
 			SPAssert(mirrorDepthSampleImage);
 			if (mirrorDepthSampleCurrent)
 				return;
-			CopyDepthForSampling(commandBuffer, *mirrorDepthImage, *mirrorDepthSampleImage);
+			CopyDepthForSampling(commandBuffer, *mirrorDepthImage, VK_IMAGE_ASPECT_DEPTH_BIT,
+			                     *mirrorDepthSampleImage);
 			mirrorDepthSampleCurrent = true;
 		}
 
 		void VulkanFramebufferManager::CopyDepthForSampling(VkCommandBuffer commandBuffer,
 		                                                    VulkanImage& depth,
+		                                                    VkImageAspectFlagBits aspect,
 		                                                    VulkanImage& sample) {
 			// The target was last read by a fragment shader or compute (the ambient
 			// occlusion), and is read by either after
@@ -1003,7 +1040,8 @@ namespace spades {
 			pre[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			pre[1].image = sample.GetImage();
-			// R32F color target (not D32 depth) — see the sample images' creation.
+			// R32F or R8_UINT color target (not D32 depth) — see the sample images'
+			// creation.
 			pre[1].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 			pre[1].srcAccessMask = 0;
 			pre[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1016,10 +1054,11 @@ namespace spades {
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				0, 0, nullptr, 0, nullptr, 2, pre);
 
-			// The depth aspect into the buffer, a 32-bit float a texel for
-			// D32_SFLOAT_S8_UINT; then the buffer, bit for bit, into the R32F image
+			// The aspect into the buffer, tightly packed from its start: the depth a
+			// 32-bit float a texel for D32_SFLOAT_S8_UINT, the stencil a byte; then
+			// the buffer, bit for bit, into the R32F or R8_UINT image
 			VkBufferImageCopy depthCopy{};
-			depthCopy.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+			depthCopy.imageSubresource = {static_cast<VkImageAspectFlags>(aspect), 0, 0, 1};
 			depthCopy.imageExtent = {(uint32_t)renderWidth, (uint32_t)renderHeight, 1};
 			vkCmdCopyImageToBuffer(commandBuffer, depth.GetImage(),
 			                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
