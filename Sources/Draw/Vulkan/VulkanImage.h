@@ -37,6 +37,7 @@ namespace spades {
 			VmaAllocation allocation;
 			VkImageView imageView;
 			VkImageView attachmentView;
+			VkImageView stencilView;
 			VkSampler sampler;
 
 			uint32_t width;
@@ -84,6 +85,11 @@ namespace spades {
 			VkImageView GetAttachmentImageView() const {
 				return attachmentView != VK_NULL_HANDLE ? attachmentView : imageView;
 			}
+			/**
+			 * The stencil aspect's sampled view, read as an unsigned integer
+			 * texture. Null until CreateStencilImageView() makes it.
+			 */
+			VkImageView GetStencilImageView() const { return stencilView; }
 			VkSampler GetSampler() const { return sampler; }
 			uint32_t GetWidth() const { return width; }
 			uint32_t GetHeight() const { return height; }
@@ -121,6 +127,13 @@ namespace spades {
 			 * sampled view is depth-only; it is a no-op for every other format.
 			 */
 			void CreateAttachmentImageView();
+
+			/**
+			 * Creates the view GetStencilImageView() hands out, for an image with a
+			 * stencil aspect and SAMPLED usage; GetImageView() of a combined
+			 * depth+stencil image samples its depth.
+			 */
+			void CreateStencilImageView();
 
 			/**
 			 * Creates the image's sampler, for texture sampling. It filters

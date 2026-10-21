@@ -35,6 +35,7 @@ namespace spades {
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
 		  attachmentView(VK_NULL_HANDLE),
+		  stencilView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -90,6 +91,7 @@ namespace spades {
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
 		  attachmentView(VK_NULL_HANDLE),
+		  stencilView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -140,6 +142,7 @@ namespace spades {
 		  allocation(VK_NULL_HANDLE),
 		  imageView(VK_NULL_HANDLE),
 		  attachmentView(VK_NULL_HANDLE),
+		  stencilView(VK_NULL_HANDLE),
 		  sampler(VK_NULL_HANDLE),
 		  width(w),
 		  height(h),
@@ -171,6 +174,10 @@ namespace spades {
 
 			if (attachmentView != VK_NULL_HANDLE) {
 				vkDestroyImageView(vkDevice, attachmentView, nullptr);
+			}
+
+			if (stencilView != VK_NULL_HANDLE) {
+				vkDestroyImageView(vkDevice, stencilView, nullptr);
 			}
 
 			if (ownsImage && image != VK_NULL_HANDLE) {
@@ -266,6 +273,40 @@ namespace spades {
 			}
 		}
 
+		void VulkanImage::CreateStencilImageView() {
+			switch (format) {
+				case VK_FORMAT_D16_UNORM_S8_UINT:
+				case VK_FORMAT_D24_UNORM_S8_UINT:
+				case VK_FORMAT_D32_SFLOAT_S8_UINT:
+				case VK_FORMAT_S8_UINT: break;
+				default: SPRaise("Image format %d has no stencil aspect to view", (int)format);
+			}
+
+			if (stencilView != VK_NULL_HANDLE) {
+				vkDestroyImageView(device->GetDevice(), stencilView, nullptr);
+				stencilView = VK_NULL_HANDLE;
+			}
+
+			VkImageViewCreateInfo viewInfo{};
+			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			viewInfo.image = image;
+			viewInfo.viewType =
+			    (arrayLayers > 1) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+			viewInfo.format = format;
+			// A sampled view covers one aspect: this one, the stencil
+			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+			viewInfo.subresourceRange.baseMipLevel = 0;
+			viewInfo.subresourceRange.levelCount = mipLevels;
+			viewInfo.subresourceRange.baseArrayLayer = 0;
+			viewInfo.subresourceRange.layerCount = arrayLayers;
+
+			VkResult result =
+			    vkCreateImageView(device->GetDevice(), &viewInfo, nullptr, &stencilView);
+			if (result != VK_SUCCESS) {
+				SPRaise("Failed to create stencil image view (error code: %d)", result);
+			}
+		}
+
 		void VulkanImage::CreateSampler(VkFilter magFilter, VkFilter minFilter,
 		                                VkSamplerAddressMode addressMode, float maxAnisotropy) {
 			// Recreates the sampler: any existing one is destroyed first. The caller
@@ -297,7 +338,17 @@ namespace spades {
 			samplerInfo.unnormalizedCoordinates = VK_FALSE;
 			samplerInfo.compareEnable = VK_FALSE;
 			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			// Mipmaps are blended only where the device filters the format linearly
+			// (VUID-vkCmdDraw-mipmapMode-04770): never an integer one, such as the
+			// scene's sampled stencil. Every image here is optimally tiled.
+			{
+				VkFormatProperties props;
+				vkGetPhysicalDeviceFormatProperties(device->GetPhysicalDevice(), format, &props);
+				samplerInfo.mipmapMode =
+				  (props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)
+				    ? VK_SAMPLER_MIPMAP_MODE_LINEAR
+				    : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			}
 			samplerInfo.mipLodBias = 0.0f;
 			samplerInfo.minLod = 0.0f;
 			samplerInfo.maxLod = (mipLevels > 1) ? static_cast<float>(mipLevels) : 0.0f;

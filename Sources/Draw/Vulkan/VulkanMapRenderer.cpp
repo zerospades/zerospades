@@ -472,8 +472,9 @@ namespace spades {
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
 			// Depth stencil. The world stamps its own bit as it is drawn so the x-ray
-			// pass can tell "behind the world" from "behind another model"; the model
-			// passes clear the same bit again where they land in front.
+			// pass can tell "behind the world" from "behind another model", and
+			// clears the no-outline bit, as it is outlined; the model passes stamp
+			// both bits again where they land in front.
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
@@ -483,7 +484,7 @@ namespace spades {
 			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
 			depthStencil.stencilTestEnable = VK_TRUE;
-			depthStencil.front = MakeWorldStampStencilOp(kStencilBitWorld);
+			depthStencil.front = MakeSurfaceStampStencilOp(kStencilBitWorld);
 			depthStencil.back = depthStencil.front;
 
 			// Color blending
@@ -625,7 +626,7 @@ namespace spades {
 
 			// The depth pre-pass's: the same vertex stage alone (with `invariant
 			// gl_Position`, so the depth matches the lit pass's bit for bit), no
-			// colour, no stencil: the lit pass stamps the world's mark.
+			// colour, no stencil: the lit pass stamps the surface bits.
 			if (result == VK_SUCCESS) {
 				VkPipelineDepthStencilStateCreateInfo prepassDepthStencil{};
 				prepassDepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;

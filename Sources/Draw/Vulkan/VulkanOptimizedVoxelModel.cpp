@@ -757,6 +757,11 @@ namespace spades {
 				                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
 				                   sizeof(drawConstants), &drawConstants);
 
+				// Whether the model is outlined, for the lit pipelines to stamp; the
+				// others' stencil reference is static or unused, and ignores it
+				vkCmdSetStencilReference(commandBuffer, VK_STENCIL_FACE_FRONT_AND_BACK,
+				                         param.drawOutline ? 0u : kStencilBitNoOutline);
+
 				if (param.depthHack) {
 					VkViewport vp{0.0f, (float)rh, (float)rw, -(float)rh, 0.0f, VulkanRenderer::kFirstPersonDepthEnd};
 					vkCmdSetViewport(commandBuffer, 0, 1, &vp);
@@ -1028,9 +1033,11 @@ namespace spades {
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
 			// Depth stencil. Clearing the world bit wherever a model lands in front is
-			// the other half of the x-ray mark the map pipeline sets; see
-			// VulkanSceneStencil.h. The ghost and dynamic-light pipelines below leave
-			// the stencil test off, so they never touch it.
+			// the other half of the x-ray mark the map pipeline sets, and the
+			// no-outline bit is the model's own, from the reference each draw sets;
+			// see VulkanSceneStencil.h. The ghost depth pipeline below stamps the
+			// no-outline bit alone; the ghost colour pipeline leaves the stencil
+			// test off, and the x-ray's only tests it.
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 			depthStencil.depthTestEnable = VK_TRUE;
@@ -1040,7 +1047,7 @@ namespace spades {
 			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 			depthStencil.depthBoundsTestEnable = VK_FALSE;
 			depthStencil.stencilTestEnable = VK_TRUE;
-			depthStencil.front = MakeWorldStampStencilOp(0);
+			depthStencil.front = MakeSurfaceStampStencilOp(0);
 			depthStencil.back = depthStencil.front;
 
 			// Color blending
@@ -1067,6 +1074,15 @@ namespace spades {
 			dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 			dynamicState.dynamicStateCount = 2;
 			dynamicState.pDynamicStates = dynamicStates;
+
+			// The lit pipelines' too: the stencil reference, which says whether the
+			// model is outlined, changes from draw to draw (`DrawInstances`)
+			VkDynamicState litDynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
+			                                     VK_DYNAMIC_STATE_SCISSOR,
+			                                     VK_DYNAMIC_STATE_STENCIL_REFERENCE};
+			VkPipelineDynamicStateCreateInfo litDynamicState = dynamicState;
+			litDynamicState.dynamicStateCount = 3;
+			litDynamicState.pDynamicStates = litDynamicStates;
 
 			// Descriptor set layout (set 0). Must stay binding-compatible with
 			// VulkanMapRenderer's layout — the voxel model reuses that
@@ -1145,7 +1161,7 @@ namespace spades {
 			pipelineInfo.pMultisampleState = &multisampling;
 			pipelineInfo.pDepthStencilState = &depthStencil;
 			pipelineInfo.pColorBlendState = &colorBlending;
-			pipelineInfo.pDynamicState = &dynamicState;
+			pipelineInfo.pDynamicState = &litDynamicState;
 			pipelineInfo.layout = sharedPipeline.pipelineLayout;
 			pipelineInfo.renderPass = renderPass;
 			pipelineInfo.subpass = 0;
@@ -1165,7 +1181,7 @@ namespace spades {
 			// The depth pre-pass's: the same vertex stage (`invariant gl_Position`,
 			// so the depth matches the lit pass's bit for bit) and a fragment stage
 			// clipping away just what the lit one does, below the mirror's water
-			// plane. No colour, no stencil: the lit pass stamps the world's mark.
+			// plane. No colour, no stencil: the lit pass stamps the surface bits.
 			if (result == VK_SUCCESS) {
 				const std::vector<uint32_t> depthFragCode =
 				  LoadSPIRVFile(sharedPipeline.physicalLighting
@@ -1199,6 +1215,7 @@ namespace spades {
 					prepassInfo.pStages = depthStages;
 					prepassInfo.pDepthStencilState = &prepassDepthStencil;
 					prepassInfo.pColorBlendState = &noColorBlending;
+					prepassInfo.pDynamicState = &dynamicState;
 					result = vkCreateGraphicsPipelines(vkDevice, renderer.GetPipelineCache(), 1,
 					                                   &prepassInfo, nullptr,
 					                                   &sharedPipeline.depthPipeline);
@@ -1266,14 +1283,17 @@ namespace spades {
 						gdStages[1].module = gdFragModule;
 						gdStages[1].pName = "main";
 
-						// Depth: write depth, compare LESS
+						// Depth: write depth, compare LESS. A ghost draws no outline, as in
+						// GL, so it stamps the no-outline bit where it lands in front.
 						VkPipelineDepthStencilStateCreateInfo gdDepth{};
 						gdDepth.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 						gdDepth.depthTestEnable = VK_TRUE;
 						gdDepth.depthWriteEnable = VK_TRUE;
 						gdDepth.depthCompareOp = VK_COMPARE_OP_LESS;
 						gdDepth.depthBoundsTestEnable = VK_FALSE;
-						gdDepth.stencilTestEnable = VK_FALSE;
+						gdDepth.stencilTestEnable = VK_TRUE;
+						gdDepth.front = MakeGhostStampStencilOp();
+						gdDepth.back = gdDepth.front;
 
 						// Write color (matches GL ghost prepass which renders full color + depth)
 						VkPipelineColorBlendAttachmentState gdBlend{};

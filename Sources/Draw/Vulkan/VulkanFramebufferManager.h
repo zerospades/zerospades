@@ -37,10 +37,11 @@ namespace spades {
 		class VulkanBuffer;
 
 		class VulkanFramebufferManager {
-			/** Copies `depth`, an attachment, into `sample`, an R32F image sampled by
-			 * fragment shaders and compute; `depth` stays an attachment */
+			/** Copies `aspect` of `depth`, an attachment, into `sample`, an image
+			 * sampled by fragment shaders and compute: R32F for the depth, R8_UINT for
+			 * the stencil; `depth` stays an attachment */
 			void CopyDepthForSampling(VkCommandBuffer commandBuffer, VulkanImage& depth,
-			                          VulkanImage& sample);
+			                          VkImageAspectFlagBits aspect, VulkanImage& sample);
 
 		public:
 			class BufferHandle {
@@ -109,6 +110,8 @@ namespace spades {
 
 			// Sampled copy of the scene depth (the 1x attachment has no SAMPLED usage)
 			Handle<VulkanImage> sceneDepthSampleImage;
+			// And of its stencil, at 1x
+			Handle<VulkanImage> sceneStencilSampleImage;
 			// The mirror's, at 1x with SSAO or r_water 3
 			Handle<VulkanImage> mirrorDepthSampleImage;
 			// What the copies into those pass through, at 1x
@@ -121,6 +124,7 @@ namespace spades {
 			// GetResolved*Image() falls back to the render images.
 			Handle<VulkanImage> renderColorResolveImage;
 			Handle<VulkanImage> renderDepthResolveImage;
+			Handle<VulkanImage> renderStencilResolveImage;
 
 			// Mirror framebuffer for water reflections
 			VkFramebuffer mirrorFramebuffer;
@@ -161,6 +165,9 @@ namespace spades {
 			void CreateRenderPass(bool mirrorDepthRead);
 
 		public:
+			/** The format the scene's stencil is sampled in, copied or resolved */
+			static constexpr VkFormat kSampledStencilFormat = VK_FORMAT_R8_UINT;
+
 			/** Makes the targets, sized and formatted from the renderer's latched
 			 * `settings` */
 			VulkanFramebufferManager(Handle<gui::SDLVulkanDevice> device, VulkanSettings& settings,
@@ -189,6 +196,13 @@ namespace spades {
 			Handle<VulkanImage> GetResolvedDepthImage() {
 				return useMSAA ? renderDepthResolveImage : sceneDepthSampleImage;
 			}
+			/** The scene's stencil as a single-sample R8_UINT image, read in
+			 * SHADER_READ_ONLY: its resolve under MSAA (VulkanDepthResolveFilter's
+			 * ResolveStencil), its copy at 1x (`CopySceneStencilForSampling`). Holds
+			 * the surface bits of VulkanSceneStencil.h once the scene is drawn. */
+			Handle<VulkanImage> GetResolvedStencilImage() {
+				return useMSAA ? renderStencilResolveImage : sceneStencilSampleImage;
+			}
 			bool IsMSAA() const { return useMSAA; }
 			/** Tells the depth copies below the depth may have changed since they
 			 * last ran (a new frame, or a draw writing depth after the pre-pass),
@@ -197,6 +211,10 @@ namespace spades {
 
 			// Depth in/out: ATTACHMENT_OPTIMAL; copy ends SHADER_READ_ONLY. No-op under MSAA.
 			void CopySceneDepthForSampling(VkCommandBuffer commandBuffer);
+			/** The scene's stencil into its single-sample copy, as the depth above:
+			 * once its last stamp is drawn, every time, since the depth's copy may
+			 * be taken before the lit pass stamps it. No-op under MSAA. */
+			void CopySceneStencilForSampling(VkCommandBuffer commandBuffer);
 			/** The mirror's depth into its single-sample copy, at 1x with SSAO or
 			 * r_water 3 */
 			void CopyMirrorDepthForSampling(VkCommandBuffer commandBuffer);

@@ -42,6 +42,11 @@
 //
 // Distance fade uses the centre tap's linear depth against
 // `fogDistance`, so the filter does not depend on the fog filter.
+//
+// An edge belongs to the surface on its near side (the nearest tap), and is
+// left out where that surface draws no outline: the scene's stencil carries
+// that per pixel (kStencilBitNoOutline, VulkanSceneStencil.h), stamped by a
+// model drawn without `drawOutline` or a ghost, which GL draws no outline for.
 
 #version 450
 
@@ -50,6 +55,10 @@ layout(location = 0) out vec4 fragColor;
 
 layout(set = 0, binding = 0) uniform sampler2D colorTexture;
 layout(set = 0, binding = 1) uniform sampler2D depthTexture;
+layout(set = 0, binding = 2) uniform usampler2D stencilTexture;
+
+// kStencilBitNoOutline in VulkanSceneStencil.h
+const uint kStencilBitNoOutline = 2u;
 
 layout(push_constant) uniform Params {
     vec4 invViewport;            // xy = 1/screen, zw reserved
@@ -87,10 +96,22 @@ void main() {
     // sky side of every voxel boundary that meets the sky. Using the
     // nearest tap makes the edge belong to the foreground surface that
     // owns it, so both sides of the silhouette paint identically.
-    float zNearest = min(min(min(zC, zR), min(zL, zU)), zD);
+    float zNearest = zC;
+    ivec2 nearestOffset = ivec2(0, 0);
+    if (zR < zNearest) { zNearest = zR; nearestOffset = ivec2(1, 0); }
+    if (zL < zNearest) { zNearest = zL; nearestOffset = ivec2(-1, 0); }
+    if (zU < zNearest) { zNearest = zU; nearestOffset = ivec2(0, 1); }
+    if (zD < zNearest) { zNearest = zD; nearestOffset = ivec2(0, -1); }
     float ratio = laplacian / max(zNearest, 0.01);
 
-    float edge = smoothstep(threshold, threshold * 4.0, ratio);
+    // The stencil texel under the nearest tap, the taps being a texel apart
+    ivec2 stencilSize = textureSize(stencilTexture, 0);
+    ivec2 nearestTexel = clamp(ivec2(texCoord * vec2(stencilSize)) + nearestOffset,
+                               ivec2(0), stencilSize - 1);
+    bool outlined =
+        (texelFetch(stencilTexture, nearestTexel, 0).r & kStencilBitNoOutline) == 0u;
+
+    float edge = outlined ? smoothstep(threshold, threshold * 4.0, ratio) : 0.0;
 
     float distanceFade = 1.0 - smoothstep(fogDistance * 0.6, fogDistance, zNearest);
 

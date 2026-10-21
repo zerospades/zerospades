@@ -56,7 +56,7 @@ namespace spades {
 		      colorFormat(VK_FORMAT_UNDEFINED),
 		      colorSampler(VK_NULL_HANDLE),
 		      ppRenderPass(VK_NULL_HANDLE),
-		      dualSamplerDSL(VK_NULL_HANDLE),
+		      texturesDSL(VK_NULL_HANDLE),
 		      cavityLayout(VK_NULL_HANDLE),
 		      cavityPipeline(VK_NULL_HANDLE) {
 			SPADES_MARK_FUNCTION();
@@ -86,7 +86,7 @@ namespace spades {
 
 			if (cavityPipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, cavityPipeline, nullptr);
 			if (cavityLayout   != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, cavityLayout, nullptr);
-			if (dualSamplerDSL != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, dualSamplerDSL, nullptr);
+			if (texturesDSL    != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, texturesDSL, nullptr);
 			if (colorSampler   != VK_NULL_HANDLE) vkDestroySampler(dev, colorSampler, nullptr);
 			if (ppRenderPass   != VK_NULL_HANDLE) vkDestroyRenderPass(dev, ppRenderPass, nullptr);
 		}
@@ -130,9 +130,9 @@ namespace spades {
 		void VulkanCavityOutlineFilter::InitDescriptorSetLayout() {
 			VkDevice dev = device->GetDevice();
 
-			VkDescriptorSetLayoutBinding bindings[2]{};
-			for (int i = 0; i < 2; ++i) {
-				bindings[i].binding         = static_cast<uint32_t>(i);
+			VkDescriptorSetLayoutBinding bindings[kNumBindings]{};
+			for (uint32_t i = 0; i < kNumBindings; ++i) {
+				bindings[i].binding         = i;
 				bindings[i].descriptorCount = 1;
 				bindings[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				bindings[i].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -140,10 +140,10 @@ namespace spades {
 
 			VkDescriptorSetLayoutCreateInfo info{};
 			info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			info.bindingCount = 2;
+			info.bindingCount = kNumBindings;
 			info.pBindings    = bindings;
 
-			if (vkCreateDescriptorSetLayout(dev, &info, nullptr, &dualSamplerDSL) != VK_SUCCESS)
+			if (vkCreateDescriptorSetLayout(dev, &info, nullptr, &texturesDSL) != VK_SUCCESS)
 				SPRaise("Failed to create cavity outline descriptor set layout");
 		}
 
@@ -180,7 +180,7 @@ namespace spades {
 			VkPipelineLayoutCreateInfo li{};
 			li.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 			li.setLayoutCount         = 1;
-			li.pSetLayouts            = &dualSamplerDSL;
+			li.pSetLayouts            = &texturesDSL;
 			li.pushConstantRangeCount = 1;
 			li.pPushConstantRanges    = &pcr;
 			if (vkCreatePipelineLayout(dev, &li, nullptr, &cavityLayout) != VK_SUCCESS)
@@ -263,12 +263,15 @@ namespace spades {
 		void VulkanCavityOutlineFilter::InitDescriptorPools() {
 			VkDevice dev = device->GetDevice();
 
-			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4};
+			// Two sets a frame slot, of every binding
+			constexpr uint32_t kMaxSets = 2;
+			VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			                          kMaxSets * kNumBindings};
 			VkDescriptorPoolCreateInfo info{};
 			info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			info.poolSizeCount = 1;
 			info.pPoolSizes    = &size;
-			info.maxSets       = 2;
+			info.maxSets       = kMaxSets;
 
 			for (int i = 0; i < MAX_FRAME_SLOTS; ++i) {
 				if (vkCreateDescriptorPool(dev, &info, nullptr, &perFrameDescPool[i]) != VK_SUCCESS)
@@ -297,30 +300,33 @@ namespace spades {
 		VkDescriptorSet VulkanCavityOutlineFilter::BindTextures(int         frameSlot,
 		                                                        VkImageView colorView,
 		                                                        VkImageView depthView,
-		                                                        VkSampler   depthSampler) {
+		                                                        VkSampler   depthSampler,
+		                                                        VkImageView stencilView,
+		                                                        VkSampler   stencilSampler) {
 			VkDescriptorSetAllocateInfo ai{};
 			ai.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			ai.descriptorPool     = perFrameDescPool[frameSlot];
 			ai.descriptorSetCount = 1;
-			ai.pSetLayouts        = &dualSamplerDSL;
+			ai.pSetLayouts        = &texturesDSL;
 			VkDescriptorSet set;
 			if (vkAllocateDescriptorSets(device->GetDevice(), &ai, &set) != VK_SUCCESS)
 				SPRaise("Failed to allocate cavity outline descriptor set");
 
-			VkDescriptorImageInfo imgs[2]{
+			VkDescriptorImageInfo imgs[kNumBindings]{
 			    {colorSampler, colorView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
 			    {depthSampler, depthView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+			    {stencilSampler, stencilView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
 			};
-			VkWriteDescriptorSet writes[2]{};
-			for (int i = 0; i < 2; ++i) {
+			VkWriteDescriptorSet writes[kNumBindings]{};
+			for (uint32_t i = 0; i < kNumBindings; ++i) {
 				writes[i].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				writes[i].dstSet          = set;
-				writes[i].dstBinding      = static_cast<uint32_t>(i);
+				writes[i].dstBinding      = i;
 				writes[i].descriptorCount = 1;
 				writes[i].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 				writes[i].pImageInfo      = &imgs[i];
 			}
-			vkUpdateDescriptorSets(device->GetDevice(), 2, writes, 0, nullptr);
+			vkUpdateDescriptorSets(device->GetDevice(), kNumBindings, writes, 0, nullptr);
 			return set;
 		}
 
@@ -370,11 +376,14 @@ namespace spades {
 			pc.thresholds[2] = 0.0F;
 			pc.thresholds[3] = 0.0F;
 
-			Handle<VulkanImage> depthImg = renderer.GetFramebufferManager()->GetResolvedDepthImage();
+			VulkanFramebufferManager& fbm = *renderer.GetFramebufferManager();
+			Handle<VulkanImage> depthImg = fbm.GetResolvedDepthImage();
+			Handle<VulkanImage> stencilImg = fbm.GetResolvedStencilImage();
 
 			VkDescriptorSet ds = BindTextures(frameSlot,
 			    input->GetImageView(),
-			    depthImg->GetImageView(), depthImg->GetSampler());
+			    depthImg->GetImageView(), depthImg->GetSampler(),
+			    stencilImg->GetImageView(), stencilImg->GetSampler());
 
 			VkFramebuffer fb = MakeFramebuffer(output, frameSlot);
 

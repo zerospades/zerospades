@@ -40,7 +40,10 @@ namespace spades {
 		// pixel-to-pixel tangent length (i.e. there is a depth
 		// discontinuity), a black overlay is composited over the
 		// input colour image with an alpha that fades smoothly into
-		// the haze using fogDistance.
+		// the haze using fogDistance. An edge belongs to the surface on
+		// its near side, and is left out where that surface draws no
+		// outline (kStencilBitNoOutline, VulkanSceneStencil.h), as GL
+		// leaves out such a model's.
 		//
 		// This replaces the per-renderer outline machinery (map +
 		// model wireframe / inverted-hull). Why:
@@ -63,13 +66,15 @@ namespace spades {
 		//   0 — colour input  (combined sampler, SHADER_READ_ONLY)
 		//   1 — depth         (combined sampler, SHADER_READ_ONLY,
 		//                      depth aspect)
+		//   2 — stencil       (combined sampler, SHADER_READ_ONLY,
+		//                      the scene's resolved R8_UINT stencil)
 		//
 		// Filter(cmd, input, output): input must be in
 		// SHADER_READ_ONLY_OPTIMAL; output ends in
-		// SHADER_READ_ONLY_OPTIMAL. The depth image must also be in
-		// SHADER_READ_ONLY_OPTIMAL on entry — the dispatch site
-		// already transitions it for the fog filter, so we get it
-		// for free.
+		// SHADER_READ_ONLY_OPTIMAL. The depth and stencil images must
+		// also be in SHADER_READ_ONLY_OPTIMAL on entry, the stencil
+		// copied or resolved once the scene is drawn
+		// (VulkanFramebufferManager::GetResolvedStencilImage).
 		class VulkanCavityOutlineFilter : public VulkanPostProcessFilter {
 
 			VkFormat colorFormat;
@@ -77,7 +82,8 @@ namespace spades {
 
 			VkRenderPass ppRenderPass;
 
-			VkDescriptorSetLayout dualSamplerDSL; // bindings 0, 1
+			static constexpr uint32_t kNumBindings = 3;
+			VkDescriptorSetLayout texturesDSL; // bindings 0, 1, 2
 
 			VkPipelineLayout cavityLayout;
 			VkPipeline       cavityPipeline;
@@ -98,7 +104,9 @@ namespace spades {
 			VkDescriptorSet BindTextures(int         frameSlot,
 			                             VkImageView colorView,
 			                             VkImageView depthView,
-			                             VkSampler   depthSampler);
+			                             VkSampler   depthSampler,
+			                             VkImageView stencilView,
+			                             VkSampler   stencilSampler);
 
 			void CreatePipeline() override {}
 			void CreateRenderPass() override {}
