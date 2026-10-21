@@ -449,7 +449,7 @@ namespace spades {
 			mask1  = renderer.RegisterImage("Gfx/LensFlare/mask1.png");
 			mask2  = renderer.RegisterImage("Gfx/LensFlare/mask2.png");
 			mask3  = renderer.RegisterImage("Gfx/LensFlare/mask3.png");
-			white  = renderer.RegisterImage("Gfx/White.tga");
+			white  = renderer.RegisterWhiteImage();
 		}
 
 		// ─────────────────────────────────────────────────────────────

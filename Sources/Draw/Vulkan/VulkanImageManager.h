@@ -26,6 +26,8 @@
 #include <Core/RefCountedObject.h>
 
 namespace spades {
+	class Bitmap;
+
 	namespace gui {
 		class SDLVulkanDevice;
 	}
@@ -40,6 +42,7 @@ namespace spades {
 			Handle<client::IImage> whiteImage;
 
 			Handle<client::IImage> CreateImage(const std::string& name);
+			Handle<client::IImage> CreateImage(Bitmap&, const std::string& name);
 
 		public:
 			explicit VulkanImageManager(Handle<gui::SDLVulkanDevice> dev);
