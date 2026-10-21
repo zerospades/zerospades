@@ -30,13 +30,27 @@ namespace spades {
 		 * drawn, so the x-ray pass can tell "hidden behind the world" apart from
 		 * "hidden behind another model". Mirrors GLRenderer's kStencilBitWorld.
 		 *
-		 * The scene's stencil buffer is cleared with the colour and depth buffers
-		 * and read by nothing else, so this bit is the whole allocation. Unlike GL,
-		 * the 2D pass never touches stencil at all -- it clips with a fragment
-		 * reject and a dynamic scissor, and its render pass has no depth/stencil
-		 * attachment (see VulkanRenderer::CreateRenderPass).
+		 * The scene's stencil buffer is cleared with the colour and depth buffers.
+		 * Its bits say what the nearest surface is: this one and
+		 * kStencilBitNoOutline are the whole allocation. Unlike GL, the 2D pass
+		 * never touches stencil at all -- it clips with a fragment reject and a
+		 * dynamic scissor, and its render pass has no depth/stencil attachment (see
+		 * VulkanRenderer::CreateRenderPass).
 		 */
 		constexpr uint32_t kStencilBitWorld = 1u << 0;
+
+		/**
+		 * Stencil bit stamped where the nearest surface draws no outline: a model
+		 * drawn without `drawOutline`, or a ghost, the models GL's outline pass
+		 * skips. The cavity outline filter reads it back, copied or resolved
+		 * (VulkanFramebufferManager::GetResolvedStencilImage), and leaves out the
+		 * edges such a surface is the near side of. CavityOutline.vk.fs repeats
+		 * the value.
+		 */
+		constexpr uint32_t kStencilBitNoOutline = 1u << 1;
+
+		/** The bits an opaque surface stamps: all of what the nearest one is */
+		constexpr uint32_t kStencilSurfaceBits = kStencilBitWorld | kStencilBitNoOutline;
 
 		/**
 		 * The aspects a layout barrier on a depth attachment has to cover. Core
@@ -56,22 +70,41 @@ namespace spades {
 		}
 
 		/**
-		 * Stamps `reference` into the world bit wherever this pipeline's fragments
-		 * land. The map passes kStencilBitWorld, every model pass that writes depth
-		 * passes 0: together they keep the bit equal to "the world is the nearest
-		 * surface here". Without the models clearing it again, a player standing
-		 * against a wall would leave the bit set under themselves and the x-ray
-		 * would draw their hidden parts over their visible body.
+		 * Stamps `reference` into the surface bits wherever this pipeline's
+		 * fragments land. The map passes kStencilBitWorld; the models' lit pass
+		 * sets its reference per draw (dynamic state), kStencilBitNoOutline for a
+		 * model without an outline and 0 otherwise: together they keep the bits
+		 * equal to what the nearest surface is. Without the models clearing the
+		 * world bit again, a player standing against a wall would leave it set
+		 * under themselves and the x-ray would draw their hidden parts over their
+		 * visible body.
 		 */
-		inline VkStencilOpState MakeWorldStampStencilOp(uint32_t reference) {
+		inline VkStencilOpState MakeSurfaceStampStencilOp(uint32_t reference) {
 			VkStencilOpState op{};
 			op.failOp = VK_STENCIL_OP_KEEP;
 			op.passOp = VK_STENCIL_OP_REPLACE;
 			op.depthFailOp = VK_STENCIL_OP_KEEP;
 			op.compareOp = VK_COMPARE_OP_ALWAYS;
-			op.compareMask = kStencilBitWorld;
-			op.writeMask = kStencilBitWorld;
+			op.compareMask = kStencilSurfaceBits;
+			op.writeMask = kStencilSurfaceBits;
 			op.reference = reference;
+			return op;
+		}
+
+		/**
+		 * Stamps kStencilBitNoOutline wherever a ghost lands in front, and leaves
+		 * the world bit as the surface behind it set it: the x-ray still tells what
+		 * hides a player behind a ghost, while the ghost draws no outline.
+		 */
+		inline VkStencilOpState MakeGhostStampStencilOp() {
+			VkStencilOpState op{};
+			op.failOp = VK_STENCIL_OP_KEEP;
+			op.passOp = VK_STENCIL_OP_REPLACE;
+			op.depthFailOp = VK_STENCIL_OP_KEEP;
+			op.compareOp = VK_COMPARE_OP_ALWAYS;
+			op.compareMask = kStencilBitNoOutline;
+			op.writeMask = kStencilBitNoOutline;
+			op.reference = kStencilBitNoOutline;
 			return op;
 		}
 
