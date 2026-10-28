@@ -22,6 +22,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include <Client/IModel.h>
 #include <Core/RefCountedObject.h>
@@ -41,6 +42,8 @@ namespace spades {
 			Handle<GLModel> RegisterModel(const char*);
 
 			void ClearCache();
+			/** The files the cached ones were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

@@ -23,6 +23,8 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/Strings.h>
+#include <ScriptBindings/ScriptFunction.h>
 #include <sstream>
 #include <vector>
 
@@ -34,6 +36,15 @@ namespace spades {
 		return m;
 	}
 
+	namespace {
+		// What MessageCallback keeps of the first error of a build.
+		struct BuildError {
+			std::string message;
+			std::string section; // the script, as "/Skin/Foo.as"
+		};
+	} // namespace
+
+	// `param` is null, or a `BuildError` that receives the first error.
 	static void MessageCallback(const asSMessageInfo* msg, void* param) {
 		SPADES_MARK_FUNCTION();
 		const char* type = "ERR ";
@@ -42,6 +53,13 @@ namespace spades {
 		else if (msg->type == asMSGTYPE_INFORMATION)
 			type = "INFO";
 		SPLog("%s (%d, %d) : %s : %s\n", msg->section, msg->row, msg->col, type, msg->message);
+
+		auto* firstError = static_cast<BuildError*>(param);
+		if (firstError && firstError->message.empty() && msg->type == asMSGTYPE_ERROR) {
+			firstError->message =
+			  Format("{0} ({1}, {2}): {3}", msg->section, msg->row, msg->col, msg->message);
+			firstError->section = msg->section;
+		}
 	}
 
 	// Helper function to normalize paths (resolve .. and .)
@@ -164,25 +182,75 @@ namespace spades {
 			ScriptObjectRegistrar::RegisterAll(this, ScriptObjectRegistrar::PhaseGlobalFunction);
 			ScriptObjectRegistrar::RegisterAll(this, ScriptObjectRegistrar::PhaseObjectMember);
 
-		SPLog("Loading scripts");
-		engine->SetDefaultNamespace("");
-		CScriptBuilder builder;
-		builder.SetIncludeCallback(IncludeCallback, NULL);
-		if (builder.StartNewModule(engine, "Client") < 0)
-			SPRaise("Failed to create script module.");
-		builder.DefineWord("CLIENT");
-
-		std::string mainScript = FileManager::ReadAllBytes("Scripts/Main.as");
-		if (builder.AddSectionFromMemory("/Main.as", mainScript.c_str(), (unsigned int)(mainScript.length()), 0) < 0)
-			SPRaise("Failed to load '/Main.as'.");
-
-		SPLog("Building");
-		if (builder.BuildModule() < 0)
-			SPRaise("Failed to build at least one of the scripts.");
+			// A build error is kept, not raised: the engine is fine, and the scripts
+			// can be built again on it once the mods at fault are left out.
+			startupError = BuildModule("Client", startupErrorFile);
 		} catch (...) {
 			engine->Release();
 			throw;
 		}
+	}
+
+	std::string ScriptManager::BuildModule(const std::string& name, std::string& errorFile) {
+		SPADES_MARK_FUNCTION();
+
+		BuildError error;
+		engine->SetMessageCallback(asFUNCTION(MessageCallback), &error, asCALL_CDECL);
+		try {
+			SPLog("Loading scripts");
+			engine->SetDefaultNamespace("");
+			CScriptBuilder builder;
+			builder.SetIncludeCallback(IncludeCallback, NULL);
+			if (builder.StartNewModule(engine, name.c_str()) < 0)
+				SPRaise("Failed to create script module.");
+			builder.DefineWord("CLIENT");
+
+			std::string mainScript = FileManager::ReadAllBytes("Scripts/Main.as");
+			if (builder.AddSectionFromMemory("/Main.as", mainScript.c_str(),
+			                                 (unsigned int)(mainScript.length()), 0) < 0)
+				SPRaise("Failed to load '/Main.as'.");
+
+			SPLog("Building");
+			if (builder.BuildModule() < 0)
+				SPRaise("Failed to build at least one of the scripts.");
+		} catch (const std::exception& ex) {
+			if (error.message.empty())
+				error.message = ex.what();
+		}
+		engine->SetMessageCallback(asFUNCTION(MessageCallback), 0, asCALL_CDECL);
+
+		// The game calls into the module by these; it must have them all.
+		if (error.message.empty())
+			error.message = ScriptFunction::FindMissing(engine, engine->GetModule(name.c_str()));
+
+		errorFile.clear();
+		if (!error.message.empty()) {
+			DiscardModule(name);
+			if (!error.section.empty())
+				errorFile = "Scripts" + error.section;
+		}
+		return error.message;
+	}
+
+	std::string ScriptManager::RebuildClientModule(std::string& errorFile) {
+		SPADES_MARK_FUNCTION();
+
+		std::string error = BuildModule("ClientNext", errorFile);
+		if (!error.empty())
+			return error;
+		// What the old module made, if anything, keeps its code alive.
+		DiscardModule("Client");
+		engine->GetModule("ClientNext")->SetName("Client");
+		generation++;
+		startupError.clear();
+		startupErrorFile.clear();
+		SPLog("Scripts rebuilt");
+		return {};
+	}
+
+	void ScriptManager::DiscardModule(const std::string& name) {
+		if (engine->GetModule(name.c_str()))
+			engine->DiscardModule(name.c_str());
 	}
 
 	static std::string ASErrorToString(int ret) {
@@ -272,7 +340,9 @@ namespace spades {
 			obj->refCount--;
 			if (obj->refCount == 0) {
 				// this context is no longer used;
-				// add to freelist
+				// add to freelist, without the object it returned last, which
+				// would otherwise live on, with all it holds, until its next use
+				obj->obj->Unprepare();
 				manager->contextFreeList.push_back(obj);
 			}
 

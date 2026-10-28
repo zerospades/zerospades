@@ -150,5 +150,12 @@ namespace spades {
 		}
 
 		void SWModelManager::ClearCache() { models.clear(); }
+
+		std::vector<std::string> SWModelManager::GetFiles() const {
+			std::vector<std::string> files;
+			for (const auto& entry : models)
+				files.push_back(entry.first);
+			return files;
+		}
 	} // namespace draw
 } // namespace spades
