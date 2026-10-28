@@ -67,6 +67,14 @@ namespace spades {
 		return path;
 	}
 
+	bool IsUnreadModFile(const std::string& path) {
+		std::string p = NormalizeResourcePath(path);
+		std::size_t slash = p.rfind('/');
+		std::string name = slash == std::string::npos ? p : p.substr(slash + 1);
+		return (!name.empty() && name[0] == '.') || name == "thumbs.db" ||
+		       name == "desktop.ini" || EndsWith(name, ".txt") || EndsWith(name, ".md");
+	}
+
 	std::string GetModelPathOfMetadata(const std::string& metadata) {
 		std::string path = GetAssetRequestPath(metadata);
 		return path.substr(0, path.size() - 10) + ".kv6";

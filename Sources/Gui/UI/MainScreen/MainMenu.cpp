@@ -919,16 +919,27 @@ namespace spades {
 				           (problems.empty() ? "" : "\n\n" + problems);
 
 			if (result == ModApplyResult::NeedsRestart) {
-				// Their files are the menus' own: only a restart picks them up.
-				if (problems.empty()) {
-					helper->RelaunchForMods();
-					return;
-				}
-				Handle<AlertScreen> al = Handle<AlertScreen>::New(
-				    this, problems + "\n\n" + _Tr("MainScreen", "The game restarts to apply the rest."),
-				    200.0F, true);
-				al->closed = [this](UIElement&) { helper->RelaunchForMods(); };
-				al->Run();
+				// Only a restart picks these up: ask first. The toggles are saved
+				// already, so declining still applies them at the next start.
+				std::string text = _Tr("MainScreen", "These changes need a restart:") + "\n" +
+				                   error + "\n\n" +
+				                   _Tr("MainScreen", "Restart now? Otherwise they apply the next "
+				                                     "time the game starts.");
+				if (!problems.empty())
+					text = problems + "\n\n" + text;
+				modsDirty = true;
+				LoadModList();
+				Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(this, text, 240.0F, true);
+				cs->closed = [this](UIElement& sender) {
+					ConfirmScreen* confirm = dynamic_cast<ConfirmScreen*>(&sender);
+					if (confirm && confirm->GetResult()) {
+						helper->RelaunchForMods();
+						return;
+					}
+					modsStatusLabel->text =
+					  _Tr("MainScreen", "Your changes apply the next time the game starts.");
+				};
+				cs->Run();
 				return;
 			}
 

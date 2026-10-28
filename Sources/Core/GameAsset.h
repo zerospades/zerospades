@@ -51,6 +51,12 @@ namespace spades {
 	 */
 	std::string GetAssetRequestPath(const std::string& file);
 
+	/**
+	 * Whether nothing in the game reads `path`: a readme, a licence text, or what
+	 * a file manager leaves behind (`.DS_Store`, `Thumbs.db`, `desktop.ini`).
+	 */
+	bool IsUnreadModFile(const std::string& path);
+
 	/** The model a `.meta.json` file goes with: `Foo.meta.json` is `Foo.kv6`. */
 	std::string GetModelPathOfMetadata(const std::string& metadata);
 } // namespace spades

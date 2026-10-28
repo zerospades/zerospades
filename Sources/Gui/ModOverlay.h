@@ -69,8 +69,9 @@ namespace spades {
 			 * doesn't load is left out and goes to `failures`. When the change only
 			 * touches game assets, it is `Applied`: the next game loads it. When it
 			 * touches the software's own files, those `renderer` and `audio` loaded
-			 * or ones that aren't game assets, it `NeedsRestart`. A script failure no
-			 * mod can be blamed for refuses it, with `error`.
+			 * or ones that aren't game assets, it `NeedsRestart`, and `error` says
+			 * which mod and why; files nothing reads, such as a readme, don't count.
+			 * A script failure no mod can be blamed for refuses it, with `error`.
 			 */
 			static ModApplyResult Apply(client::IRenderer& renderer, client::IAudioDevice& audio,
 			                            std::vector<ModFailure>& failures, std::string& error);

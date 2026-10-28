@@ -279,6 +279,30 @@ namespace spades {
 				return {};
 			}
 
+			// Why `mod` changing `file` takes a restart, for the user. `menus`: the
+			// menus loaded the file.
+			std::string DescribeRestart(const std::string& mod, const std::string& file,
+			                            bool menus) {
+				std::string p = NormalizeResourcePath(file);
+				auto startsWith = [&](const char* prefix) { return p.rfind(prefix, 0) == 0; };
+				auto endsWith = [&](const char* suffix) {
+					std::size_t n = std::char_traits<char>::length(suffix);
+					return p.size() >= n && p.compare(p.size() - n, n, suffix) == 0;
+				};
+				if (menus)
+					return _Tr("ModOverlay", "{0} changes '{1}', which the menus use.", mod, file);
+				if (startsWith("gfx/fonts/") || startsWith("fonts/") || endsWith(".ttf") ||
+				    endsWith(".otf") || endsWith(".ttc"))
+					return _Tr("ModOverlay", "{0} changes the game's fonts ({1}).", mod, file);
+				if (startsWith("shaders/"))
+					return _Tr("ModOverlay", "{0} changes the game's shaders ({1}).", mod, file);
+				if (startsWith("locales/"))
+					return _Tr("ModOverlay", "{0} changes the game's translations ({1}).", mod,
+					           file);
+				return _Tr("ModOverlay", "{0} changes '{1}', which the game reads when it starts.",
+				           mod, file);
+			}
+
 			// Takes the mod down and out of the enabled set, on disk too.
 			void Disable(const std::string& mod, const std::string& reason) {
 				SPLog("Mod failed to load, disabled: %s: %s", mod.c_str(), reason.c_str());
@@ -383,8 +407,16 @@ namespace spades {
 				loaded.insert(NormalizeResourcePath(file));
 			bool scripts = false;
 			for (const std::string& file : changes) {
+				if (IsUnreadModFile(file))
+					continue;
 				GameAssetKind kind = GetGameAssetKind(file);
-				if (kind == GameAssetKind::None || loaded.count(NormalizeResourcePath(file))) {
+				bool menus = loaded.count(NormalizeResourcePath(file)) != 0;
+				if (kind == GameAssetKind::None || menus) {
+					// The mod it comes from, or went with.
+					std::string mod = GetOwner(paks, file);
+					if (mod.empty())
+						mod = GetOwner(g_paks, file);
+					error = DescribeRestart(mod, file, menus);
 					SPLog("Mods need a restart: '%s' changed", file.c_str());
 					helper->SetEnabledMods(mods);
 					return ModApplyResult::NeedsRestart;
