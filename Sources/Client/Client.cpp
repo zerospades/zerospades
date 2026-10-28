@@ -336,6 +336,8 @@ namespace spades {
 		Client::~Client() {
 			SPADES_MARK_FUNCTION();
 
+			SmokeSpriteEntity::Unload();
+
 			NetLog("Disconnecting");
 
 			if (logStream) {
