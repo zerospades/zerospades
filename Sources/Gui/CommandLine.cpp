@@ -189,12 +189,18 @@ namespace spades {
 					   return "--screenshot-quit takes a number of seconds, not " + v[0];
 				   return std::string();
 			   }},
-			  // Takes every argument after it as its own: see ParseCommandLine.
+			  // These take every argument after them: see ParseCommandLine.
 			  {"--kv6-tools", nullptr, "COMMAND [ARGS...]", 0, true,
 			   "read and edit a KV6 model without opening the game\n"
 			   "(its size, pivot, bounds, voxels). Everything after it\n"
 			   "is its own, so only --debug-tools may come before it;\n"
 			   "--debug-tools --kv6-tools help lists its commands.",
+			   nullptr},
+			  {"--2kv6-tools", nullptr, "COMMAND FILE [ARGS...]", 0, true,
+			   "read and edit a .2kv6 scene without opening the game\n"
+			   "(its tree, hinges, transforms, models); as --kv6-tools,\n"
+			   "everything after it is its own.\n"
+			   "--debug-tools --2kv6-tools help lists its commands.",
 			   nullptr},
 			};
 			return options;
@@ -350,8 +356,8 @@ namespace spades {
 					      "come before it");
 					return CommandLineResult::Error;
 				}
-				out.kv6Tools = true;
-				out.kv6ToolsArguments.assign(args.begin() + std::ptrdiff_t(i) + 1, args.end());
+				(IsName(arg, "--kv6-tools") ? out.kv6Tools : out.twoKV6Tools) = true;
+				out.toolArguments.assign(args.begin() + std::ptrdiff_t(i) + 1, args.end());
 				break;
 			}
 			if (!IsName(arg, "--debug-tools"))
@@ -377,9 +383,10 @@ namespace spades {
 		// The options for developers and tests are allowed with --debug-tools
 		// only, wherever it stands, so none is used by accident.
 		if (developerOption && !out.debugTools) {
-			if (out.kv6Tools) {
+			if (out.kv6Tools || out.twoKV6Tools) {
 				// One after it would be the tool's own argument, not ours.
-				Error("--kv6-tools is a tool for developers and tests: give --debug-tools "
+				Error(std::string(out.kv6Tools ? "--kv6-tools" : "--2kv6-tools") +
+				      " is a tool for developers and tests: give --debug-tools "
 				      "before it");
 				return CommandLineResult::Error;
 			}
@@ -388,7 +395,7 @@ namespace spades {
 			      "(--debug-tools --help lists them all)");
 			return CommandLineResult::Error;
 		}
-		if (out.kv6Tools)
+		if (out.kv6Tools || out.twoKV6Tools)
 			return CommandLineResult::Run;
 
 		int starts = 0;

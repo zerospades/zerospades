@@ -65,9 +65,11 @@ namespace spades {
 		bool printVersion = false;
 		bool registerFileTypes = false;
 		bool unregisterFileTypes = false;
-		/** The arguments of --kv6-tools, which takes all that follow it. */
-		bool kv6Tools = false;
-		std::vector<std::string> kv6ToolsArguments;
+		/** Which command-line tool was given, if one was; each takes every
+		 *  argument after it, held in `toolArguments`. */
+		bool kv6Tools = false;    // --kv6-tools
+		bool twoKV6Tools = false; // --2kv6-tools
+		std::vector<std::string> toolArguments;
 
 		/** Whether the options for developers and tests are allowed. */
 		bool debugTools = false;
