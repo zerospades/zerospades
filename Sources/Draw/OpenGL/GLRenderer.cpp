@@ -607,6 +607,21 @@ namespace spades {
 			glareRenderer->Add(glImage, param);
 		}
 
+		void GLRenderer::AddImagePlane(client::IImage& img, Vector3 origin, Vector3 axisU,
+		                               Vector3 axisV) {
+			SPADES_MARK_FUNCTION_DEBUG();
+
+			GLImage& glImage = dynamic_cast<GLImage&>(img);
+
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			// Drawn with the long sprites: the same program takes world-space
+			// corners, in the same blended, depth-tested pass.
+			longSpriteRenderer->AddPlane(&glImage, origin, axisU, axisV,
+			                             drawColorAlphaPremultiplied);
+		}
+
 #pragma mark - Scene Finalizer
 
 		struct DebugLineVertex {

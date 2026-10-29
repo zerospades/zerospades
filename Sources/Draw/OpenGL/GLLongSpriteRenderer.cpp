@@ -60,6 +60,11 @@ namespace spades {
 			spr.start = p1;
 			spr.end = p2;
 			spr.radius = rad;
+			spr.color = PassColor(color);
+			sprites.push_back(spr);
+		}
+
+		Vector4 GLLongSpriteRenderer::PassColor(Vector4 color) const {
 			if (settings.r_hdr) {
 				// linearize color
 				if (color.x > color.w || color.y > color.w || color.z > color.w) {
@@ -75,13 +80,62 @@ namespace spades {
 					color.z *= color.z * rcp;
 				}
 			}
-			spr.color = color;
-			sprites.push_back(spr);
+			return color;
+		}
+
+		void GLLongSpriteRenderer::AddPlane(GLImage *img, Vector3 origin, Vector3 axisU,
+		                                    Vector3 axisV, Vector4 color) {
+			SPADES_MARK_FUNCTION_DEBUG();
+			Plane plane;
+			plane.image = img;
+			plane.origin = origin;
+			plane.axisU = axisU;
+			plane.axisV = axisV;
+			plane.color = PassColor(color);
+			planes.push_back(plane);
 		}
 
 		void GLLongSpriteRenderer::Clear() {
 			SPADES_MARK_FUNCTION();
 			sprites.clear();
+			planes.clear();
+		}
+
+		void GLLongSpriteRenderer::RenderPlanes() {
+			// The GPU clips a plane against the view itself: unlike a long
+			// sprite, nothing here is built in screen space.
+			for (const Plane &plane : planes) {
+				if (plane.image != lastImage) {
+					Flush();
+					lastImage = plane.image;
+				}
+				Vertex v;
+				v.r = plane.color.x;
+				v.g = plane.color.y;
+				v.b = plane.color.z;
+				v.a = plane.color.w;
+				const uint32_t idx = (uint32_t)vertices.size();
+				v = plane.origin;
+				v.u = 0;
+				v.v = 0;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisU;
+				v.u = 1;
+				v.v = 0;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisV;
+				v.u = 0;
+				v.v = 1;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisU + plane.axisV;
+				v.u = 1;
+				v.v = 1;
+				vertices.push_back(v);
+				// Both windings, so the plane shows from either side whatever is
+				// culled.
+				for (uint32_t i : {0u, 1u, 2u, 1u, 3u, 2u, 0u, 2u, 1u, 1u, 2u, 3u})
+					indices.push_back(idx + i);
+			}
 		}
 
 		void GLLongSpriteRenderer::Render() {
@@ -331,6 +385,7 @@ namespace spades {
 				}
 			}
 
+			RenderPlanes();
 			Flush();
 
 			device.EnableVertexAttribArray(positionAttribute(), false);
