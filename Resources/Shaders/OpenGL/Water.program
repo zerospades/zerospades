@@ -1,4 +1,9 @@
 Shaders/OpenGL/Water.fs
+Shaders/OpenGL/DynamicLight/LightsTileOnly.fs
+Shaders/OpenGL/WaterDynamicLight.fs
 Shaders/OpenGL/Water.vs
-*shadow*
+# The water's shadows: no SSAO, which is not computed for the water surface, and
+# the ambient light of a surface facing up, which spares samplers for the dynamic
+# lights within the limit of 16.
+*shadow-water*
 Shaders/OpenGL/Fog.vs

@@ -29,6 +29,7 @@ varying vec3 reflectionDir;
 uniform vec3 viewSpaceLight;
 
 uniform sampler2D ambientOcclusionTexture;
+uniform float sunlight;
 uniform vec3 fogColor;
 
 float VisibilityOfSunLight();
@@ -44,7 +45,7 @@ void main() {
 
 	float ao = texture2D(ambientOcclusionTexture, ambientOcclusionCoord).x;
 	vec3 diffuseShading = EvaluateAmbientLight(ao);
-	float shadowing = VisibilityOfSunLight() * 0.6;
+	float shadowing = VisibilityOfSunLight() * (0.6 * sunlight);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 	vec3 normal = normalize(viewSpaceNormal);

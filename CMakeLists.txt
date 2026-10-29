@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
+
+if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+	set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment version")
+endif()
+
 project(ZeroSpades)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -29,6 +34,14 @@ endif()
 if(POLICY CMP0072)
 	cmake_policy(SET CMP0072 NEW)
 endif()
+
+# Rendering backend options
+option(USE_OPENGL "Enable OpenGL renderer" ON)
+option(USE_VULKAN "Enable Vulkan renderer" ON)
+# macOS Debug builds only: link the Vulkan loader instead of MoltenVK so
+# validation layers can be injected. Produces a bundle that is not
+# self-contained, so it is rejected outside Debug builds.
+option(ZS_VULKAN_USE_LOADER "macOS Debug only: link the Vulkan loader instead of MoltenVK (enables validation layers)" OFF)
 
 if(USE_VCPKG)
 	find_package(Ogg CONFIG REQUIRED)
@@ -71,14 +84,16 @@ else()
 		message(FATAL_ERROR "SDL_image 2.0 not found, set ENV{SDL2DIR} to point to SDL 2.0, and optionally set the cmake var SDL2_LIBRARY_TEMP to the lib dir")
 	endif()
 
-	include(FindOpenGL)
-	if(NOT OPENGL_FOUND AND NOT OPENGL_XMESA_FOUND AND NOT OPENGL_GLU_FOUND)
-		message(FATAL_ERROR "OpenGL not found, please install it")
-	endif()
-	if(NOT APPLE)
-		include(cmake/FindGLEW2.cmake)
-		if(NOT GLEW_FOUND)
-			message(FATAL_ERROR "GLEW not found, please install it and make sure CMake can find it (add it to the PATH)")
+	if(USE_OPENGL)
+		include(FindOpenGL)
+		if(NOT OPENGL_FOUND AND NOT OPENGL_XMESA_FOUND AND NOT OPENGL_GLU_FOUND)
+			message(FATAL_ERROR "OpenGL not found, please install it")
+		endif()
+		if(NOT APPLE)
+			include(cmake/FindGLEW2.cmake)
+			if(NOT GLEW_FOUND)
+				message(FATAL_ERROR "GLEW not found, please install it and make sure CMake can find it (add it to the PATH)")
+			endif()
 		endif()
 	endif()
 
@@ -105,6 +120,132 @@ else()
 	include(cmake/FindOpus.cmake)
 	if(NOT OpusFile_FOUND)
 		message(FATAL_ERROR "libopus/libopusfile not found, please install it (and make sure it's in your path)")
+	endif()
+endif()
+
+# Vulkan configuration
+if(USE_VULKAN)
+	if(USE_VCPKG)
+		# All Vulkan deps come from vcpkg — no system installation required.
+		find_package(VulkanHeaders CONFIG REQUIRED)
+		get_target_property(Vulkan_INCLUDE_DIRS Vulkan::Headers INTERFACE_INCLUDE_DIRECTORIES)
+		message(STATUS "Vulkan headers (vcpkg): ${Vulkan_INCLUDE_DIRS}")
+
+		if(APPLE)
+			find_package(molten-vk CONFIG REQUIRED)
+			set(MOLTENVK_LIBRARY MoltenVK::MoltenVK)
+			message(STATUS "Using MoltenVK (vcpkg): ${MOLTENVK_LIBRARY}")
+		else()
+			find_package(Vulkan REQUIRED)
+			message(STATUS "Vulkan loader (vcpkg): ${Vulkan_LIBRARIES}")
+		endif()
+
+		find_program(GLSLANG_VALIDATOR glslangValidator
+			HINTS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/glslang"
+			NO_DEFAULT_PATH)
+	else()
+		if(APPLE AND ZS_VULKAN_USE_LOADER)
+			# Debugging configuration: go through the Vulkan loader rather than
+			# MoltenVK. Validation layers are injected BY the loader, so they can
+			# never load when MoltenVK is linked directly, no matter which
+			# environment variables are set. The loader dispatches to MoltenVK
+			# through its ICD manifest (/opt/local/share/vulkan/icd.d).
+			#
+			# Restricted to Debug builds so a release bundle can never end up
+			# depending on a loader and ICD installed on the developer's machine
+			# instead of being self-contained.
+			if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+				message(FATAL_ERROR
+					"ZS_VULKAN_USE_LOADER is a debugging aid and requires -DCMAKE_BUILD_TYPE=Debug "
+					"(current: '${CMAKE_BUILD_TYPE}'). It links the Vulkan loader instead of "
+					"MoltenVK, which makes the bundle non-portable.")
+			endif()
+			find_library(VULKAN_LOADER_LIBRARY NAMES vulkan vulkan.1
+				HINTS /opt/local/lib /opt/homebrew/lib /usr/local/lib
+				      ENV VULKAN_SDK
+				PATH_SUFFIXES lib)
+			if(NOT VULKAN_LOADER_LIBRARY)
+				message(FATAL_ERROR "Vulkan loader not found. Install via: sudo port install vulkan-loader")
+			endif()
+			set(MOLTENVK_LIBRARY "${VULKAN_LOADER_LIBRARY}")
+			message(STATUS "Using Vulkan loader (validation-capable): ${MOLTENVK_LIBRARY}")
+
+			find_path(Vulkan_INCLUDE_DIRS NAMES vulkan/vulkan.h
+				HINTS /opt/local/include /opt/homebrew/include /usr/local/include
+				      ENV VULKAN_SDK
+				PATH_SUFFIXES include)
+			if(NOT Vulkan_INCLUDE_DIRS)
+				message(FATAL_ERROR "Vulkan headers not found. Install via: port install vulkan-headers")
+			endif()
+			message(STATUS "Vulkan headers: ${Vulkan_INCLUDE_DIRS}")
+		elseif(APPLE)
+			# On macOS, link directly to MoltenVK instead of the Vulkan loader.
+			# MoltenVK exports all Vulkan entry points, so the loader is unnecessary
+			# and this makes the .app bundle self-contained.
+			find_library(MOLTENVK_LIBRARY NAMES MoltenVK
+				HINTS /opt/local/lib /opt/homebrew/lib /usr/local/lib
+				      ENV VULKAN_SDK
+				PATH_SUFFIXES lib)
+			if(NOT MOLTENVK_LIBRARY)
+				message(FATAL_ERROR "MoltenVK not found. Install via: port install MoltenVK-latest  OR  brew install molten-vk")
+			endif()
+			message(STATUS "Using MoltenVK directly: ${MOLTENVK_LIBRARY}")
+
+			# Find Vulkan headers (provided by vulkan-headers or molten-vk package)
+			find_path(Vulkan_INCLUDE_DIRS NAMES vulkan/vulkan.h
+				HINTS /opt/local/include /opt/homebrew/include /usr/local/include
+				      ENV VULKAN_SDK
+				PATH_SUFFIXES include)
+			if(NOT Vulkan_INCLUDE_DIRS)
+				message(FATAL_ERROR "Vulkan headers not found. Install via: port install vulkan-headers  OR  brew install vulkan-headers")
+			endif()
+			message(STATUS "Vulkan headers: ${Vulkan_INCLUDE_DIRS}")
+		else()
+			# On non-Apple platforms, use the standard Vulkan SDK
+			find_package(Vulkan REQUIRED)
+			message(STATUS "Vulkan SDK found: ${Vulkan_INCLUDE_DIRS}")
+			message(STATUS "Vulkan library: ${Vulkan_LIBRARIES}")
+		endif()
+
+		find_program(GLSLANG_VALIDATOR
+			NAMES glslangValidator
+			HINTS /opt/local/bin /opt/homebrew/bin /usr/local/bin
+			      ${Vulkan_INCLUDE_DIRS}/../bin
+			      ENV VULKAN_SDK
+			PATH_SUFFIXES bin)
+	endif()
+
+	if(GLSLANG_VALIDATOR)
+		message(STATUS "glslangValidator found: ${GLSLANG_VALIDATOR}")
+	else()
+		message(FATAL_ERROR "glslangValidator not found - required for Vulkan shader compilation. Install the Vulkan SDK or glslang package.")
+	endif()
+
+	# Find spirv-cross for shader reflection (optional)
+	if(USE_VCPKG)
+		find_package(spirv_cross_core CONFIG QUIET)
+		if(spirv_cross_core_FOUND)
+			set(SPIRV_CROSS_LIBRARIES spirv-cross-core)
+			set(HAVE_SPIRV_CROSS TRUE)
+			message(STATUS "spirv-cross library found (vcpkg)")
+		else()
+			set(HAVE_SPIRV_CROSS FALSE)
+			message(STATUS "spirv-cross library not found - shader reflection disabled")
+		endif()
+	else()
+		find_library(SPIRV_CROSS_LIBRARY NAMES spirv-cross-core
+			HINTS /opt/local/lib /opt/homebrew/lib /usr/local/lib)
+		find_path(SPIRV_CROSS_INCLUDE_DIR NAMES spirv_cross/spirv_cross.hpp
+			HINTS /opt/local/include /opt/homebrew/include /usr/local/include)
+
+		if(SPIRV_CROSS_LIBRARY AND SPIRV_CROSS_INCLUDE_DIR)
+			message(STATUS "spirv-cross library found: ${SPIRV_CROSS_LIBRARY}")
+			set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARY})
+			set(HAVE_SPIRV_CROSS TRUE)
+		else()
+			message(STATUS "spirv-cross library not found - shader reflection disabled")
+			set(HAVE_SPIRV_CROSS FALSE)
+		endif()
 	endif()
 endif()
 
@@ -145,13 +286,17 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 
 	if(CMAKE_BUILD_TYPE MATCHES "Release")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-		set(CMAKE_EXE_LINKER_FLAGS "-s")
+		if(NOT APPLE)
+			set(CMAKE_EXE_LINKER_FLAGS "-s")
+		endif()
 	endif()
 
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	if(CMAKE_BUILD_TYPE MATCHES "Release")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-		set(CMAKE_EXE_LINKER_FLAGS "-s")
+		if(NOT APPLE)
+			set(CMAKE_EXE_LINKER_FLAGS "-s")
+		endif()
 	endif()
 
 elseif(MSVC)
@@ -168,6 +313,25 @@ endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)	#msvc / xcode: group files in project
 
+# Add compile definitions for enabled renderers
+if(USE_OPENGL)
+	add_definitions(-DUSE_OPENGL=1)
+	message(STATUS "OpenGL renderer: ENABLED")
+else()
+	message(STATUS "OpenGL renderer: DISABLED")
+endif()
+
+if(USE_VULKAN)
+	add_definitions(-DUSE_VULKAN=1)
+	message(STATUS "Vulkan renderer: ENABLED")
+else()
+	message(STATUS "Vulkan renderer: DISABLED")
+endif()
+
+# Ensure at least one renderer is enabled
+if(NOT USE_OPENGL AND NOT USE_VULKAN)
+	message(FATAL_ERROR "At least one renderer must be enabled (USE_OPENGL or USE_VULKAN)")
+endif()
 
 #mainly for ENet...
 include(CheckFunctionExists)

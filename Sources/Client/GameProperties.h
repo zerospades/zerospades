@@ -59,14 +59,12 @@ namespace spades {
 			bool isGameModeFFA = false;
 			bool isStaff = false;
 
-			/**
-			 * Raises the upper limit of the number of player slots to 256.
-			 *
-			 * Reserved for a future extension.
-			 */
+			/** Allows every player id Player Limit gives rather than the vanilla 32. */
 			bool manyPlayers = true;
 
-			static constexpr int kMaxPlayerSlots = 256;
+			/** The players Player Limit allows: ids `0` to `254`, as it reserves `255` for
+			 * the server. `World` still keeps a slot for every id byte. */
+			static constexpr int kMaxPlayerSlots = 255;
 			int GetMaxNumPlayerSlots() const { return manyPlayers ? kMaxPlayerSlots : 32; }
 		};
 	} // namespace client

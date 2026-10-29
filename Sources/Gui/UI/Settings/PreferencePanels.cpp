@@ -394,8 +394,17 @@ namespace spades {
 				"fully hidden. Can improve FPS, but may crash some drivers."));
 			l.AddToggleField(_Tr("Preferences", "Object Outlines"), "r_outlines");
 			l.AddHelp(_Tr("Preferences",
-				"Draws cartoon-style outlines around players and map. "
-				"OpenGL renderer only."));
+				"Draws cartoon-style outlines around players and map."));
+			l.AddSliderField(_Tr("Preferences", "Outline Strength"), "r_outlinesStrength", 0, 4,
+			                 0.1F, NumberFormatter(1, ""));
+			l.AddHelp(_Tr("Preferences",
+				"How dark the outlines are drawn. Vulkan renderer only."));
+			l.AddSliderField(_Tr("Preferences", "Outline Depth Threshold"),
+			                 "r_outlinesDepthThreshold", 0.01F, 0.25F, 0.01F,
+			                 NumberFormatter(0, "%", "", 100));
+			l.AddHelp(_Tr("Preferences",
+				"How far behind an edge, as a share of its distance, the scene must be "
+				"for an outline to be drawn. Lower draws more outlines. Vulkan renderer only."));
 
 			l.AddHeading(_Tr("Preferences", "Post-processing"));
 			l.AddToggleField(_Tr("Preferences", "Depth Of Field"), "r_depthOfField");

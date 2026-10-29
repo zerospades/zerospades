@@ -18,6 +18,8 @@
 
  */
 
+#include <cmath>
+
 #include "GLSpriteRenderer.h"
 #include "GLImage.h"
 #include "GLProgram.h"
@@ -59,9 +61,10 @@ namespace spades {
 			spr.center = center;
 			spr.radius = rad;
 			spr.angle = ang;
+			const bool emissive = color.x > color.w || color.y > color.w || color.z > color.w;
 			if (settings.r_hdr) {
 				// linearize color
-				if (color.x > color.w || color.y > color.w || color.z > color.w) {
+				if (emissive) {
 					// emissive material
 					color.x *= color.x;
 					color.y *= color.y;
@@ -74,6 +77,9 @@ namespace spades {
 					color.z *= color.z * rcp;
 				}
 			}
+			// One that scatters light is lit by the daylight and the dynamic lights
+			// (`SpriteLight.glsl`), so that it doesn't glow in the dark.
+			spr.scattering = !emissive;
 			spr.color = color;
 			sprites.push_back(spr);
 		}
@@ -118,7 +124,11 @@ namespace spades {
 			upVector.SetValue(def.viewAxis[1].x, def.viewAxis[1].y, def.viewAxis[1].z);
 			texture.SetValue(0);
 
-			device.ActiveTexture(0);
+			static GLProgramUniform frontVector("frontVector");
+			frontVector(program);
+			frontVector.SetValue(def.viewAxis[2].x, def.viewAxis[2].y, def.viewAxis[2].z);
+
+			spriteLight.SetUp(renderer, program);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
 			device.EnableVertexAttribArray(spritePosAttribute(), true);
@@ -142,6 +152,7 @@ namespace spades {
 				v.g = spr.color.y;
 				v.b = spr.color.z;
 				v.a = spr.color.w;
+				v.scattering = spr.scattering ? 1.0F : 0.0F;
 
 				uint32_t idx = (uint32_t)vertices.size();
 				v.sx = -1;
