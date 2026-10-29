@@ -35,13 +35,16 @@
 #include <Core/TMPUtils.h>
 #include <Core/VoxelModel.h>
 #include <Core/VoxelModel2KV6.h>
+#include <cctype>
 
 namespace spades {
 	namespace {
 		// Merge all objects in a scene hierarchy into a single composite VoxelModel
 		// with transforms applied (positions, rotations, scales).
+		// `scene`'s objects sit under `rootTransform`: what their parents impose
+		// when they are one part of a larger scene, the identity otherwise.
 		Handle<VoxelModel> MergeSceneObjects(const std::vector<VoxelObject>& scene,
-		                                     IntVector3* lowCorner) {
+		                                     const Matrix4& rootTransform, IntVector3* lowCorner) {
 			if (scene.empty())
 				SPRaise(".2kv6 scene is empty");
 
@@ -111,9 +114,8 @@ namespace spades {
 			    };
 
 			// Collect voxels from all root objects
-			const Matrix4 identity = Matrix4::Identity();
 			for (const VoxelObject& root : scene) {
-				collectVoxels(root, identity);
+				collectVoxels(root, rootTransform);
 			}
 
 			if (!hasAny)
@@ -189,15 +191,63 @@ namespace spades {
 				}
 			}
 		};
+		Matrix4 LocalTransformOf(const VoxelObject& obj) {
+			return Matrix4::Translate(obj.position) * Quaternion(obj.rotation).ToRotationMatrix() *
+			       Matrix4::Scale(obj.scale);
+		}
+
+		// The object `path` names ("Gun/Bolt"), and what its parents impose on
+		// it; null when the scene holds no such object.
+		const VoxelObject* FindPart(const std::vector<VoxelObject>& scene, const std::string& path,
+		                            Matrix4& parentTransform) {
+			const std::vector<VoxelObject>* level = &scene;
+			const VoxelObject* found = nullptr;
+			parentTransform = Matrix4::Identity();
+			std::size_t start = 0;
+			while (true) {
+				const std::size_t slash = path.find('/', start);
+				const std::string name =
+				  path.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+				if (found)
+					parentTransform = parentTransform * LocalTransformOf(*found);
+				found = nullptr;
+				for (const VoxelObject& o : *level) {
+					if (o.name == name) {
+						found = &o;
+						break;
+					}
+				}
+				if (!found)
+					return nullptr;
+				if (slash == std::string::npos)
+					return found;
+				level = &found->children;
+				start = slash + 1;
+			}
+		}
 	} // namespace
 
 	Handle<VoxelModel> VoxelModelLoader::MergeScene(const std::vector<VoxelObject>& scene,
 	                                                IntVector3* lowCorner) {
-		return MergeSceneObjects(scene, lowCorner);
+		return MergeSceneObjects(scene, Matrix4::Identity(), lowCorner);
 	}
 
 	Handle<VoxelModel> VoxelModelLoader::Load(const char* path) {
 		std::string pathStr(path);
+
+		// "scene.2kv6#Gun/Bolt" names one object of a scene, with everything
+		// under it: a part a script draws and moves on its own.
+		std::string partPath;
+		{
+			std::string lower = pathStr;
+			for (char& ch : lower)
+				ch = char(std::tolower(static_cast<unsigned char>(ch)));
+			const std::size_t at = lower.find(".2kv6#");
+			if (at != std::string::npos) {
+				partPath = pathStr.substr(at + 6);
+				pathStr.resize(at + 5);
+			}
+		}
 
 		// Detect format from extension
 		bool is2KV6 = LocalFileSystem::HasExtension(pathStr, ".2kv6");
@@ -233,9 +283,24 @@ namespace spades {
 		if (is2KV6) {
 			// Load .2kv6 scene and merge all objects into a single composite model
 			SPLog("Loading '%s' as a .2kv6 scene file.", path);
-			std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
+			std::unique_ptr<IStream> stream{FileManager::OpenForReading(pathStr.c_str())};
 			std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
-			voxelModel = MergeSceneObjects(scene, nullptr);
+			IntVector3 low;
+			if (partPath.empty()) {
+				voxelModel = MergeSceneObjects(scene, Matrix4::Identity(), &low);
+			} else {
+				Matrix4 parent;
+				const VoxelObject* part = FindPart(scene, partPath, parent);
+				if (!part)
+					SPRaise("No object '%s' in '%s'", partPath.c_str(), pathStr.c_str());
+				// Drawn when asked for by name, even if the scene hides it.
+				VoxelObject shown = *part;
+				shown.hidden = false;
+				voxelModel = MergeSceneObjects({shown}, parent, &low);
+			}
+			// A scene's pivot is its origin, so every part of one, drawn with the
+			// same matrix, lands where it belongs in it.
+			voxelModel->SetOrigin(MakeVector3(float(low.x), float(low.y), float(low.z)));
 		} else {
 			// Load .kv6 file (regular single-model)
 			SPLog("Loading '%s' as a KV6 voxel model.", path);
