@@ -40,7 +40,8 @@ namespace spades {
 	namespace {
 		// Merge all objects in a scene hierarchy into a single composite VoxelModel
 		// with transforms applied (positions, rotations, scales).
-		Handle<VoxelModel> MergeSceneObjects(const std::vector<VoxelObject>& scene) {
+		Handle<VoxelModel> MergeSceneObjects(const std::vector<VoxelObject>& scene,
+		                                     IntVector3* lowCorner) {
 			if (scene.empty())
 				SPRaise(".2kv6 scene is empty");
 
@@ -124,6 +125,8 @@ namespace spades {
 			int depth = maxZ - minZ + 1;
 
 			Handle<VoxelModel> result = Handle<VoxelModel>::New(width, height, depth);
+			if (lowCorner)
+				*lowCorner = MakeIntVector3(minX, minY, minZ);
 
 			// Place all voxels in the composite model
 			for (const auto& voxel : voxels) {
@@ -188,6 +191,11 @@ namespace spades {
 		};
 	} // namespace
 
+	Handle<VoxelModel> VoxelModelLoader::MergeScene(const std::vector<VoxelObject>& scene,
+	                                                IntVector3* lowCorner) {
+		return MergeSceneObjects(scene, lowCorner);
+	}
+
 	Handle<VoxelModel> VoxelModelLoader::Load(const char* path) {
 		std::string pathStr(path);
 
@@ -227,7 +235,7 @@ namespace spades {
 			SPLog("Loading '%s' as a .2kv6 scene file.", path);
 			std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
 			std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
-			voxelModel = MergeSceneObjects(scene);
+			voxelModel = MergeSceneObjects(scene, nullptr);
 		} else {
 			// Load .kv6 file (regular single-model)
 			SPLog("Loading '%s' as a KV6 voxel model.", path);

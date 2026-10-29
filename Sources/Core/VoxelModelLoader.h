@@ -21,11 +21,14 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
+#include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
 	class VoxelModel;
+	struct VoxelObject;
 
 	/**
 	 * Provides a method for loading `VoxelModel` augmented by metadata.
@@ -59,5 +62,15 @@ namespace spades {
 		 *     }
 		 */
 		static Handle<VoxelModel> Load(const char* path);
+
+		/**
+		 * The objects of a .2kv6 scene composed into one model, as `Load` does
+		 * when the game loads one: each voxel placed by its object's transform
+		 * and its parents', hidden objects left out. `lowCorner`, when given,
+		 * gets where the model's voxel 0 0 0 lies in the scene. Throws when the
+		 * scene holds no voxel.
+		 */
+		static Handle<VoxelModel> MergeScene(const std::vector<VoxelObject>& scene,
+		                                     IntVector3* lowCorner = nullptr);
 	};
 } // namespace spades
