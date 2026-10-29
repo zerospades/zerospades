@@ -500,10 +500,14 @@ int main(int argc, char** argv) {
 
 	// A command-line tool of its own: everything after it is its, and it runs
 	// with no window and none of the game's start-up.
-	if (commandLine.kv6Tools)
-		return spades::RunKV6Tools(commandLine.toolArguments);
-	if (commandLine.twoKV6Tools)
-		return spades::RunTwoKV6Tools(commandLine.toolArguments);
+	// The engine code they reuse (the game's model loader) records its call
+	// stack, so that is started for them as the game starts it.
+	if (commandLine.kv6Tools || commandLine.twoKV6Tools) {
+		spades::reflection::Backtrace::StartBacktrace();
+		spades::SetLogToStandardOutput(false);
+		return commandLine.kv6Tools ? spades::RunKV6Tools(commandLine.toolArguments)
+		                            : spades::RunTwoKV6Tools(commandLine.toolArguments);
+	}
 
 	if (commandLine.printHelp) {
 		spades::PrintCommandLineHelp(argv[0], commandLine.debugTools);

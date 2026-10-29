@@ -197,7 +197,9 @@ namespace spades {
 		}
 
 		// The object `path` names ("Gun/Bolt"), and what its parents impose on
-		// it; null when the scene holds no such object.
+		// it; null when the scene holds no such object. A name that several
+		// objects share at one level names none of them: picking one would
+		// draw whichever came first, so the scene must tell them apart.
 		const VoxelObject* FindPart(const std::vector<VoxelObject>& scene, const std::string& path,
 		                            Matrix4& parentTransform) {
 			const std::vector<VoxelObject>* level = &scene;
@@ -212,10 +214,12 @@ namespace spades {
 					parentTransform = parentTransform * LocalTransformOf(*found);
 				found = nullptr;
 				for (const VoxelObject& o : *level) {
-					if (o.name == name) {
-						found = &o;
-						break;
-					}
+					if (o.name != name)
+						continue;
+					if (found)
+						SPRaise("Several objects are named '%s' there: give them names of "
+						        "their own to load one by its path", name.c_str());
+					found = &o;
 				}
 				if (!found)
 					return nullptr;

@@ -36,6 +36,13 @@ namespace spades {
 	 * their arguments, colours as RRGGBB, and how a mistake is reported.
 	 */
 	namespace toolargs {
+		/** What went wrong, without the call stack the engine's errors carry. */
+		inline std::string ErrorText(const std::exception& ex) {
+			std::string text = ex.what();
+			const std::size_t end = text.find('\n');
+			return end == std::string::npos ? text : text.substr(0, end);
+		}
+
 		/** A command the user got wrong: said with the usage, exit code 2. */
 		struct UsageError : std::runtime_error {
 			using std::runtime_error::runtime_error;
