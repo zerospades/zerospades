@@ -35,6 +35,8 @@
 #include <curl/curl.h>
 #include <zlib.h>
 
+#include "KV6Tools.h"
+#include "KV6Tools.h"
 #include "Main.h"
 #include "MainScreen.h"
 #include "Runner.h"
@@ -260,6 +262,10 @@ namespace {
 		printf("                       A file given on its own does the same, which\n");
 		printf("                       is what a file manager passes when it opens\n");
 		printf("                       one with this program.\n");
+		printf("  --kv6-tools COMMAND FILE [ARGS...]\n");
+		printf("                       read and edit a KV6 model without opening the\n");
+		printf("                       game (its size, pivot, bounds, voxels); must\n");
+		printf("                       come first. --kv6-tools help lists commands.\n");
 		printf("  -h, --help           show this help message\n");
 		printf("  -v, --version        show version information\n");
 		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
@@ -687,6 +693,11 @@ int main(int argc, char** argv) {
 
 	if (argc > 0 && argv[0])
 		spades::g_executablePath = argv[0];
+
+	// A command-line tool of its own: everything after it is its, and it runs
+	// with no window and none of the game's start-up.
+	if (argc > 1 && argv[1] && !strcasecmp(argv[1], "--kv6-tools"))
+		return spades::RunKV6Tools(argc - 2, argv + 2);
 
 	for (int i = 1; i < argc;) {
 		int ret = handleCommandLineArgument(argc, argv, i);
