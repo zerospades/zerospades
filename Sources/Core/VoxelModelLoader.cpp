@@ -54,6 +54,8 @@ namespace spades {
 
 			std::function<void(const VoxelObject&, const Matrix4&)> collectVoxels =
 			    [&](const VoxelObject& obj, const Matrix4& parentTransform) {
+				    if (obj.hidden)
+					    return; // out of sight, with everything under it
 				    // Build local transform: translate * rotate * scale
 				    Matrix4 scale = Matrix4::Scale(obj.scale);
 				    Matrix4 rotate = Quaternion(obj.rotation).ToRotationMatrix();
