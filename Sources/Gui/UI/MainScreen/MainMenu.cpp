@@ -29,6 +29,7 @@
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Gui/MainScreenHelper.h>
+#include <Gui/ModOverlay.h>
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/UI/Components/UpdateNotice.h>
 #include <Gui/UI/Framework/UIManager.h>
@@ -775,7 +776,7 @@ namespace spades {
 
 		void MainScreenMainMenu::UpdateModsStatus() {
 			if (modsApplyButton != nullptr) {
-				// Toggles already persist; Apply only restarts to make pending
+				// Toggles already persist; Apply makes pending
 				// changes live, so it's actionable only when something changed.
 				modsApplyButton->enable = modsDirty && !modsDownloading;
 			}
@@ -805,7 +806,7 @@ namespace spades {
 			}
 			if (modsDirty) {
 				modsStatusLabel->text =
-				    _Tr("MainScreen", "Press 'Apply changes' to restart and apply your mods.");
+				    _Tr("MainScreen", "Press 'Apply changes' to apply your mods.");
 				return;
 			}
 			modsStatusLabel->text = "";
@@ -839,17 +840,62 @@ namespace spades {
 			UpdateModsStatus();
 		}
 
-		// Apply = restart now so the enabled set is mounted. Toggles are already
-		// saved, so this just relaunches straight back into the Mods tab.
+		// Apply = mount the enabled set (see ModOverlay::Apply). Toggles are already
+		// saved. Only a change to the menus' own files relaunches, straight back
+		// into the Mods tab.
 		void MainScreenMainMenu::OnApplyModsPressed(UIElement&) {
 			if (modsDownloading)
 				return;
-			helper->RelaunchForMods();
+			std::vector<ModFailure> failures;
+			std::string error;
+			ModApplyResult result = helper->ApplyMods(failures, error);
+			// A refused apply leaves the enabled set as the user made it.
+			std::string problems =
+			  ModOverlay::Describe(failures, result != ModApplyResult::Refused);
+			if (result == ModApplyResult::Refused)
+				problems = _Tr("MainScreen", "The mods were not applied:") + "\n" + error +
+				           (problems.empty() ? "" : "\n\n" + problems);
+
+			if (result == ModApplyResult::NeedsRestart) {
+				// Only a restart picks these up: ask first. The toggles are saved
+				// already, so declining still applies them at the next start.
+				std::string text = _Tr("MainScreen", "These changes need a restart:") + "\n" +
+				                   error + "\n\n" +
+				                   _Tr("MainScreen", "Restart now? Otherwise they apply the next "
+				                                     "time the game starts.");
+				if (!problems.empty())
+					text = problems + "\n\n" + text;
+				modsDirty = true;
+				LoadModList();
+				Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(this, text, 240.0F, true);
+				cs->closed = [this](UIElement& sender) {
+					ConfirmScreen* confirm = dynamic_cast<ConfirmScreen*>(&sender);
+					if (confirm && confirm->GetResult()) {
+						helper->RelaunchForMods();
+						return;
+					}
+					modsStatusLabel->text =
+					  _Tr("MainScreen", "Your changes apply the next time the game starts.");
+				};
+				cs->Run();
+				return;
+			}
+
+			// Refused: the toggles are still to apply.
+			modsDirty = result == ModApplyResult::Refused;
+			LoadModList();
+			if (result == ModApplyResult::Applied)
+				modsStatusLabel->text = _Tr("MainScreen", "Mods applied.");
+			if (!problems.empty()) {
+				Handle<AlertScreen> al = Handle<AlertScreen>::New(this, problems, 200.0F, true);
+				al->Run();
+			}
 		}
+
 
 		void MainScreenMainMenu::OnResetModsPressed(UIElement&) {
 			Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(
-			    this, _Tr("MainScreen", "Disable all mods? This takes effect after a restart."),
+			    this, _Tr("MainScreen", "Disable all mods? This takes effect on Apply."),
 			    200.0F, true);
 			cs->closed = [this](UIElement& s) { OnResetConfirmed(s); };
 			cs->Run();
@@ -866,7 +912,7 @@ namespace spades {
 		}
 
 		// Clicking a row toggles the mod in the enabled set. The change is saved
-		// immediately and takes effect the next time the game starts.
+		// immediately and takes effect on Apply.
 		void MainScreenMainMenu::OnModToggle(const std::string& modName) {
 			if (modsDownloading)
 				return;
@@ -1197,6 +1243,14 @@ namespace spades {
 					// failed to connect.
 					Handle<AlertScreen> al =
 					    Handle<AlertScreen>::New(this, msg, 200.0F, true, true);
+					al->Run();
+				}
+
+				// Mods disabled at startup because they failed to load.
+				std::string modProblems = ModOverlay::Describe(ModOverlay::TakeStartupFailures());
+				if (!modProblems.empty()) {
+					Handle<AlertScreen> al =
+					    Handle<AlertScreen>::New(this, modProblems, 200.0F, true);
 					al->Run();
 				}
 			}

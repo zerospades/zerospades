@@ -169,6 +169,8 @@ namespace spades {
 
 			Handle<client::IImage> RegisterImage(const char* filename) override;
 			Handle<client::IModel> RegisterModel(const char* filename) override;
+			bool IsBuiltInImage(const char* name) override;
+			std::vector<std::string> GetRegisteredFiles() override;
 
 			void ClearCache() override;
 
@@ -226,6 +228,7 @@ namespace spades {
 
 			void BeginClippingRect(const AABB2& outRect) override;
 			void EndClippingRect() override;
+			bool IsRendererSW() const override { return false; }
 
 			void FrameDone() override;
 			void Flip() override;

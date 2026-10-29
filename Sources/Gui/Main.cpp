@@ -46,7 +46,6 @@
 #include <Core/CpuID.h>
 #include <Core/Debug.h>
 #include <Core/DirectoryFileSystem.h>
-#include <Core/DynamicMemoryStream.h>
 #include <Core/FileManager.h>
 #include <Core/ServerAddress.h>
 #include <Core/Settings.h>
@@ -55,7 +54,7 @@
 #include <Core/Thread.h>
 #include <Core/ZipFileSystem.h>
 #include <Gui/ConsoleScreen.h>
-#include <Gui/ModsScreenHelper.h>
+#include <Gui/ModOverlay.h>
 #include <Gui/StartupScreen.h>
 #include <ZeroSpades.h>
 
@@ -917,43 +916,9 @@ int main(int argc, char** argv) {
 				spades::FileManager::PrependFileSystem(fssImportant[i]);
 		}
 
-		// Mount enabled mods as an overlay on top of the base paks. Each enabled
-		// mod's pak(s) live in Mods/ and are prepended so they take priority over
-		// the base paks; the set is mounted in enabled order so the last-enabled
-		// mod ends up on top and wins conflicts. The shipped install paks are
-		// never modified — changes to the enabled set take effect on next launch.
-		//
-		// During a --try-mod run the enabled set is skipped entirely so the mod
-		// under test applies in isolation, on top of the base config only.
-		if (!spades::g_tryMod) {
-			std::vector<std::string> modPaks =
-			  spades::gui::ModsScreenHelper::GetEnabledModPakPaths();
-			for (const std::string& path : modPaks) {
-				try {
-					// Read the whole pak into memory and mount from there, so the
-					// file on disk is never held open for the session. That lets
-					// the mod manager overwrite or delete an enabled pak (for
-					// example re-downloading it) while the game is running — a
-					// mounted stream reading straight from the file would lock it.
-					std::string bytes;
-					{
-						auto file = spades::FileManager::OpenForReading(path.c_str());
-						bytes = file->ReadAllBytes();
-					} // file handle closed here
-					std::unique_ptr<spades::DynamicMemoryStream> mem(
-					  new spades::DynamicMemoryStream());
-					if (!bytes.empty())
-						mem->Write(bytes.data(), bytes.size());
-					mem->SetPosition(0);
-					auto* zfs = new spades::ZipFileSystem(mem.get());
-					mem.release(); // ownership transferred to the ZipFileSystem
-					spades::FileManager::PrependFileSystem(zfs);
-					SPLog("Mod pak mounted (in memory): %s", path.c_str());
-				} catch (const std::exception& ex) {
-					SPLog("Mod pak failed to mount: %s: %s", path.c_str(), ex.what());
-				}
-			}
-		}
+		// Mount enabled mods as an overlay on top of the base paks (see ModOverlay).
+		// The shipped install paks are never modified.
+		spades::gui::ModOverlay::Mount();
 
 		// Mount the --try-mod target on top of everything. The target is an
 		// unpacked mod folder or a single .pak/.zip — both expose the same file
@@ -987,7 +952,7 @@ int main(int argc, char** argv) {
 
 		// initialize AngelScript
 		SPLog("Initializing script engine");
-		spades::ScriptManager::GetInstance();
+		spades::gui::ModOverlay::StartScripts();
 		pumpEvents();
 
 		ThreadQuantumSetter quantumSetter;

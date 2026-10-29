@@ -76,16 +76,18 @@ namespace spades {
 		};
 	} // namespace
 
+	std::string VoxelModelLoader::GetMetadataPath(const std::string& path) {
+		std::string metadataPath = path;
+		auto i = metadataPath.rfind('.');
+		if (i != std::string::npos)
+			metadataPath.resize(i);
+
+		return metadataPath + ".meta.json";
+	}
+
 	Handle<VoxelModel> VoxelModelLoader::Load(const char* path) {
 		// Load the metadata file
-		std::string metadataPath = path;
-		{
-			auto i = metadataPath.rfind('.');
-			if (i != std::string::npos)
-				metadataPath.resize(i);
-
-			metadataPath += ".meta.json";
-		}
+		std::string metadataPath = GetMetadataPath(path);
 
 		// Load the metadata
 		Metadata meta;

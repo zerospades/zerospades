@@ -31,7 +31,6 @@
 #include <Core/FileManager.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
-#include <Draw/SW/SWRenderer.h>
 
 #include "CTFGameMode.h"
 #include "CenterMessageView.h"
@@ -205,7 +204,8 @@ namespace spades {
 			renderer->SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 1));
 			renderer->DrawImage(nullptr, AABB2(0, 0, sw, sh));
 
-			Handle<IImage> img = renderer->RegisterImage("Gfx/Title/Logo.png");
+			// The loading screen is the software's, not the game's.
+			Handle<IImage> img = shellRenderer->RegisterImage("Gfx/Title/Logo.png");
 
 			Vector2 size = {img->GetWidth(), img->GetHeight()};
 			size *= std::min(1.0F, sw / size.x);
@@ -623,7 +623,7 @@ namespace spades {
 				prg *= 0.3F + (1.0F - hpper) * 0.7F;
 				prg = 1.0F - std::min(prg, 0.9F);
 
-				if (dynamic_cast<draw::SWRenderer*>(&GetRenderer())) {
+				if (renderer->IsRendererSW()) {
 					prg = (1.0F - prg) * 0.5F;
 					renderer->SetColorAlphaPremultiplied(hurt
 						? MakeVector4(prg, 0.0F, 0.0F, prg)

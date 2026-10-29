@@ -40,6 +40,12 @@ namespace spades {
 			SmokeSpriteEntity(Client& cli, Vector4 color, float fps, Type type = Type::Steady);
 
 			static void Preload(IRenderer*);
+			/**
+			 * Drops the images `Preload` keeps. They are the game's: they must go
+			 * with it, while the renderer that made them is still there, and the
+			 * next game's renderer may be at the same address.
+			 */
+			static void Unload();
 
 			bool Update(float dt) override;
 		};

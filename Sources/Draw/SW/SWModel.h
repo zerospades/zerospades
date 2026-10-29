@@ -65,6 +65,8 @@ namespace spades {
 			Handle<SWModel> CreateModel(VoxelModel&);
 
 			void ClearCache();
+			/** The files the cached ones were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

@@ -43,8 +43,12 @@ namespace spades {
 
 			GLImage* RegisterImage(const std::string&);
 			GLImage* GetWhiteImage();
+			/** Whether `RegisterImage` makes `name` in memory rather than load it. */
+			static bool IsBuiltIn(const std::string& name);
 
 			void ClearCache();
+			/** The files the cached ones were loaded from. */
+			std::vector<std::string> GetFiles() const;
 		};
 	} // namespace draw
 } // namespace spades

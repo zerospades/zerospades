@@ -39,6 +39,7 @@
 #include "NetClient.h"
 #include <Core/Bitmap.h>
 #include <Core/Settings.h>
+#include <Core/TMPUtils.h>
 #include <ScriptBindings/IBlockSkin.h>
 #include <ScriptBindings/IGrenadeSkin.h>
 #include <ScriptBindings/ISpadeSkin.h>
@@ -73,6 +74,36 @@ SPADES_SETTING(cg_pngScope);
 
 namespace spades {
 	namespace client {
+
+		namespace {
+			// The functions skins are made with. Defined up front, rather than
+			// on first use, so a reloaded script module is checked against them
+			// all even before the first game (see ScriptFunction::FindMissing).
+			ScriptFunction g_spadeFactory(
+			  "ISpadeSkin@ CreateThirdPersonSpadeSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_spadeViewFactory(
+			  "ISpadeSkin@ CreateViewSpadeSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_blockFactory(
+			  "IBlockSkin@ CreateThirdPersonBlockSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_blockViewFactory(
+			  "IBlockSkin@ CreateViewBlockSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_grenadeFactory(
+			  "IGrenadeSkin@ CreateThirdPersonGrenadeSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_grenadeViewFactory(
+			  "IGrenadeSkin@ CreateViewGrenadeSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_rifleFactory(
+			  "IWeaponSkin@ CreateThirdPersonRifleSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_smgFactory(
+			  "IWeaponSkin@ CreateThirdPersonSMGSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_shotgunFactory(
+			  "IWeaponSkin@ CreateThirdPersonShotgunSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_rifleViewFactory(
+			  "IWeaponSkin@ CreateViewRifleSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_smgViewFactory(
+			  "IWeaponSkin@ CreateViewSMGSkin(Renderer@, AudioDevice@)");
+			ScriptFunction g_shotgunViewFactory(
+			  "IWeaponSkin@ CreateViewShotgunSkin(Renderer@, AudioDevice@)");
+		} // namespace
 
 		class SandboxedRenderer : public IRenderer {
 			Handle<IRenderer> base;
@@ -131,6 +162,17 @@ namespace spades {
 			}
 			Handle<IModel> RegisterModel(const char* filename) {
 				return base->RegisterModel(filename);
+			}
+			bool IsBuiltInImage(const char* name) { return base->IsBuiltInImage(name); }
+			bool IsRendererSW() const { return base->IsRendererSW(); }
+			void BeginClippingCircle(const Vector2&, float) { OnProhibitedAction(); }
+			void EndClippingCircle() { OnProhibitedAction(); }
+			void BeginClippingRect(const AABB2&) { OnProhibitedAction(); }
+			void EndClippingRect() { OnProhibitedAction(); }
+
+			std::vector<std::string> GetRegisteredFiles() {
+				OnProhibitedAction();
+				return {};
 			}
 
 			Handle<IImage> CreateImage(Bitmap& bmp) { return base->CreateImage(bmp); }
@@ -309,64 +351,82 @@ namespace spades {
 			flashlightOrientation = p.GetFront();
 			classicViewWeaponOrigin = MakeVector3(0, 0, 0);
 
-			ScriptContextHandle ctx;
-			IAudioDevice& audio = client.GetAudioDevice();
+			Skin* skin = client.GetPlayerSkin(player.GetId());
+			try {
+				Client::SkinView view = client.GetPlayerView(player.GetId());
+				CreateSkins(skin, view.renderer, view.audio);
+			} catch (const std::exception& ex) {
+				// A broken skin must not take the game down: go without it.
+				if (!skin)
+					throw;
+				SPLog("Skin '%s' of player #%d not used: %s", skin->GetName().c_str(),
+				      player.GetId(), ex.what());
+				Client::SkinView view = client.GetGameView();
+				CreateSkins(nullptr, view.renderer, view.audio);
+			}
+		}
 
-			sandboxedRenderer = Handle<SandboxedRenderer>::New(client.GetRenderer());
+		void ClientPlayer::CreateSkins(Skin* skin, Handle<IRenderer> renderer_,
+		                               Handle<IAudioDevice> audio_) {
+			SPADES_MARK_FUNCTION();
+
+			// The skin the player spawned with, if any, is what the skins load and are
+			// made from, and what the scripts' own file reads see.
+			viewRenderer = std::move(renderer_);
+			viewAudio = std::move(audio_);
+			IAudioDevice& audio = *viewAudio;
+			sandboxedRenderer = Handle<SandboxedRenderer>::New(viewRenderer);
 			IRenderer& renderer = *sandboxedRenderer;
+			std::string module = skin ? skin->GetScriptModule() : "Client";
+			std::unique_ptr<Skin::Scope> scope;
+			if (skin)
+				scope = stmp::make_unique<Skin::Scope>(*skin);
 
-			static ScriptFunction spadeFactory(
-			  "ISpadeSkin@ CreateThirdPersonSpadeSkin(Renderer@, AudioDevice@)");
-			spadeSkin = initScriptFactory(spadeFactory, renderer, audio);
+			std::array<asIScriptObject**, 8> skins = {
+			  &spadeSkin,     &blockSkin,     &weaponSkin,     &grenadeSkin,
+			  &spadeViewSkin, &blockViewSkin, &weaponViewSkin, &grenadeViewSkin};
+			for (asIScriptObject** s : skins)
+				*s = nullptr;
+			try {
+				MakeSkins(module, renderer, audio);
+			} catch (...) {
+				// Release what was made before the throw.
+				for (asIScriptObject** s : skins) {
+					if (*s)
+						(*s)->Release();
+					*s = nullptr;
+				}
+				throw;
+			}
+		}
 
-			static ScriptFunction spadeViewFactory(
-			  "ISpadeSkin@ CreateViewSpadeSkin(Renderer@, AudioDevice@)");
-			spadeViewSkin = initScriptFactory(spadeViewFactory, renderer, audio);
+		void ClientPlayer::MakeSkins(const std::string& module, IRenderer& renderer,
+		                             IAudioDevice& audio) {
 
-			static ScriptFunction blockFactory(
-			  "IBlockSkin@ CreateThirdPersonBlockSkin(Renderer@, AudioDevice@)");
-			blockSkin = initScriptFactory(blockFactory, renderer, audio);
+			spadeSkin = initScriptFactory(g_spadeFactory, module, renderer, audio);
+			spadeViewSkin = initScriptFactory(g_spadeViewFactory, module, renderer, audio);
+			blockSkin = initScriptFactory(g_blockFactory, module, renderer, audio);
+			blockViewSkin = initScriptFactory(g_blockViewFactory, module, renderer, audio);
+			grenadeSkin = initScriptFactory(g_grenadeFactory, module, renderer, audio);
+			grenadeViewSkin = initScriptFactory(g_grenadeViewFactory, module, renderer, audio);
 
-			static ScriptFunction blockViewFactory(
-			  "IBlockSkin@ CreateViewBlockSkin(Renderer@, AudioDevice@)");
-			blockViewSkin = initScriptFactory(blockViewFactory, renderer, audio);
-
-			static ScriptFunction grenadeFactory(
-			  "IGrenadeSkin@ CreateThirdPersonGrenadeSkin(Renderer@, AudioDevice@)");
-			grenadeSkin = initScriptFactory(grenadeFactory, renderer, audio);
-
-			static ScriptFunction grenadeViewFactory(
-			  "IGrenadeSkin@ CreateViewGrenadeSkin(Renderer@, AudioDevice@)");
-			grenadeViewSkin = initScriptFactory(grenadeViewFactory, renderer, audio);
-
-			static ScriptFunction rifleFactory(
-			  "IWeaponSkin@ CreateThirdPersonRifleSkin(Renderer@, AudioDevice@)");
-			static ScriptFunction smgFactory(
-			  "IWeaponSkin@ CreateThirdPersonSMGSkin(Renderer@, AudioDevice@)");
-			static ScriptFunction shotgunFactory(
-			  "IWeaponSkin@ CreateThirdPersonShotgunSkin(Renderer@, AudioDevice@)");
-			static ScriptFunction rifleViewFactory(
-			  "IWeaponSkin@ CreateViewRifleSkin(Renderer@, AudioDevice@)");
-			static ScriptFunction smgViewFactory(
-			  "IWeaponSkin@ CreateViewSMGSkin(Renderer@, AudioDevice@)");
-			static ScriptFunction shotgunViewFactory(
-			  "IWeaponSkin@ CreateViewShotgunSkin(Renderer@, AudioDevice@)");
-			switch (p.GetWeaponType()) {
+			switch (player.GetWeaponType()) {
 				case RIFLE_WEAPON:
-					weaponSkin = initScriptFactory(rifleFactory, renderer, audio);
-					weaponViewSkin = initScriptFactory(rifleViewFactory, renderer, audio);
+					weaponSkin = initScriptFactory(g_rifleFactory, module, renderer, audio);
+					weaponViewSkin = initScriptFactory(g_rifleViewFactory, module, renderer, audio);
 					break;
 				case SMG_WEAPON:
-					weaponSkin = initScriptFactory(smgFactory, renderer, audio);
-					weaponViewSkin = initScriptFactory(smgViewFactory, renderer, audio);
+					weaponSkin = initScriptFactory(g_smgFactory, module, renderer, audio);
+					weaponViewSkin = initScriptFactory(g_smgViewFactory, module, renderer, audio);
 					break;
 				case SHOTGUN_WEAPON:
-					weaponSkin = initScriptFactory(shotgunFactory, renderer, audio);
-					weaponViewSkin = initScriptFactory(shotgunViewFactory, renderer, audio);
+					weaponSkin = initScriptFactory(g_shotgunFactory, module, renderer, audio);
+					weaponViewSkin = initScriptFactory(g_shotgunViewFactory, module, renderer, audio);
 					break;
 				default: SPAssert(false);
 			}
 		}
+
 		ClientPlayer::~ClientPlayer() {
 			spadeSkin->Release();
 			blockSkin->Release();
@@ -380,8 +440,8 @@ namespace spades {
 		}
 
 		asIScriptObject* ClientPlayer::initScriptFactory(ScriptFunction& creator,
-			IRenderer& renderer, IAudioDevice& audio) {
-			ScriptContextHandle ctx = creator.Prepare();
+			const std::string& module, IRenderer& renderer, IAudioDevice& audio) {
+			ScriptContextHandle ctx = creator.Prepare(module);
 			ctx->SetArgObject(0, reinterpret_cast<void*>(&renderer));
 			ctx->SetArgObject(1, reinterpret_cast<void*>(&audio));
 			ctx.ExecuteChecked();
@@ -410,7 +470,7 @@ namespace spades {
 			if (aimingDownSight) {
 				// play zoom in sound
 				if (!wasAimingDownSight && !isThirdPerson) {
-					IAudioDevice& audioDevice = client.GetAudioDevice();
+					IAudioDevice& audioDevice = *viewAudio;
 					AudioParam param;
 					param.volume = 0.1F;
 					Handle<IAudioChunk> c =
@@ -464,7 +524,7 @@ namespace spades {
 						client.activeNet->SendTool();
 
 						// play tool change sound
-						IAudioDevice& audioDevice = client.GetAudioDevice();
+						IAudioDevice& audioDevice = *viewAudio;
 						Handle<IAudioChunk> c;
 						switch (currentTool) {
 							case Player::ToolSpade:
@@ -699,7 +759,7 @@ namespace spades {
 		void ClientPlayer::AddToSceneFirstPersonView() {
 			Player& p = player;
 			Weapon& w = p.GetWeapon();
-			IRenderer& renderer = client.GetRenderer();
+			IRenderer& renderer = *viewRenderer;
 			Matrix4 eyeMatrix = GetEyeMatrix();
 			Vector3 vel = p.GetVelocity();
 
@@ -1102,7 +1162,7 @@ namespace spades {
 		void ClientPlayer::AddToSceneThirdPersonView() {
 			Player& p = player;
 			Weapon& w = p.GetWeapon();
-			IRenderer& renderer = client.GetRenderer();
+			IRenderer& renderer = *viewRenderer;
 			World* world = client.GetWorld();
 
 			std::string modelPath = GetModelPath();
@@ -1349,7 +1409,7 @@ namespace spades {
 			if (cg_debugToolSkinAnchors
 				&& p.IsLocalPlayer() && p.IsAlive()
 				&& currentTool == Player::ToolWeapon) {
-				IRenderer& renderer = client.GetRenderer();
+				IRenderer& renderer = *viewRenderer;
 
 				auto drawAxes = [&renderer](Vector3 p) {
 					renderer.AddDebugLine(Vector3{p.x - 0.2F, p.y, p.z},
@@ -1612,8 +1672,8 @@ namespace spades {
 		}
 
 		void ClientPlayer::EjectedBrass() {
-			IRenderer& renderer = client.GetRenderer();
-			IAudioDevice& audioDevice = client.GetAudioDevice();
+			IRenderer& renderer = *viewRenderer;
+			IAudioDevice& audioDevice = *viewAudio;
 			Player& p = player;
 			WeaponType weaponType = p.GetWeaponType();
 

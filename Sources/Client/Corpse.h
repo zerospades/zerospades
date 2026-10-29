@@ -20,7 +20,9 @@
 
 #pragma once
 
+#include "IRenderer.h"
 #include <Core/Math.h>
+#include <Core/RefCountedObject.h>
 
 namespace spades {
 	namespace client {
@@ -60,7 +62,7 @@ namespace spades {
 				Edge() { node1 = node2 = NodeCount; }
 			};
 
-			IRenderer& renderer;
+			Handle<IRenderer> renderer; // may be a skin's: the corpse keeps it alive
 			GameMap& map;
 			int playerId;
 			Vector3 color;
@@ -89,7 +91,7 @@ namespace spades {
 			/**
 			 * Construct a "corpse" client object.
 			 *
-			 * @param renderer The renderer. Must outlive `Corpse`.
+			 * @param renderer The renderer: its player's, which the corpse keeps.
 			 * @param map The game map, used for physics. Must outlive `Corpse`.
 			 * @param p The player to create a corpse from. Can be destroyed
 			 *			after `Corpse` is constructed.

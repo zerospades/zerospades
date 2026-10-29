@@ -21,6 +21,8 @@
 #pragma once
 
 #include <array>
+#include <string>
+#include <vector>
 
 #include "IImage.h"
 #include "IModel.h"
@@ -123,6 +125,12 @@ namespace spades {
 			bool useLensFlare = false;
 		};
 
+		/**
+		 * Besides the backends, two classes wrap a renderer and must handle every
+		 * method: GameRenderer (GameResources.cpp) forwards it, SandboxedRenderer
+		 * (ClientPlayer.cpp) forwards or forbids it. Keep methods pure, so a new one
+		 * can't be left out of them unnoticed.
+		 */
 		class IRenderer : public RefCountedObject {
 		protected:
 			virtual ~IRenderer() {}
@@ -134,6 +142,11 @@ namespace spades {
 			virtual void Shutdown() = 0;
 
 			virtual Handle<IImage> RegisterImage(const char* filename) = 0;
+			/** Whether `RegisterImage` makes `name` itself rather than load a file. */
+			virtual bool IsBuiltInImage(const char* name) = 0;
+			/** The files the models and images loaded via `RegisterModel` and
+			 * `RegisterImage` come from. */
+			virtual std::vector<std::string> GetRegisteredFiles() = 0;
 			virtual Handle<IModel> RegisterModel(const char* filename) = 0;
 
 			/**
@@ -210,13 +223,12 @@ namespace spades {
 			 * behind it instead of a solid color.
 			 *
 			 * This isn't guaranteed to be supported by every renderer
-			 * backend (e.g. it requires a stencil buffer); the default
-			 * implementation is a no-op, meaning the circular clip is
-			 * simply skipped on backends that don't override it. Calls
-			 * cannot be nested.
+			 * backend (e.g. it requires a stencil buffer); a backend that
+			 * can't implements it as a no-op, so the circular clip is
+			 * simply skipped. Calls cannot be nested.
 			 */
-			virtual void BeginClippingCircle(const Vector2& center, float radius) {}
-			virtual void EndClippingCircle() {}
+			virtual void BeginClippingCircle(const Vector2& center, float radius) = 0;
+			virtual void EndClippingCircle() = 0;
 
 			/**
 			 * Restricts subsequent 2D drawing to an axis-aligned rectangular
@@ -227,19 +239,19 @@ namespace spades {
 			 * window's edges.
 			 *
 			 * Like `BeginClippingCircle()`, this isn't guaranteed to be
-			 * supported by every renderer backend; the default
-			 * implementation is a no-op. Calls cannot be nested, and cannot
+			 * supported by every renderer backend; a backend that can't
+			 * implements it as a no-op. Calls cannot be nested, and cannot
 			 * be mixed with `BeginClippingCircle()`.
 			 */
-			virtual void BeginClippingRect(const AABB2& outRect) {}
-			virtual void EndClippingRect() {}
+			virtual void BeginClippingRect(const AABB2& outRect) = 0;
+			virtual void EndClippingRect() = 0;
 
 			/**
 			 * Returns whether this renderer backend is the software
 			 * renderer. Used to skip features not yet supported by
 			 * SWRenderer (e.g. long sprites, circle/rect clipping).
 			 */
-			virtual bool IsRendererSW() const { return false; }
+			virtual bool IsRendererSW() const = 0;
 
 			/** Finalizes a frame. */
 			virtual void FrameDone() = 0;

@@ -29,6 +29,30 @@
 
 namespace spades {
 	static std::list<IFileSystem*> g_fileSystems;
+	// What the Overlays alive on this thread put on top, the latest last.
+	static thread_local std::vector<std::vector<IFileSystem*>> g_overlays;
+
+	// Calls `f` on each file system a read on this thread sees, the topmost
+	// first, until it returns true; returns whether one did.
+	template <class F> static bool AnyReadable(F f) {
+		for (auto it = g_overlays.rbegin(); it != g_overlays.rend(); ++it) {
+			for (auto* fs : *it) {
+				if (f(fs))
+					return true;
+			}
+		}
+		for (auto* fs : g_fileSystems) {
+			if (f(fs))
+				return true;
+		}
+		return false;
+	}
+
+	FileManager::Overlay::Overlay(std::vector<IFileSystem*> fileSystems) {
+		g_overlays.push_back(std::move(fileSystems));
+	}
+	FileManager::Overlay::~Overlay() { g_overlays.pop_back(); }
+
 	std::unique_ptr<IStream> FileManager::OpenForReading(const char* fn) {
 		SPADES_MARK_FUNCTION();
 		if (!fn)
@@ -37,17 +61,22 @@ namespace spades {
 			SPFileNotFound(fn);
 
 		// check each file system
-		for (auto* fs : g_fileSystems) {
-			if (fs->FileExists(fn))
-				return fs->OpenForReading(fn);
-		}
+		std::unique_ptr<IStream> stream;
+		auto open = [&](const char* name) {
+			return AnyReadable([&](IFileSystem* fs) {
+				if (!fs->FileExists(name))
+					return false;
+				stream = fs->OpenForReading(name);
+				return true;
+			});
+		};
+		if (open(fn))
+			return stream;
 
 		// check weak files, too
 		auto weak_fn = std::string(fn) + ".weak";
-		for (auto* fs : g_fileSystems) {
-			if (fs->FileExists(weak_fn.c_str()))
-				return fs->OpenForReading(weak_fn.c_str());
-		}
+		if (open(weak_fn.c_str()))
+			return stream;
 
 		SPFileNotFound(fn);
 	}
@@ -78,17 +107,13 @@ namespace spades {
 		if (!fn)
 			SPInvalidArgument("fn");
 
-		for (auto* fs : g_fileSystems) {
-			if (fs->FileExists(fn))
-				return true;
-		}
+		if (AnyReadable([&](IFileSystem* fs) { return fs->FileExists(fn); }))
+			return true;
 
 		// check weak files, too
 		auto weak_fn = std::string(fn) + ".weak";
-		for (auto* fs : g_fileSystems) {
-			if (fs->FileExists(weak_fn.c_str()))
-				return true;
-		}
+		if (AnyReadable([&](IFileSystem* fs) { return fs->FileExists(weak_fn.c_str()); }))
+			return true;
 
 		return false;
 	}
@@ -133,6 +158,19 @@ namespace spades {
 		g_fileSystems.push_front(fs);
 	}
 
+	std::unique_ptr<IFileSystem> FileManager::RemoveFileSystem(spades::IFileSystem* fs) {
+		SPADES_MARK_FUNCTION();
+		if (!fs)
+			SPInvalidArgument("fs");
+		for (auto it = g_fileSystems.begin(); it != g_fileSystems.end(); ++it) {
+			if (*it == fs) {
+				g_fileSystems.erase(it);
+				return std::unique_ptr<IFileSystem>(fs);
+			}
+		}
+		return nullptr;
+	}
+
 	std::string FileManager::ReadAllBytes(const char* fn) {
 		SPADES_MARK_FUNCTION();
 
@@ -149,11 +187,11 @@ namespace spades {
 		if (!path)
 			SPInvalidArgument("path");
 
-		for (auto* fs : g_fileSystems) {
-			std::vector<std::string> l = fs->EnumFiles(path);
-			for (size_t i = 0; i < l.size(); i++)
-				set.insert(l[i]);
-		}
+		AnyReadable([&](IFileSystem* fs) {
+			for (const std::string& name : fs->EnumFiles(path))
+				set.insert(name);
+			return false;
+		});
 
 		for (auto& s : set)
 			list.push_back(s);
@@ -164,5 +202,6 @@ namespace spades {
 	void FileManager::Close() {
 		for (auto* fs : g_fileSystems)
 			delete fs;
+		g_fileSystems.clear();
 	}
 } // namespace spades

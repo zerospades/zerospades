@@ -25,6 +25,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <Core/RefCountedObject.h>
@@ -67,8 +68,7 @@ namespace spades {
 
 			// The enabled set: ordered mod names, top applied first, bottom wins
 			// conflicts. Toggling persists immediately; the change takes effect
-			// the next time the game starts (mods are mounted as a startup
-			// overlay — see GetEnabledModPakPaths).
+			// when applied (see ModOverlay).
 			std::vector<std::string> GetEnabledMods();
 			void EnableMod(std::string modName);
 			void DisableMod(std::string modName);
@@ -76,11 +76,16 @@ namespace spades {
 			// Disable every mod (clears the enabled set). Always succeeds.
 			void ClearEnabledMods();
 
-			// Startup: the ordered pak paths to mount as an overlay, relative to
-			// the resource root (e.g. "Mods/<folder>/<x>.pak"). In enabled order
-			// so the caller can prepend each in turn — last-enabled ends up on
-			// top and wins conflicts. Mods missing from disk are skipped.
-			static std::vector<std::string> GetEnabledModPakPaths();
+			// Replace the enabled set, e.g. to disable a mod that failed to load.
+			void SetEnabledMods(const std::vector<std::string>& modNames);
+
+			// Startup: the paks to mount as an overlay, as (mod name, path relative
+			// to the resource root, e.g. "Mods/<folder>/<x>.pak"), see
+			// ModPak::FindPaths. In the given order, so the caller can prepend each
+			// in turn — the last one ends up on top and wins conflicts. Mods
+			// missing from disk are skipped.
+			static std::vector<std::pair<std::string, std::string>>
+			GetModPaks(const std::vector<std::string>& modNames);
 
 		protected:
 			~ModsScreenHelper();

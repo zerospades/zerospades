@@ -54,5 +54,12 @@ namespace spades {
 		}
 
 		void GLModelManager::ClearCache() { models.clear(); }
+
+		std::vector<std::string> GLModelManager::GetFiles() const {
+			std::vector<std::string> files;
+			for (const auto& entry : models)
+				files.push_back(entry.first);
+			return files;
+		}
 	} // namespace draw
 } // namespace spades

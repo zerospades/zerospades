@@ -44,6 +44,7 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/ModPak.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
 #include <Core/Thread.h>
@@ -735,7 +736,7 @@ namespace spades {
 
 		// Enable a mod: drop any existing entry and append it at the end so it is
 		// applied last (and so wins conflicts). Persisted immediately; it takes
-		// effect on the next launch, when the overlay is mounted.
+		// effect when the enabled set is applied (see ModOverlay).
 		void ModsScreenHelper::EnableMod(std::string modName) {
 			std::vector<std::string> list = ReadEnabled();
 			list.erase(std::remove(list.begin(), list.end(), modName), list.end());
@@ -751,22 +752,17 @@ namespace spades {
 
 		void ModsScreenHelper::ClearEnabledMods() { WriteEnabled({}); }
 
-		std::vector<std::string> ModsScreenHelper::GetEnabledModPakPaths() {
-			// Resolve the enabled names to pak paths relative to the resource
-			// root, in enabled order. Runs at startup before any instance
-			// exists, so a throwaway helper does the directory scan. Names with
-			// no matching mod on disk are skipped.
-			Handle<ModsScreenHelper> h = Handle<ModsScreenHelper>::New();
-			h->RebuildModsCache();
-			std::vector<std::string> out;
-			for (const std::string& name : ReadEnabled()) {
-				const ModEntry* m = h->FindMod(name);
-				if (m == nullptr)
-					continue;
-				for (const std::string& pak : m->paks)
-					out.push_back(m->isFolder
-						? (std::string(kModsDir) + "/" + m->name + "/" + pak)
-						: (std::string(kModsDir) + "/" + pak));
+		void ModsScreenHelper::SetEnabledMods(const std::vector<std::string>& modNames) {
+			WriteEnabled(modNames);
+		}
+
+		std::vector<std::pair<std::string, std::string>>
+		ModsScreenHelper::GetModPaks(const std::vector<std::string>& modNames) {
+			// In the given order. Names with no matching mod on disk are skipped.
+			std::vector<std::pair<std::string, std::string>> out;
+			for (const std::string& name : modNames) {
+				for (std::string& path : ModPak::FindPaths(name))
+					out.emplace_back(name, std::move(path));
 			}
 			return out;
 		}

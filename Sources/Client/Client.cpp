@@ -19,6 +19,7 @@
 
  */
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +28,8 @@
 
 #include "Client.h"
 #include "Fonts.h"
+#include "Skin.h"
+#include <ScriptBindings/ScriptManager.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Settings.h>
@@ -87,8 +90,11 @@ namespace spades {
 			  playerName(StripNewlines(cg_playerName.operator std::string()).substr(0, 15)),
 			  logStream(nullptr),
 			  hostname(host),
-			  renderer(r),
-			  audioDevice(audioDev),
+			  shellRenderer(r),
+			  shellAudioDevice(audioDev),
+			  gameResources(Handle<GameResources>::New(r, audioDev)),
+			  renderer(gameResources->CreateRenderer()),
+			  audioDevice(gameResources->CreateAudioDevice()),
 
 			  time(0.0F),
 			  readyToClose(false),
@@ -165,7 +171,7 @@ namespace spades {
 			pieMenuView = stmp::make_unique<PieMenuView>(this, chatFont,
 				&fontManager->GetHeadingFont());
 			tcView = stmp::make_unique<TCProgressView>(*this);
-			cursor = stmp::make_unique<gui::SoftwareCursor>(*renderer);
+			cursor = stmp::make_unique<gui::SoftwareCursor>(*shellRenderer);
 
 			// Create LimboMenu host adapter
 			class ClientLimboHost : public gui::ILimboMenuHost {
@@ -192,11 +198,11 @@ namespace spades {
 
 			auto hostAdapter = Handle<ClientLimboHost>::New(this);
 			limboMenu = stmp::make_unique<gui::LimboMenu>(
-				Handle<gui::ILimboMenuHost>(hostAdapter.GetPointerOrNull()), *renderer,
+				Handle<gui::ILimboMenuHost>(hostAdapter.GetPointerOrNull()), *shellRenderer,
 				*fontManager, *cursor);
 			teamplay = stmp::make_unique<Teamplay>();
-			scriptedUI = Handle<ClientUI>::New(renderer.GetPointerOrNull(),
-				audioDev.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
+			scriptedUI = Handle<ClientUI>::New(shellRenderer.GetPointerOrNull(),
+				shellAudioDevice.GetPointerOrNull(), fontManager.GetPointerOrNull(), this);
 
 			renderer->SetGameMap(nullptr);
 		}
@@ -328,6 +334,8 @@ namespace spades {
 
 		Client::~Client() {
 			SPADES_MARK_FUNCTION();
+
+			SmokeSpriteEntity::Unload();
 
 			NetLog("Disconnecting");
 
@@ -1209,6 +1217,103 @@ namespace spades {
 
 		void Client::OnClosePressed() {
 			CloseLimboView();
+		}
+
+		std::string Client::LoadSkin(const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (skins.count(name))
+				return {};
+			try {
+				Handle<Skin> skin = Skin::Load(name);
+				gameResources->Preload(*skin);
+				skins[name] = std::move(skin);
+			} catch (const std::exception& ex) {
+				return Format("The skin '{0}' was not loaded: {1}", name, ex.what());
+			}
+			return {};
+		}
+
+		std::string Client::UnloadSkin(const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (!skins.count(name))
+				return Format("The skin '{0}' is not loaded.", name);
+			for (auto* assigned : {&playerSkins, &teamSkins}) {
+				for (auto it = assigned->begin(); it != assigned->end();) {
+					if (it->second == name)
+						it = assigned->erase(it);
+					else
+						++it;
+				}
+			}
+			// Who wears it keeps it until they spawn again.
+			skinViews.erase(name);
+			skins.erase(name);
+			return {};
+		}
+
+		std::string Client::SetPlayerSkin(int playerId, const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			if (name.empty()) {
+				playerSkins.erase(playerId);
+				return {};
+			}
+			std::string error = LoadSkin(name);
+			if (error.empty())
+				playerSkins[playerId] = name;
+			return error;
+		}
+
+		std::string Client::SetTeamSkin(int teamId, const std::string& name) {
+			SPADES_MARK_FUNCTION();
+
+			int key = GetTeamSkinKey(teamId);
+			if (name.empty()) {
+				teamSkins.erase(key);
+				return {};
+			}
+			std::string error = LoadSkin(name);
+			if (error.empty())
+				teamSkins[key] = name;
+			return error;
+		}
+
+		Skin* Client::GetPlayerSkin(int playerId) {
+			// The player's own skin, then their team's.
+			auto it = playerSkins.find(playerId);
+			if (it == playerSkins.end()) {
+				stmp::optional<Player&> p = world ? world->GetPlayer(playerId) : stmp::optional<Player&>();
+				if (!p)
+					return nullptr;
+				it = teamSkins.find(GetTeamSkinKey(p->GetTeamId()));
+				if (it == teamSkins.end())
+					return nullptr;
+			}
+			auto skin = skins.find(it->second);
+			return skin == skins.end() ? nullptr : skin->second.GetPointerOrNull();
+		}
+
+		IRenderer& Client::GetPlayerRenderer(int playerId) {
+			if (playerId >= 0 && playerId < static_cast<int>(clientPlayers.size()) &&
+			    clientPlayers[playerId])
+				return clientPlayers[playerId]->GetRenderer();
+			return *renderer;
+		}
+
+		Client::SkinView Client::GetGameView() { return {renderer, audioDevice}; }
+
+		Client::SkinView Client::GetPlayerView(int playerId) {
+			Skin* skin = GetPlayerSkin(playerId);
+			if (!skin)
+				return GetGameView();
+			SkinView& view = skinViews[skin->GetName()];
+			if (!view.renderer) {
+				view.renderer = gameResources->CreateRenderer(Handle<Skin>(*skin));
+				view.audio = gameResources->CreateAudioDevice(Handle<Skin>(*skin));
+			}
+			return view;
 		}
 
 		void Client::LoadKillSounds() {

@@ -149,6 +149,16 @@ namespace spades {
 			return imageManager->RegisterImage(filename).Cast<client::IImage>();
 		}
 
+		bool SWRenderer::IsBuiltInImage(const char* name) { return SWImageManager::IsBuiltIn(name); }
+
+		std::vector<std::string> SWRenderer::GetRegisteredFiles() {
+			EnsureValid();
+			std::vector<std::string> files = imageManager->GetFiles();
+			for (std::string& file : modelManager->GetFiles())
+				files.push_back(std::move(file));
+			return files;
+		}
+
 		Handle<client::IModel> SWRenderer::RegisterModel(const char* filename) {
 			SPADES_MARK_FUNCTION();
 			EnsureInitialized();

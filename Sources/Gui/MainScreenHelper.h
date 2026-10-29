@@ -26,6 +26,7 @@
 
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
+#include <Gui/ModOverlay.h>
 
 namespace spades {
 	class ServerItem;
@@ -127,6 +128,8 @@ namespace spades {
 			bool ShouldOpenModsTab();
 			bool IsTryingMod();
 			void RelaunchForMods();
+			/** ModOverlay::Apply, with the main screen's renderer and audio device. */
+			ModApplyResult ApplyMods(std::vector<ModFailure>& failures, std::string& error);
 		};
 	}
 }

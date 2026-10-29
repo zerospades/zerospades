@@ -23,12 +23,14 @@
 
 #include <list>
 #include <array>
+#include <map>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 
 #include "ClientCameraMode.h"
+#include "GameResources.h"
 #include "DemoNetClient.h"
 #include "INetClient.h"
 #include "NetClient.h"
@@ -153,6 +155,11 @@ namespace spades {
 			std::unique_ptr<World> world;
 			Handle<GameMap> map;
 			std::unique_ptr<GameMapWrapper> mapWrapper;
+			// The software's renderer and audio device: the menus, the loading screen.
+			Handle<IRenderer> shellRenderer;
+			Handle<IAudioDevice> shellAudioDevice;
+			// The game's assets, and the renderer and audio device that load them.
+			Handle<GameResources> gameResources;
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audioDevice;
 			float time;
@@ -542,6 +549,24 @@ namespace spades {
 			void OnSpawnPressed();
 			void OnClosePressed();
 
+		public:
+			/** What a player's assets load through: their skin's, or the game's. */
+			struct SkinView {
+				Handle<IRenderer> renderer;
+				Handle<IAudioDevice> audio;
+			};
+
+		private:
+			// Skins: loaded ones by name, and who wears which.
+			std::map<std::string, Handle<Skin>> skins;
+			std::map<int, std::string> playerSkins; // by player id
+			std::map<int, std::string> teamSkins;   // by GetTeamSkinKey
+			std::map<std::string, SkinView> skinViews;
+			/** Spectators, whatever their team id, share one team skin. */
+			static int GetTeamSkinKey(int teamId) { return teamId >= 2 ? 2 : teamId; }
+			/** The renderer the player's assets load through: a corpse keeps their skin. */
+			IRenderer& GetPlayerRenderer(int playerId);
+
 			// Killsteak sounds
 			std::vector<Handle<IAudioChunk>> killSounds;
 			void LoadKillSounds();
@@ -788,6 +813,38 @@ namespace spades {
 			IRenderer& GetRenderer() { return *renderer; }
 			SceneDefinition GetLastSceneDef() { return lastSceneDef; }
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
+
+			// Skins: mods given to some players only, such as a player or weapon
+			// skin. A player takes the skin they are given when they next spawn.
+			// Nothing calls these yet.
+
+			/**
+			 * Loads the mod `name` from Mods/ as a skin, and every asset in it, so
+			 * wearing it loads nothing. `SetPlayerSkin` and `SetTeamSkin` load it
+			 * too. Returns why it wasn't loaded, or "".
+			 */
+			std::string LoadSkin(const std::string& name);
+			/** Takes the skin `name` off everyone, from their next spawn, and unloads it. */
+			std::string UnloadSkin(const std::string& name);
+			/**
+			 * Gives the player `playerId` the skin `name`, over their team's, or
+			 * takes theirs off with "", from their next spawn. Returns why it
+			 * couldn't, or "".
+			 */
+			std::string SetPlayerSkin(int playerId, const std::string& name);
+			/**
+			 * Gives the team `teamId` the skin `name`, or takes it off with "", from
+			 * each player's next spawn. Any team id from 2 up is the spectators'.
+			 */
+			std::string SetTeamSkin(int teamId, const std::string& name);
+
+			/** The skin the player `playerId` gets at spawn, or null. */
+			Skin* GetPlayerSkin(int playerId);
+
+			/** The view for the skin the player `playerId` gets at spawn. */
+			SkinView GetPlayerView(int playerId);
+			/** The view for no skin: the game's own assets. */
+			SkinView GetGameView();
 			gui::SoftwareCursor* GetCursor() { return cursor.get(); }
 
 			float GetTime() { return time; }

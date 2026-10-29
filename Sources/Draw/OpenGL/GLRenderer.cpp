@@ -273,6 +273,15 @@ namespace spades {
 			return imageManager->RegisterImage(filename);
 		}
 
+		bool GLRenderer::IsBuiltInImage(const char* name) { return GLImageManager::IsBuiltIn(name); }
+
+		std::vector<std::string> GLRenderer::GetRegisteredFiles() {
+			std::vector<std::string> files = imageManager->GetFiles();
+			for (std::string& file : modelManager->GetFiles())
+				files.push_back(std::move(file));
+			return files;
+		}
+
 		Handle<client::IModel> GLRenderer::RegisterModel(const char* filename) {
 			SPADES_MARK_FUNCTION();
 			return modelManager->RegisterModel(filename).Cast<client::IModel>();

@@ -119,7 +119,7 @@ namespace spades {
 		Handle<SWImage> SWImageManager::RegisterImage(const std::string& name) {
 			// The default white image is built in memory. The legacy file name is
 			// kept as an alias so existing callers and mods keep working.
-			if (name == "*white" || name == "Gfx/White.tga")
+			if (IsBuiltIn(name))
 				return GetWhiteImage();
 
 			auto it = images.find(name);
@@ -147,6 +147,17 @@ namespace spades {
 			return Handle<SWImage>::New(bitmap);
 		}
 
+		bool SWImageManager::IsBuiltIn(const std::string& name) {
+			return name == "*white" || name == "Gfx/White.tga";
+		}
+
 		void SWImageManager::ClearCache() { images.clear(); }
+
+		std::vector<std::string> SWImageManager::GetFiles() const {
+			std::vector<std::string> files;
+			for (const auto& entry : images)
+				files.push_back(entry.first);
+			return files;
+		}
 	} // namespace draw
 } // namespace spades

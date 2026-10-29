@@ -538,7 +538,7 @@ namespace spades {
 
 			// Torso
 			{
-				model = renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
+				model = renderer->RegisterModel((modelPath + "Torso.kv6").c_str());
 
 				Vector3 tX, tY, tZ;
 				tX = ((tX1 + tX2) * 0.5F).Normalize();
@@ -548,14 +548,14 @@ namespace spades {
 				torso = Matrix4::FromAxis(tX, -tZ, -tY, center);
 
 				param.matrix = torso * scaler * Matrix4::Scale(-1, -1, 1); // rotate
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 			}
 
 			// Head
 			{
 				model = isChristmasOn
-					? renderer.RegisterModel("Models/Player/XmasHat.kv6")
-					: renderer.RegisterModel((modelPath + "Head.kv6").c_str());
+					? renderer->RegisterModel("Models/Player/XmasHat.kv6")
+					: renderer->RegisterModel((modelPath + "Head.kv6").c_str());
 
 				const Vector3 headBase = (torso * MakeVector3(0.0F, 0.0F, 0.0F)).GetXYZ();
 
@@ -564,7 +564,7 @@ namespace spades {
 				aY = Vector3::Cross(-tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
 				param.matrix = Matrix4::FromAxis(-aX, aY, -aZ, headBase) * scaler;
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 			}
 
 			// Arms
@@ -576,20 +576,20 @@ namespace spades {
 					* Matrix4::Scale(0.75F, 0.75F, 1.0F)
 					* Matrix4::Scale(-1, -1, 1);
 
-				model = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
+				model = renderer->RegisterModel((modelPath + "ArmRight.kv6").c_str());
 				Vector3 aX, aY, aZ;
 				aZ = (nodes[Arm1].pos - nodes[Torso1].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
 				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm1Base) * armsScale;
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 
-				model = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
+				model = renderer->RegisterModel((modelPath + "Arm.kv6").c_str());
 				aZ = (nodes[Arm2].pos - nodes[Torso2].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
 				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm2Base) * armsScale;
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 			}
 
 			// Legs
@@ -597,20 +597,20 @@ namespace spades {
 				const Vector3 leg1Base = (torso * MakeVector3(0.25F, 0.0F, 0.9F)).GetXYZ();
 				const Vector3 leg2Base = (torso * MakeVector3(-0.25F, 0.0F, 0.9F)).GetXYZ();
 
-				model = renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
+				model = renderer->RegisterModel((modelPath + "LegRight.kv6").c_str());
 				Vector3 aX, aY, aZ;
 				aZ = (nodes[Leg1].pos - nodes[Torso3].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
 				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg1Base) * scaler;
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 
-				model = renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
+				model = renderer->RegisterModel((modelPath + "Leg.kv6").c_str());
 				aZ = (nodes[Leg2].pos - nodes[Torso4].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
 				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg2Base) * scaler;
-				renderer.RenderModel(*model, param);
+				renderer->RenderModel(*model, param);
 			}
 		}
 

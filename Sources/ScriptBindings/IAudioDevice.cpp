@@ -29,9 +29,8 @@ namespace spades {
 			static void AudioParamFactory(AudioParam* p) { new (p) AudioParam(); }
 			static IAudioChunk* RegisterSound(const std::string& name, IAudioDevice* dev) {
 				try {
-					IAudioChunk* c = dev->RegisterSound(name.c_str());
-					c->AddRef();
-					return c;
+					// The script gets the reference this handle holds.
+					return dev->RegisterSound(name.c_str()).Unmanage();
 				} catch (const std::exception& ex) {
 					ScriptContextUtils().SetNativeException(ex);
 					return nullptr;
