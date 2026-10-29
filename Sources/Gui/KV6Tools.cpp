@@ -21,6 +21,7 @@
 #include "KV6Tools.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <functional>
@@ -32,7 +33,10 @@
 #include <string>
 #include <vector>
 
+#include <Core/Bitmap.h>
 #include <Core/Exception.h>
+#include <Core/IBitmapCodec.h>
+#include <Core/StdStream.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/VoxelModel.h>
 #include <Gui/UI/Editor/KV6/KV6ModelIO.h>
@@ -138,6 +142,17 @@ namespace spades {
 		  "                         line, then save once: any edit above without\n"
 		  "                         its FILE (\"add-voxel 1 2 3 ff0000\"); blank\n"
 		  "                         lines and lines starting with # are skipped\n"
+		  "  render FILE VIEW OUT.png [--scale N] [--shade] [--background RRGGBB]\n"
+		  "                         draw the model to a PNG (transparent where\n"
+		  "                         there is no voxel, unless --background).\n"
+		  "                         Face views look along one axis from the side\n"
+		  "                         named, one pixel per voxel (times --scale):\n"
+		  "                         +x right, -x left, +y back, -y front, -z top,\n"
+		  "                         +z bottom; --shade darkens what lies deeper.\n"
+		  "                         iso, iso+x+y, iso+x-y, iso-x-y, iso-x+y look\n"
+		  "                         from above that corner (--scale: half a\n"
+		  "                         voxel's width in pixels, default 4). It prints\n"
+		  "                         which way the columns and rows run.\n"
 		  "  help                   this text\n";
 
 		int ParseInt(const std::string& text, const char* what) {
@@ -790,6 +805,235 @@ namespace spades {
 			return false;
 		}
 
+		// --- Rendering ---------------------------------------------------------
+
+		// A picture of a model, top row first, pixels packed 0xAABBGGRR.
+		struct Picture {
+			int width = 0, height = 0;
+			std::vector<std::uint32_t> pixels;
+			Picture(int w, int h, std::uint32_t fill)
+			    : width(w), height(h), pixels(std::size_t(w) * std::size_t(h), fill) {}
+			std::uint32_t& At(int x, int y) { return pixels[std::size_t(y) * width + x]; }
+		};
+
+		std::uint32_t Shaded(std::uint32_t packed, float light) {
+			auto channel = [light](std::uint32_t c) {
+				return std::uint32_t(std::min(255.0F, float(c) * light + 0.5F));
+			};
+			return channel(packed & 0xFF) | (channel((packed >> 8) & 0xFF) << 8) |
+			       (channel((packed >> 16) & 0xFF) << 16) | 0xFF000000u;
+		}
+
+		void SavePng(const Picture& picture, int scale, const std::string& path) {
+			IBitmapCodec* png = nullptr;
+			for (IBitmapCodec* codec : IBitmapCodec::GetAllCodecs()) {
+				if (codec->CanSave() && codec->CheckExtension(".png"))
+					png = codec;
+			}
+			if (!png)
+				throw std::runtime_error("this build cannot write PNG files");
+			const int w = picture.width * scale, h = picture.height * scale;
+			Handle<Bitmap> bitmap = Handle<Bitmap>::New(w, h);
+			std::uint32_t* out = bitmap->GetPixels();
+			// A bitmap keeps its bottom row first.
+			for (int y = 0; y < h; y++)
+				for (int x = 0; x < w; x++)
+					out[std::size_t(h - 1 - y) * w + x] =
+					  picture.pixels[std::size_t(y / scale) * picture.width + x / scale];
+			std::FILE* f = LocalFileSystem::OpenFile(path, "wb");
+			if (!f)
+				throw std::runtime_error("cannot write " + path);
+			StdStream stream(f, true); // takes ownership of the FILE*
+			png->Save(&stream, bitmap.GetPointerOrNull());
+		}
+
+		// A face view: looking along one axis from the side `side` names, one
+		// pixel per voxel, each the first solid voxel along the line of sight.
+		// Rows run down Z in the side views and down Y from above or below, and
+		// columns run to the right as a camera on that side sees it.
+		struct FaceView {
+			const char* name;
+			const char* alias;
+			int axis;     // looked along
+			int toward;   // +1: from the low side, looking up the axis; -1: from the high side
+			int column;   // axis the columns run along
+			int columnSign;
+			int row;      // axis the rows run down
+			int rowSign;
+		};
+		const FaceView kFaceViews[] = {
+		  {"+x", "right", 0, -1, 1, -1, 2, 1}, {"-x", "left", 0, 1, 1, 1, 2, 1},
+		  {"+y", "back", 1, -1, 0, 1, 2, 1},   {"-y", "front", 1, 1, 0, -1, 2, 1},
+		  {"-z", "top", 2, 1, 0, 1, 1, 1},     {"+z", "bottom", 2, -1, 0, -1, 1, 1},
+		};
+
+		std::string AxisLabel(int axis, int sign) {
+			return std::string(sign > 0 ? "+" : "-") + "XYZ"[axis];
+		}
+
+		Picture RenderFace(const VoxelModel& m, const FaceView& view, bool shade,
+		                   std::uint32_t background) {
+			const int size[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
+			Picture picture(size[view.column], size[view.row], background);
+			const int depth = size[view.axis];
+			for (int r = 0; r < picture.height; r++)
+				for (int c = 0; c < picture.width; c++) {
+					int p[3];
+					p[view.column] = view.columnSign > 0 ? c : size[view.column] - 1 - c;
+					p[view.row] = view.rowSign > 0 ? r : size[view.row] - 1 - r;
+					for (int d = 0; d < depth; d++) {
+						p[view.axis] = view.toward > 0 ? d : depth - 1 - d;
+						if (!m.IsSolid(p[0], p[1], p[2]))
+							continue;
+						// Deeper voxels darken with --shade, to half at the far end.
+						const float light =
+						  shade && depth > 1 ? 1.0F - 0.5F * float(d) / float(depth - 1) : 1.0F;
+						picture.At(c, r) = Shaded(m.GetColor(p[0], p[1], p[2]) & 0xFFFFFF, light);
+						break;
+					}
+				}
+			return picture;
+		}
+
+		// An isometric view from above one corner: `turns` quarter turns about
+		// Z bring that corner to +X+Y, the one drawn. `a` is half a voxel's
+		// width on screen, in pixels; a voxel is `a` pixels tall.
+		Picture RenderIso(const VoxelModel& source, int turns, int a, std::uint32_t background) {
+			Handle<VoxelModel> turned = Turned(source, 2, turns);
+			const VoxelModel& m = *turned;
+			const int w = m.GetWidth(), h = m.GetHeight(), d = m.GetDepth();
+			// From above +X+Y, the screen's right is +X-Y and its down is +X+Y and
+			// +Z; nearer to the eye is larger X + Y - Z.
+			auto project = [a, h](float x, float y, float z) {
+				return MakeVector2((x - y + float(h)) * float(a), ((x + y) * 0.5F + z) * float(a));
+			};
+			Picture picture((w + h) * a, int(std::ceil((float(w + h) * 0.5F + float(d)) * float(a))),
+			                background);
+			struct Voxel {
+				int x, y, z;
+			};
+			std::vector<Voxel> voxels;
+			for (int x = 0; x < w; x++)
+				for (int y = 0; y < h; y++)
+					for (int z = 0; z < d; z++) {
+						if (m.IsSolid(x, y, z) &&
+						    (!m.IsSolid(x + 1, y, z) || !m.IsSolid(x, y + 1, z) ||
+						     !m.IsSolid(x, y, z - 1)))
+							voxels.push_back({x, y, z});
+					}
+			// Far to near, so nearer faces paint over farther ones.
+			std::stable_sort(voxels.begin(), voxels.end(), [](const Voxel& p, const Voxel& q) {
+				return p.x + p.y - p.z < q.x + q.y - q.z;
+			});
+			auto fill = [&](const Vector2 c[4], std::uint32_t color) {
+				float minX = c[0].x, maxX = c[0].x, minY = c[0].y, maxY = c[0].y;
+				for (int i = 1; i < 4; i++) {
+					minX = std::min(minX, c[i].x);
+					maxX = std::max(maxX, c[i].x);
+					minY = std::min(minY, c[i].y);
+					maxY = std::max(maxY, c[i].y);
+				}
+				for (int py = std::max(0, int(std::floor(minY))); py < std::min(picture.height, int(std::ceil(maxY))); py++)
+					for (int px = std::max(0, int(std::floor(minX))); px < std::min(picture.width, int(std::ceil(maxX))); px++) {
+						const float sx = float(px) + 0.5F, sy = float(py) + 0.5F;
+						// Inside the convex quad when on the same side of each edge.
+						bool positive = false, negative = false;
+						for (int i = 0; i < 4; i++) {
+							const Vector2& p = c[i];
+							const Vector2& q = c[(i + 1) % 4];
+							const float cross = (q.x - p.x) * (sy - p.y) - (q.y - p.y) * (sx - p.x);
+							positive = positive || cross > 0.0F;
+							negative = negative || cross < 0.0F;
+						}
+						if (!(positive && negative))
+							picture.At(px, py) = color;
+					}
+			};
+			for (const Voxel& v : voxels) {
+				const float x = float(v.x), y = float(v.y), z = float(v.z);
+				const std::uint32_t color = m.GetColor(v.x, v.y, v.z) & 0xFFFFFF;
+				if (!m.IsSolid(v.x, v.y, v.z - 1)) { // the top, lit most
+					const Vector2 c[4] = {project(x, y, z), project(x + 1, y, z),
+					                      project(x + 1, y + 1, z), project(x, y + 1, z)};
+					fill(c, Shaded(color, 1.0F));
+				}
+				if (!m.IsSolid(v.x + 1, v.y, v.z)) {
+					const Vector2 c[4] = {project(x + 1, y, z), project(x + 1, y + 1, z),
+					                      project(x + 1, y + 1, z + 1), project(x + 1, y, z + 1)};
+					fill(c, Shaded(color, 0.8F));
+				}
+				if (!m.IsSolid(v.x, v.y + 1, v.z)) {
+					const Vector2 c[4] = {project(x, y + 1, z), project(x + 1, y + 1, z),
+					                      project(x + 1, y + 1, z + 1), project(x, y + 1, z + 1)};
+					fill(c, Shaded(color, 0.62F));
+				}
+			}
+			return picture;
+		}
+
+		int Render(const VoxelModel& m, const std::vector<std::string>& a) {
+			// a: render VIEW OUT.png [--scale N] [--shade] [--background RRGGBB]
+			std::vector<std::string> v;
+			int scale = 0;
+			bool shade = false;
+			std::uint32_t background = 0; // transparent
+			for (std::size_t i = 1; i < a.size(); i++) {
+				if (a[i] == "--shade") {
+					shade = true;
+				} else if (a[i] == "--scale") {
+					if (i + 1 >= a.size())
+						throw UsageError("--scale takes a whole number");
+					scale = ParseInt(a[++i], "the scale");
+					if (scale < 1 || scale > 64)
+						throw UsageError("a scale runs from 1 to 64");
+				} else if (a[i] == "--background") {
+					if (i + 1 >= a.size())
+						throw UsageError("--background takes RRGGBB or transparent");
+					const std::string& c = a[++i];
+					background = c == "transparent" ? 0 : (ParseColor(c) | 0xFF000000u);
+				} else {
+					v.push_back(a[i]);
+				}
+			}
+			if (v.size() != 2)
+				throw UsageError("usage: render FILE VIEW OUT.png [--scale N] [--shade] "
+				                 "[--background RRGGBB|transparent]");
+			const std::string& view = v[0];
+			const std::string& out = v[1];
+			for (const FaceView& face : kFaceViews) {
+				if (view != face.name && view != face.alias)
+					continue;
+				const Picture picture = RenderFace(m, face, shade, background);
+				const int s = scale > 0 ? scale : 1;
+				SavePng(picture, s, out);
+				std::printf("%s %dx%d, columns %s, rows %s\n", out.c_str(), picture.width * s,
+				            picture.height * s, AxisLabel(face.column, face.columnSign).c_str(),
+				            AxisLabel(face.row, face.rowSign).c_str());
+				return 0;
+			}
+			// The corners, from above, and the quarter turns about Z that bring
+			// each to +X+Y.
+			const struct {
+				const char* name;
+				int turns;
+			} corners[] = {{"iso", 0}, {"iso+x+y", 0}, {"iso+x-y", 1}, {"iso-x-y", 2},
+			               {"iso-x+y", 3}};
+			for (const auto& corner : corners) {
+				if (view != corner.name)
+					continue;
+				const Picture picture = RenderIso(m, corner.turns, scale > 0 ? scale : 4, background);
+				SavePng(picture, 1, out);
+				std::string from = corner.turns == 0 ? "+x+y" : corner.name + 3;
+				for (char& ch : from)
+					ch = char(std::toupper(static_cast<unsigned char>(ch)));
+				std::printf("%s %dx%d, isometric from above %s\n", out.c_str(), picture.width,
+				            picture.height, from.c_str());
+				return 0;
+			}
+			throw UsageError("unknown view '" + view + "': +x -x +y -y +z -z (right left back "
+			                 "front bottom top), or iso, iso+x+y, iso+x-y, iso-x-y, iso-x+y");
+		}
+
 		std::vector<std::string> SplitWords(const std::string& line) {
 			std::vector<std::string> words;
 			std::istringstream in(line);
@@ -931,6 +1175,8 @@ namespace spades {
 						}
 				return 0;
 			}
+			if (cmd == "render")
+				return Render(m, rest);
 			if (cmd == "apply") {
 				Need(rest, 1, "apply FILE < edits");
 				std::string line;
