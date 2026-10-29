@@ -36,6 +36,7 @@
 #include <zlib.h>
 
 #include "KV6Tools.h"
+#include "TwoKV6Tools.h"
 #include "KV6Tools.h"
 #include "Main.h"
 #include "MainScreen.h"
@@ -237,7 +238,7 @@ namespace {
 	const char* const kDebugOptions[] = {"--screenshot-quit", "--editor-reference",
 	                                     "--override-cvar",   "--replay-demo",
 	                                     "--demo",            "--player",
-	                                     "--kv6-tools"};
+	                                     "--kv6-tools",       "--2kv6-tools"};
 
 	bool IsDebugOption(const char* arg) {
 		for (const char* option : kDebugOptions)
@@ -302,6 +303,11 @@ namespace {
 		printf("                       right after --debug-tools, and everything after\n");
 		printf("                       it is its own. --debug-tools --kv6-tools help\n");
 		printf("                       lists its commands.\n");
+		printf("  --2kv6-tools COMMAND FILE [ARGS...]\n");
+		printf("                       read and edit a .2kv6 scene without opening the\n");
+		printf("                       game (its tree, hinges, transforms, models); as\n");
+		printf("                       --kv6-tools, right after --debug-tools.\n");
+		printf("                       --debug-tools --2kv6-tools help lists them.\n");
 	}
 
 	std::regex const hostNameRegex{"aos://.*"};
@@ -772,7 +778,7 @@ int main(int argc, char** argv) {
 		}
 		// A command-line tool takes everything after it as its own, so it
 		// comes right after --debug-tools.
-		if (!strcasecmp(argv[i], "--kv6-tools")) {
+		if (!strcasecmp(argv[i], "--kv6-tools") || !strcasecmp(argv[i], "--2kv6-tools")) {
 			if (i != 2) {
 				fprintf(stderr, "%s comes right after --debug-tools: %s --debug-tools %s ...\n",
 				        argv[i], argv[0] ? argv[0] : "ZeroSpades", argv[i]);
@@ -786,6 +792,8 @@ int main(int argc, char** argv) {
 	// with no window and none of the game's start-up.
 	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--kv6-tools"))
 		return spades::RunKV6Tools(argc - 3, argv + 3);
+	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--2kv6-tools"))
+		return spades::RunTwoKV6Tools(argc - 3, argv + 3);
 
 	for (int i = 1; i < argc;) {
 		int ret = handleCommandLineArgument(argc, argv, i);
