@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include <Core/Math.h>
@@ -47,6 +48,14 @@ namespace spades {
 			 * model is rendered; a map's voxel `i` spans `i` to `i + 1` instead.
 			 */
 			virtual Vector3 DocumentOrigin() const { return MakeVector3(0.0F, 0.0F, 0.0F); }
+			/** Asks for an image file with the host's file browser, titled
+			 *  `title`; `picked` gets its absolute path. A host without one never
+			 *  calls it. */
+			virtual void PickImageFile(const std::string& title,
+			                           std::function<void(const std::string&)> picked) {
+				(void)title;
+				(void)picked;
+			}
 
 			/** Keys the host acts on itself (the camera's, the screenshot key),
 			 *  which no tool may take as its hot key. */

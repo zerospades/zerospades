@@ -31,7 +31,10 @@
 #include <Client/IFont.h>
 #include <Client/IModel.h>
 #include <Client/IRenderer.h>
+#include <Core/Bitmap.h>
 #include <Core/Debug.h>
+#include <Core/LocalFileSystem.h>
+#include <Core/StdStream.h>
 #include <Core/Settings.h>
 #include <Core/VoxelModel.h>
 #include <Gui/OverlayPaint.h>
@@ -1584,6 +1587,117 @@ namespace spades {
 			document.SetOrigin(pivot * -1.0F);
 		}
 
+		// --- Reference images -------------------------------------------------
+
+		namespace {
+			const char* const kAxisName[3] = {"X", "Y", "Z"};
+		} // namespace
+
+		ReferenceImage& VoxelEditor::Reference(int axis) {
+			return references[Clamp(axis, 0, 2)];
+		}
+
+		void VoxelEditor::LoadReferenceImage(int axis) {
+			axis = Clamp(axis, 0, 2);
+			// The browser takes the input over while it is up.
+			ReleaseHeldInput();
+			host.PickImageFile(std::string("Reference Image Across ") + kAxisName[axis],
+			                   [this, axis](const std::string& path) { LoadReferenceFile(axis, path); });
+		}
+
+		bool VoxelEditor::LoadReferenceFile(int axis, const std::string& path) {
+			Handle<client::IImage> image;
+			int width = 0, height = 0;
+			try {
+				std::FILE* f = LocalFileSystem::OpenFile(path, "rb");
+				if (!f)
+					SPRaise("cannot open the file");
+				StdStream stream(f, true); // takes ownership of the FILE*
+				Handle<Bitmap> bitmap = Bitmap::Load(stream);
+				width = bitmap->GetWidth();
+				height = bitmap->GetHeight();
+				// Its alpha is kept: what is transparent in it shows the document
+				// and the rest of the image planes through it.
+				image = renderer->CreateImage(*bitmap);
+			} catch (const std::exception& ex) {
+				SPLog("Could not load reference image %s: %s", path.c_str(), ex.what());
+			}
+			if (!image || width <= 0 || height <= 0) {
+				SetStatus("Could not load " + LocalFileSystem::GetFileName(path));
+				return false;
+			}
+
+			ReferenceImage& ref = references[axis];
+			const bool first = !ref.Loaded();
+			ref.path = path;
+			ref.image = image;
+			ref.pixelWidth = width;
+			ref.pixelHeight = height;
+			ref.visible = true;
+			// A first image is fitted to the document: as wide as its volume
+			// across the image, its middle on the volume's, and just behind the
+			// volume, where it never cuts through the voxels being modelled. A
+			// replacement keeps how the one before it was set up.
+			if (first) {
+				int u, v;
+				ReferenceAxes(axis, u, v);
+				const IntVector3 size = document.Size();
+				const float extent[3] = {float(size.x), float(size.y), float(size.z)};
+				ref.size = std::max(1.0F, std::max(extent[u], extent[v]));
+				ref.across = extent[u] * 0.5F - 0.5F;
+				ref.along = extent[v] * 0.5F - 0.5F;
+				// Behind the voxels as each view is usually looked from: the side
+				// from +X, the front from -Y, and the top from above (Z points
+				// down, so above is the low end of Z).
+				ref.depth = axis == 0 ? -1.0F : axis == 1 ? extent[1] : extent[2];
+			}
+			SetStatus(std::string("Reference image across ") + kAxisName[axis] + ": " +
+			          LocalFileSystem::GetFileName(path));
+			return true;
+		}
+
+		void VoxelEditor::ClearReferenceImage(int axis) {
+			ReferenceImage& ref = references[Clamp(axis, 0, 2)];
+			if (!ref.Loaded())
+				return;
+			const ReferenceImage cleared;
+			// The placement stays, so loading another image puts it where this was.
+			ReferenceImage kept = cleared;
+			kept.size = ref.size;
+			kept.across = ref.across;
+			kept.along = ref.along;
+			kept.depth = ref.depth;
+			kept.opacity = ref.opacity;
+			kept.flipped = ref.flipped;
+			ref = kept;
+			SetStatus(std::string("Reference image across ") + kAxisName[axis] + " removed");
+		}
+
+		void VoxelEditor::DrawReferenceImages() {
+			for (int axis = 0; axis < 3; axis++) {
+				const ReferenceImage& ref = references[axis];
+				if (!ref.Loaded() || !ref.visible || ref.opacity <= 0.0F)
+					continue;
+				int u, v;
+				ReferenceAxes(axis, u, v);
+				Vector3 alongU = MakeVector3(0.0F, 0.0F, 0.0F);
+				Vector3 alongV = MakeVector3(0.0F, 0.0F, 0.0F);
+				Vector3 middle = MakeVector3(0.0F, 0.0F, 0.0F);
+				float* du = &alongU.x;
+				float* dv = &alongV.x;
+				float* m = &middle.x;
+				du[u] = ref.flipped ? -ref.size : ref.size;
+				dv[v] = ref.Height();
+				m[u] = ref.across;
+				m[v] = ref.along;
+				m[axis] = ref.depth;
+				const Vector3 origin = middle - alongU * 0.5F - alongV * 0.5F + host.DocumentOrigin();
+				const float o = Clamp(ref.opacity, 0.0F, 1.0F);
+				renderer->SetColorAlphaPremultiplied(MakeVector4(o, o, o, o));
+				renderer->AddImagePlane(*ref.image, origin, alongU, alongV);
+			}
+		}
+
 		// --- Mirror -----------------------------------------------------------
 
 		bool VoxelEditor::MirrorEnabled(int axis) const {
@@ -2054,6 +2168,9 @@ namespace spades {
 		}
 
 		void VoxelEditor::DrawScene() {
+			// The images to model from, whatever the tool: they are depth tested,
+			// so the voxels in front of them hide them.
+			DrawReferenceImages();
 			// Pending voxels (a paste, an import) render solid at their temporary
 			// position, in a document that does not hold them yet.
 			if (edit.placing && placementModel) {

@@ -386,6 +386,25 @@ namespace spades {
 
 		// --- Host -------------------------------------------------------------
 
+		void KV6EditorView::PickImageFile(const std::string& title,
+		                                  std::function<void(const std::string&)> picked) {
+			// The editor's browser, listing the images the game can read rather
+			// than documents: a reference image is no document, and nothing is
+			// written to it.
+			FileBrowserOptions options = EditorBrowserOptions();
+			options.purpose = FileBrowserPurpose::Open;
+			options.filters.clear();
+			options.filters.push_back(
+			  FileFilter{"Images", {".png", ".jpg", ".jpeg", ".bmp", ".tga", ".tif"}});
+			options.describeEntry = nullptr;
+			options.appendFilterExtension = false;
+			options.homeDir = EditorHomeDir();
+			options.initialDir = filePath.empty() ? EditorRememberedFolder(EditorHomeDir())
+			                                      : LocalFileSystem::ParentDir(filePath);
+			editor->ReleaseHeldInput();
+			ShowEditorFileDialog(*ui->GetOverlay(), title, std::move(options), std::move(picked));
+		}
+
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
 			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
 			       EqualsIgnoringCase(key, kFrameSelectionKey);

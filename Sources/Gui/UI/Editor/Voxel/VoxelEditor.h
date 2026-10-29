@@ -239,6 +239,9 @@ namespace spades {
 			Vector3 GetPivot() const override;
 			void SetPivot(const Vector3& pivot) override;
 			void PreviewPivot(const Vector3& pivot) override;
+			ReferenceImage& Reference(int axis) override;
+			void LoadReferenceImage(int axis) override;
+			void ClearReferenceImage(int axis) override;
 
 		private:
 			IVoxelDocument& document;
@@ -402,6 +405,15 @@ namespace spades {
 			// Alt+click, or a click while the eyedropper is armed, samples in any tool.
 			bool SamplingArmed() const;
 			bool SampleColor();
+
+			// --- Reference images ---------------------------------------------
+			// One across each axis; a setting of the editor, kept for as long as
+			// it is open.
+			ReferenceImage references[3];
+			// Shows the image at `path` across `axis`, sized to the document and
+			// set behind it; false (with a status line) when it cannot be read.
+			bool LoadReferenceFile(int axis, const std::string& path);
+			void DrawReferenceImages();
 
 			// --- Mirror -------------------------------------------------------
 			void PlaceMirrorPlane(const Vector3& plane);
