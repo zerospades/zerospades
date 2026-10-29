@@ -220,9 +220,8 @@ namespace spades {
 	void VoxelModel2KV6::Save(IStream& stream, const std::vector<VoxelObject>& objects) {
 		SPADES_MARK_FUNCTION();
 
-		if (objects.empty())
-			SPRaise("Cannot save empty .2kv6 scene");
-
+		// A scene with no objects is written as such: an editor may empty one,
+		// and it must be able to save and reopen it.
 		if (objects.size() > UINT16_MAX)
 			SPRaise("Too many root objects in .2kv6 scene: %zu (max %u)", objects.size(),
 			        UINT16_MAX);
