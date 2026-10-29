@@ -1644,12 +1644,14 @@ namespace spades {
 				const IntVector3 size = document.Size();
 				const float extent[3] = {float(size.x), float(size.y), float(size.z)};
 				ref.size = std::max(1.0F, std::max(extent[u], extent[v]));
-				ref.across = extent[u] * 0.5F - 0.5F;
-				ref.along = extent[v] * 0.5F - 0.5F;
+				float* centre = &ref.centre.x;
+				centre[u] = extent[u] * 0.5F - 0.5F;
+				centre[v] = extent[v] * 0.5F - 0.5F;
 				// Behind the voxels as each view is usually looked from: the side
 				// from +X, the front from -Y, and the top from above (Z points
 				// down, so above is the low end of Z).
-				ref.depth = axis == 0 ? -1.0F : axis == 1 ? extent[1] : extent[2];
+				centre[axis] = axis == 0 ? -1.0F : axis == 1 ? extent[1] : extent[2];
+				ref.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
 			}
 			SetStatus(std::string("Reference image across ") + kAxisName[axis] + ": " +
 			          LocalFileSystem::GetFileName(path));
@@ -1664,9 +1666,8 @@ namespace spades {
 			// The placement stays, so loading another image puts it where this was.
 			ReferenceImage kept = cleared;
 			kept.size = ref.size;
-			kept.across = ref.across;
-			kept.along = ref.along;
-			kept.depth = ref.depth;
+			kept.centre = ref.centre;
+			kept.rotation = ref.rotation;
 			kept.opacity = ref.opacity;
 			kept.flipped = ref.flipped;
 			ref = kept;
@@ -1678,20 +1679,12 @@ namespace spades {
 				const ReferenceImage& ref = references[axis];
 				if (!ref.Loaded() || !ref.visible || ref.opacity <= 0.0F)
 					continue;
-				int u, v;
-				ReferenceAxes(axis, u, v);
-				Vector3 alongU = MakeVector3(0.0F, 0.0F, 0.0F);
-				Vector3 alongV = MakeVector3(0.0F, 0.0F, 0.0F);
-				Vector3 middle = MakeVector3(0.0F, 0.0F, 0.0F);
-				float* du = &alongU.x;
-				float* dv = &alongV.x;
-				float* m = &middle.x;
-				du[u] = ref.flipped ? -ref.size : ref.size;
-				dv[v] = ref.Height();
-				m[u] = ref.across;
-				m[v] = ref.along;
-				m[axis] = ref.depth;
-				const Vector3 origin = middle - alongU * 0.5F - alongV * 0.5F + host.DocumentOrigin();
+				Vector3 frame[3];
+				ReferenceFrame(axis, ref.rotation, frame);
+				const Vector3 alongU = frame[0] * (ref.flipped ? -ref.size : ref.size);
+				const Vector3 alongV = frame[1] * ref.Height();
+				const Vector3 origin =
+				  ref.centre - alongU * 0.5F - alongV * 0.5F + host.DocumentOrigin();
 				const float o = Clamp(ref.opacity, 0.0F, 1.0F);
 				renderer->SetColorAlphaPremultiplied(MakeVector4(o, o, o, o));
 				renderer->AddImagePlane(*ref.image, origin, alongU, alongV);

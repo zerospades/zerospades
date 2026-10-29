@@ -26,10 +26,11 @@ namespace spades {
 	namespace gui {
 		/**
 		 * Sets up the images to model from: one across each axis (X, Y and Z,
-		 * its sub-tools), each loaded from a file, scaled, moved across and
-		 * along its plane and along its axis, faded, mirrored or hidden from
-		 * the bar. The images stay drawn whatever the tool; this one only
-		 * places them, and nothing it does is an undo step.
+		 * its sub-tools), each loaded from a file. The selected one carries a
+		 * gizmo that moves, turns and scales it; its bar types where it is and
+		 * how large, fades, mirrors, straightens or hides it. The images stay
+		 * drawn whatever the tool; this one only places them, and nothing it
+		 * does is an undo step.
 		 */
 		class ReferenceTool : public ContainerTool {
 		public:

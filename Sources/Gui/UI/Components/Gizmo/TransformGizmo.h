@@ -78,6 +78,10 @@ namespace spades {
 
 			bool Contains(GizmoHandle handle) const;
 			bool Intersects(const GizmoHandleSet& other) const { return (bits & other.bits) != 0; }
+			/** This set without `handle`, for "everything but ..." sets. */
+			GizmoHandleSet Without(GizmoHandle handle) const {
+				return GizmoHandleSet(bits & ~Of(handle).bits);
+			}
 			bool IsEmpty() const { return bits == 0; }
 
 			GizmoHandleSet operator|(const GizmoHandleSet& o) const {

@@ -22,13 +22,11 @@
 
 #include <string>
 
+#include <Client/IImage.h>
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
-	namespace client {
-		class IImage;
-	}
 	namespace gui {
 		/**
 		 * An image to model from, laid flat in the document across one axis
@@ -36,8 +34,9 @@ namespace spades {
 		 *
 		 * A setting of the editor, as the brush colour is: not saved with the
 		 * document, and never an undo step. Coordinates are the document's
-		 * voxels; the plane is across `axis`, at `depth` along it, and the
-		 * image runs along the other two (see ReferenceAxes).
+		 * voxels. Unturned, the plane is across its axis and the image runs
+		 * along the other two (see ReferenceAxes); `rotation` turns it from
+		 * there about its centre.
 		 */
 		struct ReferenceImage {
 			std::string path; // where it was loaded from; empty when there is none
@@ -46,10 +45,10 @@ namespace spades {
 			bool visible = true;
 			// How many voxels the image's width spans: its scale.
 			float size = 32.0F;
-			// Where its middle is, along the plane's two directions.
-			float across = 0.0F, along = 0.0F;
-			// Where the plane is along its own axis.
-			float depth = 0.0F;
+			// Where its middle is.
+			Vector3 centre = MakeVector3(0.0F, 0.0F, 0.0F);
+			// How it is turned from lying across its axis (a quaternion).
+			Vector4 rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
 			float opacity = 0.5F;
 			// Mirrored left to right, for an image drawn from the other side.
 			bool flipped = false;
@@ -62,6 +61,13 @@ namespace spades {
 		};
 
 		/**
+		 * The directions an image across `axis`, turned by `rotation`, lies
+		 * along: `axes[0]` along its width, `axes[1]` down its height, and
+		 * `axes[2]` out of it, each of unit length.
+		 */
+		void ReferenceFrame(int axis, const Vector4& rotation, Vector3 axes[3]);
+
+		/**
 		 * The directions an image across `axis` runs in: `u` along its width
 		 * and `v` down its height. The world's Z points down, so an image's top
 		 * is at the low end of Z, as a front or side view is seen; a top view
@@ -70,6 +76,18 @@ namespace spades {
 		inline void ReferenceAxes(int axis, int& u, int& v) {
 			u = axis == 0 ? 1 : 0;
 			v = axis == 2 ? 1 : 2;
+		}
+
+		inline void ReferenceFrame(int axis, const Vector4& rotation, Vector3 axes[3]) {
+			int u, v;
+			ReferenceAxes(axis, u, v);
+			const int index[3] = {u, v, axis};
+			const Quaternion turn(rotation);
+			for (int k = 0; k < 3; k++) {
+				Vector3 a = MakeVector3(0.0F, 0.0F, 0.0F);
+				(&a.x)[index[k]] = 1.0F;
+				axes[k] = turn.Apply(a);
+			}
 		}
 	} // namespace gui
 } // namespace spades
