@@ -223,6 +223,14 @@ namespace spades {
 				if (CheckVisibility(AABB3(param.origin, param.origin)))
 					base->AddGlare(image, param);
 			}
+			void AddImagePlane(IImage& image, Vector3 origin, Vector3 axisU, Vector3 axisV) {
+				AABB3 bounds(origin, origin);
+				bounds += origin + axisU;
+				bounds += origin + axisV;
+				bounds += origin + axisU + axisV;
+				if (CheckVisibility(bounds))
+					base->AddImagePlane(image, origin, axisU, axisV);
+			}
 
 			void EndScene() { OnProhibitedAction(); }
 
