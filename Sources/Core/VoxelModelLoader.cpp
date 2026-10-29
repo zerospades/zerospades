@@ -111,7 +111,7 @@ namespace spades {
 			    };
 
 			// Collect voxels from all root objects
-			Matrix4 identity;
+			const Matrix4 identity = Matrix4::Identity();
 			for (const VoxelObject& root : scene) {
 				collectVoxels(root, identity);
 			}
