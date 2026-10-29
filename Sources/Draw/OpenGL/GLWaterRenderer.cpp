@@ -511,34 +511,36 @@ namespace spades {
 			}
 
 			// create heightmap texture
-			waveTexture = device.GenTexture();
-			if (numLayers == 1) {
-				device.BindTexture(IGLDevice::Texture2D, waveTexture);
-				device.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::RGBA8,
-				                  waveTanks[0]->GetSize(), waveTanks[0]->GetSize(), 0,
-				                  IGLDevice::BGRA, IGLDevice::UnsignedByte, NULL);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter, IGLDevice::Linear);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter, IGLDevice::LinearMipmapLinear);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::Repeat);
-				device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, IGLDevice::Repeat);
-				if (settings.r_maxAnisotropy > 1.0F) {
-					device.TexParamater(IGLDevice::Texture2D,	
-						IGLDevice::TextureMaxAnisotropy, (float)settings.r_maxAnisotropy);
-				}
-			} else {
-				device.BindTexture(IGLDevice::Texture2DArray, waveTexture);
-				device.TexImage3D(IGLDevice::Texture2DArray, 0, IGLDevice::RGBA8,
-				                  waveTanks[0]->GetSize(), waveTanks[0]->GetSize(),
-				                  static_cast<IGLDevice::Sizei>(numLayers), 0, IGLDevice::BGRA,
-				                  IGLDevice::UnsignedByte, NULL);
-				device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureMagFilter, IGLDevice::Linear);
-				device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureMinFilter, IGLDevice::LinearMipmapLinear);
-				device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureWrapS, IGLDevice::Repeat);
-				device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureWrapT, IGLDevice::Repeat);
+			for (IGLDevice::UInteger& waveTexture : waveTextures) {
+				waveTexture = device.GenTexture();
+				if (numLayers == 1) {
+					device.BindTexture(IGLDevice::Texture2D, waveTexture);
+					device.TexImage2D(IGLDevice::Texture2D, 0, IGLDevice::RGBA8,
+					                  waveTanks[0]->GetSize(), waveTanks[0]->GetSize(), 0,
+					                  IGLDevice::BGRA, IGLDevice::UnsignedByte, NULL);
+					device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter, IGLDevice::Linear);
+					device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter, IGLDevice::LinearMipmapLinear);
+					device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::Repeat);
+					device.TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, IGLDevice::Repeat);
+					if (settings.r_maxAnisotropy > 1.0F) {
+						device.TexParamater(IGLDevice::Texture2D,	
+							IGLDevice::TextureMaxAnisotropy, (float)settings.r_maxAnisotropy);
+					}
+				} else {
+					device.BindTexture(IGLDevice::Texture2DArray, waveTexture);
+					device.TexImage3D(IGLDevice::Texture2DArray, 0, IGLDevice::RGBA8,
+					                  waveTanks[0]->GetSize(), waveTanks[0]->GetSize(),
+					                  static_cast<IGLDevice::Sizei>(numLayers), 0, IGLDevice::BGRA,
+					                  IGLDevice::UnsignedByte, NULL);
+					device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureMagFilter, IGLDevice::Linear);
+					device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureMinFilter, IGLDevice::LinearMipmapLinear);
+					device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureWrapS, IGLDevice::Repeat);
+					device.TexParamater(IGLDevice::Texture2DArray, IGLDevice::TextureWrapT, IGLDevice::Repeat);
 
-				if (settings.r_maxAnisotropy > 1.0F) {
-					device.TexParamater(IGLDevice::Texture2DArray,
-						IGLDevice::TextureMaxAnisotropy, (float)settings.r_maxAnisotropy);
+					if (settings.r_maxAnisotropy > 1.0F) {
+						device.TexParamater(IGLDevice::Texture2DArray,
+							IGLDevice::TextureMaxAnisotropy, (float)settings.r_maxAnisotropy);
+					}
 				}
 			}
 
@@ -614,7 +616,8 @@ namespace spades {
 				waveTanks[i]->Join();
 				delete waveTanks[i];
 			}
-			device.DeleteTexture(waveTexture);
+			for (IGLDevice::UInteger waveTexture : waveTextures)
+				device.DeleteTexture(waveTexture);
 		}
 
 		void GLWaterRenderer::Render() {
@@ -743,13 +746,13 @@ namespace spades {
 
 				if (waveTanks.size() == 1) {
 					device.ActiveTexture(3);
-					device.BindTexture(IGLDevice::Texture2D, waveTexture);
+					device.BindTexture(IGLDevice::Texture2D, waveTextures[currentWaveTexture]);
 					waveTextureUnif.SetValue(3);
 
 					shadowShader(&renderer, prg, 4);
 				} else if (waveTanks.size() == 3) {
 					device.ActiveTexture(3);
-					device.BindTexture(IGLDevice::Texture2DArray, waveTexture);
+					device.BindTexture(IGLDevice::Texture2DArray, waveTextures[currentWaveTexture]);
 					waveTextureArrayUnif.SetValue(3);
 
 					// mirror
@@ -821,6 +824,10 @@ namespace spades {
 		void GLWaterRenderer::Update(float dt) {
 			SPADES_MARK_FUNCTION();
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Update");
+
+			// The next texture in turn, which the GPU drew with frames ago
+			currentWaveTexture = (currentWaveTexture + 1) % WaveTextureCount;
+			const IGLDevice::UInteger waveTexture = waveTextures[currentWaveTexture];
 
 			// update wavetank simulation
 			{

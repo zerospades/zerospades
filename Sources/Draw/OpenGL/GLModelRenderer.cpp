@@ -89,7 +89,7 @@ namespace spades {
 			}
 		}
 
-		void GLModelRenderer::RenderDynamicLightPass(std::vector<GLDynamicLight> lights) {
+		void GLModelRenderer::RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			GLProfiler::Context profiler(renderer.GetGLProfiler(),

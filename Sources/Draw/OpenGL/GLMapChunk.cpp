@@ -433,7 +433,7 @@ namespace spades {
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, 0);
 		}
 
-		void GLMapChunk::RenderDynamicLightPass(std::vector<GLDynamicLight> lights) {
+		void GLMapChunk::RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights) {
 			SPADES_MARK_FUNCTION();
 
 			const auto& eye = renderer.renderer.GetSceneDef().viewOrigin;
@@ -470,6 +470,12 @@ namespace spades {
 			if (!renderer.renderer.BoxFrustrumCull(bx))
 				return;
 
+			// Nothing to set up for a chunk no light reaches.
+			static GLDynamicLightShader lightShader;
+			if (!lightShader.Gather(lights,
+			                        [&bx](const GLDynamicLight& light) { return light.Cull(bx); }))
+				return;
+
 			GLProgram* program = renderer.dlightProgram;
 
 			static GLProgramUniform chunkPosition("chunkPosition");
@@ -498,17 +504,11 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, iBuffer);
-			for (const auto& light : lights) {
-				static GLDynamicLightShader lightShader;
-				lightShader(&renderer.renderer, program, light, 1);
-
-				if (!light.Cull(bx))
-					continue;
-
+			lightShader.Render(&renderer.renderer, program, 1, [&] {
 				device.DrawElements(IGLDevice::Triangles,
 				                    static_cast<IGLDevice::Sizei>(indices.size()),
 				                    IGLDevice::UnsignedShort, NULL);
-			}
+			});
 
 			device.BindBuffer(IGLDevice::ElementArrayBuffer, 0);
 		}

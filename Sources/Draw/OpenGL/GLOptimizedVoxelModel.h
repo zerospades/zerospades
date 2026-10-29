@@ -92,7 +92,7 @@ namespace spades {
 			void Prerender(std::vector<client::ModelRenderParam> params, bool ghostPass) override;
 			void RenderShadowMapPass(std::vector<client::ModelRenderParam> params) override;
 			void RenderSunlightPass(std::vector<client::ModelRenderParam> params, bool ghostPass) override;
-			void RenderDynamicLightPass(std::vector<client::ModelRenderParam> params, std::vector<GLDynamicLight> lights) override;
+			void RenderDynamicLightPass(const std::vector<client::ModelRenderParam>& params, const std::vector<GLDynamicLight>& lights) override;
 			void RenderOutlinePass(std::vector<client::ModelRenderParam> params) override;
 			void RenderXRayPass(std::vector<client::ModelRenderParam> params) override;
 
