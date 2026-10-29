@@ -270,6 +270,9 @@ namespace spades {
 			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
 			items.push_back(EditorMenuItem{"Insert Model...", [this] { OpenInsertDialog(); }, true});
+			// Taken at the end of the next frame, once the menu has closed, so
+			// the picture is of the model rather than of the menu.
+			items.push_back(EditorMenuItem{"Save Screenshot", [this] { wantScreenShot = true; }, true});
 			items.push_back(EditorMenuItem{
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }, true});
 			return items;
@@ -527,6 +530,7 @@ namespace spades {
 			};
 			viewKey(kHomeViewKey, "reset view");
 			viewKey(kFrameSelectionKey, "frame selection");
+			keys({cg_keyScreenshot}, "screenshot");
 			return help;
 		}
 
