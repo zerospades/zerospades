@@ -165,6 +165,10 @@ namespace spades {
 					break;
 				case SDL_KEYUP: view.KeyEvent(TranslateKey(event.key.keysym), false); break;
 				case SDL_TEXTINPUT: view.TextInputEvent(event.text.text); break;
+				// A file is opened with this program at startup, not by dropping it on
+				// a running one. The name still has to be released: SDL allocated it
+				// for a receiver, and here there is none.
+				case SDL_DROPFILE: SDL_free(event.drop.file); break;
 				case SDL_TEXTEDITING:
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
@@ -473,7 +477,12 @@ namespace spades {
 				Uint32 sdlFlags = 0;
 				switch (rtype) {
 					case RendererType::GL:
-						sdlFlags = SDL_WINDOW_OPENGL;
+						// High-DPI: the window keeps its size in window units (layout and
+						// mouse input are unchanged) while the GL framebuffer gets every
+						// pixel the display has. The GL renderer reads both sizes from
+						// SDLGLDevice. The SW renderer blits a window surface sized in
+						// window units, so it stays out of this.
+						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);

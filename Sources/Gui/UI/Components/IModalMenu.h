@@ -39,8 +39,13 @@ namespace spades {
 
 			// Input
 			virtual bool KeyEvent(const std::string& key, bool down) = 0;
-			virtual void TextInputEvent(const std::string& text) = 0;
-			virtual bool AcceptsTextInput() const = 0;
+			/**
+			 * Typed text, for a menu that has somewhere to put it. A menu that only
+			 * offers commands has not: what asks for a value is a prompt of its own,
+			 * shown over the menu, and the host routes text there instead.
+			 */
+			virtual void TextInputEvent(const std::string& text) { (void)text; }
+			virtual bool AcceptsTextInput() const { return false; }
 
 			// Rendering
 			virtual void Draw() = 0;

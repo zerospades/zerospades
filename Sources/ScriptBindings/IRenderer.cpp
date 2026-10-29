@@ -112,6 +112,17 @@ namespace spades {
 					ScriptContextUtils().SetNativeException(ex);
 				}
 			}
+			static void AddImagePlane(IImage* img, const Vector3& origin, const Vector3& axisU,
+			                          const Vector3& axisV, IRenderer* r) {
+				try {
+					if (!img) {
+						SPInvalidArgument("img");
+					}
+					return r->AddImagePlane(*img, origin, axisU, axisV);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
 			static void MultiplyScreenColor(const Vector3& v, IRenderer* r) {
 				try {
 					return r->MultiplyScreenColor(v);
@@ -477,6 +488,12 @@ namespace spades {
 						                              "void AddLongSprite(Image@+, const Vector3& "
 						                              "in, const Vector3& in, float)",
 						                              asFUNCTION(AddLongSprite),
+						                              asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer",
+						                              "void AddImagePlane(Image@+, const Vector3& "
+						                              "in, const Vector3& in, const Vector3& in)",
+						                              asFUNCTION(AddImagePlane),
 						                              asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r =

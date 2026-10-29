@@ -256,7 +256,7 @@ namespace spades {
 				}
 			}
 
-		SPAssert(pos == blkdata.size());
+		SPAssert(static_cast<size_t>(pos) == blkdata.size());
 		model->HollowFill();
 		return model;
 	}

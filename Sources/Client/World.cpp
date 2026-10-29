@@ -287,7 +287,7 @@ namespace spades {
 
 		World::PlayerPersistent& World::GetPlayerPersistent(int index) {
 			SPAssert(index >= 0);
-			SPAssert(index < players.size());
+			SPAssert(index < static_cast<int>(players.size()));
 			return playerPersistents.at(index);
 		}
 

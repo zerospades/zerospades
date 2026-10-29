@@ -32,7 +32,7 @@ namespace spades {
 		 * disables its owner; `resultIndex` is the pressed button (or -1).
 		 */
 		class MessageBoxScreen : public ui::UIElement {
-			float contentsTop, contentsHeight;
+			AABB2 contents; // where the shared dialog chrome put our widgets
 
 			ui::UIElement* owner; // weak
 

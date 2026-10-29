@@ -198,6 +198,14 @@ namespace spades {
 				if (CheckVisibility(bounds1))
 					base->AddLongSprite(image, p1, p2, radius);
 			}
+			void AddImagePlane(IImage& image, Vector3 origin, Vector3 axisU, Vector3 axisV) {
+				AABB3 bounds(origin, origin);
+				bounds += origin + axisU;
+				bounds += origin + axisV;
+				bounds += origin + axisU + axisV;
+				if (CheckVisibility(bounds))
+					base->AddImagePlane(image, origin, axisU, axisV);
+			}
 
 			void EndScene() { OnProhibitedAction(); }
 
@@ -215,6 +223,14 @@ namespace spades {
 			void DrawFilledTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2) {
 				if (allowDepthHack)
 					base->DrawFilledTriangle(v0, v1, v2);
+				else
+					OnProhibitedAction();
+			}
+
+			void DrawShadedTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2,
+			                        const Vector4& c0, const Vector4& c1, const Vector4& c2) {
+				if (allowDepthHack)
+					base->DrawShadedTriangle(v0, v1, v2, c0, c1, c2);
 				else
 					OnProhibitedAction();
 			}
@@ -279,6 +295,7 @@ namespace spades {
 
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
+			float ScreenPixelRatio() { return base->ScreenPixelRatio(); }
 		};
 
 		namespace {

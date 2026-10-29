@@ -58,7 +58,11 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			if (streaming) {
 				unzCloseCurrentFile(zip);
-				SPAssert(this == fs->currentStream.get());
+				// Nothing may leave a destructor: raising here would end the
+				// process rather than report the broken invariant, so it is
+				// logged and the close goes ahead as it always did.
+				if (this != fs->currentStream.get())
+					SPLog("Zip stream closed out of turn");
 				fs->currentStream = NULL;
 			}
 		}

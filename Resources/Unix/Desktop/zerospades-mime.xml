@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The model types ZeroSpades opens, for share/mime/packages. Only .kv6 is
+  claimed: the others the editor lists it cannot open yet, and the desktop
+  should not promise what the program cannot do.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+	<mime-type type="application/x-kv6">
+		<comment>KV6 voxel model</comment>
+		<comment xml:lang="en">KV6 voxel model</comment>
+		<glob pattern="*.kv6"/>
+		<icon name="zerospades"/>
+		<generic-icon name="model"/>
+	</mime-type>
+</mime-info>

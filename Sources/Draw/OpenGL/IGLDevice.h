@@ -435,9 +435,16 @@ namespace spades {
 			virtual void ReadPixels(Integer x, Integer y, Sizei width, Sizei height, Enum format,
 			                        Enum type, void* data) = 0;
 
+			/** Size of the default framebuffer, in pixels. */
 			virtual Integer ScreenWidth() = 0;
 			virtual Integer ScreenHeight() = 0;
+			/** Size of the window in the units mouse events and 2D drawing use. On a
+			 *  high-DPI display the default framebuffer holds more pixels than this. */
+			virtual Integer WindowWidth() = 0;
+			virtual Integer WindowHeight() = 0;
 
+			/** Presents the frame. The screen and window sizes are re-read afterwards,
+			 *  so they follow the window across displays of different densities. */
 			virtual void Swap() = 0;
 		};
 	} // namespace draw

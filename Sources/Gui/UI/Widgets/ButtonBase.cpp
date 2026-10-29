@@ -19,6 +19,7 @@
  */
 
 #include "ButtonBase.h"
+#include <Gui/UI/Framework/FeedbackSounds.h>
 #include <Gui/UI/Framework/UIManager.h>
 
 namespace spades {
@@ -36,11 +37,11 @@ namespace spades {
 			ButtonBase::~ButtonBase() { repeatTimer->Stop(); }
 
 			void ButtonBase::PlayMouseEnterSound() {
-				GetManager().PlaySound("Sounds/Feedback/Limbo/Hover.opus");
+				GetManager().PlaySound(kHoverSound);
 			}
 
 			void ButtonBase::PlayActivateSound() {
-				GetManager().PlaySound("Sounds/Feedback/Limbo/Select.opus");
+				GetManager().PlaySound(kActivateSound);
 			}
 
 			void ButtonBase::OnActivated() {

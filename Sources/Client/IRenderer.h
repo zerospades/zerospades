@@ -170,6 +170,16 @@ namespace spades {
 
 			virtual void AddSprite(IImage&, Vector3 center, float radius, float rotation) = 0;
 			virtual void AddLongSprite(IImage&, Vector3 p1, Vector3 p2, float radius) = 0;
+			/**
+			 * An image laid flat in the scene: the parallelogram whose corners
+			 * are `origin`, `origin + axisU`, `origin + axisV` and
+			 * `origin + axisU + axisV`, the image's left edge along `axisV` and
+			 * its top edge along `axisU`, tinted by the colour set with
+			 * SetColorAlphaPremultiplied. Seen from either side, and depth
+			 * tested: what is in front hides it, and it shows what is behind
+			 * it through its transparency, as a sprite does.
+			 */
+			virtual void AddImagePlane(IImage&, Vector3 origin, Vector3 axisU, Vector3 axisV) = 0;
 
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;
@@ -248,8 +258,14 @@ namespace spades {
 			/** get a rendered image. */
 			virtual Handle<Bitmap> ReadBitmap() = 0;
 
+			/** Screen size in 2D drawing units, the units of mouse input too. */
 			virtual float ScreenWidth() = 0;
 			virtual float ScreenHeight() = 0;
+			/** Framebuffer pixels per 2D drawing unit: above 1 on a high-DPI display,
+			 *  where the screen size above stays in window units while the image is
+			 *  rendered at the display's full resolution. Anything sized in device
+			 *  pixels (a one-pixel anti-aliasing fringe, a hairline) divides by it. */
+			virtual float ScreenPixelRatio() = 0;
 
 			/**
 			 * 2D drawing helpers
@@ -323,6 +339,12 @@ namespace spades {
 				}
 			}
 			virtual void DrawFilledTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2) = 0;
+			/** Draws a triangle whose colour is interpolated between its vertices.
+			 *  Colours are alpha premultiplied, and the current draw colour is not
+			 *  used. A backend that cannot interpolate fills it with the average. */
+			virtual void DrawShadedTriangle(const Vector2& v0, const Vector2& v1,
+			                                const Vector2& v2, const Vector4& c0,
+			                                const Vector4& c1, const Vector4& c2) = 0;
 		};
 	} // namespace client
 } // namespace spades
