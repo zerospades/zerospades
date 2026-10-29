@@ -790,10 +790,18 @@ int main(int argc, char** argv) {
 
 	// A command-line tool of its own: everything after it is its, and it runs
 	// with no window and none of the game's start-up.
-	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--kv6-tools"))
+	// The engine code they reuse (the game's model loader) records its call
+	// stack, so that is started for them as the game starts it.
+	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--kv6-tools")) {
+		spades::reflection::Backtrace::StartBacktrace();
+		spades::SetLogToStandardOutput(false);
 		return spades::RunKV6Tools(argc - 3, argv + 3);
-	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--2kv6-tools"))
+	}
+	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--2kv6-tools")) {
+		spades::reflection::Backtrace::StartBacktrace();
+		spades::SetLogToStandardOutput(false);
 		return spades::RunTwoKV6Tools(argc - 3, argv + 3);
+	}
 
 	for (int i = 1; i < argc;) {
 		int ret = handleCommandLineArgument(argc, argv, i);

@@ -35,6 +35,9 @@
 #include <vector>
 
 #include <Core/Bitmap.h>
+#include <Core/DirectoryFileSystem.h>
+#include <Core/FileManager.h>
+#include <Core/VoxelModelLoader.h>
 #include <Core/Exception.h>
 #include <Core/IBitmapCodec.h>
 #include <Core/StdStream.h>
@@ -144,6 +147,11 @@ namespace spades {
 		  "                         line, then save once: any edit above without\n"
 		  "                         its FILE (\"add-voxel 1 2 3 ff0000\"); blank\n"
 		  "                         lines and lines starting with # are skipped\n"
+		  "\n"
+		  "FILE may name one part of a .2kv6 scene, by its object's name (a path\n"
+		  "of names for nested ones): scene.2kv6#Bolt, scene.2kv6#Gun/Bolt. It is\n"
+		  "read through the game's own loader, exactly as a skin gets it, its\n"
+		  "pivot on the scene's origin; edits to it cannot be saved.\n"
 		  "  render FILE VIEW OUT.png [--scale N] [--shade] [--background RRGGBB]\n"
 		  "                         draw the model to a PNG (transparent where\n"
 		  "                         there is no voxel, unless --background).\n"
@@ -174,6 +182,26 @@ namespace spades {
 		}
 
 		Handle<VoxelModel> Load(const std::string& path) {
+			// "scene.2kv6#Gun/Bolt": one part of a scene, read through the game's
+			// own loader, so it is exactly what a skin gets for that name.
+			std::string lower = path;
+			for (char& ch : lower)
+				ch = char(std::tolower(static_cast<unsigned char>(ch)));
+			const std::size_t at = lower.find(".2kv6#");
+			if (at != std::string::npos) {
+				const std::string file = path.substr(0, at + 5);
+				if (!LocalFileSystem::Exists(file))
+					throw std::runtime_error("cannot find " + file);
+				const std::size_t slash = file.find_last_of('/');
+				const std::string folder = slash == std::string::npos ? "." : file.substr(0, slash);
+				FileManager::PrependFileSystem(new DirectoryFileSystem(folder, false));
+				try {
+					return VoxelModelLoader::Load(
+					  (LocalFileSystem::GetFileName(file) + path.substr(at + 5)).c_str());
+				} catch (const std::exception& ex) {
+					throw std::runtime_error(ex.what());
+				}
+			}
 			Handle<VoxelModel> model = gui::KV6ModelIO::Load(path);
 			if (!model)
 				throw std::runtime_error("cannot read a KV6 model from " + path);
@@ -181,6 +209,9 @@ namespace spades {
 		}
 
 		void Save(VoxelModel& model, const std::string& path) {
+			if (path.find(".2kv6#") != std::string::npos || path.find(".2KV6#") != std::string::npos)
+				throw std::runtime_error("a part of a scene is read only here: edit the scene "
+				                         "with --2kv6-tools");
 			if (!gui::KV6ModelIO::Save(model, path))
 				throw std::runtime_error("cannot write " + path);
 		}
@@ -1124,10 +1155,10 @@ namespace spades {
 		try {
 			return Run(args);
 		} catch (const UsageError& ex) {
-			std::fprintf(stderr, "kv6-tools: %s\n", ex.what());
+			std::fprintf(stderr, "kv6-tools: %s\n", ErrorText(ex).c_str());
 			return 2;
 		} catch (const std::exception& ex) {
-			std::fprintf(stderr, "kv6-tools: %s\n", ex.what());
+			std::fprintf(stderr, "kv6-tools: %s\n", ErrorText(ex).c_str());
 			return 1;
 		}
 	}

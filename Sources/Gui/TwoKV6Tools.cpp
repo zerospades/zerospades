@@ -783,10 +783,10 @@ namespace spades {
 		try {
 			return Run(args);
 		} catch (const UsageError& ex) {
-			std::fprintf(stderr, "2kv6-tools: %s\n", ex.what());
+			std::fprintf(stderr, "2kv6-tools: %s\n", ErrorText(ex).c_str());
 			return 2;
 		} catch (const std::exception& ex) {
-			std::fprintf(stderr, "2kv6-tools: %s\n", ex.what());
+			std::fprintf(stderr, "2kv6-tools: %s\n", ErrorText(ex).c_str());
 			return 1;
 		}
 	}

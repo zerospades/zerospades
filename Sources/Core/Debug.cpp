@@ -227,6 +227,10 @@ namespace spades {
 
 	// TODO: What happened to thread-safety here
 
+	static bool logToStandardOutput = true;
+
+	void SetLogToStandardOutput(bool echo) { logToStandardOutput = echo; }
+
 	void LogMessage(const char* file, int line, const char* format, ...) {
 		char buf[4096];
 		va_list va;
@@ -254,7 +258,8 @@ namespace spades {
 
 		// (1) stdout
 		std::string outStr = EscapeControlCharacters(buf);
-		printf("%s", outStr.c_str());
+		if (logToStandardOutput)
+			printf("%s", outStr.c_str());
 
 		// (2) The log file a.k.a. `SystemMessages.log`
 		if (logStream || !attemptedToInitializeLog) {
