@@ -186,6 +186,16 @@ namespace spades {
 
 			virtual void AddSprite(IImage&, Vector3 center, float radius, float rotation) = 0;
 			virtual void AddLongSprite(IImage&, Vector3 p1, Vector3 p2, float radius) = 0;
+			/**
+			 * An image laid flat in the scene: the parallelogram whose corners
+			 * are `origin`, `origin + axisU`, `origin + axisV` and
+			 * `origin + axisU + axisV`, the image's left edge along `axisV` and
+			 * its top edge along `axisU`, tinted by the colour set with
+			 * SetColorAlphaPremultiplied. Seen from either side, and depth
+			 * tested: what is in front hides it, and it shows what is behind
+			 * it through its transparency, as a sprite does.
+			 */
+			virtual void AddImagePlane(IImage&, Vector3 origin, Vector3 axisU, Vector3 axisV) = 0;
 
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;

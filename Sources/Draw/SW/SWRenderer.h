@@ -77,6 +77,14 @@ namespace spades {
 			};
 			std::vector<Sprite> sprites;
 
+			// An image laid flat (see IRenderer::AddImagePlane).
+			struct Plane {
+				Handle<SWImage> img;
+				Vector3 origin, axisU, axisV;
+				Vector4 color;
+			};
+			std::vector<Plane> planes;
+
 			struct LongSprite {
 				Handle<SWImage> img;
 				Vector3 start;
@@ -178,6 +186,8 @@ namespace spades {
 
 			void AddSprite(client::IImage &, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage &, Vector3 p1, Vector3 p2, float radius) override;
+			void AddImagePlane(client::IImage &, Vector3 origin, Vector3 axisU,
+			                   Vector3 axisV) override;
 
 			void EndScene() override;
 

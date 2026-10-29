@@ -689,6 +689,21 @@ namespace spades {
 			// TODO: long sprite
 		}
 
+		void SWRenderer::AddImagePlane(client::IImage& image, Vector3 origin, Vector3 axisU,
+		                               Vector3 axisV) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			planes.push_back(Plane());
+			auto& plane = planes.back();
+			plane.img = dynamic_cast<SWImage&>(image);
+			plane.origin = origin;
+			plane.axisU = axisU;
+			plane.axisV = axisV;
+			plane.color = drawColorAlphaPremultiplied;
+		}
+
 		static uint32_t ConvertColor32(Vector4 col) {
 			auto convertColor = [](float f) {
 				int i = static_cast<int>(f * 255.0F + 0.5F);
@@ -782,8 +797,36 @@ namespace spades {
 						imageRenderer->DrawPolygon(spr.img.GetPointerOrNull(), v1, v2, v3);
 					}
 					sprites.clear();
+
+					// Image planes take the sprites' way: corners in the world,
+					// depth tested against what was drawn.
+					for (const auto& plane : planes) {
+						auto at = [&](float u, float v) {
+							const Vector3 p = plane.origin + plane.axisU * u + plane.axisV * v;
+							return MakeVector4(p.x, p.y, p.z, 1.0F);
+						};
+						const Vector2 uvMax = plane.img->GetUVScale();
+						SWImageRenderer::Vertex v1, v2, v3;
+						v1.color = v2.color = v3.color = plane.color;
+						v1.uv = MakeVector2(0, 0);
+						v1.position = at(0, 0);
+						v2.uv = MakeVector2(uvMax.x, 0);
+						v2.position = at(1, 0);
+						v3.uv = MakeVector2(0, uvMax.y);
+						v3.position = at(0, 1);
+						imageRenderer->DrawPolygon(plane.img.GetPointerOrNull(), v1, v2, v3);
+						v1.uv = MakeVector2(uvMax.x, 0);
+						v1.position = at(1, 0);
+						v2.uv = MakeVector2(uvMax.x, uvMax.y);
+						v2.position = at(1, 1);
+						v3.uv = MakeVector2(0, uvMax.y);
+						v3.position = at(0, 1);
+						imageRenderer->DrawPolygon(plane.img.GetPointerOrNull(), v1, v2, v3);
+					}
 				}
 			}
+			// Kept for one scene only, whether or not it drew the world.
+			planes.clear();
 
 			// render debug lines
 			{
