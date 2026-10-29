@@ -34,8 +34,10 @@ namespace spades {
 		class GLOptimizedVoxelModel : public GLModel {
 			class SliceGenerator;
 			struct Vertex {
-				uint8_t x, y, z;
-				uint8_t padding;
+				// 16 bits each, so a model may be longer than 255 voxels on any
+				// axis; 8-bit positions wrapped there.
+				uint16_t x, y, z;
+				uint16_t padding;
 
 				// texture coord
 				uint16_t u, v;

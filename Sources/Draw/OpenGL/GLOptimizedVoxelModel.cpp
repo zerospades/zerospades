@@ -559,10 +559,10 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
 			device.VertexAttribPointer(positionAttribute(), 4,
-				IGLDevice::UnsignedByte, false, sizeof(Vertex), (void*)0);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
 			if (normalAttribute() != -1)
 				device.VertexAttribPointer(normalAttribute(), 3,
-					IGLDevice::Byte, false, sizeof(Vertex), (void*)8);
+					IGLDevice::Byte, false, sizeof(Vertex), (void*)12);
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
@@ -700,11 +700,11 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
 			device.VertexAttribPointer(positionAttribute(), 4,
-				IGLDevice::UnsignedByte, false, sizeof(Vertex), (void*)0);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
 			device.VertexAttribPointer(textureCoordAttribute(), 2,
-				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)4);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)8);
 			device.VertexAttribPointer(normalAttribute(), 3,
-				IGLDevice::Byte, false, sizeof(Vertex), (void*)8);
+				IGLDevice::Byte, false, sizeof(Vertex), (void*)12);
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
@@ -838,11 +838,11 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
 			device.VertexAttribPointer(positionAttribute(), 4,
-				IGLDevice::UnsignedByte, false, sizeof(Vertex), (void*)0);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
 			device.VertexAttribPointer(textureCoordAttribute(), 2,
-				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)4);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)8);
 			device.VertexAttribPointer(normalAttribute(), 3,
-				IGLDevice::Byte, false, sizeof(Vertex), (void*)8);
+				IGLDevice::Byte, false, sizeof(Vertex), (void*)12);
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
@@ -966,7 +966,7 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
 			device.VertexAttribPointer(positionAttribute(), 4,
-				IGLDevice::UnsignedByte, false, sizeof(Vertex), (void*)0);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
@@ -1089,11 +1089,11 @@ namespace spades {
 
 			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
 			device.VertexAttribPointer(positionAttribute(), 4,
-				IGLDevice::UnsignedByte, false, sizeof(Vertex), (void*)0);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
 			device.VertexAttribPointer(textureCoordAttribute(), 2,
-				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)4);
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)8);
 			device.VertexAttribPointer(normalAttribute(), 3,
-				IGLDevice::Byte, false, sizeof(Vertex), (void*)8);
+				IGLDevice::Byte, false, sizeof(Vertex), (void*)12);
 			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
 
 			device.EnableVertexAttribArray(positionAttribute(), true);
