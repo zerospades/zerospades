@@ -20,7 +20,10 @@
 
 #include "KV6Tools.h"
 
+#include <algorithm>
 #include <cerrno>
+#include <cmath>
+#include <functional>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -41,6 +44,11 @@ namespace spades {
 		// keeps them packed 0x00BBGGRR. The pivot is the point the model is
 		// built about, as the editor shows it (the KV6 origin, negated).
 
+		// A KV6 file keeps only the voxels with a face in the open: air sealed
+		// inside a closed shell reads back solid, in this placeholder colour
+		// (see VoxelModel::HollowFill). Such voxels are reported as "interior".
+		constexpr std::uint32_t kInteriorColor = 0xDDBEEF;
+
 		// A KV6 column is a 64-bit mask, so no model is deeper than this.
 		constexpr int kMaxDepth = 64;
 		constexpr int kMaxWidth = 4096;
@@ -57,32 +65,75 @@ namespace spades {
 		  "are voxel indices from 0 (Z points down, as in the game); colours are\n"
 		  "RRGGBB in hex (a leading # is allowed). Edits are saved in place.\n"
 		  "\n"
+		  "A KV6 file keeps only the voxels with a face in the open: air sealed\n"
+		  "inside a closed shell (a hollow ball with no opening) reads back\n"
+		  "solid. Those voxels look the same from outside, and are reported as\n"
+		  "\"interior\" instead of a colour.\n"
+		  "\n"
 		  "  new FILE W H D [--pivot X Y Z] [--force]\n"
 		  "                         create an empty W x H x D model (D <= 64), its\n"
 		  "                         pivot in the middle unless given\n"
-		  "  info FILE [--json]     size, pivot, voxel count and bounds\n"
+		  "  info FILE [--json]     size, pivot, voxel count (and how many are on\n"
+		  "                         the surface) and bounds\n"
 		  "  get-size FILE          W H D\n"
 		  "  get-pivot FILE         X Y Z\n"
 		  "  set-pivot FILE X Y Z   move the pivot (the voxels stay)\n"
 		  "  get-rect FILE          MINX MINY MINZ MAXX MAXY MAXZ of the solid\n"
 		  "                         voxels, or \"empty\"\n"
 		  "  count-voxels FILE      how many voxels are solid\n"
-		  "  get-voxel FILE X Y Z   RRGGBB, or \"air\"\n"
+		  "  get-voxel FILE X Y Z   RRGGBB, \"interior\" or \"air\"\n"
 		  "  add-voxel FILE X Y Z COLOR\n"
 		  "                         make a voxel solid in COLOR (replacing it)\n"
 		  "  remove-voxel FILE X Y Z\n"
 		  "  paint-voxel FILE X Y Z COLOR\n"
 		  "                         recolour a solid voxel; air stays air\n"
-		  "  fill-box FILE X0 Y0 Z0 X1 Y1 Z1 COLOR\n"
-		  "                         every voxel of the box, corners included\n"
-		  "  clear-box FILE X0 Y0 Z0 X1 Y1 Z1\n"
-		  "  paint-box FILE X0 Y0 Z0 X1 Y1 Z1 COLOR\n"
-		  "  list-voxels FILE       one solid voxel per line: X Y Z RRGGBB\n"
+		  "\n"
+		  "Shapes, each drawn by a verb: fill-SHAPE makes its voxels solid in\n"
+		  "COLOR, clear-SHAPE carves them out (it takes no COLOR), paint-SHAPE\n"
+		  "recolours those that are solid (draw- and carve- are fill- and clear-).\n"
+		  "Centres and radii may be fractional (4.5 centres on a voxel edge); a\n"
+		  "prism's base is at X Y Z and it runs HEIGHT voxels along --axis (z by\n"
+		  "default, which points down); --hollow T keeps only a wall T thick\n"
+		  "(a closed shell reads back solid inside, see above: cut its opening\n"
+		  "in the same apply batch, before it is first saved).\n"
+		  "Whatever falls outside the model is left out.\n"
+		  "  fill-box FILE X0 Y0 Z0 X1 Y1 Z1 [--hollow T] COLOR   (rect too)\n"
+		  "  fill-hollow-box FILE X0 Y0 Z0 X1 Y1 Z1 T COLOR\n"
+		  "  fill-cylinder FILE X Y Z RADIUS HEIGHT [--axis A] [--hollow T] COLOR\n"
+		  "  fill-hollow-cylinder FILE X Y Z RADIUS HEIGHT T [--axis A] COLOR\n"
+		  "  fill-hex-cylinder FILE X Y Z RADIUS HEIGHT [--axis A] [--hollow T] COLOR\n"
+		  "  fill-hollow-hex-cylinder FILE X Y Z RADIUS HEIGHT T [--axis A] COLOR\n"
+		  "                         a hexagonal prism, RADIUS to its corners\n"
+		  "  fill-ball FILE X Y Z RADIUS [--hollow T] COLOR\n"
+		  "  fill-hollow-ball FILE X Y Z RADIUS T COLOR\n"
+		  "\n"
+		  "  blit FILE SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint]\n"
+		  "                         copy the solid voxels of the model SOURCE in,\n"
+		  "                         its voxel 0 0 0 at X Y Z (its pivot, with\n"
+		  "                         --pivot): over what is there (the default),\n"
+		  "                         under it (only into air), carving them out, or\n"
+		  "                         painting only what is solid\n"
+		  "\n"
+		  "  list-voxels FILE [--surface]\n"
+		  "                         one solid voxel per line: X Y Z RRGGBB (or\n"
+		  "                         interior); --surface lists only those with a\n"
+		  "                         face in the open\n"
 		  "  resize FILE W H D [DX DY DZ]\n"
 		  "                         new size, voxels moved by DX DY DZ (default 0);\n"
 		  "                         the pivot stays on the same voxels; what falls\n"
 		  "                         outside is lost\n"
 		  "  trim FILE              shrink the volume to the solid voxels\n"
+		  "  rotate FILE AXIS TURNS turn by TURNS quarter turns about x, y or z\n"
+		  "                         (right-handed; negative turns the other way),\n"
+		  "                         as the editor's Transform tool turns; the volume\n"
+		  "                         and the pivot turn with the voxels\n"
+		  "  mirror FILE AXIS       reflect across the middle of the volume\n"
+		  "  move FILE DX DY DZ [--clip]\n"
+		  "  move FILE up|down|left|right|forward|back [N] [--clip]\n"
+		  "                         shift the voxels (N, default 1) while the pivot\n"
+		  "                         stays, which moves the model as the game places\n"
+		  "                         it; up is -Z, forward -Y. Refused when voxels\n"
+		  "                         would leave the volume, unless --clip drops them\n"
 		  "  apply FILE             run edits read from standard input, one per\n"
 		  "                         line, then save once: any edit above without\n"
 		  "                         its FILE (\"add-voxel 1 2 3 ff0000\"); blank\n"
@@ -177,6 +228,26 @@ namespace spades {
 			return any;
 		}
 
+		// Whether a solid voxel has a face in the open, so a KV6 file keeps it.
+		bool OnSurface(const VoxelModel& m, int x, int y, int z) {
+			return !m.IsSolid(x - 1, y, z) || !m.IsSolid(x + 1, y, z) || !m.IsSolid(x, y - 1, z) ||
+			       !m.IsSolid(x, y + 1, z) || !m.IsSolid(x, y, z - 1) || !m.IsSolid(x, y, z + 1);
+		}
+
+		std::string VoxelText(const VoxelModel& m, int x, int y, int z) {
+			const std::uint32_t color = m.GetColor(x, y, z) & 0xFFFFFF;
+			return color == kInteriorColor ? std::string("interior") : FormatColor(color);
+		}
+
+		int CountSurface(const VoxelModel& m) {
+			int count = 0;
+			for (int x = 0; x < m.GetWidth(); x++)
+				for (int y = 0; y < m.GetHeight(); y++)
+					for (int z = 0; z < m.GetDepth(); z++)
+						count += (m.IsSolid(x, y, z) && OnSurface(m, x, y, z)) ? 1 : 0;
+			return count;
+		}
+
 		int CountSolid(const VoxelModel& m) {
 			int count = 0;
 			for (int x = 0; x < m.GetWidth(); x++)
@@ -186,23 +257,232 @@ namespace spades {
 			return count;
 		}
 
-		// A box given by two opposite corners, in either order, clipped to the
-		// model; empty when it misses it altogether.
-		struct Box {
-			int lo[3], hi[3];
-			bool Empty() const { return lo[0] > hi[0] || lo[1] > hi[1] || lo[2] > hi[2]; }
+		// --- Shapes ----------------------------------------------------------
+		//
+		// Every shape is drawn by one of three verbs: fill (make its voxels solid
+		// in a colour), clear (carve them out) and paint (recolour those of them
+		// that are solid). A shape is a test of whether a voxel centre lies in
+		// it, over the box it fits in; whatever of it lies outside the model is
+		// left out.
+
+		struct Shape {
+			int lo[3], hi[3]; // the voxels it may hold, before clipping
+			std::function<bool(float, float, float)> contains;
 		};
-		Box ParseBox(const VoxelModel& m, const std::vector<std::string>& a, std::size_t at) {
-			Box box;
-			const int size[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
-			for (int k = 0; k < 3; k++) {
-				const int c0 = ParseInt(a[at + k], "a corner");
-				const int c1 = ParseInt(a[at + 3 + k], "a corner");
-				box.lo[k] = std::max(0, std::min(c0, c1));
-				box.hi[k] = std::min(size[k] - 1, std::max(c0, c1));
+
+		enum class Verb { Fill, Clear, Paint };
+
+		// Positional arguments, and the options among them.
+		struct ShapeArgs {
+			std::vector<std::string> values;
+			int axis = 2; // a prism's, along which its height runs
+			float hollow = 0.0F; // wall thickness; 0 for a solid shape
+		};
+
+		ShapeArgs SplitShapeArgs(const std::vector<std::string>& a, std::size_t from) {
+			ShapeArgs out;
+			for (std::size_t i = from; i < a.size(); i++) {
+				if (a[i] == "--axis") {
+					if (i + 1 >= a.size())
+						throw UsageError("--axis takes x, y or z");
+					const std::string& v = a[++i];
+					if (v == "x" || v == "X")
+						out.axis = 0;
+					else if (v == "y" || v == "Y")
+						out.axis = 1;
+					else if (v == "z" || v == "Z")
+						out.axis = 2;
+					else
+						throw UsageError("--axis takes x, y or z, not '" + v + "'");
+				} else if (a[i] == "--hollow") {
+					if (i + 1 >= a.size())
+						throw UsageError("--hollow takes a wall thickness");
+					out.hollow = ParseFloat(a[++i], "the wall thickness");
+					if (out.hollow <= 0.0F)
+						throw UsageError("a wall is thicker than nothing");
+				} else {
+					out.values.push_back(a[i]);
+				}
 			}
-			return box;
+			return out;
 		}
+
+		// What each shape takes, after the verb's colour comes off the end.
+		const char* ShapeUsage(const std::string& shape) {
+			if (shape == "box" || shape == "rect")
+				return "X0 Y0 Z0 X1 Y1 Z1 [--hollow T]";
+			if (shape == "hollow-box")
+				return "X0 Y0 Z0 X1 Y1 Z1 T";
+			if (shape == "cylinder" || shape == "hex-cylinder")
+				return "X Y Z RADIUS HEIGHT [--axis x|y|z] [--hollow T]";
+			if (shape == "hollow-cylinder" || shape == "hollow-hex-cylinder")
+				return "X Y Z RADIUS HEIGHT T [--axis x|y|z]";
+			if (shape == "ball")
+				return "X Y Z RADIUS [--hollow T]";
+			if (shape == "hollow-ball")
+				return "X Y Z RADIUS T";
+			return nullptr;
+		}
+
+		// The shape `name` from its arguments (the colour already taken off).
+		Shape MakeShape(std::string name, ShapeArgs args) {
+			const std::string usage = name + " " + ShapeUsage(name);
+			// A hollow-* name is its solid shape with a wall, given last.
+			if (name.compare(0, 7, "hollow-") == 0) {
+				if (args.values.empty())
+					throw UsageError("usage: " + usage);
+				args.hollow = ParseFloat(args.values.back(), "the wall thickness");
+				if (args.hollow <= 0.0F)
+					throw UsageError("a wall is thicker than nothing");
+				args.values.pop_back();
+				name = name.substr(7);
+			}
+			const std::vector<std::string>& v = args.values;
+			const float t = args.hollow;
+			Shape shape;
+
+			if (name == "box" || name == "rect") {
+				if (v.size() != 6)
+					throw UsageError("usage: " + usage);
+				for (int k = 0; k < 3; k++) {
+					const int c0 = ParseInt(v[k], "a corner"), c1 = ParseInt(v[3 + k], "a corner");
+					shape.lo[k] = std::min(c0, c1);
+					shape.hi[k] = std::max(c0, c1);
+				}
+				const Shape outer = shape;
+				// A wall of `t` voxels: whatever is that close to a face.
+				shape.contains = [outer, t](float x, float y, float z) {
+					if (t <= 0.0F)
+						return true;
+					const float p[3] = {x, y, z};
+					for (int k = 0; k < 3; k++) {
+						if (p[k] - float(outer.lo[k]) < t || float(outer.hi[k]) - p[k] < t)
+							return true;
+					}
+					return false;
+				};
+				return shape;
+			}
+
+			if (name == "ball") {
+				if (v.size() != 4)
+					throw UsageError("usage: " + usage);
+				const float c[3] = {ParseFloat(v[0], "X"), ParseFloat(v[1], "Y"),
+				                    ParseFloat(v[2], "Z")};
+				const float r = ParseFloat(v[3], "the radius");
+				if (r <= 0.0F)
+					throw UsageError("a radius is larger than nothing");
+				for (int k = 0; k < 3; k++) {
+					shape.lo[k] = int(std::floor(c[k] - r));
+					shape.hi[k] = int(std::ceil(c[k] + r));
+				}
+				const float inner = std::max(0.0F, r - t);
+				shape.contains = [=](float x, float y, float z) {
+					const float dx = x - c[0], dy = y - c[1], dz = z - c[2];
+					const float d2 = dx * dx + dy * dy + dz * dz;
+					return d2 <= r * r && (t <= 0.0F || d2 > inner * inner);
+				};
+				return shape;
+			}
+
+			if (name == "cylinder" || name == "hex-cylinder") {
+				if (v.size() != 5)
+					throw UsageError("usage: " + usage);
+				const float c[3] = {ParseFloat(v[0], "X"), ParseFloat(v[1], "Y"),
+				                    ParseFloat(v[2], "Z")};
+				const float r = ParseFloat(v[3], "the radius");
+				const int height = ParseInt(v[4], "the height");
+				if (r <= 0.0F || height < 1)
+					throw UsageError("a radius and a height are larger than nothing");
+				const int axis = args.axis;
+				// The two directions across the axis, as a reference image's.
+				const int u = axis == 0 ? 1 : 0;
+				const int w = axis == 2 ? 1 : 2;
+				// The base is at the given point, and the prism runs `height`
+				// voxels from it along its axis.
+				const int base = int(std::lround(c[axis]));
+				shape.lo[axis] = base;
+				shape.hi[axis] = base + height - 1;
+				for (int k : {u, w}) {
+					shape.lo[k] = int(std::floor(c[k] - r));
+					shape.hi[k] = int(std::ceil(c[k] + r));
+				}
+				const bool hex = name == "hex-cylinder";
+				// A hexagon of circumradius `r` with two corners on the first
+				// direction across; its wall `t` thick measured across its sides.
+				const float s3 = std::sqrt(3.0F);
+				auto inHex = [s3](float a, float b, float radius) {
+					a = std::fabs(a);
+					b = std::fabs(b);
+					const float apothem = radius * s3 * 0.5F;
+					return b <= apothem && a * s3 * 0.5F + b * 0.5F <= apothem;
+				};
+				const float innerCircle = std::max(0.0F, r - t);
+				const float innerHex = std::max(0.0F, r - t * 2.0F / s3);
+				shape.contains = [=](float x, float y, float z) {
+					const float p[3] = {x, y, z};
+					const float a = p[u] - c[u], b = p[w] - c[w];
+					if (hex)
+						return inHex(a, b, r) && (t <= 0.0F || !inHex(a, b, innerHex));
+					const float d2 = a * a + b * b;
+					return d2 <= r * r && (t <= 0.0F || d2 > innerCircle * innerCircle);
+				};
+				return shape;
+			}
+			throw UsageError("unknown shape '" + name + "'");
+		}
+
+		// Draws `shape` into `m` by `verb`; returns how many voxels it changed.
+		int Draw(VoxelModel& m, const Shape& shape, Verb verb, std::uint32_t color) {
+			const int size[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
+			int lo[3], hi[3];
+			for (int k = 0; k < 3; k++) {
+				lo[k] = std::max(0, shape.lo[k]);
+				hi[k] = std::min(size[k] - 1, shape.hi[k]);
+			}
+			int changed = 0;
+			for (int x = lo[0]; x <= hi[0]; x++)
+				for (int y = lo[1]; y <= hi[1]; y++)
+					for (int z = lo[2]; z <= hi[2]; z++) {
+						if (!shape.contains(float(x), float(y), float(z)))
+							continue;
+						const bool solid = m.IsSolid(x, y, z);
+						if (verb == Verb::Clear) {
+							if (solid) {
+								m.SetAir(x, y, z);
+								changed++;
+							}
+						} else if (verb == Verb::Fill || solid) {
+							if (!solid || (m.GetColor(x, y, z) & 0xFFFFFF) != color)
+								changed++;
+							m.SetSolid(x, y, z, color);
+						}
+					}
+			return changed;
+		}
+
+		// The verb and the shape a command like "fill-hollow-ball" names; false
+		// when it names no shape.
+		bool ShapeCommand(const std::string& cmd, Verb& verb, std::string& shape) {
+			const std::size_t dash = cmd.find('-');
+			if (dash == std::string::npos)
+				return false;
+			const std::string head = cmd.substr(0, dash);
+			if (head == "fill" || head == "draw")
+				verb = Verb::Fill;
+			else if (head == "clear" || head == "carve")
+				verb = Verb::Clear;
+			else if (head == "paint")
+				verb = Verb::Paint;
+			else
+				return false;
+			shape = cmd.substr(dash + 1);
+			return ShapeUsage(shape) != nullptr;
+		}
+
+		// --- Blit -------------------------------------------------------------
+
+		enum class BlitMode { Over, Under, Carve, Paint };
 
 		Handle<VoxelModel> Resized(const VoxelModel& m, int w, int h, int d, int dx, int dy,
 		                           int dz) {
@@ -221,6 +501,104 @@ namespace spades {
 			// The pivot stays on the same voxels, as the editor keeps it.
 			out->SetOrigin(m.GetOrigin() - MakeVector3(float(dx), float(dy), float(dz)));
 			return out;
+		}
+
+		int ParseAxis(const std::string& v) {
+			if (v == "x" || v == "X")
+				return 0;
+			if (v == "y" || v == "Y")
+				return 1;
+			if (v == "z" || v == "Z")
+				return 2;
+			throw UsageError("an axis is x, y or z, not '" + v + "'");
+		}
+
+		// `m` turned by `turns` right-handed quarter turns about `axis`, as the
+		// editor's Transform tool turns voxels: the axis after `axis` goes onto
+		// the one after that. The volume turns with them, and so does the pivot.
+		Handle<VoxelModel> Turned(const VoxelModel& m, int axis, int turns) {
+			turns = ((turns % 4) + 4) % 4;
+			const int u = (axis + 1) % 3, v = (axis + 2) % 3;
+			// One quarter turn takes (u, v) to (-v, u); in indices of the turned
+			// volume, shifted back to start at 0, that is (size v - 1 - v, u).
+			// `size` is the volume's before the turn, and becomes it after.
+			auto turn = [u, v](float p[3], int size[3]) {
+				const float pu = p[u];
+				p[u] = float(size[v] - 1) - p[v];
+				p[v] = pu;
+				std::swap(size[u], size[v]);
+			};
+			const int start[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
+			int size[3] = {start[0], start[1], start[2]};
+			if (turns % 2)
+				std::swap(size[u], size[v]);
+			if (size[2] > kMaxDepth)
+				throw std::runtime_error("turned so, the model would be " +
+				                         std::to_string(size[2]) +
+				                         " voxels deep, more than a KV6 holds (" +
+				                         std::to_string(kMaxDepth) + ")");
+			Handle<VoxelModel> out = Handle<VoxelModel>::New(size[0], size[1], size[2]);
+			for (int x = 0; x < m.GetWidth(); x++)
+				for (int y = 0; y < m.GetHeight(); y++)
+					for (int z = 0; z < m.GetDepth(); z++) {
+						if (!m.IsSolid(x, y, z))
+							continue;
+						float p[3] = {float(x), float(y), float(z)};
+						int s[3] = {start[0], start[1], start[2]};
+						for (int k = 0; k < turns; k++)
+							turn(p, s);
+						out->SetSolid(int(p[0]), int(p[1]), int(p[2]), m.GetColor(x, y, z) & 0xFFFFFF);
+					}
+			const Vector3 pivot = m.GetOrigin() * -1.0F;
+			float p[3] = {pivot.x, pivot.y, pivot.z};
+			int s[3] = {start[0], start[1], start[2]};
+			for (int k = 0; k < turns; k++)
+				turn(p, s);
+			out->SetOrigin(MakeVector3(-p[0], -p[1], -p[2]));
+			return out;
+		}
+
+		// `m` reflected across the middle of its volume along `axis`; the pivot
+		// is reflected with it.
+		Handle<VoxelModel> Mirrored(const VoxelModel& m, int axis) {
+			Handle<VoxelModel> out =
+			  Handle<VoxelModel>::New(m.GetWidth(), m.GetHeight(), m.GetDepth());
+			const int size[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
+			for (int x = 0; x < m.GetWidth(); x++)
+				for (int y = 0; y < m.GetHeight(); y++)
+					for (int z = 0; z < m.GetDepth(); z++) {
+						if (!m.IsSolid(x, y, z))
+							continue;
+						int p[3] = {x, y, z};
+						p[axis] = size[axis] - 1 - p[axis];
+						out->SetSolid(p[0], p[1], p[2], m.GetColor(x, y, z) & 0xFFFFFF);
+					}
+			Vector3 pivot = m.GetOrigin() * -1.0F;
+			float* q = &pivot.x;
+			q[axis] = float(size[axis] - 1) - q[axis];
+			out->SetOrigin(pivot * -1.0F);
+			return out;
+		}
+
+		// The direction a name of one stands for. Z points down, so up is -Z;
+		// the front is at -Y, as the editor's front reference image is seen.
+		bool Direction(const std::string& name, int d[3]) {
+			struct Named {
+				const char* name;
+				int x, y, z;
+			};
+			static const Named names[] = {{"up", 0, 0, -1},     {"down", 0, 0, 1},
+			                              {"left", -1, 0, 0},   {"right", 1, 0, 0},
+			                              {"forward", 0, -1, 0}, {"back", 0, 1, 0}};
+			for (const Named& n : names) {
+				if (name == n.name) {
+					d[0] = n.x;
+					d[1] = n.y;
+					d[2] = n.z;
+					return true;
+				}
+			}
+			return false;
 		}
 
 		void Need(const std::vector<std::string>& a, std::size_t count, const char* usage) {
@@ -249,21 +627,136 @@ namespace spades {
 				m.SetAir(x, y, z);
 				return true;
 			}
-			if (cmd == "fill-box" || cmd == "paint-box" || cmd == "clear-box") {
-				const bool clear = cmd == "clear-box";
-				Need(a, clear ? 7 : 8, (cmd + " X0 Y0 Z0 X1 Y1 Z1" + (clear ? "" : " COLOR")).c_str());
-				const Box box = ParseBox(m, a, 1);
-				const std::uint32_t color = clear ? 0 : ParseColor(a[7]);
-				if (box.Empty())
-					return true;
-				for (int x = box.lo[0]; x <= box.hi[0]; x++)
-					for (int y = box.lo[1]; y <= box.hi[1]; y++)
-						for (int z = box.lo[2]; z <= box.hi[2]; z++) {
-							if (clear)
-								m.SetAir(x, y, z);
-							else if (cmd == "fill-box" || m.IsSolid(x, y, z))
-								m.SetSolid(x, y, z, color);
+			Verb verb;
+			std::string shapeName;
+			if (ShapeCommand(cmd, verb, shapeName)) {
+				ShapeArgs args = SplitShapeArgs(a, 1);
+				std::uint32_t color = 0;
+				if (verb != Verb::Clear) {
+					if (args.values.empty())
+						throw UsageError("usage: " + cmd + " " + ShapeUsage(shapeName) + " COLOR");
+					color = ParseColor(args.values.back());
+					args.values.pop_back();
+				}
+				try {
+					Draw(m, MakeShape(shapeName, args), verb, color);
+				} catch (const UsageError& ex) {
+					// Said with the verb, and its colour when it takes one.
+					const std::string text = ex.what();
+					if (text.compare(0, 7, "usage: ") == 0)
+						throw UsageError(std::string("usage: ") + cmd + " " +
+						                 ShapeUsage(shapeName) + (verb == Verb::Clear ? "" : " COLOR"));
+					throw;
+				}
+				return true;
+			}
+			if (cmd == "blit") {
+				// blit SOURCE X Y Z [--pivot] [--under|--carve|--paint]
+				std::vector<std::string> v;
+				bool atPivot = false;
+				BlitMode mode = BlitMode::Over;
+				for (std::size_t i = 1; i < a.size(); i++) {
+					if (a[i] == "--pivot")
+						atPivot = true;
+					else if (a[i] == "--under")
+						mode = BlitMode::Under;
+					else if (a[i] == "--carve")
+						mode = BlitMode::Carve;
+					else if (a[i] == "--paint")
+						mode = BlitMode::Paint;
+					else if (a[i] == "--over")
+						mode = BlitMode::Over;
+					else
+						v.push_back(a[i]);
+				}
+				if (v.size() != 4)
+					throw UsageError(
+					  "usage: blit SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint]");
+				Handle<VoxelModel> source = Load(v[0]);
+				const VoxelModel& src = *source;
+				int at[3] = {ParseInt(v[1], "X"), ParseInt(v[2], "Y"), ParseInt(v[3], "Z")};
+				// By default the source's voxel 0 0 0 lands at X Y Z; with --pivot
+				// its pivot does, rounded to a voxel.
+				if (atPivot) {
+					const Vector3 pivot = src.GetOrigin() * -1.0F;
+					at[0] -= int(std::lround(pivot.x));
+					at[1] -= int(std::lround(pivot.y));
+					at[2] -= int(std::lround(pivot.z));
+				}
+				for (int x = 0; x < src.GetWidth(); x++)
+					for (int y = 0; y < src.GetHeight(); y++)
+						for (int z = 0; z < src.GetDepth(); z++) {
+							if (!src.IsSolid(x, y, z))
+								continue;
+							const int tx = x + at[0], ty = y + at[1], tz = z + at[2];
+							if (tx < 0 || ty < 0 || tz < 0 || tx >= m.GetWidth() ||
+							    ty >= m.GetHeight() || tz >= m.GetDepth())
+								continue; // outside the model: left out
+							const std::uint32_t color = src.GetColor(x, y, z) & 0xFFFFFF;
+							const bool solid = m.IsSolid(tx, ty, tz);
+							switch (mode) {
+								case BlitMode::Over: m.SetSolid(tx, ty, tz, color); break;
+								case BlitMode::Under:
+									if (!solid)
+										m.SetSolid(tx, ty, tz, color);
+									break;
+								case BlitMode::Carve: m.SetAir(tx, ty, tz); break;
+								case BlitMode::Paint:
+									if (solid)
+										m.SetSolid(tx, ty, tz, color);
+									break;
+							}
 						}
+				return true;
+			}
+			if (cmd == "rotate") {
+				Need(a, 3, "rotate AXIS TURNS");
+				model = Turned(m, ParseAxis(a[1]), ParseInt(a[2], "the quarter turns"));
+				return true;
+			}
+			if (cmd == "mirror") {
+				Need(a, 2, "mirror AXIS");
+				model = Mirrored(m, ParseAxis(a[1]));
+				return true;
+			}
+			if (cmd == "move") {
+				// move DX DY DZ | move DIRECTION [N], with --clip: the voxels
+				// shift within the volume and the pivot stays, so the model moves
+				// relative to it, as it is placed in the game.
+				std::vector<std::string> v;
+				bool clip = false;
+				for (std::size_t i = 1; i < a.size(); i++) {
+					if (a[i] == "--clip")
+						clip = true;
+					else
+						v.push_back(a[i]);
+				}
+				int d[3] = {0, 0, 0};
+				if ((v.size() == 1 || v.size() == 2) && Direction(v[0], d)) {
+					const int n = v.size() == 2 ? ParseInt(v[1], "the voxels to move by") : 1;
+					for (int& c : d)
+						c *= n;
+				} else if (v.size() == 3) {
+					d[0] = ParseInt(v[0], "DX");
+					d[1] = ParseInt(v[1], "DY");
+					d[2] = ParseInt(v[2], "DZ");
+				} else {
+					throw UsageError("usage: move DX DY DZ [--clip], or move "
+					                 "up|down|left|right|forward|back [N] [--clip]");
+				}
+				int lo[3], hi[3];
+				const int size[3] = {m.GetWidth(), m.GetHeight(), m.GetDepth()};
+				if (!clip && Bounds(m, lo, hi)) {
+					for (int k = 0; k < 3; k++) {
+						if (lo[k] + d[k] < 0 || hi[k] + d[k] >= size[k])
+							throw std::runtime_error(
+							  "moved so, voxels would leave the volume (resize it first, or "
+							  "--clip to drop them)");
+					}
+				}
+				const Vector3 origin = m.GetOrigin();
+				model = Resized(m, size[0], size[1], size[2], d[0], d[1], d[2]);
+				model->SetOrigin(origin); // the pivot stays where it was
 				return true;
 			}
 			if (cmd == "set-pivot") {
@@ -366,11 +859,12 @@ namespace spades {
 				int lo[3], hi[3];
 				const bool any = Bounds(m, lo, hi);
 				const int count = CountSolid(m);
+				const int surface = CountSurface(m);
 				if (json) {
 					std::printf("{\"size\": [%d, %d, %d], \"pivot\": [%s, %s, %s], \"voxels\": %d, "
-					            "\"bounds\": ",
+					            "\"surfaceVoxels\": %d, \"bounds\": ",
 					            m.GetWidth(), m.GetHeight(), m.GetDepth(), FormatFloat(p.x).c_str(),
-					            FormatFloat(p.y).c_str(), FormatFloat(p.z).c_str(), count);
+					            FormatFloat(p.y).c_str(), FormatFloat(p.z).c_str(), count, surface);
 					if (any)
 						std::printf("{\"min\": [%d, %d, %d], \"max\": [%d, %d, %d]}}\n", lo[0], lo[1],
 						            lo[2], hi[0], hi[1], hi[2]);
@@ -381,6 +875,7 @@ namespace spades {
 					std::printf("pivot %s %s %s\n", FormatFloat(p.x).c_str(),
 					            FormatFloat(p.y).c_str(), FormatFloat(p.z).c_str());
 					std::printf("voxels %d\n", count);
+					std::printf("surface %d\n", surface);
 					if (any)
 						std::printf("rect %d %d %d %d %d %d\n", lo[0], lo[1], lo[2], hi[0], hi[1],
 						            hi[2]);
@@ -420,18 +915,19 @@ namespace spades {
 				const int x = ParseInt(rest[1], "X"), y = ParseInt(rest[2], "Y"),
 				          z = ParseInt(rest[3], "Z");
 				CheckInside(m, x, y, z);
-				std::printf("%s\n", m.IsSolid(x, y, z) ? FormatColor(m.GetColor(x, y, z)).c_str()
-				                                       : "air");
+				std::printf("%s\n", m.IsSolid(x, y, z) ? VoxelText(m, x, y, z).c_str() : "air");
 				return 0;
 			}
 			if (cmd == "list-voxels") {
-				Need(rest, 1, "list-voxels FILE");
+				const bool surfaceOnly = rest.size() == 2 && rest[1] == "--surface";
+				if (rest.size() != 1 && !surfaceOnly)
+					throw UsageError("usage: list-voxels FILE [--surface]");
 				for (int x = 0; x < m.GetWidth(); x++)
 					for (int y = 0; y < m.GetHeight(); y++)
 						for (int z = 0; z < m.GetDepth(); z++) {
-							if (m.IsSolid(x, y, z))
-								std::printf("%d %d %d %s\n", x, y, z,
-								            FormatColor(m.GetColor(x, y, z)).c_str());
+							if (!m.IsSolid(x, y, z) || (surfaceOnly && !OnSurface(m, x, y, z)))
+								continue;
+							std::printf("%d %d %d %s\n", x, y, z, VoxelText(m, x, y, z).c_str());
 						}
 				return 0;
 			}
