@@ -271,7 +271,7 @@ namespace spades {
 						continue;
 					float x1 = seg.x1 * textScale;
 					float x2 = seg.x2 * textScale;
-					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.15F));
+					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, 0.15F * item.color.w));
 					r.DrawImage(nullptr, AABB2(pos.x + x1 - 2.0F, pos.y - 1.0F, (x2 - x1) + 3.0F, sz.y));
 				}
 
@@ -301,7 +301,9 @@ namespace spades {
 					return;
 				}
 
-				// Code and links change the color, so the row is drawn run by run
+				// Code and links change the color, so the row is drawn run by run; they
+				// fade with the rest of it.
+				const float alpha = item.color.w;
 				for (const TextViewerSegment& seg : item.segments) {
 					Vector4 color = item.color;
 					bool underline = false;
@@ -313,6 +315,8 @@ namespace spades {
 					} else if (seg.kind == TextViewerSegment::Kind::Code) {
 						color = inlineCodeColor;
 					}
+					if (seg.kind != TextViewerSegment::Kind::Plain)
+						color.w *= alpha;
 
 					float x1 = seg.x1 * textScale;
 					float x2 = seg.x2 * textScale;

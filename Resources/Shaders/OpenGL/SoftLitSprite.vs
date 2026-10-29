@@ -78,7 +78,14 @@ void main() {
 	frontDepth = min(frontDepth, depthRange.y);
 	depthRange.w = frontDepth;
 
-	pos += frontVector * (frontDepth - centerDepth);
+	// Along the lines of sight, so the sprite still covers the same pixels: the
+	// quad faces the camera, so all of it is at `centerDepth`, and scaling it about
+	// the eye brings all of it to `frontDepth`. A centre at or behind the eye has
+	// no such projection to keep.
+	if (centerDepth > 0.001)
+		pos = viewOriginVector + (pos - viewOriginVector) * (frontDepth / centerDepth);
+	else
+		pos += frontVector * (frontDepth - centerDepth);
 
 	gl_Position = projectionViewMatrix * vec4(pos, 1.0);
 

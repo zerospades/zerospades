@@ -123,6 +123,34 @@ namespace spades {
 			bool useLensFlare = false;
 		};
 
+		/**
+		 * The dazzle of a light the camera looks into: an image added onto the
+		 * finished frame, centred where the light projects.
+		 *
+		 * The renderer hides it as far as what it drew covers the light, a player as
+		 * much as a wall, so that it never gives away a lamp the camera can't see.
+		 * The first-person view's models (`ModelRenderParam::depthHack`) are drawn
+		 * over it instead, and say nothing of what stands before the light.
+		 */
+		struct GlareParam {
+			/** The radius of a glaring light's lens, in blocks: how much of the scene
+			 * around it is looked at to tell whether it is in sight. */
+			static constexpr float SourceRadius = 0.1F;
+
+			/** How far nearer than the light something has to be drawn to hide it, in
+			 * blocks: the headlamp it shines from is drawn about as far as it. */
+			static constexpr float SourceOcclusionMargin = 0.25F;
+
+			/** Where the light is. */
+			Vector3 origin;
+
+			/** Half the image's width and height, in the renderer's 2D units. */
+			float radius = 0.0F;
+
+			/** Added onto the frame, scaled by the image's alpha. */
+			Vector3 color;
+		};
+
 		class IRenderer : public RefCountedObject {
 		protected:
 			virtual ~IRenderer() {}
@@ -170,6 +198,9 @@ namespace spades {
 
 			virtual void AddSprite(IImage&, Vector3 center, float radius, float rotation) = 0;
 			virtual void AddLongSprite(IImage&, Vector3 p1, Vector3 p2, float radius) = 0;
+
+			/** Adds a glare, drawn over the finished frame once the scene ends. */
+			virtual void AddGlare(IImage&, const GlareParam&) = 0;
 
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;

@@ -93,7 +93,7 @@ namespace spades {
 			void Realize();
 			void Prerender();
 			void RenderSunlightPass();
-			void RenderDynamicLightPass(std::vector<GLDynamicLight> lights);
+			void RenderDynamicLightPass(const std::vector<GLDynamicLight>& lights);
 			void RenderOutlinePass();
 		};
 	} // namespace draw
