@@ -26,6 +26,8 @@
 #include <Core/Math.h>
 #include <Gui/UI/Editor/Shell/EditorContext.h>
 
+#include "ReferenceImage.h"
+
 namespace spades {
 	namespace gui {
 		/**
@@ -203,6 +205,16 @@ namespace spades {
 			// step. A preview lasts until the user action ends or a command runs:
 			// commit it with SetPivot before then, or the pivot goes back.
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
+
+			// --- Reference images ---------------------------------------------
+			// An image across each axis (0 = x, 1 = y, 2 = z) to model from,
+			// drawn in the document whatever the tool. A setting of the editor:
+			// changing one is no undo step, and none is saved with the document.
+			virtual ReferenceImage& Reference(int axis) = 0;
+			/** Asks for an image file, then shows it across `axis`, sized to the
+			 *  document and set behind it. */
+			virtual void LoadReferenceImage(int axis) = 0;
+			virtual void ClearReferenceImage(int axis) = 0;
 		};
 	} // namespace gui
 } // namespace spades

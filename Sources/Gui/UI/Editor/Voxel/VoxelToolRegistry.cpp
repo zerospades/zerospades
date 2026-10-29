@@ -24,6 +24,7 @@
 #include "MirrorTool.h"
 #include "PaintTool.h"
 #include "PivotTool.h"
+#include "ReferenceTool.h"
 #include "SelectTool.h"
 #include "TransformTool.h"
 
@@ -56,6 +57,8 @@ namespace spades {
 				registry.Register(Make<TransformTool>(), "transform", kEditingGroup, "T");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
+				// The images to model from, across each axis.
+				registry.Register(Make<ReferenceTool>(), "reference", kSetupGroup, "I");
 			}
 			return registry;
 		}

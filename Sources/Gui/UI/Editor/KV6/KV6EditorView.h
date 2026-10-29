@@ -88,6 +88,8 @@ namespace spades {
 			bool ClickViewportWidget(const Vector2& cursor) override;
 			void DocumentReframed(const Vector3& shift) override { cam.Shift(shift); }
 			void ReleaseHeldKeys() override { cam.ReleaseHeld(); }
+			void PickImageFile(const std::string& title,
+			                   std::function<void(const std::string&)> picked) override;
 
 		protected:
 			~KV6EditorView();
