@@ -24,6 +24,8 @@
 #include <vector>
 
 namespace spades {
+	class VoxelModel;
+
 	/**
 	 * `--kv6-tools`: reads and edits KV6 models from the command line, with no
 	 * window, for scripts and for agents that cannot drive the editor. Runs
@@ -31,4 +33,10 @@ namespace spades {
 	 * code: 0 done, 1 the command failed, 2 it was not understood.
 	 */
 	int RunKV6Tools(const std::vector<std::string>& args);
+
+	/**
+	 * The `render` command on a model already in memory: `args` is "render"
+	 * followed by its VIEW, OUT.png and options. Throws on a bad request.
+	 */
+	int RenderKV6Model(const VoxelModel& model, const std::vector<std::string>& args);
 } // namespace spades

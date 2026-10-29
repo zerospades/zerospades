@@ -19,6 +19,7 @@
  */
 
 #include "KV6Tools.h"
+#include "ToolArgs.h"
 
 #include <algorithm>
 #include <cctype>
@@ -44,6 +45,8 @@
 
 namespace spades {
 	namespace {
+		using namespace toolargs;
+
 		// Coordinates are voxel indices, 0 .. size - 1 on each axis, with Z
 		// pointing down as in the game. Colours are RRGGBB in hex; the model
 		// keeps them packed 0x00BBGGRR. The pivot is the point the model is
@@ -57,11 +60,6 @@ namespace spades {
 		// A KV6 column is a 64-bit mask, so no model is deeper than this.
 		constexpr int kMaxDepth = 64;
 		constexpr int kMaxWidth = 4096;
-
-		/** A command the user got wrong: said with the usage, exit code 2. */
-		struct UsageError : std::runtime_error {
-			using std::runtime_error::runtime_error;
-		};
 
 		const char* const kUsage =
 		  "usage: --debug-tools --kv6-tools COMMAND FILE [ARGS...]\n"
@@ -158,49 +156,6 @@ namespace spades {
 		  "                         voxel's width in pixels, default 4). It prints\n"
 		  "                         which way the columns and rows run.\n"
 		  "  help                   this text\n";
-
-		int ParseInt(const std::string& text, const char* what) {
-			char* end = nullptr;
-			errno = 0;
-			const long value = std::strtol(text.c_str(), &end, 10);
-			if (text.empty() || *end != '\0' || errno != 0 || value < -1000000 || value > 1000000)
-				throw UsageError(std::string("not a whole number for ") + what + ": '" + text + "'");
-			return int(value);
-		}
-
-		float ParseFloat(const std::string& text, const char* what) {
-			char* end = nullptr;
-			const float value = std::strtof(text.c_str(), &end);
-			if (text.empty() || *end != '\0')
-				throw UsageError(std::string("not a number for ") + what + ": '" + text + "'");
-			return value;
-		}
-
-		std::uint32_t ParseColor(std::string text) {
-			if (!text.empty() && text[0] == '#')
-				text = text.substr(1);
-			if (text.size() == 8 && (text.compare(0, 2, "0x") == 0 || text.compare(0, 2, "0X") == 0))
-				text = text.substr(2);
-			char* end = nullptr;
-			const unsigned long rgb = std::strtoul(text.c_str(), &end, 16);
-			if (text.size() != 6 || *end != '\0')
-				throw UsageError("not a colour (RRGGBB in hex): '" + text + "'");
-			const std::uint32_t r = (rgb >> 16) & 0xFF, g = (rgb >> 8) & 0xFF, b = rgb & 0xFF;
-			return r | (g << 8) | (b << 16); // packed 0x00BBGGRR
-		}
-
-		std::string FormatColor(std::uint32_t packed) {
-			char text[8];
-			std::snprintf(text, sizeof(text), "%02x%02x%02x", packed & 0xFF, (packed >> 8) & 0xFF,
-			              (packed >> 16) & 0xFF);
-			return text;
-		}
-
-		std::string FormatFloat(float v) {
-			char text[32];
-			std::snprintf(text, sizeof(text), "%g", double(v));
-			return text;
-		}
 
 		void CheckSize(int w, int h, int d) {
 			if (w < 1 || h < 1 || d < 1 || w > kMaxWidth || h > kMaxWidth || d > kMaxDepth)
@@ -508,16 +463,6 @@ namespace spades {
 			return ReframedVoxelModel(m, MakeIntVector3(w, h, d), MakeIntVector3(dx, dy, dz));
 		}
 
-		int ParseAxis(const std::string& v) {
-			if (v == "x" || v == "X")
-				return 0;
-			if (v == "y" || v == "Y")
-				return 1;
-			if (v == "z" || v == "Z")
-				return 2;
-			throw UsageError("an axis is x, y or z, not '" + v + "'");
-		}
-
 		// `m` turned by `turns` right-handed quarter turns about `axis`, as the
 		// editor's Transform tool turns voxels: the axis after `axis` goes onto
 		// the one after that. The volume turns with them, and so does the pivot.
@@ -603,11 +548,6 @@ namespace spades {
 				}
 			}
 			return false;
-		}
-
-		void Need(const std::vector<std::string>& a, std::size_t count, const char* usage) {
-			if (a.size() != count)
-				throw UsageError(std::string("usage: ") + usage);
 		}
 
 		// One edit of `model` (`a` is the command and its arguments, without the
@@ -945,6 +885,14 @@ namespace spades {
 			return picture;
 		}
 
+		int Render(const VoxelModel& m, const std::vector<std::string>& a);
+	} // namespace
+
+	int RenderKV6Model(const VoxelModel& m, const std::vector<std::string>& a) {
+		return Render(m, a);
+	}
+
+	namespace {
 		int Render(const VoxelModel& m, const std::vector<std::string>& a) {
 			// a: render VIEW OUT.png [--scale N] [--shade] [--background RRGGBB]
 			std::vector<std::string> v;
@@ -1006,15 +954,6 @@ namespace spades {
 			}
 			throw UsageError("unknown view '" + view + "': +x -x +y -y +z -z (right left back "
 			                 "front bottom top), or iso, iso+x+y, iso+x-y, iso-x-y, iso-x+y");
-		}
-
-		std::vector<std::string> SplitWords(const std::string& line) {
-			std::vector<std::string> words;
-			std::istringstream in(line);
-			std::string word;
-			while (in >> word)
-				words.push_back(word);
-			return words;
 		}
 
 		int Run(const std::vector<std::string>& args) {
