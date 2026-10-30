@@ -32,7 +32,7 @@ namespace spades {
 		const std::vector<DocumentType>& DocumentTypes() {
 			static const std::vector<DocumentType> types = {
 			  {".kv6", "KV6 voxel model", DocumentKind::Model, true},
-			  {".2kv6", "2KV6 voxel scene", DocumentKind::Scene, false},
+			  {".2kv6", "2KV6 voxel scene", DocumentKind::Scene, true},
 			  {".vxl", "VXL voxel map", DocumentKind::Map, false},
 			};
 			return types;

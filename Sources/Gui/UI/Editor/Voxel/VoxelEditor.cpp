@@ -19,6 +19,7 @@
  */
 // VoxelEditor: its making, the document, Escape, undo, the tools and the frame's update.
 
+#include "ObjectTool.h"
 #include "VoxelEditorInternal.h"
 
 DEFINE_SPADES_SETTING(cg_keyDelete, "Delete");
@@ -83,6 +84,8 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			transformPanel.reset(new TransformPanel(renderer, fontManager.GetSmallGuiFont()));
 			pivotTarget.reset(new PivotTarget(*this));
+
+			objectTool = std::make_unique<ObjectTool>();
 
 			// The tools come from the registry (toolbar order = registration),
 			// narrowed to the ones this editor offers.
@@ -370,6 +373,10 @@ namespace spades {
 				if (!tool->EscapeLabel(*this).empty())
 					return EscapeLayer::Tool;
 			}
+			// The pending voxels and the selection are Edit mode's, out of reach
+			// of Object mode's Escape.
+			if (currentMode != EditorMode::Edit)
+				return EscapeLayer::None;
 			if (edit.placing)
 				return EscapeLayer::Placement;
 			if (!edit.selection.Empty())
@@ -450,6 +457,20 @@ namespace spades {
 		void VoxelEditor::Redo() { StepHistory(true); }
 
 		void VoxelEditor::StepHistory(bool forward) {
+			// Object mode steps through the scene's own history of placements.
+			if (currentMode == EditorMode::Object) {
+				if (IObjectModeHost* objects = ObjectMode()) {
+					if (forward ? objects->CanRedoObjects() : objects->CanUndoObjects()) {
+						if (forward)
+							objects->RedoObjects();
+						else
+							objects->UndoObjects();
+					} else {
+						SetStatus(forward ? "Nothing to redo" : "Nothing to undo");
+					}
+				}
+				return;
+			}
 			// The same whether asked for by a key, the menu or the toolbar: a
 			// drag, a half-placed box or a colour being chosen is abandoned, and
 			// what is only previewed put back, as the history holds only what
@@ -510,9 +531,19 @@ namespace spades {
 			Activate(index);
 		}
 
-		void VoxelEditor::Activate(int toolIndex) {
-			if (toolIndex == activeTool)
+		void VoxelEditor::Activate(int toolIndex) { Activate(toolIndex, currentMode); }
+
+		void VoxelEditor::Activate(int toolIndex, EditorMode mode) {
+			if (toolIndex == activeTool && mode == currentMode)
 				return;
+			// Edit mode edits the picked object of a scene, so a scene with none
+			// picked stays in Object mode.
+			IObjectModeHost* objects = ObjectMode();
+			if (mode == EditorMode::Edit && currentMode != EditorMode::Edit && objects &&
+			    !objects->HasPickedObject()) {
+				SetStatus("Pick an object to edit first");
+				return;
+			}
 			// A number being typed into the sub-toolbar, or the panel, belongs to
 			// the tool whose box it is: it is settled here, while that tool is
 			// still the one listening. Left to the bar, the edit would be dropped
@@ -523,12 +554,47 @@ namespace spades {
 			// placement reaches the document.
 			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
+			const bool wasEditing = currentMode == EditorMode::Edit;
+			if (wasEditing && mode != EditorMode::Edit)
+				EndUserAction(); // nothing previewed is carried out of the document
 			activeTool = toolIndex;
+			currentMode = mode;
+			// The scene takes the voxels back as Edit mode is left, and hands the
+			// picked object's over as it is entered.
+			const bool editing = mode == EditorMode::Edit;
+			if (objects && wasEditing != editing)
+				objects->EditModeChanged(editing);
 			if (VoxelTool* current = ActiveTool())
 				current->OnActivate(*this);
 			// The picker shows the colour it now sets, which may be another's.
 			if (ui.GetColorPicker()->IsOpen())
 				ui.GetColorPicker()->SetColor(PickedColor());
+		}
+
+		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
+
+		void VoxelEditor::SetObjectMode(bool on) {
+			SetMode(on && ModeSupported(EditorMode::Object) ? EditorMode::Object
+			                                                : EditorMode::Edit);
+		}
+
+		bool VoxelEditor::ModeSupported(EditorMode mode) const {
+			switch (mode) {
+				case EditorMode::Edit: return true;
+				case EditorMode::Object: return host.ObjectMode() != nullptr;
+				case EditorMode::Animation: return false;
+			}
+			return false;
+		}
+
+		IObjectModeHost* VoxelEditor::ObjectMode() { return host.ObjectMode(); }
+
+		const std::vector<VoxelEditor::ModeInfo>& VoxelEditor::Modes() {
+			static const std::vector<ModeInfo> modes = {
+			  {EditorMode::Object, "object", "Object"},
+			  {EditorMode::Edit, "edit", "Edit"},
+			  {EditorMode::Animation, "animation", "Animation"}};
+			return modes;
 		}
 
 		int VoxelEditor::ToolIndex(const std::string& id) const {
@@ -656,7 +722,10 @@ namespace spades {
 		}
 
 		VoxelTool* VoxelEditor::ActiveTool() {
-			if (activeTool >= 0 && activeTool < int(tools.size()))
+			if (currentMode == EditorMode::Object && ObjectMode())
+				return objectTool.get();
+			if (currentMode == EditorMode::Edit && activeTool >= 0 &&
+			    activeTool < int(tools.size()))
 				return tools[activeTool].tool.get();
 			return nullptr;
 		}

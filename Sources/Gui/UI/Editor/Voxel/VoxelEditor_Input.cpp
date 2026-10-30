@@ -145,20 +145,23 @@ namespace spades {
 			// A shortcut changes the document or the placement under a drag in
 			// progress (a paste replaces it), so that drag is abandoned.
 			CancelToolInteraction();
-			if (EqualsIgnoringCase(key, "a")) {
+			// Selecting, copying, cutting and pasting are voxels', which only
+			// Edit mode has.
+			const bool editing = currentMode == EditorMode::Edit;
+			if (editing && EqualsIgnoringCase(key, "a")) {
 				// Select All, and with Shift the other way about, as a list in
 				// any application does it.
 				if (shiftHeld)
 					ClearSelection();
 				else
 					SelectAll();
-			} else if (EqualsIgnoringCase(key, "i"))
+			} else if (editing && EqualsIgnoringCase(key, "i"))
 				InvertSelection();
-			else if (EqualsIgnoringCase(key, "c"))
+			else if (editing && EqualsIgnoringCase(key, "c"))
 				CopySelection();
-			else if (EqualsIgnoringCase(key, "x"))
+			else if (editing && EqualsIgnoringCase(key, "x"))
 				CutSelection();
-			else if (EqualsIgnoringCase(key, "v"))
+			else if (editing && EqualsIgnoringCase(key, "v"))
 				Paste();
 			else if (EqualsIgnoringCase(key, "z")) {
 				if (shiftHeld)
@@ -409,7 +412,14 @@ namespace spades {
 		}
 
 		bool VoxelEditor::CommandKey(const std::string& key, bool down) {
-			if (down && EditorKeyMatches(cg_keyDelete, key)) {
+			// Tab goes between the scene's objects and the picked one's voxels,
+			// as in Blender.
+			if (down && key == "Tab" && ModeSupported(EditorMode::Object) && !lmbHeld && !rmbHeld) {
+				CancelToolInteraction();
+				SetObjectMode(currentMode != EditorMode::Object);
+				return true;
+			}
+			if (down && currentMode == EditorMode::Edit && EditorKeyMatches(cg_keyDelete, key)) {
 				// Like a Ctrl shortcut, it edits behind the tool's back.
 				CancelToolInteraction();
 				DeleteSelection();

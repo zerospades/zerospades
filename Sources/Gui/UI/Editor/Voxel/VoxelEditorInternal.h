@@ -58,6 +58,7 @@
 #include <Gui/UI/Editor/Shell/EditorKeys.h>
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 
+#include "ObjectModeHost.h"
 #include "SubTool.h"
 #include "VoxelDocument.h"
 #include "VoxelEditorHost.h"

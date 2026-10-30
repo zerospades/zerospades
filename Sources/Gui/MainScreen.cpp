@@ -82,12 +82,14 @@ namespace spades {
 				return UnsupportedDocumentMessage();
 			try {
 				switch (type->kind) {
+					// The model editor opens scenes too, their objects in Object
+					// mode.
 					case DocumentKind::Model:
+					case DocumentKind::Scene:
 						subview = Handle<KV6EditorView>::New(&*renderer, &*audioDevice,
 						                                     &*fontManager, cursor, path, isNew)
 						            .Cast<View>();
 						return "";
-					case DocumentKind::Scene:
 					case DocumentKind::Map: break; // no editor for these yet
 				}
 			} catch (const std::exception& ex) {

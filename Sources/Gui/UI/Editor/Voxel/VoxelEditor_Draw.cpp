@@ -197,6 +197,13 @@ namespace spades {
 			// An image of the model holds the model, which the host draws.
 			if (PresentsRender())
 				return;
+			// Object mode shows the scene, which the host draws; what is drawn
+			// below is the document's, Edit mode's.
+			if (currentMode != EditorMode::Edit) {
+				if (VoxelTool* tool = ActiveTool())
+					tool->DrawScene(*this);
+				return;
+			}
 			// The images to model from, whatever the tool: they are depth tested,
 			// so the voxels in front of them hide them.
 			DrawReferenceImages();
@@ -252,7 +259,7 @@ namespace spades {
 				occluders.pendingAnchor = edit.placement.anchor;
 				occluders.pendingVersion = placementModelVersion;
 			}
-			if (!PresentsRender())
+			if (currentMode == EditorMode::Edit && !PresentsRender())
 				overlayLines.Draw(*renderer, DocumentView(), occluders);
 
 			// The picker is laid out first: the text under the viewport keeps clear of it.
@@ -270,12 +277,19 @@ namespace spades {
 			auto add = [&](const std::string& part) {
 				help += (help.empty() ? std::string() : kHintSeparator) + part;
 			};
-			add("[Alt+LMB] pick colour");
+			if (ModeSupported(EditorMode::Object))
+				add(currentMode == EditorMode::Object ? "[Tab] edit the object"
+				                                      : "[Tab] back to the objects");
+			const bool editing = currentMode == EditorMode::Edit;
+			if (editing)
+				add("[Alt+LMB] pick colour");
 			add("[" + CommandShortcut("Z/Y") + "] undo/redo");
-			add("[" + CommandShortcut("C/X/V") + "] copy/cut/paste");
-			const std::string deleteKey = cg_keyDelete;
-			if (!deleteKey.empty())
-				add("[" + deleteKey + "] delete selection");
+			if (editing) {
+				add("[" + CommandShortcut("C/X/V") + "] copy/cut/paste");
+				const std::string deleteKey = cg_keyDelete;
+				if (!deleteKey.empty())
+					add("[" + deleteKey + "] delete selection");
+			}
 
 			// Text stays clear of the colour picker when it is open.
 			float right = sw - left;
@@ -329,8 +343,9 @@ namespace spades {
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
 			ui.GetToolbar()->SetColorSwatch(PickedColor(), ui.GetColorPicker()->IsOpen());
-			ui.GetToolbar()->SetUndoButton(undo.CanUndo());
-			ui.GetToolbar()->SetRedoButton(undo.CanRedo());
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
+			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
+			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
 
 			ui.GetToolbar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                      ui.GetMenuBar()->IsOpen(), sw);

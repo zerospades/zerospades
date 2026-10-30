@@ -472,6 +472,9 @@ namespace spades {
 		}
 
 		bool VoxelEditor::SamplingArmed() const {
+			// A colour is sampled from the document, which only Edit mode shows.
+			if (currentMode != EditorMode::Edit)
+				return false;
 			return altHeld || ui.GetColorPicker()->GetEyedropperMode();
 		}
 
