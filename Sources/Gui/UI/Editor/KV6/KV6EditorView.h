@@ -37,10 +37,12 @@
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/UI/Editor/Shell/EditorCamera.h>
 #include <Gui/UI/Editor/Shell/NavigationCube.h>
+#include <Gui/UI/Editor/Voxel/ObjectModeHost.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditorHost.h>
 #include <Gui/View.h>
 
 #include "KV6Document.h"
+#include "KV6Scene.h"
 
 namespace spades {
 	namespace client {
@@ -52,7 +54,7 @@ namespace spades {
 		class VoxelEditor;
 
 		/**
-		 * In-app KV6 voxel model editor.
+		 * In-app KV6 voxel model editor, which also opens .2kv6 scenes.
 		 *
 		 * Hosted by `MainScreen` as a `subview` (like the game `Client`), so the
 		 * Runner forwards input and frame events to it. It hosts a VoxelEditor,
@@ -61,8 +63,16 @@ namespace spades {
 		 * of the model over a ground grid, and the model files (new, open, save,
 		 * insert). It consumes relative mouse motion and draws a software cursor
 		 * for the 2D UI (which may be shared across views).
+		 *
+		 * With a scene open, the editor has Object mode (see IObjectModeHost):
+		 * the scene's objects are shown in place, one is picked and placed with
+		 * the gizmo, and Edit mode edits its voxels, the document being them
+		 * for as long as it lasts.
 		 */
-		class KV6EditorView : public View, public IVoxelEditorHost, public IEditorMenuHost {
+		class KV6EditorView : public View,
+		                      public IVoxelEditorHost,
+		                      public IObjectModeHost,
+		                      public IEditorMenuHost {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, SoftwareCursor* cursor,
@@ -86,10 +96,26 @@ namespace spades {
 			const Vector2& AimPosition() const override { return softwareCursor->GetPosition(); }
 			bool KeyIsReserved(const std::string& key) const override;
 			bool ClickViewportWidget(const Vector2& cursor) override;
-			void DocumentReframed(const Vector3& shift) override { cam.Shift(shift); }
+			void DocumentReframed(const Vector3& shift) override;
+			IObjectModeHost* ObjectMode() override { return scene ? this : nullptr; }
 			void ReleaseHeldKeys() override { cam.ReleaseHeld(); }
 			void PickImageFile(const std::string& title,
 			                   std::function<void(const std::string&)> picked) override;
+
+			// --- IObjectModeHost ----------------------------------------------
+			bool PickObjectAtCursor() override;
+			bool HasPickedObject() const override;
+			std::string PickedObjectName() const override;
+			bool PickedObjectPose(GizmoPose& pose) const override;
+			void BeginObjectDrag() override;
+			void PreviewObjectDrag(const GizmoTransform& total) override;
+			void CommitObjectDrag() override;
+			void CancelObjectDrag() override;
+			bool CanUndoObjects() const override;
+			bool CanRedoObjects() const override;
+			void UndoObjects() override;
+			void RedoObjects() override;
+			void EditModeChanged(bool entering) override;
 
 		protected:
 			~KV6EditorView();
@@ -105,6 +131,28 @@ namespace spades {
 
 			// --- Document -----------------------------------------------------
 			KV6Document document;
+			// The scene open, when the file is a .2kv6; the document is then its
+			// picked object's voxels while Edit mode lasts.
+			std::unique_ptr<KV6Scene> scene;
+			// How far the voxels of the object being edited were relabelled since
+			// Edit mode began on it (a volume that grew), which the object makes up
+			// for so it stays where it was.
+			Vector3 editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+			// The document's state when the object's voxels were last taken back.
+			long editedState = 0;
+			/** Whether the scene's objects are shown (Object mode on a scene). */
+			bool ShowingObjects() const;
+			/** Hands the voxels being edited back to the picked object, which
+			 *  stays where it was whatever its volume did. */
+			void TakeBackEditedObject();
+			/** Replaces the document with the scene at `path`, in Object mode.
+			 *  False leaves everything untouched. */
+			bool LoadScene(const std::string& path);
+			/** Opens a scene of one new model at `path`, unsaved. */
+			void NewScene(int n, const std::string& path);
+			/** Closes the scene, back to editing a lone model. */
+			void CloseScene();
+			Handle<VoxelModel> SeedModel(int n);
 			std::unique_ptr<VoxelEditor> editor;
 			std::string filePath;
 			// The document is dirty while its state differs from the one captured
@@ -159,7 +207,10 @@ namespace spades {
 			bool OnMenuEscape() override;
 
 			// --- Document commands behind the menu items ---
-			std::string GetDocumentExtension() const { return DefaultExtension(DocumentKind::Model); }
+			DocumentKind GetDocumentKind() const {
+				return scene ? DocumentKind::Scene : DocumentKind::Model;
+			}
+			std::string GetDocumentExtension() const { return DefaultExtension(GetDocumentKind()); }
 			bool SaveDocument(const std::string& path);
 			/** Asks for a path with the shared file browser, then saves to it.
 			 *  `after` runs only once the document has actually been written. */

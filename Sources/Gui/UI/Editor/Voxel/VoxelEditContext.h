@@ -32,6 +32,7 @@
 
 namespace spades {
 	namespace gui {
+		class IObjectModeHost;
 		class ITransformTarget;
 
 		/**
@@ -266,6 +267,11 @@ namespace spades {
 			 *  document and set behind it. */
 			virtual void LoadReferenceImage(int axis) = 0;
 			virtual void ClearReferenceImage(int axis) = 0;
+
+			// --- Scene objects -------------------------------------------------
+			/** The scene the document is one object of, which Object mode picks
+			 *  and places objects of; null when the document is no scene's. */
+			virtual IObjectModeHost* ObjectMode() = 0;
 		};
 	} // namespace gui
 } // namespace spades
