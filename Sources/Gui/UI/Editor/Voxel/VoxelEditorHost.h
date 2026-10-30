@@ -28,6 +28,8 @@
 
 namespace spades {
 	namespace gui {
+		class IObjectModeHost;
+
 		/**
 		 * What a VoxelEditor needs from the view hosting it: how the document is
 		 * seen and aimed at. The host owns the camera, draws the document and
@@ -79,6 +81,10 @@ namespace spades {
 				(void)cursor;
 				return false;
 			}
+
+			/** The scene the document is one object of, which offers Object mode;
+			 *  null when the document is no scene's (Edit mode only). */
+			virtual IObjectModeHost* ObjectMode() { return nullptr; }
 
 			/** The document was relabelled by `shift`: whatever the host keeps in
 			 *  voxel coordinates (its camera) follows, so the view stays put. */

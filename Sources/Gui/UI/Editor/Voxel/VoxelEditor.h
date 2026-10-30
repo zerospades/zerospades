@@ -22,6 +22,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -148,6 +149,12 @@ namespace spades {
 			void SelectTool(int index);
 			/** The tool active in Edit mode, as SelectTool takes it. */
 			int ActiveToolIndex() const { return activeTool; }
+
+			// --- Modes ---------------------------------------------------------
+			/** Object mode, when the host offers it (IVoxelEditorHost::ObjectMode),
+			 *  else Edit mode, as the toolbar's mode buttons switch them. */
+			void SetObjectMode(bool on);
+			bool InObjectMode() const { return currentMode == EditorMode::Object; }
 
 			// --- Input, in the host's routing order ---------------------------
 			/** Every key, even while a modal has the keyboard, so no modifier
@@ -304,6 +311,7 @@ namespace spades {
 			ReferenceImage& Reference(int axis) override;
 			void LoadReferenceImage(int axis) override;
 			void ClearReferenceImage(int axis) override;
+			IObjectModeHost* ObjectMode() override;
 
 		private:
 			IVoxelDocument& document;
@@ -333,12 +341,13 @@ namespace spades {
 			void WriteVoxel(int x, int y, int z, bool solid, std::uint32_t color);
 
 			// --- Mode (Blender-style) -----------------------------------------
-			// Voxels are only edited in Edit mode, the only one so far: Object
-			// and Animation arrive with .2kv6 scenes, and a mode the document
-			// cannot use is not shown.
+			// Voxels are only edited in Edit mode. Object mode picks and places
+			// the objects of a scene, when the document is one of them (see
+			// IObjectModeHost); Animation is to come. A mode the document cannot
+			// use is not shown.
 			enum class EditorMode { Object, Edit, Animation };
 			EditorMode currentMode = EditorMode::Edit;
-			static bool ModeSupported(EditorMode mode) { return mode == EditorMode::Edit; }
+			bool ModeSupported(EditorMode mode) const;
 			struct ModeInfo {
 				EditorMode mode;
 				const char* id;
@@ -349,7 +358,11 @@ namespace spades {
 			// --- Tools --------------------------------------------------------
 			std::vector<VoxelToolSlot> tools;
 			int activeTool = 0;
-			VoxelTool* ActiveTool(); // active tool in Edit mode, else null
+			// Object mode's one tool, active whenever the editor is in it.
+			std::unique_ptr<VoxelTool> objectTool;
+			// The active tool: Edit mode's, or Object mode's; null in a mode with
+			// none.
+			VoxelTool* ActiveTool();
 			int ToolIndex(const std::string& id) const;
 			// The active tool's option `id` if it is of `type`, else null: where a
 			// click on the option bar lands.

@@ -37,6 +37,7 @@
 #include <Gui/AutomationOptions.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
@@ -170,7 +171,9 @@ namespace spades {
 			// leaves an untitled document instead, because naming it after a file
 			// whose contents are still on disk is how Save comes to overwrite
 			// something this editor never managed to read.
-			if (isNew || path.empty())
+			if (isNew && LocalFileSystem::HasExtension(path, DefaultExtension(DocumentKind::Scene)))
+				NewScene(kNewModelSize, path);
+			else if (isNew || path.empty())
 				NewModel(kNewModelSize, path);
 			else if (!LoadModel(path))
 				NewModel(kNewModelSize, std::string());
@@ -184,13 +187,28 @@ namespace spades {
 
 		// --- Document ---------------------------------------------------------
 
-		bool KV6EditorView::IsDirty() const { return editor->DocumentStateId() != savedDocumentId; }
+		bool KV6EditorView::IsDirty() const {
+			if (scene) {
+				// The objects' placements, and the voxels of the one being edited
+				// since they were last taken back.
+				return scene->Changed() ||
+				       (!ShowingObjects() && editor->DocumentStateId() != editedState);
+			}
+			return editor->DocumentStateId() != savedDocumentId;
+		}
+
+		bool KV6EditorView::ShowingObjects() const { return scene && editor->InObjectMode(); }
 
 		bool KV6EditorView::HasUnsavedChanges() const { return IsDirty() || editor->HasPlacement(); }
 
 		void KV6EditorView::FrameCamera() {
 			Vector3 centre;
 			float size;
+			if (ShowingObjects()) {
+				scene->Bounds(centre, size);
+				cam.Frame(centre, size);
+				return;
+			}
 			BoxFrame(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1), centre,
 			         size);
 			cam.Frame(centre + DocumentOrigin(), size);
@@ -199,9 +217,14 @@ namespace spades {
 		void KV6EditorView::ResetView() {
 			Vector3 centre;
 			float size;
-			BoxFrame(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1), centre,
-			         size);
-			cam.FlyHome(centre + DocumentOrigin(), size);
+			if (ShowingObjects()) {
+				scene->Bounds(centre, size);
+				cam.FlyHome(centre, size);
+			} else {
+				BoxFrame(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1),
+				         centre, size);
+				cam.FlyHome(centre + DocumentOrigin(), size);
+			}
 			editor->SetStatus("View reset");
 		}
 
@@ -215,6 +238,16 @@ namespace spades {
 			}
 			if (EqualsIgnoringCase(key, kProjectionKey)) {
 				ToggleProjection();
+				return true;
+			}
+			if (EqualsIgnoringCase(key, kFrameSelectionKey) && ShowingObjects()) {
+				const bool picked = scene->Picked() >= 0;
+				if (picked)
+					scene->Bounds(scene->Picked(), centre, size);
+				else
+					scene->Bounds(centre, size);
+				cam.FlyToFrame(centre, size);
+				editor->SetStatus(picked ? "Framed the object" : "Framed the scene");
 				return true;
 			}
 			if (EqualsIgnoringCase(key, kFrameSelectionKey)) {
@@ -232,14 +265,19 @@ namespace spades {
 			return false;
 		}
 
-		void KV6EditorView::NewModel(int n, const std::string& path) {
+		Handle<VoxelModel> KV6EditorView::SeedModel(int n) {
 			Handle<VoxelModel> model = Handle<VoxelModel>::New(n, n, n);
 			model->SetSolid(n / 2, n / 2, n / 2, editor->CurrentColor());
 			// Anchor the pivot on the seed voxel so mirroring (whose planes start
 			// there) is symmetric about it from the start.
 			float c = float(n / 2);
 			model->SetOrigin(MakeVector3(-c, -c, -c));
-			document.Assign(model);
+			return model;
+		}
+
+		void KV6EditorView::NewModel(int n, const std::string& path) {
+			CloseScene();
+			document.Assign(SeedModel(n));
 			editor->DocumentReplaced();
 			filePath = path;
 			FrameCamera();
@@ -247,6 +285,8 @@ namespace spades {
 		}
 
 		bool KV6EditorView::LoadModel(const std::string& path) {
+			if (LocalFileSystem::HasExtension(path, DefaultExtension(DocumentKind::Scene)))
+				return LoadScene(path);
 			Handle<VoxelModel> loaded = KV6ModelIO::Load(path);
 			if (!loaded) {
 				// The document that is open is not the one that failed to load, so it
@@ -254,12 +294,148 @@ namespace spades {
 				editor->SetStatus("Could not load " + path);
 				return false;
 			}
+			CloseScene();
 			document.Assign(loaded);
 			editor->DocumentReplaced();
 			filePath = path;
 			FrameCamera();
 			savedDocumentId = editor->DocumentStateId(); // a freshly loaded document is clean
 			return true;
+		}
+
+		// --- Scene ------------------------------------------------------------
+
+		void KV6EditorView::CloseScene() {
+			if (!scene)
+				return;
+			// Edit mode first, while the scene is still there to take the voxels
+			// back; then nothing is left that offers Object mode.
+			editor->SetObjectMode(false);
+			scene.reset();
+		}
+
+		bool KV6EditorView::LoadScene(const std::string& path) {
+			std::unique_ptr<KV6Scene> loaded = std::make_unique<KV6Scene>();
+			if (!loaded->Load(path)) {
+				editor->SetStatus("Could not load " + path);
+				return false;
+			}
+			CloseScene();
+			scene = std::move(loaded);
+			filePath = path;
+			// The document is the picked object's voxels, handed over as Edit
+			// mode is entered; it opens on the objects.
+			document.Assign(scene->Object(scene->Picked()).model);
+			editor->DocumentReplaced();
+			editedState = editor->DocumentStateId();
+			editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+			editor->SetObjectMode(true);
+			FrameCamera();
+			return true;
+		}
+
+		void KV6EditorView::NewScene(int n, const std::string& path) {
+			CloseScene();
+			scene = std::make_unique<KV6Scene>();
+			scene->StartWith(SeedModel(n), "Object");
+			filePath = path;
+			document.Assign(scene->Object(0).model);
+			editor->DocumentReplaced();
+			editedState = editor->DocumentStateId();
+			editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+			editor->SetObjectMode(true);
+			FrameCamera();
+		}
+
+		void KV6EditorView::TakeBackEditedObject() {
+			const int picked = scene ? scene->Picked() : -1;
+			if (picked < 0)
+				return;
+			// A volume that grew is another model, and its voxels were relabelled:
+			// the object takes the model as it is now, and moves back by as much.
+			VoxelObject& object = scene->Object(picked);
+			object.model = Handle<VoxelModel>(document.Model());
+			scene->CompensateShift(picked, editShift);
+			editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+			scene->InvalidateModel(picked);
+			if (editor->DocumentStateId() != editedState)
+				scene->MarkChanged();
+			editedState = editor->DocumentStateId();
+		}
+
+		void KV6EditorView::DocumentReframed(const Vector3& shift) {
+			cam.Shift(shift);
+			if (scene && !editor->InObjectMode())
+				editShift = editShift + shift;
+		}
+
+		// --- IObjectModeHost ----------------------------------------------------
+
+		bool KV6EditorView::PickObjectAtCursor() {
+			const int index = scene->ObjectAt(cam.View(), softwareCursor->GetPosition());
+			scene->Pick(index);
+			if (index >= 0)
+				editor->SetStatus("Picked " + PickedObjectName());
+			return index >= 0;
+		}
+
+		bool KV6EditorView::HasPickedObject() const { return scene && scene->Picked() >= 0; }
+
+		std::string KV6EditorView::PickedObjectName() const {
+			if (!HasPickedObject())
+				return std::string();
+			const std::string& name = scene->Object(scene->Picked()).name;
+			return name.empty() ? "Object " + std::to_string(scene->Picked() + 1) : name;
+		}
+
+		bool KV6EditorView::PickedObjectPose(GizmoPose& pose) const {
+			return scene && scene->PickedPose(pose);
+		}
+
+		void KV6EditorView::BeginObjectDrag() { scene->BeginDrag(); }
+
+		void KV6EditorView::PreviewObjectDrag(const GizmoTransform& total) {
+			scene->PreviewDrag(total);
+		}
+
+		void KV6EditorView::CommitObjectDrag() {
+			if (scene->CommitDrag())
+				editor->SetStatus("Placed " + PickedObjectName());
+		}
+
+		void KV6EditorView::CancelObjectDrag() { scene->CancelDrag(); }
+
+		bool KV6EditorView::CanUndoObjects() const { return scene && scene->CanUndo(); }
+		bool KV6EditorView::CanRedoObjects() const { return scene && scene->CanRedo(); }
+
+		void KV6EditorView::UndoObjects() {
+			scene->Undo();
+			editor->SetStatus("Undid placing " + PickedObjectName());
+		}
+
+		void KV6EditorView::RedoObjects() {
+			scene->Redo();
+			editor->SetStatus("Redid placing " + PickedObjectName());
+		}
+
+		void KV6EditorView::EditModeChanged(bool entering) {
+			if (!scene || scene->Picked() < 0)
+				return;
+			if (entering) {
+				// The picked object's voxels become the document, in its own frame.
+				document.Assign(scene->Object(scene->Picked()).model);
+				editor->DocumentReplaced();
+				editedState = editor->DocumentStateId();
+				editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+				FrameCamera();
+				editor->SetStatus("Editing " + PickedObjectName());
+				return;
+			}
+			TakeBackEditedObject();
+			Vector3 centre;
+			float size;
+			scene->Bounds(scene->Picked(), centre, size);
+			cam.Frame(centre, size);
 		}
 
 		bool KV6EditorView::Save() {
@@ -273,6 +449,19 @@ namespace spades {
 
 			// Saving writes the document, so anything still pending belongs in it.
 			VoxelEditor::DocumentCommand command(*editor);
+			if (scene) {
+				// The voxels being edited are the picked object's, which the scene
+				// holds once they are taken back.
+				if (!editor->InObjectMode())
+					TakeBackEditedObject();
+				if (!scene->Save(filePath)) {
+					editor->SetStatus("Save failed");
+					return false;
+				}
+				scene->MarkSaved();
+				editor->SetStatus("Saved " + filePath);
+				return true;
+			}
 			if (!KV6ModelIO::Save(document.Model(), filePath)) {
 				editor->SetStatus("Save failed");
 				return false;
@@ -304,14 +493,16 @@ namespace spades {
 			file.title = "File";
 			file.items.push_back(MenuCommand("New Model", [this] { NewDocument(); }, true, "Ctrl+N"));
 			file.items.push_back(
-			  MenuCommand("Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"));
+			  MenuCommand("Open...", [this] { OpenDocument(); }, true, "Ctrl+O"));
 			// Always available: a document with nowhere to go yet is asked where.
 			file.items.push_back(MenuCommand("Save", [this] { Save(); }, true, "Ctrl+S"));
 			file.items.push_back(MenuCommand("Save As...", [this] { OpenSaveAsDialog(); }));
 			// The one command that edits the open document with a file:
 			// inserting a model is a paste that happens to come from disk.
-			file.items.push_back(
-			  MenuCommand("Insert Model...", command([this] { OpenInsertDialog(); })));
+			// Inserting places voxels, which only Edit mode edits.
+			if (!ShowingObjects())
+				file.items.push_back(
+				  MenuCommand("Insert Model...", command([this] { OpenInsertDialog(); })));
 			file.items.push_back(MenuRule());
 			file.items.push_back(MenuCommand(
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }));
@@ -378,7 +569,9 @@ namespace spades {
 				return;
 			}
 			editor->ReleaseHeldInput();
-			gui::ConfirmDiscardChanges(*ui->GetOverlay(), "This model has unsaved changes.",
+			gui::ConfirmDiscardChanges(*ui->GetOverlay(),
+			                           scene ? "This scene has unsaved changes."
+			                                 : "This model has unsaved changes.",
 			                           [this](std::function<void()> after) {
 				                           // A document that was never saved needs
 				                           // somewhere to go first; `after` then runs
@@ -422,7 +615,7 @@ namespace spades {
 
 		void KV6EditorView::OpenDocument() {
 			ConfirmDiscardChanges([this] {
-				ShowModelFileDialog("Open Model", FileBrowserPurpose::Open, std::string(),
+				ShowModelFileDialog("Open", FileBrowserPurpose::Open, std::string(),
 				                    [this](const std::string& path) {
 					                    if (!LoadModel(path))
 						                    ShowMessage("Could not open " +
@@ -432,7 +625,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::OpenSaveAsDialog(std::function<void()> after) {
-			const std::string name = filePath.empty() ? UntitledFileName(DocumentKind::Model)
+			const std::string name = filePath.empty() ? UntitledFileName(GetDocumentKind())
 			                                          : LocalFileSystem::GetFileName(filePath);
 			ShowModelFileDialog("Save As", FileBrowserPurpose::Save, name,
 			                    [this, after](const std::string& path) {
@@ -547,7 +740,8 @@ namespace spades {
 		// Long world axes through the model's origin (pivot), which renders at
 		// world coordinate -origin in the editor's grid space.
 		void KV6EditorView::DrawOriginAxes() {
-			Vector3 org = document.Origin();
+			// The scene's origin with its objects shown, else the model's pivot.
+			Vector3 org = ShowingObjects() ? MakeVector3(0.0F, 0.0F, 0.0F) : document.Origin();
 			Vector3 p = MakeVector3(-org.x, -org.y, -org.z);
 			float L = 1000.0F;
 			renderer->AddDebugLine(p - MakeVector3(L, 0, 0), p + MakeVector3(L, 0, 0),
@@ -581,6 +775,9 @@ namespace spades {
 				renderer->AddDebugLine(MakeVector3(from, at, z), MakeVector3(to, at, z), color);
 			}
 
+			// The volume being edited; the scene outlines its picked object itself.
+			if (ShowingObjects())
+				return;
 			const IntVector3 size = document.Size();
 			Vector3 a = MakeVector3(-0.5F, -0.5F, -0.5F);
 			Vector3 b = MakeVector3(float(size.x) - 0.5F, float(size.y) - 0.5F, float(size.z) - 0.5F);
@@ -600,11 +797,15 @@ namespace spades {
 			  12.0F + menus.Layout(font, 12.0F, VoxelEditor::RibbonHeight()) + 16.0F;
 			menus.DrawTitles(*renderer, *fontManager, softwareCursor->GetPosition());
 
-			std::string name = (!filePath.empty()) ? filePath : "(unsaved model)";
+			std::string name =
+			  (!filePath.empty()) ? filePath : (scene ? "(unsaved scene)" : "(unsaved model)");
 			if (HasUnsavedChanges())
 				name += " *";
-			font.Draw(name + "   (" + std::to_string(document.VoxelCount()) + " voxels)",
-			          MakeVector2(namesAt, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
+			const std::string count =
+			  ShowingObjects() ? std::to_string(scene->Count()) + " objects"
+			                   : std::to_string(document.VoxelCount()) + " voxels";
+			font.Draw(name + "   (" + count + ")", MakeVector2(namesAt, 5.0F), 0.85F,
+			          MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
 
 			std::string save = "[Ctrl+S] save";
 			Vector2 cs = font.Measure(save);
@@ -744,7 +945,7 @@ namespace spades {
 			if (key == "MiddleMouseButton") {
 				// Turning and panning go round the voxel under the cursor, wherever
 				// flying has left the orbited point.
-				if (down) {
+				if (down && !ShowingObjects()) {
 					editor->DoPick();
 					if (editor->HasPick()) {
 						const IntVector3 v = editor->PickSolid();
@@ -811,7 +1012,9 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawSceneContents(bool modelOnly) {
-			if (renderModel) {
+			if (ShowingObjects()) {
+				scene->Render(*renderer);
+			} else if (renderModel) {
 				client::ModelRenderParam param;
 				// Cancel the KV6 pivot so the model sits in the editor's grid space.
 				param.matrix = Matrix4::Translate(document.Origin() * -1.0F);
@@ -865,7 +1068,13 @@ namespace spades {
 			// The movement keys fly the camera unless a modal has the keyboard;
 			// its speed follows the model's size, so any model is crossed as fast.
 			const IntVector3 size = document.Size();
-			const int span = std::max(size.x, std::max(size.y, size.z));
+			int span = std::max(size.x, std::max(size.y, size.z));
+			if (ShowingObjects()) {
+				Vector3 centre;
+				float extent;
+				scene->Bounds(centre, extent);
+				span = std::max(1, int(extent));
+			}
 			cam.Update(dt, globalTime, float(span) * kCameraSpeedPerSize,
 			           !ui->GetMenuBar()->IsOpen() && !ui->GetOverlay()->IsActive());
 			editor->Update(dt);

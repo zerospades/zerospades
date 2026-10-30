@@ -53,6 +53,8 @@
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 
 #include "DrawTool.h"
+#include "ObjectModeHost.h"
+#include "ObjectTool.h"
 #include "SubTool.h"
 #include "VoxelDocument.h"
 #include "VoxelEditorHost.h"
@@ -181,6 +183,8 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			transformPanel.reset(new TransformPanel(renderer, fontManager.GetSmallGuiFont()));
 			pivotTarget.reset(new PivotTarget(*this));
+
+			objectTool = std::make_unique<ObjectTool>();
 
 			// The tools come from the registry (toolbar order = registration),
 			// narrowed to the ones this editor offers.
@@ -465,6 +469,10 @@ namespace spades {
 				if (!tool->EscapeLabel(*this).empty())
 					return EscapeLayer::Tool;
 			}
+			// The pending voxels and the selection are Edit mode's, out of reach
+			// of Object mode's Escape.
+			if (currentMode != EditorMode::Edit)
+				return EscapeLayer::None;
 			if (edit.placing)
 				return EscapeLayer::Placement;
 			if (!edit.selection.Empty())
@@ -1194,6 +1202,9 @@ namespace spades {
 		}
 
 		bool VoxelEditor::SamplingArmed() const {
+			// A colour is sampled from the document, which only Edit mode shows.
+			if (currentMode != EditorMode::Edit)
+				return false;
 			return altHeld || ui.GetColorPicker()->GetEyedropperMode();
 		}
 
@@ -2222,6 +2233,16 @@ namespace spades {
 		// Undo and redo replay the one history, pending voxels included: a
 		// move or a turn is a step like any edit, so nothing is placed first.
 		void VoxelEditor::Undo() {
+			// Object mode steps through the scene's own history of placements.
+			if (currentMode == EditorMode::Object) {
+				if (IObjectModeHost* objects = ObjectMode()) {
+					if (objects->CanUndoObjects())
+						objects->UndoObjects();
+					else
+						SetStatus("Nothing to undo");
+				}
+				return;
+			}
 			EndPreviews(); // the history holds only what was committed
 			std::string label = undo.UndoLabel();
 			if (!undo.Undo()) {
@@ -2233,6 +2254,15 @@ namespace spades {
 		}
 
 		void VoxelEditor::Redo() {
+			if (currentMode == EditorMode::Object) {
+				if (IObjectModeHost* objects = ObjectMode()) {
+					if (objects->CanRedoObjects())
+						objects->RedoObjects();
+					else
+						SetStatus("Nothing to redo");
+				}
+				return;
+			}
 			EndPreviews(); // the history holds only what was committed
 			std::string label = undo.RedoLabel();
 			if (!undo.Redo()) {
@@ -2535,9 +2565,32 @@ namespace spades {
 
 		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
 
+		void VoxelEditor::SetObjectMode(bool on) {
+			SetMode(on && ModeSupported(EditorMode::Object) ? EditorMode::Object : EditorMode::Edit);
+		}
+
+		bool VoxelEditor::ModeSupported(EditorMode mode) const {
+			switch (mode) {
+				case EditorMode::Edit: return true;
+				case EditorMode::Object: return host.ObjectMode() != nullptr;
+				case EditorMode::Animation: return false;
+			}
+			return false;
+		}
+
+		IObjectModeHost* VoxelEditor::ObjectMode() { return host.ObjectMode(); }
+
 		void VoxelEditor::Activate(int toolIndex, EditorMode mode) {
 			if (toolIndex == activeTool && mode == currentMode)
 				return;
+			// Edit mode edits the picked object of a scene, so a scene with none
+			// picked stays in Object mode.
+			IObjectModeHost* objects = ObjectMode();
+			if (mode == EditorMode::Edit && currentMode != EditorMode::Edit && objects &&
+			    !objects->HasPickedObject()) {
+				SetStatus("Pick an object to edit first");
+				return;
+			}
 			// A number being typed into the sub-toolbar, or the panel, belongs to
 			// the tool whose box it is: it is settled here, while that tool is
 			// still the one listening. Left to the bar, the edit would be dropped
@@ -2548,8 +2601,16 @@ namespace spades {
 			// placement reaches the document.
 			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
+			const bool wasEditing = currentMode == EditorMode::Edit;
+			if (wasEditing && mode != EditorMode::Edit)
+				EndUserAction(); // nothing previewed is carried out of the document
 			activeTool = toolIndex;
 			currentMode = mode;
+			// The scene takes the voxels back as Edit mode is left, and hands the
+			// picked object's over as it is entered.
+			const bool editing = mode == EditorMode::Edit;
+			if (objects && wasEditing != editing)
+				objects->EditModeChanged(editing);
 			if (VoxelTool* current = ActiveTool())
 				current->OnActivate(*this);
 			// The picker shows the colour it now sets, which may be another's.
@@ -2672,6 +2733,8 @@ namespace spades {
 		}
 
 		VoxelTool* VoxelEditor::ActiveTool() {
+			if (currentMode == EditorMode::Object && ObjectMode())
+				return objectTool.get();
 			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()))
 				return tools[activeTool].tool.get();
 			return nullptr;
@@ -2793,20 +2856,23 @@ namespace spades {
 			// A shortcut changes the document or the placement under a drag in
 			// progress (a paste replaces it), so that drag is abandoned.
 			CancelToolInteraction();
-			if (EqualsIgnoringCase(key, "a")) {
+			// Selecting, copying, cutting and pasting are voxels', which only
+			// Edit mode has.
+			const bool editing = currentMode == EditorMode::Edit;
+			if (editing && EqualsIgnoringCase(key, "a")) {
 				// Select All, and with Shift the other way about, as a list in
 				// any application does it.
 				if (shiftHeld)
 					ClearSelection();
 				else
 					SelectAll();
-			} else if (EqualsIgnoringCase(key, "i"))
+			} else if (editing && EqualsIgnoringCase(key, "i"))
 				InvertSelection();
-			else if (EqualsIgnoringCase(key, "c"))
+			else if (editing && EqualsIgnoringCase(key, "c"))
 				CopySelection();
-			else if (EqualsIgnoringCase(key, "x"))
+			else if (editing && EqualsIgnoringCase(key, "x"))
 				CutSelection();
-			else if (EqualsIgnoringCase(key, "v"))
+			else if (editing && EqualsIgnoringCase(key, "v"))
 				Paste();
 			else if (EqualsIgnoringCase(key, "z")) {
 				if (shiftHeld)
@@ -2999,7 +3065,14 @@ namespace spades {
 		}
 
 		bool VoxelEditor::CommandKey(const std::string& key, bool down) {
-			if (down && EditorKeyMatches(cg_keyDelete, key)) {
+			// Tab goes between the scene's objects and the picked one's voxels,
+			// as in Blender.
+			if (down && key == "Tab" && ModeSupported(EditorMode::Object) && !lmbHeld && !rmbHeld) {
+				CancelToolInteraction();
+				SetObjectMode(currentMode != EditorMode::Object);
+				return true;
+			}
+			if (down && currentMode == EditorMode::Edit && EditorKeyMatches(cg_keyDelete, key)) {
 				// Like a Ctrl shortcut, it edits behind the tool's back.
 				CancelToolInteraction();
 				DeleteSelection();
@@ -3078,6 +3151,13 @@ namespace spades {
 			// An image of the model holds the model, which the host draws.
 			if (PresentsRender())
 				return;
+			// Object mode shows the scene, which the host draws; what is drawn
+			// below is the document's, Edit mode's.
+			if (currentMode != EditorMode::Edit) {
+				if (VoxelTool* tool = ActiveTool())
+					tool->DrawScene(*this);
+				return;
+			}
 			// The images to model from, whatever the tool: they are depth tested,
 			// so the voxels in front of them hide them.
 			DrawReferenceImages();
@@ -3131,7 +3211,7 @@ namespace spades {
 				occluders.pendingAnchor = edit.placement.anchor;
 				occluders.pendingVersion = placementModelVersion;
 			}
-			if (!PresentsRender())
+			if (currentMode == EditorMode::Edit && !PresentsRender())
 				overlayLines.Draw(*renderer, DocumentView(), occluders);
 
 			// The picker is laid out first: the text under the viewport keeps clear of it.
@@ -3149,12 +3229,19 @@ namespace spades {
 			auto add = [&](const std::string& part) {
 				help += (help.empty() ? std::string() : kHintSeparator) + part;
 			};
-			add("[Alt+LMB] pick colour");
+			if (ModeSupported(EditorMode::Object))
+				add(currentMode == EditorMode::Object ? "[Tab] edit the object"
+				                                      : "[Tab] back to the objects");
+			const bool editing = currentMode == EditorMode::Edit;
+			if (editing)
+				add("[Alt+LMB] pick colour");
 			add("[Ctrl+Z/Y] undo/redo");
-			add("[Ctrl+C/X/V] copy/cut/paste");
-			const std::string deleteKey = cg_keyDelete;
-			if (!deleteKey.empty())
-				add("[" + deleteKey + "] delete selection");
+			if (editing) {
+				add("[Ctrl+C/X/V] copy/cut/paste");
+				const std::string deleteKey = cg_keyDelete;
+				if (!deleteKey.empty())
+					add("[" + deleteKey + "] delete selection");
+			}
 
 			// Text stays clear of the colour picker when it is open.
 			float right = sw - left;
@@ -3224,8 +3311,9 @@ namespace spades {
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
 			ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
-			ui.GetToolbar()->SetUndoButton(undo.CanUndo());
-			ui.GetToolbar()->SetRedoButton(undo.CanRedo());
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
+			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
+			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
 
 			ui.GetToolbar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                      ui.GetMenuBar()->IsOpen(), sw);
