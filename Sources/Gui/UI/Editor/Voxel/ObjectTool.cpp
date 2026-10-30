@@ -54,6 +54,18 @@ namespace spades {
 				ObjectGizmoSubTool() : GizmoSubTool(ObjectSnap(), ObjectHandles()) {}
 				const char* Label() const override { return "Object"; }
 
+				void OnPointer(IVoxelEditContext& ed, const PointerInput& e) override {
+					// With nothing picked there is no gizmo, and the gizmo's own
+					// handling ignores a press it has nowhere to place: the press
+					// picks whatever is under the cursor instead.
+					GizmoPose pose;
+					if (e.IsLeft() && e.IsDown() && !gizmo.IsDragging() && !CurrentPose(ed, pose)) {
+						OnClickAway(ed);
+						return;
+					}
+					GizmoSubTool::OnPointer(ed, e);
+				}
+
 			protected:
 				bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override {
 					IObjectModeHost* objects = ed.ObjectMode();
