@@ -63,6 +63,7 @@ DEFINE_SPADES_SETTING(cg_tracers, "1");
 DEFINE_SPADES_SETTING(cg_hitLog, "0");
 DEFINE_SPADES_SETTING(cg_killfeedIcons, "1");
 DEFINE_SPADES_SETTING(cg_killfeedStreaks, "1");
+DEFINE_SPADES_SETTING(cg_killfeedDistance, "1");
 DEFINE_SPADES_SETTING(cg_classicSprinting, "0");
 DEFINE_SPADES_SETTING(cg_autoUnscope, "0");
 DEFINE_SPADES_SETTING(cg_spectatorNoclip, "0");
@@ -1367,6 +1368,13 @@ namespace spades {
 							s += "(x" + ToString(killerStreak) + ")";
 						}
 					}
+				}
+
+				// add horizontal distance
+				if (cg_killfeedDistance && (kt == KillTypeWeapon || kt == KillTypeHeadshot)) {
+					float dist = (killer.GetEye() - victim.GetEye()).GetLength2D();
+					int idist = std::max(1, static_cast<int>(roundf(dist)));
+					s += " (" + ToString(idist) + "m)";
 				}
 			}
 
