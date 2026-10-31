@@ -3,8 +3,7 @@
 
 ![unknown](https://user-images.githubusercontent.com/25997662/166125363-3cdf237d-2154-4371-a44b-baea8a7abe5f.png)
 
-[Download](https://github.com/siecvi/zerospades/releases/latest) — Community: [BuildAndShoot](https://buildandshoot.com) - [aloha.pk](https://aloha.pk)
-
+[Download](https://github.com/siecvi/zerospades/releases/latest) - Community: [Discord](https://discord.gg/t64rKedpAu) - [BuildAndShoot](https://buildandshoot.com) - [aloha.pk](https://aloha.pk)
 ## What is OpenSpades?
 [OpenSpades](https://github.com/yvt/openspades) is a compatible client of [Ace Of Spades](https://en.wikipedia.org/wiki/Ace_of_Spades_(video_game)) 0.75.
 
