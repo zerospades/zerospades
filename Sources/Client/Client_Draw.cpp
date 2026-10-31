@@ -2636,14 +2636,14 @@ namespace spades {
 					} else {
 						DrawSpectateHUD();
 					}
-
-					if (netgraphVisible && !isDemoMode)
-						DrawNetGraph();
-
+					
 					// the chat panel shows the history by itself while it is open
 					if (!isChatPanelVisible)
 						chatWindow->Draw();
 					killfeedWindow->Draw();
+					
+					if (netgraphVisible && !isDemoMode)
+						DrawNetGraph();
 
 					if (debugHitTestZoom)
 						DrawHitTestDebugger();
