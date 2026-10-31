@@ -412,50 +412,42 @@ namespace spades {
 		}
 
 		void Client::DrawRecordingIndicator() {
-			float sw = renderer->ScreenWidth();
-
-			int recTime = static_cast<int>(net->GetDemoRecordingTime());
-			char timeBuf[16];
-			snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", recTime / 60, recTime % 60);
-
-			const std::string recStr = "REC";
+			const float sw = renderer->ScreenWidth();
+			
+			const int t = static_cast<int>(net->GetDemoRecordingTime());
+			char buf[32];
+			snprintf(buf, sizeof(buf), "REC %d:%02d", t / 60, t % 60);
 
 			IFont& font = fontManager->GetSmallGuiFont();
-
-			const Vector2 recSize = font.Measure(recStr);
-			const float timeFixedW = font.Measure("00:00").x;
-
-			const float iconSize = 10.0F;
-			const float iconTextOffset = iconSize - 4.0F;
-			const float labelGap = 6.0F;
-			const float totalW = iconTextOffset + labelGap + recSize.x + labelGap + timeFixedW;
-
+			const Vector2 size = font.Measure(buf);
+			
+			float minimapW = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
 			float minimapY = 8.0F;
 			const int statsMode = cg_stats;
 			if (statsMode == 2 || (statsMode >= 3 && scoreboardVisible))
 				minimapY += cg_statsSmallFont ? 10.0F : 20.0F;
-			float minimapSize = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
-
-			const float x = (sw - 8.0F) - minimapSize - totalW;
+			
+			const float x = (sw - 8.0F) - minimapW - 8.0F - size.x;
 			const float y = minimapY;
+			
+			const float right = x + size.x + 4.0F;
+			const float bottom = y + size.y + 4.0F;
 
-			Vector4 red = MakeVector4(1, 0.15F, 0.15F, 1);
-			Vector4 shadow = MakeVector4(0, 0, 0, 0.6F);
+			const Vector4 red = MakeVector4(1.0F, 0.15F, 0.15F, 1.0F);
+			const Vector4 black = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+			const Vector4 fade1 = MakeVector4(0.0F, 0.0F, 0.0F, 0.0F);
+			const Vector4 fade2 = MakeVector4(0.0F, 0.0F, 0.0F, 0.55F);
+			const Vector4 textColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
+			const Vector4 outline = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
+			
+			const float pulse = 0.5F + 0.5F * sinf(time * 3.5F);
+			const Vector4 accent = black + (red - black) * pulse;
 
-			bool dotVisible = fmodf(time, 1.0F) < 0.6F;
-			if (dotVisible) {
-				float size = (iconSize - 2.0F) * 0.5F;
-				renderer->SetColorAlphaPremultiplied(shadow * 0.3F);
-				renderer->DrawOutlinedCircle(MakeVector2(x + size, y + size), size, 2.0F);
-				renderer->SetColorAlphaPremultiplied(red);
-				renderer->DrawFilledCircle(MakeVector2(x + size, y + size), size);
-			}
+			renderer->DrawFilledRectFade(x - 8.0F, y, right - 2.0F, bottom, fade1, fade2, true);
+			renderer->SetColorAlphaPremultiplied(accent);
+			renderer->DrawFilledRect(right - 2.0F, y, right, bottom);
 
-			float textX = x + iconTextOffset + labelGap;
-			float textY = y + (iconSize - recSize.y) * 0.5F;
-
-			font.DrawShadow(recStr, MakeVector2(textX, textY), 1.0F, red, shadow);
-			font.DrawShadow(timeBuf, MakeVector2(textX + recSize.x + labelGap, textY), 1.0F, red, shadow);
+			font.DrawOutline(buf, MakeVector2(x, y + 1.0F), 1.0F, textColor, outline);
 		}
 
 		void Client::DrawAlivePlayersCount() {
