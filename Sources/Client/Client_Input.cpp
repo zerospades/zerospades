@@ -128,6 +128,8 @@ SPADES_SETTING(cg_debugHitTest);
 DEFINE_SPADES_SETTING(cg_keyToggleHud, "Home");
 SPADES_SETTING(cg_hideHud);
 
+DEFINE_SPADES_SETTING(cg_keyDebugScreen, "f3");
+
 DEFINE_SPADES_SETTING(cg_keyToggleLeftHand, "c");
 SPADES_SETTING(cg_viewWeaponSide);
 
@@ -472,6 +474,12 @@ namespace spades {
 						return;
 					} else if (CheckKey(cg_keySaveMap, name) && down) {
 						TakeMapShot();
+						return;
+					} else if (CheckKey(cg_keyDebugScreen, name) && down) {
+						debugScreenVisible = !debugScreenVisible;
+						Handle<IAudioChunk> c =
+						  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+						audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
 						return;
 					} else if (CheckKey(cg_keyStaffSpectating, name) && down) {
 						staffSpectating = !staffSpectating;
@@ -1034,6 +1042,11 @@ namespace spades {
 					}
 				} else if (CheckKey(cg_keyScoreboard, name)) {
 					scoreboardVisible = down;
+				} else if (CheckKey(cg_keyDebugScreen, name) && down) {
+					debugScreenVisible = !debugScreenVisible;
+					Handle<IAudioChunk> c =
+					  audioDevice->RegisterSound("Sounds/Player/Flashlight.opus");
+					audioDevice->PlayLocal(c.GetPointerOrNull(), AudioParam());
 				} else if (CheckKey(cg_keyNetgraph, name) && down) {
 					netgraphVisible = !netgraphVisible;
 					Handle<IAudioChunk> c =

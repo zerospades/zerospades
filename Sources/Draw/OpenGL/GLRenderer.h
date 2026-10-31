@@ -134,6 +134,10 @@ namespace spades {
 			unsigned int lastTime;
 			std::uint32_t frameNumber = 0;
 
+			// The device strings never change, so they are read once.
+			bool rendererInfoCached = false;
+			client::RendererInfo rendererInfo;
+
 			bool duringSceneRendering;
 
 			void BuildProjectionMatrix();
@@ -233,6 +237,8 @@ namespace spades {
 
 			float ScreenWidth() override;
 			float ScreenHeight() override;
+
+			client::RendererInfo GetRendererInfo() override;
 
 			int GetRenderWidth() const { return renderWidth; }
 			int GetRenderHeight() const { return renderHeight; }

@@ -21,6 +21,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 
 #include "IImage.h"
 #include "IModel.h"
@@ -121,6 +122,21 @@ namespace spades {
 			/** When set to `true`, the lens flare post-effect is enabled for
 			 * the light. */
 			bool useLensFlare = false;
+		};
+
+		/** A description of a renderer backend, shown on the debug screen. A string left empty
+		 * means the backend does not know it. */
+		struct RendererInfo {
+			/** The kind of backend, such as "OpenGL" or "Software". */
+			std::string backend;
+			std::string vendor;
+			/** The name of the graphics device. */
+			std::string gpu;
+			/** The version of the graphics API the backend runs on. */
+			std::string apiVersion;
+			/** The resolution the scene is rendered at, or `0` when it is the screen's. */
+			int renderWidth = 0;
+			int renderHeight = 0;
 		};
 
 		class IRenderer : public RefCountedObject {
@@ -240,6 +256,12 @@ namespace spades {
 			 * SWRenderer (e.g. long sprites, circle/rect clipping).
 			 */
 			virtual bool IsRendererSW() const { return false; }
+
+			/**
+			 * Describes the backend, for the debug screen. The default implementation only
+			 * tells the software renderer apart.
+			 */
+			virtual RendererInfo GetRendererInfo();
 
 			/** Finalizes a frame. */
 			virtual void FrameDone() = 0;

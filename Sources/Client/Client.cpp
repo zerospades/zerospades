@@ -985,7 +985,9 @@ namespace spades {
 			}
 
 			// render scene
+			Stopwatch drawTimer;
 			DrawScene();
+			debugDrawSceneMs = std::max(0.0F, static_cast<float>(drawTimer.GetTime() * 1000.0));
 
 			// accumulate net-graph sample at fixed interval
 			if (!isDemoMode) {
@@ -1002,7 +1004,10 @@ namespace spades {
 			}
 
 			// draw 2d
+			drawTimer.Reset();
 			Draw2D();
+			debugDraw2DMs = std::max(0.0F, static_cast<float>(drawTimer.GetTime() * 1000.0));
+			debugFrames.Push(DebugFrameSample(dt * 1000.0F, debugDrawSceneMs + debugDraw2DMs));
 
 			// draw scripted GUI
 			scriptedUI->RunFrame(dt);

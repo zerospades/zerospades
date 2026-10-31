@@ -352,6 +352,36 @@ namespace spades {
 			bool scoreboardVisible;
 			bool netgraphVisible;
 			bool hudVisible;
+
+			/** The debug screen (F3). While it is open it replaces the HUD. */
+			bool debugScreenVisible = false;
+			/** CPU time of the last frame's `DrawScene` and `Draw2D`, in milliseconds. */
+			float debugDrawSceneMs = 0.0F;
+			float debugDraw2DMs = 0.0F;
+
+			// History of the last frames, for the frame time graph of the debug screen.
+			static constexpr int kDebugFrameSamples = 240;
+			struct DebugFrameSample {
+				/** The time the whole frame took, vsync wait included. */
+				float frameMs;
+				/** The CPU time spent drawing it, part of `frameMs`. */
+				float cpuMs;
+				DebugFrameSample(float frame = 0.0F, float cpu = 0.0F) : frameMs(frame), cpuMs(cpu) {}
+			};
+			struct DebugFrameSampler {
+				DebugFrameSample samples[kDebugFrameSamples];
+				int head = 0; // next write index
+
+				void Push(const DebugFrameSample& s) {
+					samples[head] = s;
+					head = (head + 1) % kDebugFrameSamples;
+				}
+				// Index 0 = oldest, index (kDebugFrameSamples-1) = newest
+				const DebugFrameSample& At(int i) const {
+					return samples[(head + i) % kDebugFrameSamples];
+				}
+			};
+			DebugFrameSampler debugFrames;
 			bool flashlightOn;
 			float flashlightOnTime;
 
@@ -599,6 +629,13 @@ namespace spades {
 			void DrawReloadIndicator(const Vector4&);
 			void DrawStats();
 			void DrawNetGraph();
+
+			struct DebugScreenLine;
+			/** Draws the debug screen: two columns of text over the world. */
+			void DrawDebugScreen();
+			/** `subject` is the player the camera looks out of, or `nullptr` for a free camera. */
+			void BuildDebugScreenLeft(std::vector<DebugScreenLine>& lines, Player* subject);
+			void BuildDebugScreenRight(std::vector<DebugScreenLine>& lines, Player* subject);
 			void DrawHitTestDebugger();
 			void DrawPlayerStats();
 
@@ -797,6 +834,7 @@ namespace spades {
 			bool IsMuted();
 			bool IsScoreboardVisible() { return scoreboardVisible; }
 			bool IsNetgraphVisible() { return netgraphVisible; }
+			bool IsDebugScreenVisible() { return debugScreenVisible; }
 
 			/** What the Teamplay extension has made this client remember. */
 			const Teamplay& GetTeamplay() const { return *teamplay; }

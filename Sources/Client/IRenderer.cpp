@@ -21,5 +21,11 @@
 #include "IRenderer.h"
 
 namespace spades {
-	namespace client {}
+	namespace client {
+		RendererInfo IRenderer::GetRendererInfo() {
+			RendererInfo info;
+			info.backend = IsRendererSW() ? "Software" : "Unknown";
+			return info;
+		}
+	} // namespace client
 } // namespace spades

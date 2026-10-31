@@ -2540,7 +2540,8 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			bool isDemoMode = IsDemoMode();
-			bool shouldDrawHUD = hudVisible && !cg_hideHud;
+			// The debug screen replaces the HUD while it is open.
+			bool shouldDrawHUD = hudVisible && !cg_hideHud && !debugScreenVisible;
 			bool isChatPanelVisible = scriptedUI->IsChatPanelOpen();
 
 			float sw = renderer->ScreenWidth();
@@ -2567,7 +2568,7 @@ namespace spades {
 			if (maybePlayer) { // joined local player
 				Player& player = maybePlayer.value();
 
-				if (cg_playerNamesDead)
+				if (cg_playerNamesDead && !debugScreenVisible)
 					DrawDeadPlayers();
 
 				bool localPlayerIsSpectator = player.IsSpectator() || staffSpectating;
@@ -2580,23 +2581,25 @@ namespace spades {
 					if (cg_healScreenEffects)
 						DrawScreenEffect(false);
 
-					if (cg_playerNames)
+					if (cg_playerNames && !debugScreenVisible)
 						DrawHottrackedPlayerName();
 
-					if (cg_damageIndicators)
+					if (cg_damageIndicators && !debugScreenVisible)
 						DrawDamageIndicators();
-				} else if (spectatorPlayerNames) { // only if we are spectating
+				} else if (spectatorPlayerNames && !debugScreenVisible) { // only if we are spectating
 					DrawPubOVL();
 				}
 
 				// Teamplay marks and pings come from the server and are drawn
 				// whether or not the local player is spectating; the team overlay is the
 				// local player's own view of their team and is not.
-				DrawEspMarks();
-				DrawLocalPlayerMarkedIndicator();
-				DrawTeamplayPings();
-				if (!localPlayerIsSpectator)
-					DrawTeamOverlay();
+				if (!debugScreenVisible) {
+					DrawEspMarks();
+					DrawLocalPlayerMarkedIndicator();
+					DrawTeamplayPings();
+					if (!localPlayerIsSpectator)
+						DrawTeamOverlay();
+				}
 
 				if (shouldDrawHUD) {
 					// draw firstperson camera player HUD
@@ -2660,7 +2663,8 @@ namespace spades {
 				if (isDemoMode) {
 					// Draw spectator HUD elements in demo mode.
 					// Boxes always render (staff use); names follow the toggle.
-					DrawPubOVL();
+					if (!debugScreenVisible)
+						DrawPubOVL();
 
 					if (shouldDrawHUD) {
 						// draw firstperson camera player HUD
@@ -2711,6 +2715,9 @@ namespace spades {
 				if (cg_stats)
 					DrawStats();
 			}
+
+			if (debugScreenVisible)
+				DrawDebugScreen();
 
 			// Mouse cursor for the demo timeline (paused demos only)
 			if (isDemoMode)

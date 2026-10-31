@@ -362,6 +362,26 @@ namespace spades {
 			return static_cast<float>(device->ScreenHeight());
 		}
 
+		client::RendererInfo GLRenderer::GetRendererInfo() {
+			if (!rendererInfoCached) {
+				auto toString = [](const char* s) { return std::string(s ? s : ""); };
+				rendererInfo.backend = "OpenGL";
+				rendererInfo.vendor = toString(device->GetString(IGLDevice::Vendor));
+				rendererInfo.gpu = toString(device->GetString(IGLDevice::Renderer));
+				rendererInfo.apiVersion = toString(device->GetString(IGLDevice::Version));
+				rendererInfoCached = true;
+			}
+
+			client::RendererInfo info = rendererInfo;
+
+			// Only worth reporting when the scene is rendered at a scale other than 1.
+			if (renderWidth != device->ScreenWidth() || renderHeight != device->ScreenHeight()) {
+				info.renderWidth = renderWidth;
+				info.renderHeight = renderHeight;
+			}
+			return info;
+		}
+
 		void GLRenderer::SetFogColor(spades::Vector3 v) {
 			fogColor = v;
 			if (smoothedFogColor.x < 0.0F)
