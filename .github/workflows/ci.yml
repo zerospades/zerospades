@@ -103,7 +103,7 @@ jobs:
 
   build-macos-intel:
     name: Build (macOS Intel)
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
@@ -154,7 +154,7 @@ jobs:
 
   build-macos-arm:
     name: Build (macOS Apple Silicon)
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
