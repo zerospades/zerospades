@@ -53,11 +53,9 @@
 #include <psapi.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
+#include <sys/sysctl.h>
 #elif defined(__linux__)
 #include <unistd.h>
-#elif defined(__APPLE__)
-#include <mach/mach.h>
-#include <sys/sysctl.h>
 #endif
 
 DEFINE_SPADES_SETTING(cg_debugSreenSmallFont, "0");
