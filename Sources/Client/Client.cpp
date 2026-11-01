@@ -284,6 +284,7 @@ namespace spades {
 			limbo->SetSelectedTeam(2);
 			limbo->SetSelectedWeapon(RIFLE_WEAPON);
 			inGameLimbo = false;
+			limboMenu->Close();
 
 			worldSubFrame = 0.0F;
 			worldSetTime = time;
@@ -1148,6 +1149,7 @@ namespace spades {
 			limbo->SetSelectedTeam(team);
 			limbo->SetSelectedWeapon(weap);
 			inGameLimbo = false;
+			limboMenu->Close();
 		}
 
 		void Client::ShowAlert(const std::string& contents, AlertType type) {
