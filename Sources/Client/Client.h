@@ -763,14 +763,16 @@ namespace spades {
 			bool HasLocalPlayer();
 			bool IsDemoMode() const { return demoNet != nullptr; }
 			/** True while a paused demo exposes the mouse as an absolute cursor. */
-			bool IsDemoCursorMode() const { return demoNet != nullptr && demoNet->IsPaused(); }
+			bool IsDemoCursorMode() const {
+				return demoNet != nullptr && demoNet->IsPaused() && demoHudVisible;
+			}
 			DemoNetClient* GetDemoNetClient() { return demoNet.get(); }
 			void ReloadDemo();
-			
+
 			const std::string& GetServerName() const { return serverName; }
 			/** Game mode announced by the server list; empty for direct connects and demos. */
 			const std::string& GetGameMode() const { return gameMode; }
-			
+
 			/** Extensions announced by the server; empty in demo mode or before the handshake. */
 			std::vector<ServerExtensionInfo> GetServerExtensions() const {
 				return (net && !IsDemoMode()) ? net->GetServerExtensions()
