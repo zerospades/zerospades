@@ -1341,6 +1341,8 @@ namespace spades {
 			if (global) {
 				s += _Tr("Client", "[Global]");
 				s += " ";
+			} else {
+				s += "[" + mapView->ToGrid(p.GetPosition().GetXY()) + "] ";
 			}
 
 			// add player name (team-colored)
