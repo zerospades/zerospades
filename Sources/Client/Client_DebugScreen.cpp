@@ -411,7 +411,6 @@ namespace spades {
 
 		void Client::BuildDebugScreenRight(std::vector<DebugScreenLine>& lines, Player* player) {
 			const Vector4 white = MakeVector4(1, 1, 1, 1);
-			const Vector4 gray = MakeVector4(0.7F, 0.7F, 0.7F, 1);
 
 			auto addLine = [&lines](const std::string& text, const Vector4& color) {
 				DebugScreenLine line;
