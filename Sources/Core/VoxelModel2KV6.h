@@ -64,6 +64,43 @@ namespace spades {
 	};
 
 	/**
+	 * A named piece of data a scene or one of its objects carries, of one of
+	 * a few types, each checked on reading and writing: no raw binary ever
+	 * travels in a .2kv6.
+	 */
+	enum class MetadataType : uint8_t {
+		Text = 1,   ///< UTF-8 text, no NUL
+		Audio = 2,  ///< an Opus stream in Ogg ("OggS", then "OpusHead")
+		Image = 3,  ///< a PNG image (its 8-byte signature)
+		Script = 4, ///< AngelScript source: UTF-8 text, no NUL; stored, never run here
+	};
+
+	struct MetadataEntry {
+		std::string name; ///< unique within its table, 1 to 255 bytes
+		MetadataType type = MetadataType::Text;
+		std::string data; ///< the bytes, as the type says
+	};
+
+	/** A keyframed track of one object of a clip, named by its path ("Gun/Bolt"). */
+	struct AnimationTrack {
+		std::string path;
+		std::vector<TransformKeyframe> keyframes; ///< times within the clip's duration
+	};
+
+	/**
+	 * A named animation of a scene. A template locks what a scene built from
+	 * it must keep: its name (scripts play it by name) and its duration (they
+	 * time it), which an editor then refuses to change.
+	 */
+	struct AnimationClip {
+		std::string name; ///< unique in the scene, 1 to 255 bytes
+		float duration = 1.0F; ///< seconds, above zero
+		bool nameLocked = false;
+		bool durationLocked = false;
+		std::vector<AnimationTrack> tracks;
+	};
+
+	/**
 	 * Represents a named voxel object within a .2kv6 scene.
 	 * Each object contains a KV6 voxel model with optional transform animation
 	 * and can have child objects forming a scene hierarchy.
@@ -99,6 +136,9 @@ namespace spades {
 		// Scene hierarchy: child objects (empty for leaf nodes)
 		std::vector<VoxelObject> children;
 
+		/** Named data this object carries (a sound of it, a script driving it). */
+		std::vector<MetadataEntry> metadata;
+
 		VoxelObject() : position(0, 0, 0), rotation(0, 0, 0, 1), scale(1, 1, 1) {}
 	};
 
@@ -115,8 +155,12 @@ namespace spades {
 	 * HEADER (8 bytes total):
 	 *   Offset  Type      Field
 	 *   0       char[4]   Magic signature ("2kv6")
-	 *   4       uint16    Version (current: 1)
+	 *   4       uint16    Version (1 or 2)
 	 *   6       uint16    NumRootObjects
+	 *
+	 * Version 2 adds named, typed metadata and named animation clips; a scene
+	 * using none of them is still written as version 1, which version 2
+	 * readers read too.
 	 *
 	 * OBJECT (recursive structure):
 	 *   NameLength: uint16
@@ -129,8 +173,26 @@ namespace spades {
 	 *   [If HasModel==1]: Embedded KV6 data (no magic, just header+blocks+indices)
 	 *   NumKeyframes: uint16
 	 *   [Keyframes]: Time float, Position float[3], Rotation float[4], Scale float[3]
+	 *   [Version 2]: METADATA TABLE (the object's)
 	 *   NumChildren: uint16
 	 *   [Recursively]: child objects
+	 *
+	 * [Version 2] after the root objects:
+	 *   METADATA TABLE (the scene's)
+	 *   NumClips: uint16, then each CLIP
+	 *
+	 * METADATA TABLE: Count uint16, then each entry:
+	 *   NameLength uint16, Name char[NameLength]
+	 *   Type uint8 (1 text, 2 audio, 3 image, 4 script)
+	 *   DataLength uint32, Data byte[DataLength]
+	 *
+	 * CLIP:
+	 *   NameLength uint16, Name char[NameLength]
+	 *   Duration float (seconds)
+	 *   Flags uint8 (bit 0: name locked; bit 1: duration locked; others zero)
+	 *   NumTracks uint16, then each track:
+	 *     PathLength uint16, Path char[PathLength]
+	 *     NumKeyframes uint16, then keyframes as above
 	 */
 	class VoxelModel2KV6 {
 	public:
@@ -138,17 +200,38 @@ namespace spades {
 		VoxelModel2KV6(const VoxelModel2KV6&) = delete;
 		void operator=(const VoxelModel2KV6&) = delete;
 
-		static constexpr uint16_t FORMAT_VERSION = 1;
+		/** The newest version read and written. */
+		static constexpr uint16_t FORMAT_VERSION = 2;
+
+		/** A whole .2kv6 file: its objects, and what version 2 adds around them. */
+		struct SceneFile {
+			std::vector<VoxelObject> objects;
+			std::vector<MetadataEntry> metadata; ///< the scene's own
+			std::vector<AnimationClip> clips;
+		};
+
+		/** Reads a whole .2kv6 file, of either version. */
+		static SceneFile LoadScene(IStream& stream);
+		/** Writes a whole .2kv6 file, as version 1 when it uses nothing of
+		 *  version 2; checks every metadata entry and clip first (Validate). */
+		static void SaveScene(IStream& stream, const SceneFile& scene);
+
+		/** Throws, saying why, when `entry` is not what its type promises. */
+		static void Validate(const MetadataEntry& entry);
+		/** Throws when `clip` has no name, no duration, or a key past its end. */
+		static void Validate(const AnimationClip& clip);
 
 		/**
 		 * Load a .2kv6 scene from a stream.
-		 * Returns a vector of VoxelObject, one per object in the scene.
+		 * Returns a vector of VoxelObject, one per object in the scene. A
+		 * scene's own metadata and clips are left out: LoadScene keeps them.
 		 */
 		static std::vector<VoxelObject> Load(IStream& stream);
 
 		/**
 		 * Save a .2kv6 scene to a stream.
 		 * Objects should contain valid models with optional animation keyframes.
+		 * A scene's own metadata and clips are SaveScene's.
 		 */
 		static void Save(IStream& stream, const std::vector<VoxelObject>& objects);
 

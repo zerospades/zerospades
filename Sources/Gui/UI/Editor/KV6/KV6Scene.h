@@ -129,6 +129,10 @@ namespace spades {
 			};
 
 			std::vector<VoxelObject> roots;
+			// What the file carries besides its objects, kept as it came so a
+			// save writes it back (the editor does not change it yet).
+			std::vector<MetadataEntry> metadata;
+			std::vector<AnimationClip> clips;
 			std::vector<Entry> entries;
 			int picked = -1;
 

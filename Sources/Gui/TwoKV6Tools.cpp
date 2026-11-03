@@ -117,6 +117,26 @@ namespace spades {
 		  "                           them: +x -x +y -y +z -z (right left back\n"
 		  "                           front bottom top), iso, iso+x-y, iso-x-y,\n"
 		  "                           iso-x+y\n"
+		  "\n"
+		  "  meta-list FILE [--object OBJECT]\n"
+		  "                           the scene's named data (or OBJECT's): name,\n"
+		  "                           type, size\n"
+		  "  meta-set FILE NAME text|audio|image|script FROM [--object OBJECT]\n"
+		  "                           store the file FROM under NAME, replacing it;\n"
+		  "                           checked against its type: UTF-8 text or script,\n"
+		  "                           Opus audio in Ogg, PNG image, nothing else\n"
+		  "  meta-get FILE NAME OUT [--object OBJECT]   write it to the file OUT\n"
+		  "  meta-remove FILE NAME [--object OBJECT]\n"
+		  "\n"
+		  "  clip-list FILE           the animation clips: name, seconds, locks, tracks\n"
+		  "  clip-add FILE NAME SECONDS [--lock-name] [--lock-duration]\n"
+		  "  clip-lock FILE NAME [--name] [--duration]    (both when neither is given)\n"
+		  "  clip-unlock FILE NAME [--name] [--duration]\n"
+		  "  clip-rename FILE NAME NEW        refused when its name is locked\n"
+		  "  clip-duration FILE NAME SECONDS  refused when its duration is locked\n"
+		  "  clip-key FILE CLIP OBJECT TIME   key OBJECT's place at TIME seconds\n"
+		  "  clip-remove FILE NAME [--force]  a locked clip only with --force\n"
+		  "\n"
 		  "  apply FILE               run edits from standard input, one per line\n"
 		  "                           without FILE, then save once (# comments)\n"
 		  "  help                     this text\n";
@@ -203,6 +223,7 @@ namespace spades {
 		// --- The tree ------------------------------------------------------
 
 		using Scene = std::vector<VoxelObject>;
+		using SceneFile = VoxelModel2KV6::SceneFile;
 
 		// Where an object is: the list holding it, its place there, and the
 		// object above it (null at the top).
@@ -347,6 +368,14 @@ namespace spades {
 
 		bool IsScenePath(const std::string& path) { return LocalFileSystem::HasExtension(path, ".2kv6"); }
 
+		SceneFile LoadSceneFile(const std::string& path) {
+			std::FILE* f = LocalFileSystem::OpenFile(path, "rb");
+			if (!f)
+				throw std::runtime_error("cannot open " + path);
+			StdStream stream(f, true);
+			return VoxelModel2KV6::LoadScene(stream);
+		}
+
 		Scene LoadScene(const std::string& path) {
 			std::FILE* f = LocalFileSystem::OpenFile(path, "rb");
 			if (!f)
@@ -355,7 +384,7 @@ namespace spades {
 			return VoxelModel2KV6::Load(stream);
 		}
 
-		void SaveScene(const Scene& scene, const std::string& path) {
+		void SaveSceneFile(const SceneFile& scene, const std::string& path) {
 			// Through a temporary file, so a failure never leaves half a scene.
 			const std::string tmp = path + ".savetmp";
 			{
@@ -363,12 +392,61 @@ namespace spades {
 				if (!f)
 					throw std::runtime_error("cannot write " + path);
 				StdStream stream(f, true);
-				VoxelModel2KV6::Save(stream, scene);
+				VoxelModel2KV6::SaveScene(stream, scene);
 			}
 			if (!LocalFileSystem::Rename(tmp, path, true)) {
 				LocalFileSystem::Delete(tmp);
 				throw std::runtime_error("cannot write " + path);
 			}
+		}
+
+		void SaveScene(const Scene& objects, const std::string& path) {
+			SceneFile scene;
+			scene.objects = objects;
+			SaveSceneFile(scene, path);
+		}
+
+		std::string ReadWholeFile(const std::string& path) {
+			std::FILE* f = LocalFileSystem::OpenFile(path, "rb");
+			if (!f)
+				throw std::runtime_error("cannot open " + path);
+			StdStream stream(f, true);
+			return stream.ReadAllBytes();
+		}
+
+		MetadataType ParseMetadataType(const std::string& name) {
+			if (name == "text")
+				return MetadataType::Text;
+			if (name == "audio")
+				return MetadataType::Audio;
+			if (name == "image")
+				return MetadataType::Image;
+			if (name == "script")
+				return MetadataType::Script;
+			throw UsageError("a type is text, audio, image or script");
+		}
+
+		const char* MetadataTypeName(MetadataType type) {
+			switch (type) {
+				case MetadataType::Text: return "text";
+				case MetadataType::Audio: return "audio";
+				case MetadataType::Image: return "image";
+				case MetadataType::Script: return "script";
+			}
+			return "?";
+		}
+
+		AnimationClip* FindClip(SceneFile& file, const std::string& name) {
+			for (AnimationClip& clip : file.clips)
+				if (clip.name == name)
+					return &clip;
+			return nullptr;
+		}
+
+		AnimationClip& Clip(SceneFile& file, const std::string& name) {
+			if (AnimationClip* clip = FindClip(file, name))
+				return *clip;
+			throw std::runtime_error("no clip named '" + name + "'");
 		}
 
 		Handle<VoxelModel> LoadModel(const std::string& path) {
@@ -451,8 +529,136 @@ namespace spades {
 
 		// One edit of `scene` (`a` is the command and its arguments, without
 		// the file). Returns false when `a` is no edit. Throws on a bad edit.
-		bool Edit(Scene& scene, const std::vector<std::string>& a) {
+		// The metadata table --object names, or the scene's own.
+		std::vector<MetadataEntry>& MetadataTable(SceneFile& file, const Options& o) {
+			if (!o.Has("--object"))
+				return file.metadata;
+			return Find(file.objects, o.Values("--object")[0]).Object().metadata;
+		}
+
+		bool Edit(SceneFile& file, const std::vector<std::string>& a) {
+			Scene& scene = file.objects;
 			const std::string& cmd = a[0];
+
+			if (cmd == "meta-set" || cmd == "meta-remove") {
+				const Options o = TakeOptions(a, 1, {{"--object", 1}});
+				std::vector<MetadataEntry>& table = MetadataTable(file, o);
+				if (cmd == "meta-remove") {
+					Need(o.rest, 1, "meta-remove NAME [--object OBJECT]");
+					const auto it = std::find_if(table.begin(), table.end(), [&](const MetadataEntry& e) {
+						return e.name == o.rest[0];
+					});
+					if (it == table.end())
+						throw std::runtime_error("no metadata named '" + o.rest[0] + "'");
+					table.erase(it);
+					return true;
+				}
+				Need(o.rest, 3, "meta-set NAME text|audio|image|script FROM [--object OBJECT]");
+				MetadataEntry entry;
+				entry.name = o.rest[0];
+				entry.type = ParseMetadataType(o.rest[1]);
+				entry.data = ReadWholeFile(o.rest[2]);
+				VoxelModel2KV6::Validate(entry); // refused before anything changes
+				for (MetadataEntry& existing : table)
+					if (existing.name == entry.name) {
+						existing = std::move(entry);
+						return true;
+					}
+				table.push_back(std::move(entry));
+				return true;
+			}
+			if (cmd == "clip-add") {
+				const Options o = TakeOptions(a, 1, {{"--lock-name", 0}, {"--lock-duration", 0}});
+				Need(o.rest, 2, "clip-add NAME SECONDS [--lock-name] [--lock-duration]");
+				if (FindClip(file, o.rest[0]))
+					throw std::runtime_error("a clip is named '" + o.rest[0] + "' already");
+				AnimationClip clip;
+				clip.name = o.rest[0];
+				clip.duration = ParseFloat(o.rest[1], "the seconds");
+				clip.nameLocked = o.Has("--lock-name");
+				clip.durationLocked = o.Has("--lock-duration");
+				VoxelModel2KV6::Validate(clip);
+				file.clips.push_back(std::move(clip));
+				return true;
+			}
+			if (cmd == "clip-lock" || cmd == "clip-unlock") {
+				const Options o = TakeOptions(a, 1, {{"--name", 0}, {"--duration", 0}});
+				Need(o.rest, 1, (cmd + " NAME [--name] [--duration]").c_str());
+				AnimationClip& clip = Clip(file, o.rest[0]);
+				const bool both = !o.Has("--name") && !o.Has("--duration");
+				const bool lock = cmd == "clip-lock";
+				if (both || o.Has("--name"))
+					clip.nameLocked = lock;
+				if (both || o.Has("--duration"))
+					clip.durationLocked = lock;
+				return true;
+			}
+			if (cmd == "clip-rename") {
+				Need(a, 3, "clip-rename NAME NEW");
+				AnimationClip& clip = Clip(file, a[1]);
+				if (clip.nameLocked)
+					throw std::runtime_error("clip '" + clip.name +
+					                         "' has its name locked (clip-unlock --name)");
+				if (FindClip(file, a[2]))
+					throw std::runtime_error("a clip is named '" + a[2] + "' already");
+				clip.name = a[2];
+				VoxelModel2KV6::Validate(clip);
+				return true;
+			}
+			if (cmd == "clip-duration") {
+				Need(a, 3, "clip-duration NAME SECONDS");
+				AnimationClip& clip = Clip(file, a[1]);
+				if (clip.durationLocked)
+					throw std::runtime_error("clip '" + clip.name +
+					                         "' has its duration locked (clip-unlock --duration)");
+				AnimationClip changed = clip;
+				changed.duration = ParseFloat(a[2], "the seconds");
+				VoxelModel2KV6::Validate(changed); // keys past the new end refuse it
+				clip = std::move(changed);
+				return true;
+			}
+			if (cmd == "clip-key") {
+				Need(a, 4, "clip-key CLIP OBJECT TIME");
+				AnimationClip& clip = Clip(file, a[1]);
+				const VoxelObject& object = Find(scene, a[2]).Object();
+				TransformKeyframe key;
+				key.time = ParseFloat(a[3], "the time");
+				if (!(key.time >= 0.0F && key.time <= clip.duration))
+					throw UsageError("a key lies within the clip's " + FormatFloat(clip.duration) +
+					                 " seconds");
+				key.position = object.position;
+				key.rotation = object.rotation;
+				key.scale = object.scale;
+				AnimationTrack* track = nullptr;
+				for (AnimationTrack& t : clip.tracks)
+					if (t.path == a[2])
+						track = &t;
+				if (!track) {
+					clip.tracks.push_back(AnimationTrack{a[2], {}});
+					track = &clip.tracks.back();
+				}
+				// One key per time, in time order.
+				auto& keys = track->keyframes;
+				keys.erase(std::remove_if(keys.begin(), keys.end(),
+				                          [&](const TransformKeyframe& k) { return k.time == key.time; }),
+				           keys.end());
+				keys.insert(std::upper_bound(keys.begin(), keys.end(), key,
+				                             [](const TransformKeyframe& x, const TransformKeyframe& y) {
+					                             return x.time < y.time;
+				                             }),
+				            key);
+				return true;
+			}
+			if (cmd == "clip-remove") {
+				const Options o = TakeOptions(a, 1, {{"--force", 0}});
+				Need(o.rest, 1, "clip-remove NAME [--force]");
+				AnimationClip& clip = Clip(file, o.rest[0]);
+				if ((clip.nameLocked || clip.durationLocked) && !o.Has("--force"))
+					throw std::runtime_error("clip '" + clip.name +
+					                         "' is locked, as a template's are (--force removes it)");
+				file.clips.erase(file.clips.begin() + (&clip - file.clips.data()));
+				return true;
+			}
 
 			if (cmd == "add-model") {
 				const Options o = TakeOptions(a, 1, {{"--name", 1}, {"--at", 3}});
@@ -746,7 +952,43 @@ namespace spades {
 				return 0;
 			}
 
-			Scene scene = LoadScene(path);
+			SceneFile file = LoadSceneFile(path);
+			Scene& scene = file.objects;
+
+			if (cmd == "meta-list" || cmd == "meta-get") {
+				const Options o = TakeOptions(rest, 1, {{"--object", 1}});
+				const std::vector<MetadataEntry>& table = MetadataTable(file, o);
+				if (cmd == "meta-list") {
+					Need(o.rest, 0, "meta-list FILE [--object OBJECT]");
+					for (const MetadataEntry& e : table)
+						std::printf("%s %s %zu\n", e.name.c_str(), MetadataTypeName(e.type),
+						            e.data.size());
+					return 0;
+				}
+				Need(o.rest, 2, "meta-get FILE NAME OUT [--object OBJECT]");
+				for (const MetadataEntry& e : table) {
+					if (e.name != o.rest[0])
+						continue;
+					std::FILE* f = LocalFileSystem::OpenFile(o.rest[1], "wb");
+					if (!f)
+						throw std::runtime_error("cannot write " + o.rest[1]);
+					StdStream stream(f, true);
+					stream.Write(e.data.data(), e.data.size());
+					return 0;
+				}
+				throw std::runtime_error("no metadata named '" + o.rest[0] + "'");
+			}
+			if (cmd == "clip-list") {
+				Need(rest, 1, "clip-list FILE");
+				for (const AnimationClip& clip : file.clips) {
+					std::printf("%s %ss%s%s %zu track%s\n", clip.name.c_str(),
+					            FormatFloat(clip.duration).c_str(),
+					            clip.nameLocked ? " name-locked" : "",
+					            clip.durationLocked ? " duration-locked" : "", clip.tracks.size(),
+					            clip.tracks.size() == 1 ? "" : "s");
+				}
+				return 0;
+			}
 
 			if (cmd == "tree") {
 				const Options o = TakeOptions(rest, 1, {{"--world", 0}, {"--json", 0}});
@@ -765,6 +1007,7 @@ namespace spades {
 				});
 				std::printf("objects %d\nmodels %d\nhinges %d\nlocked %d\nhidden %d\n", objects,
 				            models, objects - models, locked, hidden);
+				std::printf("metadata %zu\nclips %zu\n", file.metadata.size(), file.clips.size());
 				try {
 					IntVector3 low;
 					Handle<VoxelModel> m = VoxelModelLoader::MergeScene(scene, &low);
@@ -850,19 +1093,19 @@ namespace spades {
 					if (words.empty() || words[0][0] == '#')
 						continue;
 					try {
-						if (!Edit(scene, words))
+						if (!Edit(file, words))
 							throw UsageError("not an edit: '" + words[0] + "'");
 					} catch (const std::exception& ex) {
 						// Nothing is saved: a batch applies whole or not at all.
 						throw std::runtime_error("line " + std::to_string(number) + ": " + ex.what());
 					}
 				}
-				SaveScene(scene, path);
+				SaveSceneFile(file, path);
 				return 0;
 			}
-			if (!Edit(scene, rest))
+			if (!Edit(file, rest))
 				throw UsageError("unknown command '" + cmd + "' (try help)");
-			SaveScene(scene, path);
+			SaveSceneFile(file, path);
 			return 0;
 		}
 	} // namespace
