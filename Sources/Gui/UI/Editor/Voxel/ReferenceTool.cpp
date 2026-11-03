@@ -79,23 +79,12 @@ namespace spades {
 
 				void OnGizmoBegin(IVoxelEditContext& ed) override { start = ed.Reference(axis); }
 
-				void OnGizmoDrag(IVoxelEditContext& ed) override {
-					if (!start)
-						return;
-					const GizmoTransform& total = gizmo.Total();
-					ReferenceImage& ref = ed.Reference(axis);
-					ref.centre = start->centre + total.translation;
-					ref.rotation =
-					  (total.rotation * Quaternion(start->rotation)).Normalize().v;
-					// An image keeps its shape: whichever of its two sides was
-					// pulled the most scales it whole.
-					const float su = total.scale.x, sv = total.scale.y;
-					const float factor = std::fabs(su - 1.0F) >= std::fabs(sv - 1.0F) ? su : sv;
-					ref.size = std::max(kMinSize, start->size * std::fabs(factor));
-				}
+				void OnGizmoDrag(IVoxelEditContext& ed) override { Apply(ed, gizmo.Total()); }
 
-				void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform&) override {
-					OnGizmoDrag(ed); // already where the drag left it
+				void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override {
+					// The gizmo has let go, its own total cleared: the drag's
+					// total is the one handed over.
+					Apply(ed, total);
 					start.reset();
 				}
 
@@ -113,6 +102,21 @@ namespace spades {
 				int axis;
 				// The image as the drag began, which the whole drag applies to.
 				std::optional<ReferenceImage> start;
+
+				// Places the image moved by `total` from where the drag began.
+				void Apply(IVoxelEditContext& ed, const GizmoTransform& total) {
+					if (!start)
+						return;
+					ReferenceImage& ref = ed.Reference(axis);
+					ref.centre = start->centre + total.translation;
+					ref.rotation =
+					  (total.rotation * Quaternion(start->rotation)).Normalize().v;
+					// An image keeps its shape: whichever of its two sides was
+					// pulled the most scales it whole.
+					const float su = total.scale.x, sv = total.scale.y;
+					const float factor = std::fabs(su - 1.0F) >= std::fabs(sv - 1.0F) ? su : sv;
+					ref.size = std::max(kMinSize, start->size * std::fabs(factor));
+				}
 			};
 		} // namespace
 
