@@ -206,6 +206,21 @@ namespace spades {
 			// commit it with SetPivot before then, or the pivot goes back.
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
 
+			// --- Sweeping the selection (Extrude, Pocket) ----------------------
+			/**
+			 * The cells sweeping each selected voxel `steps` voxels along `axis`
+			 * (the sign is the direction) would change, mirror images aside: the
+			 * empty cells it would fill, or for a pocket (`pocket`) the voxels it
+			 * would dig out, the selected ones first. For a preview.
+			 */
+			virtual std::vector<IntVector3> SweptCells(int axis, int steps, bool pocket) const = 0;
+			/**
+			 * Sweeps the selection as one undo step. Extruding fills the cells
+			 * each selected voxel passes, in its colour; pocketing digs them out.
+			 * The selection then moves to where the sweep ends, so sweeps chain.
+			 */
+			virtual void SweepSelection(int axis, int steps, bool pocket) = 0;
+
 			// --- Reference images ---------------------------------------------
 			// An image across each axis (0 = x, 1 = y, 2 = z) to model from,
 			// drawn in the document whatever the tool. A setting of the editor:

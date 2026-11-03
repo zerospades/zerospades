@@ -707,6 +707,78 @@ namespace spades {
 		// --- PivotGizmoSubTool (drag the pivot) ------------------------------
 
 		// The Pivot tool sets the snap (GizmoTool).
+		// --- SweepSubTool (Extrude, Pocket) ----------------------------------
+
+		SweepSubTool::SweepSubTool(bool pocket)
+		    : GizmoSubTool(TranslationSnap(1.0F),
+		                   GizmoHandleSet::Of(GizmoHandle::TranslateX) |
+		                     GizmoHandleSet::Of(GizmoHandle::TranslateY) |
+		                     GizmoHandleSet::Of(GizmoHandle::TranslateZ)),
+		      pocket(pocket) {}
+
+		std::string SweepSubTool::Hint(IVoxelEditContext& ed) {
+			if (ed.HasPlacement())
+				return "place the pending voxels first";
+			if (ed.SelectionCount() == 0)
+				return "select some voxels first";
+			return std::string(pocket ? "drag an arrow to dig the selected voxels along it"
+			                          : "drag an arrow to extrude the selected voxels along it") +
+			       ", a voxel per step" + kGizmoDragHint;
+		}
+
+		bool SweepSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
+			IntVector3 pivot;
+			if (ed.HasPlacement() || ed.SelectionCount() == 0 || !ed.TransformPivot(pivot))
+				return false;
+			// The voxels change on release; the gizmo rides the drag meanwhile.
+			pose.position = VecOf(pivot) + gizmo.Total().translation;
+			for (int a = 0; a < 3; a++)
+				pose.axes[a] = AxisUnit(a);
+			return true;
+		}
+
+		int SweepSubTool::StepsOf(const GizmoTransform& total) const {
+			if (axis < 0)
+				return 0;
+			const Vector3& t = total.translation;
+			return int(std::lround(axis == 0 ? t.x : axis == 1 ? t.y : t.z));
+		}
+
+		void SweepSubTool::OnGizmoBegin(IVoxelEditContext&) {
+			switch (gizmo.ActiveHandle()) {
+				case GizmoHandle::TranslateX: axis = 0; break;
+				case GizmoHandle::TranslateY: axis = 1; break;
+				case GizmoHandle::TranslateZ: axis = 2; break;
+				default: axis = -1; break;
+			}
+			steps = 0;
+		}
+
+		void SweepSubTool::OnGizmoDrag(IVoxelEditContext&) { steps = StepsOf(gizmo.Total()); }
+
+		void SweepSubTool::OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) {
+			const int dragged = StepsOf(total);
+			if (dragged != 0)
+				ed.SweepSelection(axis, dragged, pocket); // one undo step
+			axis = -1;
+			steps = 0;
+		}
+
+		void SweepSubTool::OnGizmoCancel(IVoxelEditContext&, const GizmoTransform&) {
+			axis = -1;
+			steps = 0;
+		}
+
+		void SweepSubTool::DrawScene(IVoxelEditContext& ed) {
+			if (axis < 0 || steps == 0)
+				return;
+			// What the release would add, in green, or dig, in red.
+			const Vector4 color = pocket ? MakeVector4(1.0F, 0.35F, 0.3F, 0.9F)
+			                             : MakeVector4(0.4F, 1.0F, 0.5F, 0.9F);
+			for (const IntVector3& c : ed.SweptCells(axis, steps, pocket))
+				ed.DrawCellOutlineMirrored(c.x, c.y, c.z, color);
+		}
+
 		PivotGizmoSubTool::PivotGizmoSubTool() : GizmoSubTool(GizmoSnap()) {}
 
 		std::string PivotGizmoSubTool::Hint(IVoxelEditContext&) {
