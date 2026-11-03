@@ -21,6 +21,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <Core/Math.h>
@@ -72,5 +73,14 @@ namespace spades {
 		 */
 		static Handle<VoxelModel> MergeScene(const std::vector<VoxelObject>& scene,
 		                                     IntVector3* lowCorner = nullptr);
+
+		/**
+		 * Where every object of the .2kv6 scene at `path` sits, by its path of
+		 * names ("Gun/Bolt"): the matrix taking its own coordinates to the
+		 * scene's, the frame its parts are drawn in ("scene.2kv6#Gun/Bolt"), so
+		 * an object holding no voxels marks a point to attach things to. A
+		 * path several objects share names none of them, and is left out.
+		 */
+		static std::vector<std::pair<std::string, Matrix4>> SceneTransforms(const char* path);
 	};
 } // namespace spades

@@ -231,6 +231,37 @@ namespace spades {
 		}
 	} // namespace
 
+	std::vector<std::pair<std::string, Matrix4>> VoxelModelLoader::SceneTransforms(const char* path) {
+		std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
+		const std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
+		std::vector<std::pair<std::string, Matrix4>> found;
+		std::vector<std::string> shared;
+		std::function<void(const VoxelObject&, const std::string&, const Matrix4&)> visit =
+		  [&](const VoxelObject& o, const std::string& parentPath, const Matrix4& parent) {
+			  const std::string here = parentPath.empty() ? o.name : parentPath + "/" + o.name;
+			  const Matrix4 world = parent * LocalTransformOf(o);
+			  const bool taken = std::any_of(found.begin(), found.end(),
+			                                 [&](const std::pair<std::string, Matrix4>& f) {
+				                                 return f.first == here;
+			                                 });
+			  if (taken)
+				  shared.push_back(here);
+			  else
+				  found.emplace_back(here, world);
+			  for (const VoxelObject& child : o.children)
+				  visit(child, here, world);
+		  };
+		for (const VoxelObject& root : scene)
+			visit(root, std::string(), Matrix4::Identity());
+		found.erase(std::remove_if(found.begin(), found.end(),
+		                           [&](const std::pair<std::string, Matrix4>& f) {
+			                           return std::find(shared.begin(), shared.end(), f.first) !=
+			                                  shared.end();
+		                           }),
+		            found.end());
+		return found;
+	}
+
 	Handle<VoxelModel> VoxelModelLoader::MergeScene(const std::vector<VoxelObject>& scene,
 	                                                IntVector3* lowCorner) {
 		return MergeSceneObjects(scene, Matrix4::Identity(), lowCorner);

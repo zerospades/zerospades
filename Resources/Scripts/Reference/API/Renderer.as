@@ -44,6 +44,14 @@ namespace spades {
         Model @RegisterModel(const string @path) {}
 
         /**
+         * Registers a .2kv6 scene, to draw it whole or part by part, and to
+         * find where its objects sit (see ModelScene). Its parts are cached
+         * like models: "scene.2kv6#Gun/Bolt" is the same part.
+         * @param path file-system path of the .2kv6 file.
+         */
+        ModelScene @RegisterScene(const string @path) {}
+
+        /**
          * Clear the cache of models and images loaded via `RegisterModel`
          * and `RegisterImage`. This method is merely a hint - the
          * implementation may partially or completely ignore the request.
