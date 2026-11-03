@@ -20,6 +20,7 @@
 
 #include "VoxelModel2KV6.h"
 
+#include <cmath>
 #include <cstring>
 #include <algorithm>
 
@@ -34,7 +35,170 @@ namespace spades {
 		constexpr uint8_t kFlagHidden = 1u << 1;
 		constexpr uint8_t kKnownFlags = kFlagLocked | kFlagHidden;
 
-		VoxelObject LoadObject(IStream& stream, int depth = 0) {
+		// Clip flags, one bit each.
+		constexpr uint8_t kClipNameLocked = 1u << 0;
+		constexpr uint8_t kClipDurationLocked = 1u << 1;
+		constexpr uint8_t kKnownClipFlags = kClipNameLocked | kClipDurationLocked;
+
+		// The most a metadata entry may hold: a sound, an image or a script,
+		// never something to stall a game loading a model.
+		constexpr uint32_t kMaxMetadataBytes = 16u * 1024u * 1024u;
+
+		template <class T> void ReadValue(IStream& stream, T& value, const char* what) {
+			if (stream.Read(&value, sizeof(value)) < sizeof(value))
+				SPRaise(".2kv6 file truncated: failed to read %s", what);
+		}
+
+		std::string ReadString(IStream& stream, std::size_t length, const char* what) {
+			std::string out(length, '\0');
+			if (length > 0 && stream.Read(&out[0], length) < length)
+				SPRaise(".2kv6 file truncated: failed to read %s", what);
+			return out;
+		}
+
+		std::string ReadShortString(IStream& stream, const char* what) {
+			uint16_t length;
+			ReadValue(stream, length, what);
+			return ReadString(stream, length, what);
+		}
+
+		void WriteShortString(IStream& stream, const std::string& text, const char* what) {
+			if (text.size() > UINT16_MAX)
+				SPRaise("%s too long: %zu bytes", what, text.size());
+			const uint16_t length = static_cast<uint16_t>(text.size());
+			stream.Write(&length, sizeof(length));
+			if (length > 0)
+				stream.Write(text.data(), length);
+		}
+
+		TransformKeyframe ReadKeyframe(IStream& stream) {
+			TransformKeyframe kf;
+			float pos[3], rot[4], scale[3];
+			ReadValue(stream, kf.time, "a keyframe's time");
+			ReadValue(stream, pos, "a keyframe's position");
+			ReadValue(stream, rot, "a keyframe's rotation");
+			ReadValue(stream, scale, "a keyframe's scale");
+			kf.position = MakeVector3(pos[0], pos[1], pos[2]);
+			kf.rotation = MakeVector4(rot[0], rot[1], rot[2], rot[3]);
+			kf.scale = MakeVector3(scale[0], scale[1], scale[2]);
+			return kf;
+		}
+
+		void WriteKeyframe(IStream& stream, const TransformKeyframe& kf) {
+			const float pos[3] = {kf.position.x, kf.position.y, kf.position.z};
+			const float rot[4] = {kf.rotation.x, kf.rotation.y, kf.rotation.z, kf.rotation.w};
+			const float scale[3] = {kf.scale.x, kf.scale.y, kf.scale.z};
+			stream.Write(&kf.time, sizeof(kf.time));
+			stream.Write(pos, sizeof(pos));
+			stream.Write(rot, sizeof(rot));
+			stream.Write(scale, sizeof(scale));
+		}
+
+		std::vector<MetadataEntry> ReadMetadata(IStream& stream) {
+			uint16_t count;
+			ReadValue(stream, count, "a metadata count");
+			std::vector<MetadataEntry> table;
+			table.reserve(count);
+			for (uint16_t i = 0; i < count; i++) {
+				MetadataEntry entry;
+				entry.name = ReadShortString(stream, "a metadata name");
+				uint8_t type;
+				ReadValue(stream, type, "a metadata type");
+				entry.type = static_cast<MetadataType>(type);
+				uint32_t length;
+				ReadValue(stream, length, "a metadata length");
+				if (length > kMaxMetadataBytes)
+					SPRaise("Metadata '%s' is %u bytes, more than the %u a .2kv6 holds",
+					        entry.name.c_str(), length, kMaxMetadataBytes);
+				entry.data = ReadString(stream, length, "metadata data");
+				// What was written unchecked, by hand or by another program, is
+				// refused rather than handed over.
+				VoxelModel2KV6::Validate(entry);
+				table.push_back(std::move(entry));
+			}
+			return table;
+		}
+
+		void CheckUniqueNames(const std::vector<MetadataEntry>& table) {
+			for (std::size_t i = 0; i < table.size(); i++)
+				for (std::size_t j = i + 1; j < table.size(); j++)
+					if (table[i].name == table[j].name)
+						SPRaise("Two metadata entries are named '%s'", table[i].name.c_str());
+		}
+
+		void WriteMetadata(IStream& stream, const std::vector<MetadataEntry>& table) {
+			if (table.size() > UINT16_MAX)
+				SPRaise("Too many metadata entries: %zu", table.size());
+			CheckUniqueNames(table);
+			const uint16_t count = static_cast<uint16_t>(table.size());
+			stream.Write(&count, sizeof(count));
+			for (const MetadataEntry& entry : table) {
+				VoxelModel2KV6::Validate(entry);
+				WriteShortString(stream, entry.name, "A metadata name");
+				const uint8_t type = static_cast<uint8_t>(entry.type);
+				stream.Write(&type, sizeof(type));
+				const uint32_t length = static_cast<uint32_t>(entry.data.size());
+				stream.Write(&length, sizeof(length));
+				if (length > 0)
+					stream.Write(entry.data.data(), length);
+			}
+		}
+
+		AnimationClip ReadClip(IStream& stream) {
+			AnimationClip clip;
+			clip.name = ReadShortString(stream, "a clip name");
+			ReadValue(stream, clip.duration, "a clip duration");
+			uint8_t flags;
+			ReadValue(stream, flags, "clip flags");
+			if ((flags & ~kKnownClipFlags) != 0)
+				SPRaise("Unknown .2kv6 clip flags 0x%02x on '%s'", unsigned(flags), clip.name.c_str());
+			clip.nameLocked = (flags & kClipNameLocked) != 0;
+			clip.durationLocked = (flags & kClipDurationLocked) != 0;
+			uint16_t tracks;
+			ReadValue(stream, tracks, "a track count");
+			for (uint16_t t = 0; t < tracks; t++) {
+				AnimationTrack track;
+				track.path = ReadShortString(stream, "a track path");
+				uint16_t keys;
+				ReadValue(stream, keys, "a keyframe count");
+				for (uint16_t k = 0; k < keys; k++)
+					track.keyframes.push_back(ReadKeyframe(stream));
+				clip.tracks.push_back(std::move(track));
+			}
+			VoxelModel2KV6::Validate(clip);
+			return clip;
+		}
+
+		void WriteClip(IStream& stream, const AnimationClip& clip) {
+			VoxelModel2KV6::Validate(clip);
+			WriteShortString(stream, clip.name, "A clip name");
+			stream.Write(&clip.duration, sizeof(clip.duration));
+			const uint8_t flags = uint8_t((clip.nameLocked ? kClipNameLocked : 0) |
+			                              (clip.durationLocked ? kClipDurationLocked : 0));
+			stream.Write(&flags, sizeof(flags));
+			if (clip.tracks.size() > UINT16_MAX)
+				SPRaise("Too many tracks in clip '%s'", clip.name.c_str());
+			const uint16_t tracks = static_cast<uint16_t>(clip.tracks.size());
+			stream.Write(&tracks, sizeof(tracks));
+			for (const AnimationTrack& track : clip.tracks) {
+				WriteShortString(stream, track.path, "A track path");
+				if (track.keyframes.size() > UINT16_MAX)
+					SPRaise("Too many keyframes in a track of '%s'", clip.name.c_str());
+				const uint16_t keys = static_cast<uint16_t>(track.keyframes.size());
+				stream.Write(&keys, sizeof(keys));
+				for (const TransformKeyframe& kf : track.keyframes)
+					WriteKeyframe(stream, kf);
+			}
+		}
+
+		bool UsesVersion2(const std::vector<VoxelObject>& objects) {
+			for (const VoxelObject& o : objects)
+				if (!o.metadata.empty() || UsesVersion2(o.children))
+					return true;
+			return false;
+		}
+
+		VoxelObject LoadObject(IStream& stream, uint16_t version, int depth = 0) {
 			if (depth > 64)
 				SPRaise("Object hierarchy too deep (max 64 levels)");
 
@@ -126,6 +290,11 @@ namespace spades {
 				obj.keyframes.push_back(kf);
 			}
 
+			if (version >= 2) {
+				obj.metadata = ReadMetadata(stream);
+				CheckUniqueNames(obj.metadata);
+			}
+
 			// Read child objects
 			uint16_t numChildren;
 			if (stream.Read(&numChildren, sizeof(numChildren)) < sizeof(numChildren))
@@ -133,13 +302,13 @@ namespace spades {
 
 			obj.children.reserve(numChildren);
 			for (uint16_t c = 0; c < numChildren; c++) {
-				obj.children.push_back(LoadObject(stream, depth + 1));
+				obj.children.push_back(LoadObject(stream, version, depth + 1));
 			}
 
 			return obj;
 		}
 
-		void SaveObject(IStream& stream, const VoxelObject& obj, int depth = 0) {
+		void SaveObject(IStream& stream, const VoxelObject& obj, uint16_t version, int depth = 0) {
 			if (depth > 64)
 				SPRaise("Object hierarchy too deep (max 64 levels)");
 
@@ -191,6 +360,9 @@ namespace spades {
 				stream.Write(kfScaleData, sizeof(kfScaleData));
 			}
 
+			if (version >= 2)
+				WriteMetadata(stream, obj.metadata);
+
 			// Write child objects
 			uint16_t numChildren = static_cast<uint16_t>(obj.children.size());
 			if (numChildren > UINT16_MAX)
@@ -200,12 +372,22 @@ namespace spades {
 			stream.Write(&numChildren, sizeof(numChildren));
 
 			for (const VoxelObject& child : obj.children) {
-				SaveObject(stream, child, depth + 1);
+				SaveObject(stream, child, version, depth + 1);
 			}
 		}
 	} // namespace
 
 	std::vector<VoxelObject> VoxelModel2KV6::Load(IStream& stream) {
+		return LoadScene(stream).objects;
+	}
+
+	void VoxelModel2KV6::Save(IStream& stream, const std::vector<VoxelObject>& objects) {
+		SceneFile scene;
+		scene.objects = objects;
+		SaveScene(stream, scene);
+	}
+
+	VoxelModel2KV6::SceneFile VoxelModel2KV6::LoadScene(IStream& stream) {
 		SPADES_MARK_FUNCTION();
 
 		// Read and verify file header (8 bytes total)
@@ -218,44 +400,134 @@ namespace spades {
 			SPRaise("Invalid .2kv6 file: magic signature mismatch (not a .2kv6 file)");
 
 		// Check version compatibility
-		if (header.version != FORMAT_VERSION)
-			SPRaise("Unsupported .2kv6 format version: %u (this reader supports version %u)",
+		if (header.version < 1 || header.version > FORMAT_VERSION)
+			SPRaise("Unsupported .2kv6 format version: %u (this reader supports 1 to %u)",
 			        header.version, FORMAT_VERSION);
 
-		uint16_t numRootObjects = header.numRootObjects;
+		SceneFile scene;
+		scene.objects.reserve(header.numRootObjects);
+		for (uint16_t i = 0; i < header.numRootObjects; i++)
+			scene.objects.push_back(LoadObject(stream, header.version, 0));
 
-		std::vector<VoxelObject> objects;
-		objects.reserve(numRootObjects);
-
-		for (uint16_t i = 0; i < numRootObjects; i++) {
-			objects.push_back(LoadObject(stream, 0));
+		if (header.version >= 2) {
+			scene.metadata = ReadMetadata(stream);
+			CheckUniqueNames(scene.metadata);
+			uint16_t clips;
+			ReadValue(stream, clips, "a clip count");
+			for (uint16_t c = 0; c < clips; c++)
+				scene.clips.push_back(ReadClip(stream));
+			for (std::size_t i = 0; i < scene.clips.size(); i++)
+				for (std::size_t j = i + 1; j < scene.clips.size(); j++)
+					if (scene.clips[i].name == scene.clips[j].name)
+						SPRaise("Two clips are named '%s'", scene.clips[i].name.c_str());
 		}
-
-		return objects;
+		return scene;
 	}
 
-	void VoxelModel2KV6::Save(IStream& stream, const std::vector<VoxelObject>& objects) {
+	void VoxelModel2KV6::SaveScene(IStream& stream, const SceneFile& scene) {
 		SPADES_MARK_FUNCTION();
 
 		// A scene with no objects is written as such: an editor may empty one,
 		// and it must be able to save and reopen it.
-		if (objects.size() > UINT16_MAX)
-			SPRaise("Too many root objects in .2kv6 scene: %zu (max %u)", objects.size(),
+		if (scene.objects.size() > UINT16_MAX)
+			SPRaise("Too many root objects in .2kv6 scene: %zu (max %u)", scene.objects.size(),
 			        UINT16_MAX);
+		if (scene.clips.size() > UINT16_MAX)
+			SPRaise("Too many clips in .2kv6 scene: %zu", scene.clips.size());
+		for (std::size_t i = 0; i < scene.clips.size(); i++)
+			for (std::size_t j = i + 1; j < scene.clips.size(); j++)
+				if (scene.clips[i].name == scene.clips[j].name)
+					SPRaise("Two clips are named '%s'", scene.clips[i].name.c_str());
+
+		// Version 1 while nothing of version 2 is used, so older readers keep
+		// reading what they could read before.
+		const uint16_t version =
+		  (scene.metadata.empty() && scene.clips.empty() && !UsesVersion2(scene.objects))
+		    ? uint16_t(1)
+		    : FORMAT_VERSION;
 
 		// Write file header (8 bytes total)
 		KV6FileHeader header;
 		std::strncpy(header.magic, MAGIC, 4);
-		header.version = FORMAT_VERSION;
-		header.numRootObjects = static_cast<uint16_t>(objects.size());
+		header.version = version;
+		header.numRootObjects = static_cast<uint16_t>(scene.objects.size());
 		stream.Write(&header, sizeof(header));
 
 		// Recursively write objects
-		for (const VoxelObject& obj : objects) {
-			SaveObject(stream, obj, 0);
+		for (const VoxelObject& obj : scene.objects)
+			SaveObject(stream, obj, version, 0);
+
+		if (version >= 2) {
+			WriteMetadata(stream, scene.metadata);
+			const uint16_t clips = static_cast<uint16_t>(scene.clips.size());
+			stream.Write(&clips, sizeof(clips));
+			for (const AnimationClip& clip : scene.clips)
+				WriteClip(stream, clip);
 		}
 
 		stream.Flush();
+	}
+
+	void VoxelModel2KV6::Validate(const MetadataEntry& entry) {
+		if (entry.name.empty() || entry.name.size() > 255)
+			SPRaise("A metadata name is 1 to 255 bytes long");
+		if (entry.data.size() > kMaxMetadataBytes)
+			SPRaise("Metadata '%s' is %zu bytes, more than the %u a .2kv6 holds",
+			        entry.name.c_str(), entry.data.size(), kMaxMetadataBytes);
+		const std::string& d = entry.data;
+		const char* name = entry.name.c_str();
+		switch (entry.type) {
+			case MetadataType::Text:
+			case MetadataType::Script: {
+				// UTF-8, every sequence well formed, and no NUL anywhere.
+				for (std::size_t i = 0; i < d.size();) {
+					const unsigned char c = static_cast<unsigned char>(d[i]);
+					if (c == 0)
+						SPRaise("Metadata '%s' holds a NUL byte: text holds none", name);
+					// How many continuation bytes the lead byte announces.
+					const int more = c < 0x80          ? 0
+					                 : (c >> 5) == 0x6  ? 1
+					                 : (c >> 4) == 0xE  ? 2
+					                 : (c >> 3) == 0x1E ? 3
+					                                    : -1;
+					if (more < 0 || i + std::size_t(more) >= d.size())
+						SPRaise("Metadata '%s' is not UTF-8 text", name);
+					for (int k = 1; k <= more; k++)
+						if ((static_cast<unsigned char>(d[i + k]) & 0xC0) != 0x80)
+							SPRaise("Metadata '%s' is not UTF-8 text", name);
+					i += std::size_t(more) + 1;
+				}
+				return;
+			}
+			case MetadataType::Audio:
+				// An Ogg stream whose first packet is an Opus header.
+				if (d.size() < 36 || d.compare(0, 4, "OggS") != 0 || d.compare(28, 8, "OpusHead") != 0)
+					SPRaise("Metadata '%s' is not Opus audio in Ogg: the only sound a .2kv6 holds",
+					        name);
+				return;
+			case MetadataType::Image:
+				if (d.size() < 8 || d.compare(0, 8, "\x89PNG\r\n\x1a\n") != 0)
+					SPRaise("Metadata '%s' is not a PNG image: the only image a .2kv6 holds", name);
+				return;
+		}
+		SPRaise("Metadata '%s' is of an unknown type %u: a .2kv6 holds text, Opus audio, "
+		        "PNG images and scripts",
+		        name, unsigned(entry.type));
+	}
+
+	void VoxelModel2KV6::Validate(const AnimationClip& clip) {
+		if (clip.name.empty() || clip.name.size() > 255)
+			SPRaise("A clip's name is 1 to 255 bytes long");
+		if (!(clip.duration > 0.0F) || !std::isfinite(clip.duration))
+			SPRaise("Clip '%s' lasts no time: its duration is above zero", clip.name.c_str());
+		for (const AnimationTrack& track : clip.tracks) {
+			if (track.path.empty())
+				SPRaise("A track of clip '%s' names no object", clip.name.c_str());
+			for (const TransformKeyframe& kf : track.keyframes)
+				if (!(kf.time >= 0.0F && kf.time <= clip.duration))
+					SPRaise("A key of '%s' in clip '%s' lies outside its %g seconds",
+					        track.path.c_str(), clip.name.c_str(), double(clip.duration));
+		}
 	}
 
 	VoxelObject VoxelModel2KV6::CreateObject(const std::string& name, int sizeXYZ) {
