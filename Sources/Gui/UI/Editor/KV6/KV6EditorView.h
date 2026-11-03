@@ -153,6 +153,9 @@ namespace spades {
 			void NewScene(int n, const std::string& path);
 			/** Closes the scene, back to editing a lone model. */
 			void CloseScene();
+			/** Makes the lone model open a scene of one object, named after its
+			 *  file, shown in Object mode; the scene is saved as a new .2kv6. */
+			void ConvertToScene();
 			Handle<VoxelModel> SeedModel(int n);
 			std::unique_ptr<VoxelEditor> editor;
 			std::string filePath;

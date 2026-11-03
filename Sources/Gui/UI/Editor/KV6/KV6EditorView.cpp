@@ -319,6 +319,27 @@ namespace spades {
 			FrameCamera();
 		}
 
+		void KV6EditorView::ConvertToScene() {
+			if (scene)
+				return;
+			// The model as it stands, pending voxels placed.
+			VoxelEditor::DocumentCommand command(*editor);
+			std::string name = LocalFileSystem::GetFileName(filePath);
+			const std::size_t dot = name.rfind('.');
+			if (dot != std::string::npos)
+				name.resize(dot);
+			scene = std::make_unique<KV6Scene>();
+			scene->StartWith(Handle<VoxelModel>(document.Model()), name.empty() ? "Object" : name);
+			editedState = editor->DocumentStateId();
+			editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+			// A new document: the model's file stays as it was, and saving asks
+			// where the scene goes.
+			filePath.clear();
+			editor->SetObjectMode(true);
+			FrameCamera();
+			editor->SetStatus("Converted to a scene of one object; save it as a .2kv6");
+		}
+
 		void KV6EditorView::TakeBackEditedObject() {
 			const int picked = scene ? scene->Picked() : -1;
 			if (picked < 0)
@@ -467,6 +488,9 @@ namespace spades {
 			// Always available: a document with nowhere to go yet is asked where.
 			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
+			// A lone model can become the first object of a scene.
+			if (!scene)
+				items.push_back(EditorMenuItem{"Convert to Scene", [this] { ConvertToScene(); }, true});
 			// Inserting places voxels, which only Edit mode edits.
 			if (!ShowingObjects())
 				items.push_back(
