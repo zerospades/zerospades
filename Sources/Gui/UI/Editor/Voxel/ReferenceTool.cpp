@@ -140,7 +140,7 @@ namespace spades {
 			const bool loaded = ref.Loaded();
 			options.SetNumber(kSizeOption, ref.size);
 			for (int a = 0; a < 3; a++)
-				options.SetNumber(kCentreOption[a], (&ref.centre.x)[a]);
+				options.SetNumber(kCentreOption[a], ref.centre[a]);
 			options.SetNumber(kOpacityOption, ref.opacity);
 			options.SetBool(kShowOption, ref.visible);
 			options.SetBool(kFlipOption, ref.flipped);
@@ -174,7 +174,7 @@ namespace spades {
 				ref.opacity = std::max(0.0F, std::min(1.0F, value));
 			for (int a = 0; a < 3; a++) {
 				if (id == kCentreOption[a])
-					(&ref.centre.x)[a] = value;
+					ref.centre[a] = value;
 			}
 		}
 
