@@ -2263,16 +2263,20 @@ namespace spades {
 		void VoxelEditor::DrawToolbar(float sw) {
 			screenWidth = sw; // for hit tests in ButtonEvent
 
-			// Mode buttons; the ones not supported yet are greyed out.
+			// Mode buttons, for the modes this document has; a document with
+			// only one has nothing to switch between, and shows none.
 			std::vector<Toolbar::ToolbarButton> modeButtons;
 			for (const ModeInfo& info : Modes()) {
+				if (!ModeSupported(info.mode))
+					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = info.id;
 				btn.label = info.label;
-				btn.enabled = ModeSupported(info.mode);
 				btn.active = info.mode == currentMode;
 				modeButtons.push_back(btn);
 			}
+			if (modeButtons.size() < 2)
+				modeButtons.clear();
 			ui.GetToolbar()->SetModeButtons(modeButtons);
 
 			// Tool buttons. A hot key the editor already uses for something else

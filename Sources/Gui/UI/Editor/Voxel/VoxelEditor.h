@@ -271,8 +271,9 @@ namespace spades {
 			void WriteVoxel(int x, int y, int z, bool solid, std::uint32_t color);
 
 			// --- Mode (Blender-style) -----------------------------------------
-			// Voxels are only edited in Edit mode. Object and Animation are shown
-			// greyed out: they arrive with .2kv6 scenes.
+			// Voxels are only edited in Edit mode, the only one so far: Object
+			// and Animation arrive with .2kv6 scenes, and a mode the document
+			// cannot use is not shown.
 			enum class EditorMode { Object, Edit, Animation };
 			EditorMode currentMode = EditorMode::Edit;
 			static bool ModeSupported(EditorMode mode) { return mode == EditorMode::Edit; }
