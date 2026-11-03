@@ -85,7 +85,7 @@ namespace spades {
 			const Quaternion turn(rotation);
 			for (int k = 0; k < 3; k++) {
 				Vector3 a = MakeVector3(0.0F, 0.0F, 0.0F);
-				(&a.x)[index[k]] = 1.0F;
+				a[index[k]] = 1.0F;
 				axes[k] = turn.Apply(a);
 			}
 		}
