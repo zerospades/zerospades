@@ -49,17 +49,23 @@ namespace spades {
 			// The smallest an image is scaled to, in voxels across.
 			constexpr float kMinSize = 0.1F;
 
-			// Every handle but the trackball, as Object mode's: free rotation
-			// would answer to a press anywhere inside the rings.
+			// An image turns only within its own plane, about the axis out of it
+			// (the pose's third, see ReferenceFrame): the other rings, the view
+			// ring and the trackball would tilt it out of the view it shows.
 			GizmoHandleSet ImageHandles() {
-				return GizmoHandleSet::All().Without(GizmoHandle::RotateTrackball);
+				return GizmoHandleSet::All()
+				  .Without(GizmoHandle::RotateTrackball)
+				  .Without(GizmoHandle::RotateView)
+				  .Without(GizmoHandle::RotateX)
+				  .Without(GizmoHandle::RotateY);
 			}
 
 			/**
 			 * The image across one axis, handled with a gizmo on it: its arrows
-			 * and squares move it, its rings turn it, and its cubes scale it,
-			 * keeping its shape. It follows a drag live, as nothing about it is
-			 * journaled, and Escape puts it back where the drag began.
+			 * and squares move it, its ring turns it within its plane, and its
+			 * cubes scale it, keeping its shape. It follows a drag live, as
+			 * nothing about it is journaled, and Escape puts it back where the
+			 * drag began.
 			 */
 			class ImageGizmoSubTool : public GizmoSubTool {
 			public:
