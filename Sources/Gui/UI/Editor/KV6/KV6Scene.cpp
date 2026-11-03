@@ -62,18 +62,18 @@ namespace spades {
 		// --- Files -------------------------------------------------------------
 
 		bool KV6Scene::Load(const std::string& path) {
-			std::vector<VoxelObject> loaded;
+			VoxelModel2KV6::SceneFile loaded;
 			std::FILE* f = fs::OpenFile(path, "rb");
 			if (!f)
 				return false;
 			try {
 				StdStream stream(f, true); // takes ownership of the FILE*
-				loaded = VoxelModel2KV6::Load(stream);
+				loaded = VoxelModel2KV6::LoadScene(stream);
 			} catch (const std::exception&) {
 				return false;
 			}
 			std::vector<VoxelObject> previous = std::move(roots);
-			roots = std::move(loaded);
+			roots = std::move(loaded.objects);
 			Index();
 			if (entries.empty()) {
 				// Nothing in it to show or edit: the scene open stays.
@@ -81,6 +81,8 @@ namespace spades {
 				Index();
 				return false;
 			}
+			metadata = std::move(loaded.metadata);
+			clips = std::move(loaded.clips);
 			picked = 0;
 			history.clear();
 			undoTop = 0;
@@ -95,7 +97,11 @@ namespace spades {
 				return false;
 			try {
 				StdStream stream(f, true); // takes ownership; closes at scope exit
-				VoxelModel2KV6::Save(stream, roots);
+				VoxelModel2KV6::SceneFile file;
+				file.objects = roots;
+				file.metadata = metadata;
+				file.clips = clips;
+				VoxelModel2KV6::SaveScene(stream, file);
 			} catch (const std::exception&) {
 				fs::Delete(tmpPath);
 				return false;
@@ -113,6 +119,8 @@ namespace spades {
 			object.model = std::move(model);
 			roots.clear();
 			roots.push_back(std::move(object));
+			metadata.clear();
+			clips.clear();
 			Index();
 			picked = 0;
 			history.clear();
