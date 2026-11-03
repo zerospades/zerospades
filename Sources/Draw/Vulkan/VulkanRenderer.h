@@ -475,6 +475,8 @@ namespace spades {
 			float ScreenWidth() override;
 			float ScreenHeight() override;
 
+			client::RendererInfo GetRendererInfo() override;
+
 			// IGameMapListener implementation
 			void GameMapChanged(int x, int y, int z, client::GameMap*) override;
 

@@ -469,7 +469,11 @@ namespace spades {
 				if (info.renderWidth > 0 && info.renderHeight > 0)
 					addLine(DBGFormat("Render size: %dx%d", info.renderWidth, info.renderHeight), white);
 
-				if (!renderer->IsRendererSW()) {
+				if (!info.vsync.empty()) {
+					addLine(DBGFormat("VSync: %s", info.vsync.c_str()), white);
+				} else if (info.backend == "OpenGL") {
+					// The GL renderer presents through the SDL GL context, which
+					// knows its swap interval; other renderers report their own.
 					const int interval = SDL_GL_GetSwapInterval();
 					addLine(DBGFormat("VSync: %s", (interval == 0)
 						? "off" : ((interval > 0) ? "on" : "adaptive")),  white);

@@ -54,6 +54,8 @@ namespace spades {
 			VkSwapchainKHR swapchain;
 			VkFormat swapchainImageFormat;
 			VkExtent2D swapchainExtent;
+			/** How the swapchain presents, as chosen from `r_vsync`. */
+			VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 			std::vector<VkImage> swapchainImages;
 			std::vector<VkImageView> swapchainImageViews;
 
@@ -150,6 +152,7 @@ namespace spades {
 			VkSwapchainKHR GetSwapchain() const { return swapchain; }
 			VkFormat GetSwapchainImageFormat() const { return swapchainImageFormat; }
 			VkExtent2D GetSwapchainExtent() const { return swapchainExtent; }
+			VkPresentModeKHR GetPresentMode() const { return presentMode; }
 			const std::vector<VkImageView>& GetSwapchainImageViews() const { return swapchainImageViews; }
 			VkImage GetSwapchainImage(uint32_t index) const { return swapchainImages[index]; }
 			VkCommandPool GetCommandPool() const { return commandPool; }
