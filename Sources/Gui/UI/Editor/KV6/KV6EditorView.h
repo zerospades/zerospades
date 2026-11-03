@@ -103,6 +103,7 @@ namespace spades {
 			                   std::function<void(const std::string&)> picked) override;
 
 			// --- IObjectModeHost ----------------------------------------------
+			void SceneBox(Vector3& lo, Vector3& hi) const override { scene->Box(lo, hi); }
 			bool PickObjectAtCursor() override;
 			bool HasPickedObject() const override;
 			std::string PickedObjectName() const override;

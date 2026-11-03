@@ -338,8 +338,20 @@ namespace spades {
 			// --- Tools --------------------------------------------------------
 			std::vector<VoxelToolSlot> tools;
 			int activeTool = 0;
-			// Object mode's one tool, active whenever the editor is in it.
+			// Object mode's own tool, picking and placing the scene's objects.
 			std::unique_ptr<VoxelTool> objectTool;
+			// The tool active in Object mode: -1 for its own, or a registered
+			// tool that works on the scene rather than on voxels (see
+			// InObjectMode).
+			int objectModeTool = -1;
+			// The Edit tool the editor opens on, which Edit mode falls back to.
+			int defaultTool = 0;
+			// Whether registered tool `index` belongs to Object mode rather than
+			// to Edit mode: with a scene open, the reference images are the
+			// scene's, set up among its objects.
+			bool InObjectMode(int index) const;
+			// Makes `index` (-1 for Object mode's own) the active Object mode tool.
+			void SetObjectModeTool(int index);
 			// The active tool: Edit mode's, or Object mode's; null in a mode with
 			// none.
 			VoxelTool* ActiveTool();
