@@ -30,6 +30,7 @@
 #include <Core/Exception.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/StdStream.h>
+#include <Core/VoxelBlend.h>
 #include <Core/VoxelModel.h>
 #include <Core/VoxelModel2KV6.h>
 #include <Core/VoxelModelLoader.h>
@@ -81,7 +82,11 @@ namespace spades {
 		  "                           it stands in the scene; OUT.kv6: its voxels\n"
 		  "                           composed with all under it (--self: its own\n"
 		  "                           only), its pivot on the object's origin\n"
-		  "  flatten FILE OUT.kv6     the whole scene composed as the game draws\n"
+		  "  flatten FILE OUT.kv6 [--scale 1/N]\n"
+		  "                           the whole scene composed as the game draws;\n"
+		  "                           --scale 1/N makes it N times coarser, a\n"
+		  "                           lighter model to show far away (each N^3 block\n"
+		  "                           kept when at least half a plane full)\n"
 		  "                           it, its pivot on the scene's origin\n"
 		  "\n"
 		  "  move FILE OBJECT DX DY DZ        set-position FILE OBJECT X Y Z\n"
@@ -698,10 +703,21 @@ namespace spades {
 			if (cmd == "extract" || cmd == "flatten") {
 				Handle<VoxelModel> model;
 				if (cmd == "flatten") {
-					Need(rest, 2, "flatten FILE OUT.kv6");
+					const Options o = TakeOptions(rest, 1, {{"--scale", 1}});
+					Need(o.rest, 1, "flatten FILE OUT.kv6 [--scale 1/N]");
 					model = Composed(scene);
-					if (!gui::KV6ModelIO::Save(*model, rest[1]))
-						throw std::runtime_error("cannot write " + rest[1]);
+					if (o.Has("--scale")) {
+						// 1/N, or N itself, the factor the model gets coarser by.
+						std::string factor = o.Values("--scale")[0];
+						if (factor.compare(0, 2, "1/") == 0)
+							factor = factor.substr(2);
+						const int n = ParseInt(factor, "the scale's N (in 1/N)");
+						if (n < 1)
+							throw UsageError("--scale takes 1/N, N a whole number from 1");
+						model = DownsampledVoxelModel(*model, n);
+					}
+					if (!gui::KV6ModelIO::Save(*model, o.rest[0]))
+						throw std::runtime_error("cannot write " + o.rest[0]);
 					return 0;
 				}
 				const Options o = TakeOptions(rest, 1, {{"--self", 0}});
