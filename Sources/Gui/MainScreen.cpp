@@ -265,6 +265,17 @@ namespace spades {
 		// is torn down, so the renderer state it leaves behind is never swapped in.
 		void MainScreen::RunFrameLate(float dt) {
 			SPADES_MARK_FUNCTION();
+			// Started to open a model: go straight to the editor, so opening one
+			// from a terminal or a file manager lands where the file belongs rather
+			// than in the menus. Once a first frame has been presented, as when
+			// the editor is opened from the menus: an editor drawing the window's
+			// very first frame drew into no framebuffer, which GL refused.
+			if (ui && !subview && !pendingDocumentPath.empty()) {
+				std::string path;
+				path.swap(pendingDocumentPath); // opened once, not on every return here
+				OpenDocumentFile(path);
+				return;
+			}
 			if (!subview)
 				return;
 
@@ -303,14 +314,6 @@ namespace spades {
 				throw;
 			}
 
-			// Started to open a model: go straight to the editor, so opening one
-			// from a terminal or a file manager lands where the file belongs rather
-			// than in the menus.
-			if (!pendingDocumentPath.empty()) {
-				std::string path;
-				path.swap(pendingDocumentPath); // opened once, not on every return here
-				OpenDocumentFile(path);
-			}
 		}
 
 		void MainScreen::OpenDocumentFile(const std::string& path) {
