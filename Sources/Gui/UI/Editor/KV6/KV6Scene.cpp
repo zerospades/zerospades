@@ -189,8 +189,8 @@ namespace spades {
 				float enter = 0.0F, leave = std::numeric_limits<float>::max();
 				bool misses = false;
 				for (int a = 0; a < 3 && !misses; a++) {
-					const float f = (&from.x)[a], d = (&along.x)[a];
-					const float l = (&lo.x)[a], h = (&hi.x)[a];
+					const float f = from[a], d = along[a];
+					const float l = lo[a], h = hi[a];
 					if (std::fabs(d) < 1.0e-6F) {
 						misses = f < l || f > h;
 						continue;
