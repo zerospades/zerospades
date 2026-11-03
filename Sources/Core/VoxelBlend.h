@@ -51,8 +51,9 @@ namespace spades {
 	/**
 	 * `model` at a resolution `factor` times coarser, for a model to show far
 	 * away: each block of factor x factor x factor voxels becomes one voxel
-	 * when it holds at least half a plane of them (so thin plates survive,
-	 * single strands do not), in the mean colour of its voxels in sight. The
+	 * when it holds at least a quarter of a plane of them (so plates and
+	 * rods a few voxels thick survive, single strands do not), in the mean
+	 * colour of its voxels in sight. The
 	 * pivot stays where it was, scaled down with the model.
 	 */
 	Handle<VoxelModel> DownsampledVoxelModel(const VoxelModel& model, int factor);
