@@ -123,7 +123,10 @@ namespace spades {
 				}
 				return true;
 			}
-		} // namespace
+					// The toolbar id of Object mode's own tool, which no registered
+			// tool takes.
+			const char* const kObjectToolId = "object";
+} // namespace
 
 		/**
 		 * The model's pivot, as the transform panel sets it: a Location only,
@@ -207,6 +210,7 @@ namespace spades {
 					break;
 				}
 			}
+			defaultTool = activeTool;
 			WireUI();
 		}
 
@@ -283,7 +287,10 @@ namespace spades {
 				}
 			};
 			ui.GetToolbar()->OnToolClicked = [this](const std::string& id) {
-				SetActiveTool(ToolIndex(id));
+				if (currentMode == EditorMode::Object && id == kObjectToolId)
+					SetObjectModeTool(-1);
+				else
+					SetActiveTool(ToolIndex(id));
 			};
 			ui.GetToolbar()->OnUndoClicked = [this]() { Undo(); };
 			ui.GetToolbar()->OnRedoClicked = [this]() { Redo(); };
@@ -2359,16 +2366,21 @@ namespace spades {
 			if (first) {
 				int u, v;
 				ReferenceAxes(axis, u, v);
+				// The box it is fitted to, from voxel edge to edge: the document's
+				// volume, or with a scene's objects shown, all of them.
 				const IntVector3 size = document.Size();
-				const float extent[3] = {float(size.x), float(size.y), float(size.z)};
-				ref.size = std::max(1.0F, std::max(extent[u], extent[v]));
+				Vector3 lo = MakeVector3(-0.5F, -0.5F, -0.5F);
+				Vector3 hi = MakeVector3(float(size.x), float(size.y), float(size.z)) - 0.5F;
+				if (currentMode == EditorMode::Object && ObjectMode())
+					ObjectMode()->SceneBox(lo, hi);
+				ref.size = std::max(1.0F, std::max(hi[u] - lo[u], hi[v] - lo[v]));
 				Vector3& centre = ref.centre;
-				centre[u] = extent[u] * 0.5F - 0.5F;
-				centre[v] = extent[v] * 0.5F - 0.5F;
+				centre[u] = (lo[u] + hi[u]) * 0.5F;
+				centre[v] = (lo[v] + hi[v]) * 0.5F;
 				// Behind the voxels as each view is usually looked from: the side
 				// from +X, the front from -Y, and the top from above (Z points
 				// down, so above is the low end of Z).
-				centre[axis] = axis == 0 ? -1.0F : axis == 1 ? extent[1] : extent[2];
+				centre[axis] = axis == 0 ? lo.x - 0.5F : axis == 1 ? hi.y + 0.5F : hi.z + 0.5F;
 				ref.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
 			}
 			SetStatus(std::string("Reference image across ") + kAxisName[axis] + ": " +
@@ -2555,12 +2567,42 @@ namespace spades {
 		}
 
 		void VoxelEditor::SetActiveTool(int index) {
+			if (index < 0 || index >= int(tools.size()))
+				return;
+			// A tool belongs to one mode: in the other, its button is not shown
+			// and its hot key does nothing.
+			if (currentMode == EditorMode::Object) {
+				if (InObjectMode(index))
+					SetObjectModeTool(index);
+				return;
+			}
+			if (InObjectMode(index))
+				return;
 			if (!ToolAvailable(index)) {
-				if (index >= 0 && index < int(tools.size()))
-					SetStatus("Select some voxels first");
+				SetStatus("Select some voxels first");
 				return;
 			}
 			Activate(index, currentMode);
+		}
+
+		bool VoxelEditor::InObjectMode(int index) const {
+			return host.ObjectMode() && index >= 0 && index < int(tools.size()) &&
+			       tools[std::size_t(index)].id == "reference";
+		}
+
+		void VoxelEditor::SetObjectModeTool(int index) {
+			if (index == objectModeTool || (index >= 0 && !InObjectMode(index)))
+				return;
+			ui.GetOptionBar()->EndEditing(true);
+			VoxelTool* previous = ActiveTool();
+			objectModeTool = index;
+			VoxelTool* current = ActiveTool();
+			if (previous == current)
+				return;
+			if (previous)
+				previous->OnDeactivate(*this);
+			if (current)
+				current->OnActivate(*this);
 		}
 
 		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
@@ -2604,6 +2646,8 @@ namespace spades {
 			const bool wasEditing = currentMode == EditorMode::Edit;
 			if (wasEditing && mode != EditorMode::Edit)
 				EndUserAction(); // nothing previewed is carried out of the document
+			if (mode == EditorMode::Edit && InObjectMode(toolIndex))
+				toolIndex = defaultTool;
 			activeTool = toolIndex;
 			currentMode = mode;
 			// The scene takes the voxels back as Edit mode is left, and hands the
@@ -2704,6 +2748,9 @@ namespace spades {
 			if (key.empty() || lmbHeld || rmbHeld || KeyIsTaken(key))
 				return false;
 			for (size_t i = 0; i < tools.size(); i++) {
+				// Only the tools of the mode the editor is in.
+				if ((currentMode == EditorMode::Object) != InObjectMode(int(i)))
+					continue;
 				if (!tools[i].hotKey.empty() && EqualsIgnoringCase(tools[i].hotKey, key)) {
 					SetActiveTool(int(i));
 					return true;
@@ -2733,9 +2780,13 @@ namespace spades {
 		}
 
 		VoxelTool* VoxelEditor::ActiveTool() {
-			if (currentMode == EditorMode::Object && ObjectMode())
+			if (currentMode == EditorMode::Object && ObjectMode()) {
+				if (InObjectMode(objectModeTool))
+					return tools[std::size_t(objectModeTool)].tool.get();
 				return objectTool.get();
-			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()))
+			}
+			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()) &&
+			    !InObjectMode(activeTool))
 				return tools[activeTool].tool.get();
 			return nullptr;
 		}
@@ -3153,14 +3204,19 @@ namespace spades {
 				return;
 			// Object mode shows the scene, which the host draws; what is drawn
 			// below is the document's, Edit mode's.
+			// The images to model from, whatever the tool: they are depth tested,
+			// so the voxels in front of them hide them. A scene's are set up
+			// among its objects and shown with them, in Object mode only.
+			const bool scene = ObjectMode() != nullptr;
 			if (currentMode != EditorMode::Edit) {
+				if (scene && currentMode == EditorMode::Object)
+					DrawReferenceImages();
 				if (VoxelTool* tool = ActiveTool())
 					tool->DrawScene(*this);
 				return;
 			}
-			// The images to model from, whatever the tool: they are depth tested,
-			// so the voxels in front of them hide them.
-			DrawReferenceImages();
+			if (!scene)
+				DrawReferenceImages();
 			// Pending voxels (a paste, an import) render solid at their temporary
 			// position, in a document that does not hold them yet.
 			if (edit.placing && placementModel) {
@@ -3291,19 +3347,30 @@ namespace spades {
 
 			// Tool buttons. A hot key the editor already uses for something else
 			// never reaches the tool, so the button does not claim it.
-			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
+			// Each mode shows its own tools: Object mode its own first.
 			std::vector<Toolbar::ToolbarButton> toolButtons;
+			const bool objectTools = currentMode == EditorMode::Object && ObjectMode();
+			if (objectTools) {
+				Toolbar::ToolbarButton btn;
+				btn.id = kObjectToolId;
+				btn.label = objectTool->Label();
+				btn.active = objectModeTool < 0;
+				toolButtons.push_back(btn);
+			}
+			const int toolCount =
+			  (currentMode == EditorMode::Edit || objectTools) ? int(tools.size()) : 0;
 			for (int i = 0; i < toolCount; i++) {
 				// A strip has no button: the tool it is the strip of stands for it.
-				if (!tools[i].tool->StripOf().empty())
+				if (objectTools != InObjectMode(i) || !tools[i].tool->StripOf().empty())
 					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
 				btn.label = tools[i].tool->Label();
 				btn.hotKey = KeyIsTaken(tools[i].hotKey) ? std::string() : tools[i].hotKey;
-				btn.active = (activeTool == i) ||
-				             (activeTool >= 0 && activeTool < toolCount &&
-				              tools[activeTool].tool->StripOf() == tools[i].id);
+				btn.active = objectTools ? (objectModeTool == i)
+				                         : (activeTool == i) ||
+				                             (activeTool >= 0 && activeTool < toolCount &&
+				                              tools[activeTool].tool->StripOf() == tools[i].id);
 				btn.enabled = ToolAvailable(i);
 				btn.group = tools[i].group;
 				toolButtons.push_back(btn);
