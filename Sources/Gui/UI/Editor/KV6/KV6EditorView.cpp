@@ -32,6 +32,7 @@
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
 #include <Core/VoxelModel.h>
+#include <Gui/AutomationOptions.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
 #include <Gui/UI/Components/OptionBar.h>
@@ -146,6 +147,10 @@ namespace spades {
 				NewModel(kNewModelSize, path);
 			else if (!LoadModel(path))
 				NewModel(kNewModelSize, std::string());
+
+			// --editor-reference: images to model from, shown from the start.
+			for (const auto& reference : Automation().editorReferences)
+				editor->ShowReferenceImage(reference.first, reference.second);
 		}
 
 		KV6EditorView::~KV6EditorView() { SPADES_MARK_FUNCTION(); }
