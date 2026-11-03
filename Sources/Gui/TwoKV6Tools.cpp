@@ -89,6 +89,13 @@ namespace spades {
 		  "                           kept when at least half a plane full)\n"
 		  "                           it, its pivot on the scene's origin\n"
 		  "\n"
+		  "  combine FILE TARGET SOURCE [--over|--under|--carve|--paint|--intersect]\n"
+		  "          [--grow]         combine SOURCE's voxels with TARGET's where they\n"
+		  "                           lie in the scene: union (--over, the default,\n"
+		  "                           or --under), subtraction (--carve), painting,\n"
+		  "                           or intersection; --grow makes room for all of\n"
+		  "                           a union, TARGET staying where it is. SOURCE is\n"
+		  "                           left as it was\n"
 		  "  move FILE OBJECT DX DY DZ        set-position FILE OBJECT X Y Z\n"
 		  "  rotate FILE OBJECT AXIS DEGREES  turn about its origin, in its\n"
 		  "                                   parent's axes\n"
@@ -492,6 +499,74 @@ namespace spades {
 					hinge.position = ParseVector(o.Values("--at"), 0, "--at");
 				hinge.locked = o.Has("--lock");
 				siblings.push_back(std::move(hinge));
+				return true;
+			}
+			if (cmd == "combine") {
+				const Options o =
+				  TakeOptions(a, 1, {{"--over", 0}, {"--under", 0}, {"--carve", 0}, {"--paint", 0},
+				                     {"--intersect", 0}, {"--grow", 0}});
+				Need(o.rest, 2,
+				     "combine TARGET SOURCE [--over|--under|--carve|--paint|--intersect] [--grow]");
+				VoxelObject& target = Find(scene, o.rest[0]).Object();
+				const VoxelObject& source = Find(scene, o.rest[1]).Object();
+				if (&target == &source)
+					throw UsageError("an object combines with another, not with itself");
+				for (const VoxelObject* obj : {static_cast<const VoxelObject*>(&target), &source})
+					if (!obj->model)
+						throw std::runtime_error("'" + obj->name + "' is a hinge: it holds no voxels");
+				VoxelBlend mode = VoxelBlend::Over;
+				if (o.Has("--under"))
+					mode = VoxelBlend::Under;
+				else if (o.Has("--carve"))
+					mode = VoxelBlend::Carve;
+				else if (o.Has("--paint"))
+					mode = VoxelBlend::Paint;
+				else if (o.Has("--intersect"))
+					mode = VoxelBlend::Intersect;
+
+				// SOURCE's voxels where they land in TARGET's own voxels, through
+				// both objects' places in the scene, each on the nearest voxel.
+				const Matrix4 toTarget =
+				  (ParentTransform(scene, &target) * LocalTransform(target)).Inversed() *
+				  ParentTransform(scene, &source) * LocalTransform(source);
+				const VoxelModel& src = *source.model;
+				std::vector<std::pair<IntVector3, std::uint32_t>> landed;
+				IntVector3 lo = MakeIntVector3(0, 0, 0), hi = lo;
+				for (int x = 0; x < src.GetWidth(); x++)
+					for (int y = 0; y < src.GetHeight(); y++)
+						for (int z = 0; z < src.GetDepth(); z++) {
+							if (!src.IsSolid(x, y, z))
+								continue;
+							const Vector4 p = toTarget * MakeVector3(float(x), float(y), float(z));
+							const IntVector3 at = MakeIntVector3(int(std::lround(p.x)), int(std::lround(p.y)),
+							                                     int(std::lround(p.z)));
+							if (landed.empty())
+								lo = hi = at;
+							lo = MakeIntVector3(std::min(lo.x, at.x), std::min(lo.y, at.y), std::min(lo.z, at.z));
+							hi = MakeIntVector3(std::max(hi.x, at.x), std::max(hi.y, at.y), std::max(hi.z, at.z));
+							landed.emplace_back(at, src.GetColor(x, y, z) & 0xFFFFFF);
+						}
+				if (landed.empty())
+					throw std::runtime_error("'" + source.name + "' holds no voxels");
+				const IntVector3 extent = hi - lo + MakeIntVector3(1, 1, 1);
+				Handle<VoxelModel> placed = Handle<VoxelModel>::New(extent.x, extent.y, extent.z);
+				for (const auto& voxel : landed) {
+					const IntVector3 at = voxel.first - lo;
+					placed->SetSolid(at.x, at.y, at.z, voxel.second);
+				}
+
+				const Vector3 originBefore = target.model->GetOrigin();
+				Handle<VoxelModel> combined = BlendVoxels(target.model, *placed, lo, mode, o.Has("--grow"));
+				if (combined->GetWidth() > 4096 || combined->GetHeight() > 4096 ||
+				    combined->GetDepth() > 64)
+					throw std::runtime_error("the combined model would be larger than a KV6 holds "
+					                         "(4096 x 4096 x 64)");
+				// A grown model holds TARGET's voxels further along: the object
+				// moves back by as much, so they stay where they were.
+				const Vector3 shift = originBefore - combined->GetOrigin();
+				target.position =
+				  target.position - Quaternion(target.rotation).Apply(target.scale * shift);
+				target.model = combined;
 				return true;
 			}
 			if (cmd == "set-model") {
