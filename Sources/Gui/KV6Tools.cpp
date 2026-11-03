@@ -38,6 +38,7 @@
 #include <Core/IBitmapCodec.h>
 #include <Core/StdStream.h>
 #include <Core/LocalFileSystem.h>
+#include <Core/VoxelBlend.h>
 #include <Core/VoxelModel.h>
 #include <Gui/UI/Editor/KV6/KV6ModelIO.h>
 
@@ -111,12 +112,15 @@ namespace spades {
 		  "  fill-ball FILE X Y Z RADIUS [--hollow T] COLOR\n"
 		  "  fill-hollow-ball FILE X Y Z RADIUS T COLOR\n"
 		  "\n"
-		  "  blit FILE SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint]\n"
-		  "                         copy the solid voxels of the model SOURCE in,\n"
-		  "                         its voxel 0 0 0 at X Y Z (its pivot, with\n"
-		  "                         --pivot): over what is there (the default),\n"
-		  "                         under it (only into air), carving them out, or\n"
-		  "                         painting only what is solid\n"
+		  "  blit FILE SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint|--intersect]\n"
+		  "       [--grow]          combine the model SOURCE with it, its voxel\n"
+		  "                         0 0 0 at X Y Z (its pivot, with --pivot):\n"
+		  "                         union, over what is there (the default) or\n"
+		  "                         under it (only into air); subtraction\n"
+		  "                         (--carve); painting only what is solid; or\n"
+		  "                         intersection (keeping only what SOURCE\n"
+		  "                         covers). --grow makes room for all of a union\n"
+		  "                         instead of leaving out what falls outside\n"
 		  "\n"
 		  "  list-voxels FILE [--surface]\n"
 		  "                         one solid voxel per line: X Y Z RRGGBB (or\n"
@@ -497,25 +501,11 @@ namespace spades {
 
 		// --- Blit -------------------------------------------------------------
 
-		enum class BlitMode { Over, Under, Carve, Paint };
-
 		Handle<VoxelModel> Resized(const VoxelModel& m, int w, int h, int d, int dx, int dy,
 		                           int dz) {
 			CheckSize(w, h, d);
-			Handle<VoxelModel> out = Handle<VoxelModel>::New(w, h, d);
-			for (int x = 0; x < m.GetWidth(); x++)
-				for (int y = 0; y < m.GetHeight(); y++)
-					for (int z = 0; z < m.GetDepth(); z++) {
-						if (!m.IsSolid(x, y, z))
-							continue;
-						const int nx = x + dx, ny = y + dy, nz = z + dz;
-						if (nx < 0 || ny < 0 || nz < 0 || nx >= w || ny >= h || nz >= d)
-							continue;
-						out->SetSolid(nx, ny, nz, m.GetColor(x, y, z) & 0xFFFFFF);
-					}
 			// The pivot stays on the same voxels, as the editor keeps it.
-			out->SetOrigin(m.GetOrigin() - MakeVector3(float(dx), float(dy), float(dz)));
-			return out;
+			return ReframedVoxelModel(m, MakeIntVector3(w, h, d), MakeIntVector3(dx, dy, dz));
 		}
 
 		int ParseAxis(const std::string& v) {
@@ -666,27 +656,32 @@ namespace spades {
 				return true;
 			}
 			if (cmd == "blit") {
-				// blit SOURCE X Y Z [--pivot] [--under|--carve|--paint]
+				// blit SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint|--intersect]
+				// [--grow]
 				std::vector<std::string> v;
-				bool atPivot = false;
-				BlitMode mode = BlitMode::Over;
+				bool atPivot = false, grow = false;
+				VoxelBlend mode = VoxelBlend::Over;
 				for (std::size_t i = 1; i < a.size(); i++) {
 					if (a[i] == "--pivot")
 						atPivot = true;
+					else if (a[i] == "--grow")
+						grow = true;
 					else if (a[i] == "--under")
-						mode = BlitMode::Under;
+						mode = VoxelBlend::Under;
 					else if (a[i] == "--carve")
-						mode = BlitMode::Carve;
+						mode = VoxelBlend::Carve;
 					else if (a[i] == "--paint")
-						mode = BlitMode::Paint;
+						mode = VoxelBlend::Paint;
+					else if (a[i] == "--intersect")
+						mode = VoxelBlend::Intersect;
 					else if (a[i] == "--over")
-						mode = BlitMode::Over;
+						mode = VoxelBlend::Over;
 					else
 						v.push_back(a[i]);
 				}
 				if (v.size() != 4)
-					throw UsageError(
-					  "usage: blit SOURCE X Y Z [--pivot] [--over|--under|--carve|--paint]");
+					throw UsageError("usage: blit SOURCE X Y Z [--pivot] "
+					                 "[--over|--under|--carve|--paint|--intersect] [--grow]");
 				Handle<VoxelModel> source = Load(v[0]);
 				const VoxelModel& src = *source;
 				int at[3] = {ParseInt(v[1], "X"), ParseInt(v[2], "Y"), ParseInt(v[3], "Z")};
@@ -698,30 +693,10 @@ namespace spades {
 					at[1] -= int(std::lround(pivot.y));
 					at[2] -= int(std::lround(pivot.z));
 				}
-				for (int x = 0; x < src.GetWidth(); x++)
-					for (int y = 0; y < src.GetHeight(); y++)
-						for (int z = 0; z < src.GetDepth(); z++) {
-							if (!src.IsSolid(x, y, z))
-								continue;
-							const int tx = x + at[0], ty = y + at[1], tz = z + at[2];
-							if (tx < 0 || ty < 0 || tz < 0 || tx >= m.GetWidth() ||
-							    ty >= m.GetHeight() || tz >= m.GetDepth())
-								continue; // outside the model: left out
-							const std::uint32_t color = src.GetColor(x, y, z) & 0xFFFFFF;
-							const bool solid = m.IsSolid(tx, ty, tz);
-							switch (mode) {
-								case BlitMode::Over: m.SetSolid(tx, ty, tz, color); break;
-								case BlitMode::Under:
-									if (!solid)
-										m.SetSolid(tx, ty, tz, color);
-									break;
-								case BlitMode::Carve: m.SetAir(tx, ty, tz); break;
-								case BlitMode::Paint:
-									if (solid)
-										m.SetSolid(tx, ty, tz, color);
-									break;
-							}
-						}
+				Handle<VoxelModel> blended =
+				  BlendVoxels(model, src, MakeIntVector3(at[0], at[1], at[2]), mode, grow);
+				CheckSize(blended->GetWidth(), blended->GetHeight(), blended->GetDepth());
+				model = blended;
 				return true;
 			}
 			if (cmd == "rotate") {
