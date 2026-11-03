@@ -60,6 +60,13 @@
 
 #include "ObjectModeHost.h"
 #include "SubTool.h"
+
+namespace spades {
+	namespace gui {
+		// The toolbar id of Object mode's own tool, which no registered tool takes.
+		constexpr const char* kObjectToolId = "object";
+	} // namespace gui
+} // namespace spades
 #include "VoxelDocument.h"
 #include "VoxelEditorHost.h"
 

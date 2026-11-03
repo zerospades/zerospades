@@ -100,16 +100,21 @@ namespace spades {
 			if (first) {
 				int u, v;
 				ReferenceAxes(axis, u, v);
+				// The box it is fitted to, from voxel edge to edge: the document's
+				// volume, or with a scene's objects shown, all of them.
 				const IntVector3 size = document.Size();
-				const float extent[3] = {float(size.x), float(size.y), float(size.z)};
-				ref.size = std::max(1.0F, std::max(extent[u], extent[v]));
+				Vector3 lo = MakeVector3(-0.5F, -0.5F, -0.5F);
+				Vector3 hi = MakeVector3(float(size.x), float(size.y), float(size.z)) - 0.5F;
+				if (currentMode == EditorMode::Object && ObjectMode())
+					ObjectMode()->SceneBox(lo, hi);
+				ref.size = std::max(1.0F, std::max(hi[u] - lo[u], hi[v] - lo[v]));
 				Vector3& centre = ref.centre;
-				centre[u] = extent[u] * 0.5F - 0.5F;
-				centre[v] = extent[v] * 0.5F - 0.5F;
+				centre[u] = (lo[u] + hi[u]) * 0.5F;
+				centre[v] = (lo[v] + hi[v]) * 0.5F;
 				// Behind the voxels as each view is usually looked from: the side
 				// from +X, the front from -Y, and the top from above (Z points
 				// down, so above is the low end of Z).
-				centre[axis] = axis == 0 ? -1.0F : axis == 1 ? extent[1] : extent[2];
+				centre[axis] = axis == 0 ? lo.x - 0.5F : axis == 1 ? hi.y + 0.5F : hi.z + 0.5F;
 				ref.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
 			}
 			SetStatus(std::string("Reference image across ") + kAxisName[axis] + ": " +

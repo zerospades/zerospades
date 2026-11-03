@@ -101,6 +101,7 @@ namespace spades {
 			}
 			// Open on the tool registered for it, or the first.
 			activeTool = std::max(0, ToolWithRole(ToolRole::Initial));
+			defaultTool = activeTool;
 			// A history thrown away is said where the user reads, not only in
 			// the log: undo falling silent would otherwise go unexplained.
 			undo.OnDiscarded = [this](const std::string& why) {
@@ -177,7 +178,10 @@ namespace spades {
 			// Buttons report ids, resolved against the tools as they are now; the
 			// toolbar only reports clicks on enabled buttons.
 			ui.GetToolbar()->OnToolClicked = [this](const std::string& id) {
-				SetActiveTool(ToolIndex(id));
+				if (currentMode == EditorMode::Object && id == kObjectToolId)
+					SetObjectModeTool(-1);
+				else
+					SetActiveTool(ToolIndex(id));
 			};
 			ui.GetToolbar()->OnUndoClicked = [this]() { Undo(); };
 			ui.GetToolbar()->OnRedoClicked = [this]() { Redo(); };
@@ -523,9 +527,19 @@ namespace spades {
 		void VoxelEditor::SelectTool(int index) { SetActiveTool(index); }
 
 		void VoxelEditor::SetActiveTool(int index) {
+			if (index < 0 || index >= int(tools.size()))
+				return;
+			// A tool belongs to one mode: in the other, its button is not shown
+			// and its hot key does nothing.
+			if (currentMode == EditorMode::Object) {
+				if (InObjectMode(index))
+					SetObjectModeTool(index);
+				return;
+			}
+			if (InObjectMode(index))
+				return;
 			if (!ToolAvailable(index)) {
-				if (index >= 0 && index < int(tools.size()))
-					SetStatus("Select some voxels first");
+				SetStatus("Select some voxels first");
 				return;
 			}
 			Activate(index);
@@ -557,6 +571,8 @@ namespace spades {
 			const bool wasEditing = currentMode == EditorMode::Edit;
 			if (wasEditing && mode != EditorMode::Edit)
 				EndUserAction(); // nothing previewed is carried out of the document
+			if (mode == EditorMode::Edit && InObjectMode(toolIndex))
+				toolIndex = defaultTool;
 			activeTool = toolIndex;
 			currentMode = mode;
 			// The scene takes the voxels back as Edit mode is left, and hands the
@@ -569,6 +585,26 @@ namespace spades {
 			// The picker shows the colour it now sets, which may be another's.
 			if (ui.GetColorPicker()->IsOpen())
 				ui.GetColorPicker()->SetColor(PickedColor());
+		}
+
+		bool VoxelEditor::InObjectMode(int index) const {
+			return host.ObjectMode() && index >= 0 && index < int(tools.size()) &&
+			       tools[std::size_t(index)].id == "reference";
+		}
+
+		void VoxelEditor::SetObjectModeTool(int index) {
+			if (index == objectModeTool || (index >= 0 && !InObjectMode(index)))
+				return;
+			ui.GetOptionBar()->EndEditing(true);
+			VoxelTool* previous = ActiveTool();
+			objectModeTool = index;
+			VoxelTool* current = ActiveTool();
+			if (previous == current)
+				return;
+			if (previous)
+				previous->OnDeactivate(*this);
+			if (current)
+				current->OnActivate(*this);
 		}
 
 		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
@@ -693,6 +729,9 @@ namespace spades {
 			if (key.empty() || lmbHeld || rmbHeld || KeyIsTaken(key))
 				return false;
 			for (size_t i = 0; i < tools.size(); i++) {
+				// Only the tools of the mode the editor is in.
+				if ((currentMode == EditorMode::Object) != InObjectMode(int(i)))
+					continue;
 				if (!tools[i].hotKey.empty() && EqualsIgnoringCase(tools[i].hotKey, key)) {
 					SetActiveTool(int(i));
 					return true;
@@ -722,10 +761,13 @@ namespace spades {
 		}
 
 		VoxelTool* VoxelEditor::ActiveTool() {
-			if (currentMode == EditorMode::Object && ObjectMode())
+			if (currentMode == EditorMode::Object && ObjectMode()) {
+				if (InObjectMode(objectModeTool))
+					return tools[std::size_t(objectModeTool)].tool.get();
 				return objectTool.get();
+			}
 			if (currentMode == EditorMode::Edit && activeTool >= 0 &&
-			    activeTool < int(tools.size()))
+			    activeTool < int(tools.size()) && !InObjectMode(activeTool))
 				return tools[activeTool].tool.get();
 			return nullptr;
 		}

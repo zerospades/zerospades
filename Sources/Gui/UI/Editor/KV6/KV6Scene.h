@@ -71,6 +71,10 @@ namespace spades {
 			void Pick(int index) { picked = index; }
 			/** The object hit first along the view's ray through `cursor`, or -1. */
 			int ObjectAt(const GizmoView& view, const Vector2& cursor) const;
+			/** The box object `index` fills in the world, from voxel edge to edge. */
+			void Box(int index, Vector3& lo, Vector3& hi) const;
+			/** The box every object fills together. */
+			void Box(Vector3& lo, Vector3& hi) const;
 			/** The middle of object `index` and its largest extent, in the world. */
 			void Bounds(int index, Vector3& centre, float& size) const;
 			/** The same for every object at once. */

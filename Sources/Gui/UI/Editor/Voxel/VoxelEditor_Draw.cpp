@@ -199,14 +199,19 @@ namespace spades {
 				return;
 			// Object mode shows the scene, which the host draws; what is drawn
 			// below is the document's, Edit mode's.
+			// The images to model from, whatever the tool: they are depth tested,
+			// so the voxels in front of them hide them. A scene's are set up
+			// among its objects and shown with them, in Object mode only.
+			const bool scene = ObjectMode() != nullptr;
 			if (currentMode != EditorMode::Edit) {
+				if (scene && currentMode == EditorMode::Object)
+					DrawReferenceImages();
 				if (VoxelTool* tool = ActiveTool())
 					tool->DrawScene(*this);
 				return;
 			}
-			// The images to model from, whatever the tool: they are depth tested,
-			// so the voxels in front of them hide them.
-			DrawReferenceImages();
+			if (!scene)
+				DrawReferenceImages();
 			// Pending voxels (a paste, an import) render solid at their temporary
 			// position, in a document that does not hold them yet.
 			if (edit.placing && placementModel) {
@@ -323,19 +328,31 @@ namespace spades {
 
 			// Tool buttons. A hot key the editor already uses for something else
 			// never reaches the tool, so the button does not claim it.
-			const int toolCount = int(tools.size());
+			// Each mode shows its own tools: Object mode its own first.
 			std::vector<Toolbar::ToolbarButton> toolButtons;
+			const bool objectTools = currentMode == EditorMode::Object && ObjectMode();
+			if (objectTools) {
+				Toolbar::ToolbarButton btn;
+				btn.id = kObjectToolId;
+				btn.label = objectTool->Label();
+				btn.active = objectModeTool < 0;
+				toolButtons.push_back(btn);
+			}
+			const int toolCount =
+			  (currentMode == EditorMode::Edit || objectTools) ? int(tools.size()) : 0;
 			for (int i = 0; i < toolCount; i++) {
-				// A strip has no button: the tool it is the strip of stands for it.
-				if (!tools[i].traits.stripOf.empty())
+				// A strip has no button: the tool it is the strip of stands for
+				// it. A mode only offers its own tools.
+				if (objectTools != InObjectMode(i) || !tools[i].traits.stripOf.empty())
 					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
 				btn.label = tools[i].tool->Label();
 				btn.hotKey = KeyIsTaken(tools[i].hotKey) ? std::string() : tools[i].hotKey;
-				btn.active = (activeTool == i) ||
-				             (activeTool >= 0 && activeTool < toolCount &&
-				              tools[activeTool].traits.stripOf == tools[i].id);
+				btn.active = objectTools ? (objectModeTool == i)
+				                         : (activeTool == i) ||
+				                             (activeTool >= 0 && activeTool < toolCount &&
+				                              tools[activeTool].traits.stripOf == tools[i].id);
 				btn.enabled = ToolAvailable(i);
 				btn.group = tools[i].group;
 				toolButtons.push_back(btn);

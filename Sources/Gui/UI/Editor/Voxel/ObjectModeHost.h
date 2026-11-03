@@ -22,6 +22,8 @@
 
 #include <string>
 
+#include <Core/Math.h>
+
 namespace spades {
 	namespace gui {
 		struct GizmoPose;
@@ -39,6 +41,9 @@ namespace spades {
 		class IObjectModeHost {
 		public:
 			virtual ~IObjectModeHost() {}
+
+			/** The box the scene's objects fill together, in the world. */
+			virtual void SceneBox(Vector3& lo, Vector3& hi) const = 0;
 
 			/** Picks the object under the cursor, or nothing; false for nothing. */
 			virtual bool PickObjectAtCursor() = 0;

@@ -225,12 +225,29 @@ namespace spades {
 		}
 
 		void KV6Scene::Bounds(int index, Vector3& centre, float& size) const {
+			Vector3 lo, hi;
+			Box(index, lo, hi);
+			centre = (lo + hi) * 0.5F;
+			const Vector3 extent = hi - lo;
+			size = std::max(extent.x, std::max(extent.y, extent.z));
+		}
+
+		void KV6Scene::Box(Vector3& lo, Vector3& hi) const {
+			lo = hi = MakeVector3(0.0F, 0.0F, 0.0F);
+			for (int i = 0; i < Count(); i++) {
+				Vector3 l, h;
+				Box(i, l, h);
+				lo = i == 0 ? l : MakeVector3(std::min(lo.x, l.x), std::min(lo.y, l.y), std::min(lo.z, l.z));
+				hi = i == 0 ? h : MakeVector3(std::max(hi.x, h.x), std::max(hi.y, h.y), std::max(hi.z, h.z));
+			}
+		}
+
+		void KV6Scene::Box(int index, Vector3& lo, Vector3& hi) const {
 			const VoxelModel& model = *Object(index).model;
 			const Matrix4 world = WorldMatrix(index);
-			Vector3 lo = MakeVector3(std::numeric_limits<float>::max(),
-			                         std::numeric_limits<float>::max(),
-			                         std::numeric_limits<float>::max());
-			Vector3 hi = lo * -1.0F;
+			lo = MakeVector3(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+			                 std::numeric_limits<float>::max());
+			hi = lo * -1.0F;
 			for (int c = 0; c < 8; c++) {
 				const Vector3 corner =
 				  MakeVector3((c & 1) ? float(model.GetWidth()) - 0.5F : -0.5F,
@@ -240,9 +257,6 @@ namespace spades {
 				lo = MakeVector3(std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z));
 				hi = MakeVector3(std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z));
 			}
-			centre = (lo + hi) * 0.5F;
-			const Vector3 extent = hi - lo;
-			size = std::max(extent.x, std::max(extent.y, extent.z));
 		}
 
 		void KV6Scene::Bounds(Vector3& centre, float& size) const {
