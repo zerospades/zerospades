@@ -86,7 +86,7 @@ namespace spades {
 		  "                           the whole scene composed as the game draws;\n"
 		  "                           --scale 1/N makes it N times coarser, a\n"
 		  "                           lighter model to show far away (each N^3 block\n"
-		  "                           kept when at least half a plane full)\n"
+		  "                           kept when a quarter of a plane full)\n"
 		  "                           it, its pivot on the scene's origin\n"
 		  "\n"
 		  "  combine FILE TARGET SOURCE [--over|--under|--carve|--paint|--intersect]\n"

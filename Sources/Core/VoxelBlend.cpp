@@ -53,7 +53,7 @@ namespace spades {
 		const int w = (m.GetWidth() + factor - 1) / factor;
 		const int h = (m.GetHeight() + factor - 1) / factor;
 		const int d = (m.GetDepth() + factor - 1) / factor;
-		const int keep = std::max(1, factor * factor / 2);
+		const int keep = std::max(1, factor * factor / 4);
 		Handle<VoxelModel> out = Handle<VoxelModel>::New(w, h, d);
 		for (int bx = 0; bx < w; bx++)
 			for (int by = 0; by < h; by++)
