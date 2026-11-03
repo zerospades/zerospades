@@ -239,6 +239,8 @@ namespace spades {
 			Vector3 GetPivot() const override;
 			void SetPivot(const Vector3& pivot) override;
 			void PreviewPivot(const Vector3& pivot) override;
+			std::vector<IntVector3> SweptCells(int axis, int steps, bool pocket) const override;
+			void SweepSelection(int axis, int steps, bool pocket) override;
 			ReferenceImage& Reference(int axis) override;
 			void LoadReferenceImage(int axis) override;
 			void ClearReferenceImage(int axis) override;
@@ -362,6 +364,18 @@ namespace spades {
 			int documentCommandDepth = 0;
 			void NotifyDocumentChanged();
 			void HistoryReplayed();
+
+			// --- Sweeping ------------------------------------------------------
+			// A cell a sweep of the selection changes, with the colour of the
+			// selected voxel it comes from.
+			struct SweptCell {
+				IntVector3 at;
+				std::uint32_t color;
+			};
+			// The cells each selected voxel passes, `steps` voxels along `axis`:
+			// the ones after it for an extrusion, itself and the ones after it
+			// for a pocket. Mirror images are added when `mirrored`.
+			std::vector<SweptCell> SweepPath(int axis, int steps, bool pocket, bool mirrored) const;
 
 			// --- Volume -------------------------------------------------------
 			// A volume to reframe to: its size, and the shift moving today's voxels

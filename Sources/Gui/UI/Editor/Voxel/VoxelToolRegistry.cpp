@@ -21,6 +21,7 @@
 #include "VoxelTool.h"
 
 #include "DrawTool.h"
+#include "ExtrudeTool.h"
 #include "MirrorTool.h"
 #include "PaintTool.h"
 #include "PivotTool.h"
@@ -55,6 +56,7 @@ namespace spades {
 				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B");
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
 				registry.Register(Make<TransformTool>(), "transform", kEditingGroup, "T");
+				registry.Register(Make<ExtrudeTool>(), "extrude", kEditingGroup, "E");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
 				// The images to model from, across each axis.
