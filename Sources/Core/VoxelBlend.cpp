@@ -43,6 +43,49 @@ namespace spades {
 		return out;
 	}
 
+	Handle<VoxelModel> DownsampledVoxelModel(const VoxelModel& m, int factor) {
+		if (factor <= 1)
+			return ReframedVoxelModel(m, MakeIntVector3(m.GetWidth(), m.GetHeight(), m.GetDepth()),
+			                          MakeIntVector3(0, 0, 0));
+		// The colour a loaded model gives voxels sealed inside a shell (see
+		// VoxelModel::HollowFill): solid, but never seen.
+		constexpr std::uint32_t kInterior = 0xDDBEEF;
+		const int w = (m.GetWidth() + factor - 1) / factor;
+		const int h = (m.GetHeight() + factor - 1) / factor;
+		const int d = (m.GetDepth() + factor - 1) / factor;
+		const int keep = std::max(1, factor * factor / 2);
+		Handle<VoxelModel> out = Handle<VoxelModel>::New(w, h, d);
+		for (int bx = 0; bx < w; bx++)
+			for (int by = 0; by < h; by++)
+				for (int bz = 0; bz < d; bz++) {
+					int solid = 0, seen = 0;
+					unsigned r = 0, g = 0, b = 0;
+					for (int x = bx * factor; x < std::min(m.GetWidth(), (bx + 1) * factor); x++)
+						for (int y = by * factor; y < std::min(m.GetHeight(), (by + 1) * factor); y++)
+							for (int z = bz * factor; z < std::min(m.GetDepth(), (bz + 1) * factor);
+							     z++) {
+								if (!m.IsSolid(x, y, z))
+									continue;
+								solid++;
+								const std::uint32_t c = m.GetColor(x, y, z) & 0xFFFFFF;
+								if (c == kInterior)
+									continue;
+								seen++;
+								r += c & 0xFF;
+								g += (c >> 8) & 0xFF;
+								b += (c >> 16) & 0xFF;
+							}
+					if (solid < keep)
+						continue;
+					const std::uint32_t color =
+					  seen == 0 ? kInterior
+					            : (r / seen) | ((g / seen) << 8) | ((b / seen) << 16);
+					out->SetSolid(bx, by, bz, color);
+				}
+		out->SetOrigin(m.GetOrigin() / float(factor));
+		return out;
+	}
+
 	Handle<VoxelModel> BlendVoxels(Handle<VoxelModel> target, const VoxelModel& src,
 	                               const IntVector3& atIn, VoxelBlend mode, bool grow) {
 		IntVector3 at = atIn;

@@ -49,6 +49,15 @@ namespace spades {
 	                               const IntVector3& at, VoxelBlend mode, bool grow);
 
 	/**
+	 * `model` at a resolution `factor` times coarser, for a model to show far
+	 * away: each block of factor x factor x factor voxels becomes one voxel
+	 * when it holds at least half a plane of them (so thin plates survive,
+	 * single strands do not), in the mean colour of its voxels in sight. The
+	 * pivot stays where it was, scaled down with the model.
+	 */
+	Handle<VoxelModel> DownsampledVoxelModel(const VoxelModel& model, int factor);
+
+	/**
 	 * A copy of `model` in a volume of `size`, each voxel moved by `shift`,
 	 * the pivot staying on the same voxels; what falls outside is left out.
 	 */
