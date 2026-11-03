@@ -123,6 +123,12 @@ namespace spades {
 			 *  that is nothing. For a host framing it in its camera. */
 			bool SelectionBounds(IntVector3& lo, IntVector3& hi) const;
 
+			/** Shows the image at `path` across `axis`, as Load Image... does once
+			 *  a file is picked; false (with a status line) when it cannot be read. */
+			bool ShowReferenceImage(int axis, const std::string& path) {
+				return LoadReferenceFile(axis, path);
+			}
+
 			// --- Tools, for a host offering them elsewhere (a pie menu) ---------
 			int ToolCount() const { return int(tools.size()); }
 			/** The label of tool `index`, as on its toolbar button. */

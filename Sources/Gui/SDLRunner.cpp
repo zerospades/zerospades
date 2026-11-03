@@ -24,7 +24,11 @@
 
 #include "SDLRunner.h"
 
+#include <Client/ScreenShot.h>
 #include <Gui/Utils/DisplayUtils.h>
+
+#include "AutomationOptions.h"
+
 #include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
@@ -204,6 +208,8 @@ namespace spades {
 			{
 				Handle<View> view(CreateView(renderer, audio), false);
 				Uint32 ot = SDL_GetTicks();
+				const Uint32 startTicks = ot;
+				bool quitAfterFrame = false;
 
 				bool running = true;
 				bool lastShift = false;
@@ -243,9 +249,30 @@ namespace spades {
 						// (closing a subview, restoring renderer state) — that work must
 						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
+
+						// --screenshot-quit: the frame drawn that long after the start
+						// is saved, and the program quits.
+						const float screenshotAfter = Automation().screenshotQuitAfter;
+						if (screenshotAfter >= 0.0F &&
+						    float(SDL_GetTicks() - startTicks) / 1000.0F >= screenshotAfter) {
+							try {
+								SPLog("Screenshot taken before quitting: %s",
+								      client::SaveScreenShot(*renderer).c_str());
+							} catch (const std::exception& ex) {
+								SPLog("[!] Screenshot before quitting failed: %s", ex.what());
+							}
+							quitAfterFrame = true;
+						}
+
 						renderer->Flip();
 
 						view->RunFrameLate((float)dt / 1000.0F);
+					}
+
+					if (quitAfterFrame) {
+						view->Closing();
+						SPLog("Quitting after the screenshot (--screenshot-quit)");
+						break;
 					}
 
 					if (view->WantsToBeClosed()) {

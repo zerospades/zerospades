@@ -57,6 +57,7 @@
 #include <Core/Strings.h>
 #include <Core/Thread.h>
 #include <Core/ZipFileSystem.h>
+#include <Gui/AutomationOptions.h>
 #include <Gui/ConsoleScreen.h>
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/StartupScreen.h>
@@ -262,6 +263,13 @@ namespace {
 		printf("                       A file given on its own does the same, which\n");
 		printf("                       is what a file manager passes when it opens\n");
 		printf("                       one with this program.\n");
+		printf("  --editor-reference X|Y|Z IMAGE\n");
+		printf("                       show IMAGE as a reference image across that\n");
+		printf("                       axis in the model editor --open opens\n");
+		printf("  --screenshot-quit SECONDS\n");
+		printf("                       take a screenshot that many seconds after\n");
+		printf("                       starting, then quit: to check what is drawn\n");
+		printf("                       with no one at the keyboard\n");
 		printf("  --kv6-tools COMMAND FILE [ARGS...]\n");
 		printf("                       read and edit a KV6 model without opening the\n");
 		printf("                       game (its size, pivot, bounds, voxels); must\n");
@@ -384,6 +392,32 @@ namespace {
 			if (!strcasecmp(a, "--unregister-file-types")) {
 				g_unregisterFileTypes = true;
 				return ++i;
+			}
+			if (!strcasecmp(a, "--editor-reference")) {
+				if (i + 2 < argc) {
+					const std::string axis = argv[i + 1];
+					const int index = !strcasecmp(axis.c_str(), "x")   ? 0
+					                  : !strcasecmp(axis.c_str(), "y") ? 1
+					                  : !strcasecmp(axis.c_str(), "z") ? 2
+					                                                    : -1;
+					if (index < 0) {
+						fprintf(stderr, "--editor-reference: the axis is X, Y or Z\n");
+						return 0;
+					}
+					spades::gui::Automation().editorReferences.emplace_back(
+					  index, LocalPathFromArgument(argv[i + 2]));
+					i += 3;
+					return i;
+				}
+				return 0;
+			}
+			if (!strcasecmp(a, "--screenshot-quit")) {
+				if (i + 1 < argc) {
+					spades::gui::Automation().screenshotQuitAfter =
+					  std::max(0.0F, float(atof(argv[++i])));
+					return ++i;
+				}
+				return 0;
 			}
 			if (!strcasecmp(a, "--open")) {
 				if (i + 1 < argc) {
