@@ -1760,7 +1760,7 @@ namespace spades {
 				const IntVector3 size = document.Size();
 				const float extent[3] = {float(size.x), float(size.y), float(size.z)};
 				ref.size = std::max(1.0F, std::max(extent[u], extent[v]));
-				float* centre = &ref.centre.x;
+				Vector3& centre = ref.centre;
 				centre[u] = extent[u] * 0.5F - 0.5F;
 				centre[v] = extent[v] * 0.5F - 0.5F;
 				// Behind the voxels as each view is usually looked from: the side

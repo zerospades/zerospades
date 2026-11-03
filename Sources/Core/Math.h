@@ -287,6 +287,14 @@ namespace spades {
 			return v;
 		}
 
+		/**
+		 * The component on axis `i` (0 = x, 1 = y, 2 = z). Reaching y or z
+		 * through `(&v.x)[i]` instead is undefined: an optimizing compiler may
+		 * assume only x is ever touched, and drop the rest.
+		 */
+		float& operator[](int i) { return i == 0 ? x : (i == 1 ? y : z); }
+		const float& operator[](int i) const { return i == 0 ? x : (i == 1 ? y : z); }
+
 		Vector3 operator+(const Vector3& v) const { return Make(x + v.x, y + v.y, z + v.z); }
 		Vector3 operator-(const Vector3& v) const { return Make(x - v.x, y - v.y, z - v.z); }
 		Vector3 operator*(const Vector3& v) const { return Make(x * v.x, y * v.y, z * v.z); }

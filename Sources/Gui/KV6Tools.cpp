@@ -579,8 +579,7 @@ namespace spades {
 						out->SetSolid(p[0], p[1], p[2], m.GetColor(x, y, z) & 0xFFFFFF);
 					}
 			Vector3 pivot = m.GetOrigin() * -1.0F;
-			float* q = &pivot.x;
-			q[axis] = float(size[axis] - 1) - q[axis];
+			pivot[axis] = float(size[axis] - 1) - pivot[axis];
 			out->SetOrigin(pivot * -1.0F);
 			return out;
 		}
