@@ -895,10 +895,17 @@ namespace spades {
 
 			float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
 			bool leftHanded = weapSide < 0.0F;
+			// A skin handling left-handedness itself (IViewToolSkin2) is told the
+			// side and left alone; any other is mirrored whole when left-handed.
+			ScriptIViewToolSkin2 handedSkin(curSkin);
+			const bool skinHandlesSide = handedSkin.ImplementsInterface();
+			if (skinHandlesSide)
+				handedSkin.SetLeftHanded(leftHanded);
+			const bool mirrored = leftHanded && !skinHandlesSide;
 
 			// view weapon
 			Vector3 viewWeaponSway = viewWeaponOffset;
-			viewWeaponSway.x *= leftHanded ? -1.0F : 1.0F;
+			viewWeaponSway.x *= mirrored ? -1.0F : 1.0F;
 
 			// Moving this to the scripting environment means
 			// breaking compatibility with existing scripts.
@@ -1150,7 +1157,7 @@ namespace spades {
 				Vector3 shoulders[] = {{0.4F, 0.0F, 0.25F}, {-0.4F, 0.0F, 0.25F}};
 				Vector3 benddirs[] = {{0.5F, 0.2F, 0.0F}, {-0.5F, 0.2F, 0.0F}};
 
-				if (leftHanded) {
+				if (mirrored) {
 					std::swap(hands[0], hands[1]);
 					hands[0].x = -hands[0].x;
 					hands[1].x = -hands[1].x;
@@ -1189,7 +1196,7 @@ namespace spades {
 						axes[1] = Vector3::Cross(axes[2], MakeVector3(0, 0, 1)).Normalize();
 						axes[0] = Vector3::Cross(axes[1], axes[2]).Normalize();
 						Matrix4 mat = Matrix4::FromAxis(axes[0], axes[1], axes[2], v2);
-						if (leftHanded)
+						if (mirrored)
 							mat = Matrix4::Scale(-1, 1, 1) * mat;
 						return eyeMatrix * mat * armsScale;
 					};
@@ -1207,7 +1214,7 @@ namespace spades {
 						const float bendlen = sqrtf(std::max(armlenSqr - distSqr * 0.25F, 0.0F));
 						const Vector3 elbow = ((hand + shoulder) * 0.5F) + (bend * bendlen);
 
-						const bool isLeftArm = leftHanded ? (i != 0) : (i == 0);
+						const bool isLeftArm = mirrored ? (i != 0) : (i == 0);
 
 						// draw arm
 						param.matrix = getArmMatrix(hand, elbow);
@@ -1796,16 +1803,32 @@ namespace spades {
 			}
 
 			if (model) {
-				float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
-				bool leftHanded = weapSide < 0.0F;
-
-				Vector3 origin = ShouldRenderInThirdPersonView()
+				const bool thirdPerson = ShouldRenderInThirdPersonView();
+				Vector3 origin = thirdPerson
 					? GetCaseEjectPosition()
 					: GetCaseEjectPositionInFirstPersonView();
 
-				float casingSide = leftHanded ? -1.0F : 1.0F;
+				// A skin handling its handedness (IViewToolSkin2) is never mirrored
+				// and may say where its brass flies.
+				ScriptIViewToolSkin2 handedSkin(weaponViewSkin);
+				const bool skinHandlesSide = !thirdPerson && handedSkin.ImplementsInterface();
+
+				// Out to the right, or to the left for a left-handed player's own
+				// mirrored gun; another player's gun is held as its skin shows it,
+				// whatever this player's handedness.
+				float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
+				bool mirrored = weapSide < 0.0F && !thirdPerson && !skinHandlesSide;
+				float casingSide = mirrored ? -1.0F : 1.0F;
 				Vector3 o = p.GetFront();
 				Vector3 vel = o * 0.5F + p.GetRight() * casingSide + p.GetUp() * 0.2F;
+
+				if (skinHandlesSide) {
+					const Vector3 dir = handedSkin.GetCaseEjectDirection();
+					if (dir.GetSquaredLength() > 1.0e-8F) {
+						const Matrix4 eye = GetEyeMatrix();
+						vel = (eye * dir).GetXYZ() - eye.GetOrigin();
+					}
+				}
 
 				if (weaponType == SHOTGUN_WEAPON)
 					vel *= 0.5F;
