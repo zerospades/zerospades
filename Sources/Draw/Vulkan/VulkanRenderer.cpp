@@ -20,6 +20,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <string>
 #include <thread>
 #include "VulkanRenderer.h"
 #include "VulkanSettings.h"
@@ -1920,6 +1922,48 @@ namespace spades {
 
 		float VulkanRenderer::ScreenHeight() {
 			return static_cast<float>(device->ScreenHeight());
+		}
+
+		client::RendererInfo VulkanRenderer::GetRendererInfo() {
+			VkPhysicalDeviceProperties props;
+			vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
+
+			client::RendererInfo info;
+			info.backend = "Vulkan";
+			info.gpu = props.deviceName;
+			info.apiVersion = std::to_string(VK_API_VERSION_MAJOR(props.apiVersion)) + "." +
+			                  std::to_string(VK_API_VERSION_MINOR(props.apiVersion)) + "." +
+			                  std::to_string(VK_API_VERSION_PATCH(props.apiVersion));
+
+			// Vulkan only gives the PCI vendor id; name the common ones.
+			switch (props.vendorID) {
+				case 0x1002: info.vendor = "AMD"; break;
+				case 0x106B: info.vendor = "Apple"; break;
+				case 0x10DE: info.vendor = "NVIDIA"; break;
+				case 0x13B5: info.vendor = "ARM"; break;
+				case 0x5143: info.vendor = "Qualcomm"; break;
+				case 0x8086: info.vendor = "Intel"; break;
+				default: {
+					char id[16];
+					std::snprintf(id, sizeof(id), "0x%04X", props.vendorID);
+					info.vendor = id;
+				}
+			}
+
+			// Only worth reporting when the scene is rendered at a scale other than 1.
+			if (renderWidth != device->ScreenWidth() || renderHeight != device->ScreenHeight()) {
+				info.renderWidth = renderWidth;
+				info.renderHeight = renderHeight;
+			}
+
+			switch (device->GetPresentMode()) {
+				case VK_PRESENT_MODE_FIFO_KHR: info.vsync = "on"; break;
+				case VK_PRESENT_MODE_FIFO_RELAXED_KHR: info.vsync = "adaptive"; break;
+				case VK_PRESENT_MODE_IMMEDIATE_KHR:
+				case VK_PRESENT_MODE_MAILBOX_KHR: info.vsync = "off"; break;
+				default: break;
+			}
+			return info;
 		}
 
 		void VulkanRenderer::GameMapChanged(int x, int y, int z, client::GameMap* map) {

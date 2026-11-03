@@ -712,7 +712,7 @@ namespace spades {
 
 			// Waiting for the vertical blank or not, as `r_vsync` asks
 			presentVsync = GetVsyncSetting();
-			const VkPresentModeKHR presentMode = ChoosePresentMode(presentModes, presentVsync);
+			presentMode = ChoosePresentMode(presentModes, presentVsync);
 
 			swapchainExtent = extent;
 

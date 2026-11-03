@@ -137,6 +137,8 @@ namespace spades {
 			/** The resolution the scene is rendered at, or `0` when it is the screen's. */
 			int renderWidth = 0;
 			int renderHeight = 0;
+			/** Whether presenting waits for the vertical blank: "on", "off" or "adaptive". */
+			std::string vsync;
 		};
 
 		/**
