@@ -113,9 +113,9 @@ namespace spades {
 
 		Vector4 AxisAngle(int axis, float degrees) {
 			const float half = degrees * float(M_PI) / 360.0F;
-			Vector4 q = MakeVector4(0.0F, 0.0F, 0.0F, std::cos(half));
-			(&q.x)[axis] = std::sin(half);
-			return q;
+			const float s = std::sin(half);
+			return MakeVector4(axis == 0 ? s : 0.0F, axis == 1 ? s : 0.0F, axis == 2 ? s : 0.0F,
+			                   std::cos(half));
 		}
 
 		Vector4 Compose(const Vector4& a, const Vector4& b) {
