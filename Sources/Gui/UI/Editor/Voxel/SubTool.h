@@ -273,6 +273,35 @@ namespace spades {
 			void OnClickAway(IVoxelEditContext& ed) override;
 		};
 
+		/**
+		 * Sweeps the selected voxels along an axis with the gizmo's arrows, one
+		 * voxel per step: Extrude fills the cells they pass in their colours,
+		 * Pocket digs them out. The voxels need not lie on one face; each one
+		 * sweeps on its own. A drag previews the cells it would change, and its
+		 * release makes them one undo step; the selection then moves to where
+		 * the sweep ended, so sweeps chain.
+		 */
+		class SweepSubTool : public GizmoSubTool {
+		public:
+			explicit SweepSubTool(bool pocket);
+			const char* Label() const override { return pocket ? "Pocket" : "Extrude"; }
+			std::string Hint(IVoxelEditContext&) override;
+			void DrawScene(IVoxelEditContext&) override;
+
+		protected:
+			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
+			void OnGizmoBegin(IVoxelEditContext& ed) override;
+			void OnGizmoDrag(IVoxelEditContext& ed) override;
+			void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override;
+			void OnGizmoCancel(IVoxelEditContext& ed, const GizmoTransform& undo) override;
+
+		private:
+			const bool pocket;
+			int axis = -1;  // the arrow being dragged, -1 between drags
+			int steps = 0;  // how far it has been dragged, in voxels
+			int StepsOf(const GizmoTransform& total) const;
+		};
+
 		// Moves the model pivot with the gizmo, snapped as the Pivot tool sets it.
 		// Voxels stay put. The pivot follows the drag live and is committed as one
 		// undo step on release.

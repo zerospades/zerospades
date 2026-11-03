@@ -25,6 +25,7 @@
 #include <exception>
 #include <limits>
 #include <unordered_map>
+#include <tuple>
 #include <utility>
 
 #include <Client/Fonts.h>
@@ -670,6 +671,121 @@ namespace spades {
 					WriteVoxel(c.x, c.y, c.z, false, 0);
 			}
 			TrimVolume();
+		}
+
+		// --- Sweeping (Extrude, Pocket) ----------------------------------------
+
+		std::vector<VoxelEditor::SweptCell> VoxelEditor::SweepPath(int axis, int steps, bool pocket,
+		                                                           bool mirrored) const {
+			std::vector<SweptCell> path;
+			if (axis < 0 || axis > 2 || steps == 0)
+				return path;
+			IntVector3 unit = MakeIntVector3(0, 0, 0);
+			(axis == 0 ? unit.x : axis == 1 ? unit.y : unit.z) = steps > 0 ? 1 : -1;
+			const int count = std::abs(steps);
+			// An extrusion starts past each voxel; a pocket digs the voxel too.
+			const int first = pocket ? 0 : 1;
+			const int last = pocket ? count - 1 : count;
+			edit.selection.ForEach([&](const IntVector3& v) {
+				const std::uint32_t color = document.Color(v.x, v.y, v.z);
+				for (int k = first; k <= last; k++) {
+					std::vector<IntVector3> cells{v + unit * k};
+					if (mirrored)
+						ExpandMirrors(cells);
+					for (const IntVector3& c : cells)
+						path.push_back(SweptCell{c, color});
+				}
+			});
+			// Several voxels sweep through the same cell: it changes once, in
+			// the colour of the first to reach it.
+			std::stable_sort(path.begin(), path.end(), [](const SweptCell& a, const SweptCell& b) {
+				return std::tie(a.at.x, a.at.y, a.at.z) < std::tie(b.at.x, b.at.y, b.at.z);
+			});
+			path.erase(std::unique(path.begin(), path.end(),
+			                       [](const SweptCell& a, const SweptCell& b) { return a.at == b.at; }),
+			           path.end());
+			return path;
+		}
+
+		std::vector<IntVector3> VoxelEditor::SweptCells(int axis, int steps, bool pocket) const {
+			std::vector<IntVector3> cells;
+			for (const SweptCell& c : SweepPath(axis, steps, pocket, false)) {
+				const IntVector3& at = c.at;
+				const bool solid = InBounds(at.x, at.y, at.z) && document.IsSolid(at.x, at.y, at.z);
+				// A pocket digs what is there; an extrusion fills what is not.
+				if (pocket ? (solid && Editable(at.x, at.y, at.z)) : !solid)
+					cells.push_back(at);
+			}
+			return cells;
+		}
+
+		void VoxelEditor::SweepSelection(int axis, int steps, bool pocket) {
+			if (axis < 0 || axis > 2 || steps == 0)
+				return;
+			DocumentCommand command(*this);
+			if (edit.selection.Empty())
+				return;
+			IntVector3 reach = MakeIntVector3(0, 0, 0);
+			(axis == 0 ? reach.x : axis == 1 ? reach.y : reach.z) = steps;
+			std::vector<IntVector3> selected;
+			edit.selection.ForEach([&](const IntVector3& v) { selected.push_back(v); });
+			const std::vector<SweptCell> path = SweepPath(axis, steps, pocket, true);
+
+			if (pocket) {
+				int count = 0;
+				for (const SweptCell& c : path) {
+					if (Editable(c.at.x, c.at.y, c.at.z) && document.IsSolid(c.at.x, c.at.y, c.at.z))
+						count++;
+				}
+				if (count == 0) {
+					SetStatus("Nothing to dig there");
+					return;
+				}
+				if (count > document.RemovableVoxels()) {
+					SetStatus(document.RemovalLimitMessage());
+					return;
+				}
+				VoxelUndoStack::Step step(undo, "Pocket");
+				for (const SweptCell& c : path) {
+					if (Editable(c.at.x, c.at.y, c.at.z) && document.IsSolid(c.at.x, c.at.y, c.at.z))
+						WriteVoxel(c.at.x, c.at.y, c.at.z, false, 0);
+				}
+				// The pockets' floors are selected, so the next sweep digs on.
+				edit.selection.Clear();
+				for (const IntVector3& v : selected)
+					SelectIfSolid(v + reach);
+				TrimVolume();
+				return;
+			}
+
+			std::vector<IntVector3> cells;
+			for (const SweptCell& c : path)
+				cells.push_back(c.at);
+			IntVector3 lo, hi;
+			if (!BoundsOf(cells, lo, hi))
+				return;
+			const VolumeFrame frame = FrameHolding(lo, hi);
+			if (!Fits(frame)) {
+				SetStatus(SizeLimitMessage());
+				return;
+			}
+			VoxelUndoStack::Step step(undo, "Extrude");
+			Reframe(frame);
+			bool wrote = false;
+			for (const SweptCell& c : path) {
+				const IntVector3 at = c.at + frame.shift;
+				if (Editable(at.x, at.y, at.z) && !document.IsSolid(at.x, at.y, at.z)) {
+					WriteVoxel(at.x, at.y, at.z, true, c.color);
+					wrote = true;
+				}
+			}
+			if (!wrote)
+				SetStatus("Nothing to extrude: the way is filled");
+			// The ends of the extrusion are selected, so the next sweep goes on
+			// from them.
+			edit.selection.Clear();
+			for (const IntVector3& v : selected)
+				SelectIfSolid(v + reach + frame.shift);
 		}
 
 		void VoxelEditor::FillCells(const std::vector<IntVector3>& cells, std::uint32_t color) {
