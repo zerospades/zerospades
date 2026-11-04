@@ -13,66 +13,66 @@ msgstr ""
 "X-Generator: Poedit 3.10\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 
-#: Sources/Gui/UI/Components/LimboMenu.cpp:66 Sources/Client/Client.cpp:185
-#: Sources/Client/Client.cpp:1326 Sources/Client/Client_NetHandler.cpp:411
+#: Sources/Gui/UI/Components/LimboMenu.cpp:66 Sources/Client/Client.cpp:191
+#: Sources/Client/Client.cpp:1431 Sources/Client/Client_NetHandler.cpp:414
 msgctxt "Client"
 msgid "Spectator"
 msgstr "Espectador"
 
-#: Sources/Client/Client.cpp:758
+#: Sources/Client/Client.cpp:766
 msgctxt "Client"
 msgid "This server does not offer a quick menu."
 msgstr "Este servidor no dispone de un menú rápido."
 
-#: Sources/Client/Client.cpp:1285
+#: Sources/Client/Client.cpp:1390
 #, c++-format
 msgctxt "Client"
 msgid "Map saved: {0}"
 msgstr "Mapa guardado: {0}"
 
-#: Sources/Client/Client.cpp:1289 Sources/Client/Client.cpp:1294
+#: Sources/Client/Client.cpp:1394 Sources/Client/Client.cpp:1399
 msgctxt "Client"
 msgid "Saving map failed: "
 msgstr "Error en el guardado del mapa: "
 
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:599
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:694 Sources/Client/Client.cpp:1323
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:694 Sources/Client/Client.cpp:1428
 msgctxt "Client"
 msgid "Global"
 msgstr "Global"
 
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:609
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:704 Sources/Client/Client.cpp:1323
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:704 Sources/Client/Client.cpp:1428
 msgctxt "Client"
 msgid "Team"
 msgstr "Equipo"
 
-#: Sources/Client/Client.cpp:1333
+#: Sources/Client/Client.cpp:1438
 msgctxt "Client"
 msgid "(DEAD)"
 msgstr "(MUERTO)"
 
-#: Sources/Client/Client.cpp:1335
+#: Sources/Client/Client.cpp:1440
 msgctxt "Client"
 msgid "(SPEC)"
 msgstr "(SPEC)"
 
-#: Sources/Client/Client.cpp:1342
+#: Sources/Client/Client.cpp:1447
 msgctxt "Client"
 msgid "[Global]"
 msgstr "[Global]"
 
-#: Sources/Client/Client.cpp:1395
+#: Sources/Client/Client.cpp:1500
 msgctxt "Client"
 msgid "The server"
 msgstr "El servidor"
 
-#: Sources/Client/Client.cpp:1510
+#: Sources/Client/Client.cpp:1615
 msgctxt "Client"
 msgid "This server does not allow team pings."
 msgstr "Este servidor no permite pings de equipo."
 
-#: Sources/Client/Client.cpp:1576
+#: Sources/Client/Client.cpp:1681
 msgctxt "Client"
 msgid "[PM] "
 msgstr "[MP] "
@@ -87,24 +87,24 @@ msgctxt "Client"
 msgid "Set the block color (all values 0-255)"
 msgstr "Establecer el color del bloque (todos los valores entre 0 y 255)"
 
-#: Sources/Client/Client_Draw.cpp:135
+#: Sources/Client/Client_Draw.cpp:134
 msgctxt "Client"
 msgid "Unbound"
 msgstr "Sin asignar"
 
-#: Sources/Client/Client_Draw.cpp:181
+#: Sources/Client/Client_Draw.cpp:180
 #, c++-format
 msgctxt "Client"
 msgid "Sceneshot saved: {0}"
 msgstr "Sceneshot guardada: {0}"
 
-#: Sources/Client/Client_Draw.cpp:182
+#: Sources/Client/Client_Draw.cpp:181
 #, c++-format
 msgctxt "Client"
 msgid "Screenshot saved: {0}"
 msgstr "Screenshot guardada: {0}"
 
-#: Sources/Client/Client_Draw.cpp:187 Sources/Client/Client_Draw.cpp:192
+#: Sources/Client/Client_Draw.cpp:186 Sources/Client/Client_Draw.cpp:191
 msgctxt "Client"
 msgid "Screenshot failed: "
 msgstr "Screenshot fallida: "
@@ -368,7 +368,7 @@ msgctxt "Client"
 msgid "Volume: {0}%"
 msgstr "Volumen: {0}%"
 
-#: Sources/Client/Client_Input.cpp:701 Sources/Client/Client_Input.cpp:1064
+#: Sources/Client/Client_Input.cpp:701 Sources/Client/Client_Input.cpp:1065
 #, c++-format
 msgctxt "Client"
 msgid "Press [{0}] to enable HUD"
@@ -395,22 +395,22 @@ msgctxt "Client"
 msgid "Failed to start demo recording"
 msgstr "No se pudo iniciar la grabación de la demo"
 
-#: Sources/Client/Client_Input.cpp:983
+#: Sources/Client/Client_Input.cpp:984
 msgctxt "Client"
 msgid "Out of Blocks"
 msgstr "Sin bloques"
 
-#: Sources/Client/Client_Input.cpp:990
+#: Sources/Client/Client_Input.cpp:991
 msgctxt "Client"
 msgid "Out of Ammo"
 msgstr "Sin munición"
 
-#: Sources/Client/Client_Input.cpp:997
+#: Sources/Client/Client_Input.cpp:998
 msgctxt "Client"
 msgid "Out of Grenades"
 msgstr "Sin granadas"
 
-#: Sources/Client/Client_Input.cpp:1102
+#: Sources/Client/Client_Input.cpp:1103
 #, c++-format
 msgctxt "Client"
 msgid "zerovl {0}"
@@ -506,41 +506,41 @@ msgctxt "Client"
 msgid "{0} dropped {1}'s intel"
 msgstr "{0} soltó la intel {1}"
 
-#: Sources/Client/Client_NetHandler.cpp:387
+#: Sources/Client/Client_NetHandler.cpp:390
 #, c++-format
 msgctxt "Client"
 msgid "Player {0} has left"
 msgstr "El jugador {0} ha salido"
 
-#: Sources/Client/Client_NetHandler.cpp:390
+#: Sources/Client/Client_NetHandler.cpp:393
 msgctxt "Client"
 msgid " (ragequit)"
 msgstr " (ragequit)"
 
-#: Sources/Client/Client_NetHandler.cpp:415
+#: Sources/Client/Client_NetHandler.cpp:418
 msgctxt "Client"
 msgid "You are now a spectator"
 msgstr "Ahora eres un espectador"
 
-#: Sources/Client/Client_NetHandler.cpp:416
+#: Sources/Client/Client_NetHandler.cpp:419
 #, c++-format
 msgctxt "Client"
 msgid "You joined {0} team"
 msgstr "Te has unido al equipo {0}"
 
-#: Sources/Client/Client_NetHandler.cpp:421
+#: Sources/Client/Client_NetHandler.cpp:424
 #, c++-format
 msgctxt "Client"
 msgid "{0} joined {1} team"
 msgstr "{0} se unio al equipo {1}"
 
-#: Sources/Client/Client_NetHandler.cpp:450
+#: Sources/Client/Client_NetHandler.cpp:453
 #, c++-format
 msgctxt "Client"
 msgid "{0} Wins!"
 msgstr "{0} Gana!"
 
-#: Sources/Client/Client_NetHandler.cpp:457
+#: Sources/Client/Client_NetHandler.cpp:460
 #, c++-format
 msgctxt "Client"
 msgid "{0} wins!"
@@ -629,48 +629,48 @@ msgctxt "Client"
 msgid "You have killed {0}"
 msgstr "Has eliminado a {0}"
 
-#: Sources/Client/Client_Update.cpp:1600
+#: Sources/Client/Client_Update.cpp:1601
 #, c++-format
 msgctxt "Client"
 msgid "You hit {0} from: {1} blocks "
 msgstr "Le diste a {0} desde: {1} bloques "
 
-#: Sources/Client/Client_Update.cpp:1620
+#: Sources/Client/Client_Update.cpp:1621
 msgctxt "Client"
 msgid "TORSO"
 msgstr "TORSO"
 
-#: Sources/Client/Client_Update.cpp:1621
+#: Sources/Client/Client_Update.cpp:1622
 msgctxt "Client"
 msgid "ARMS"
 msgstr "BRAZOS"
 
-#: Sources/Client/Client_Update.cpp:1622
+#: Sources/Client/Client_Update.cpp:1623
 msgctxt "Client"
 msgid "LEGS"
 msgstr "PIERNAS"
 
-#: Sources/Client/Client_Update.cpp:1623
+#: Sources/Client/Client_Update.cpp:1624
 msgctxt "Client"
 msgid "MELEE"
 msgstr "MELEE"
 
-#: Sources/Client/Client_Update.cpp:1624
+#: Sources/Client/Client_Update.cpp:1625
 msgctxt "Client"
 msgid "HEAD"
 msgstr "CABEZA"
 
-#: Sources/Client/Client_Update.cpp:1953
+#: Sources/Client/Client_Update.cpp:1954
 msgctxt "Client"
 msgid "You are taking damage. Find solid ground!"
 msgstr "Estás recibiendo daño. ¡Busca un terreno firme!"
 
-#: Sources/Client/Client_Update.cpp:1971
+#: Sources/Client/Client_Update.cpp:1972
 msgctxt "Client"
 msgid "Insufficient blocks."
 msgstr "Bloques insuficientes."
 
-#: Sources/Client/Client_Update.cpp:1974
+#: Sources/Client/Client_Update.cpp:1975
 msgctxt "Client"
 msgid "You cannot place a block there."
 msgstr "No puedes colocar un bloque ahí."
@@ -852,12 +852,12 @@ msgctxt "Client"
 msgid "Clear the SFX cache, forcing reload"
 msgstr "Borrar la caché de SFX y forzar la recarga"
 
-#: Sources/Gui/Main.cpp:983
+#: Sources/Gui/Main.cpp:948
 msgctxt "Main"
 msgid "Localization System Loaded"
 msgstr "Sistema de localización cargado"
 
-#: Sources/Gui/Runner.cpp:56 Sources/Gui/Main.cpp:1061
+#: Sources/Gui/Runner.cpp:56 Sources/Gui/Main.cpp:1026
 #, c++-format
 msgctxt "Main"
 msgid ""
@@ -873,7 +873,7 @@ msgstr ""
 "\n"
 "Ver SystemMessages.log para más detalles."
 
-#: Sources/Gui/Runner.cpp:62 Sources/Gui/Main.cpp:1069
+#: Sources/Gui/Runner.cpp:62 Sources/Gui/Main.cpp:1034
 msgctxt "Main"
 msgid "ZeroSpades Fatal Error"
 msgstr "Error fatal de ZeroSpades"
@@ -883,7 +883,7 @@ msgctxt "MainScreen"
 msgid "NOW LOADING"
 msgstr "CARGANDO"
 
-#: Sources/Gui/ModsScreenHelper.cpp:643
+#: Sources/Gui/ModsScreenHelper.cpp:644
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: cannot replace (file in use?)"
@@ -905,7 +905,7 @@ msgid "Select Weapon:"
 msgstr "Seleccionar arma:"
 
 #: Sources/Gui/UI/Settings/PreferenceView.cpp:138
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:645
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:646
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:584
 #: Sources/Gui/UI/InGame/ChatLogWindow.cpp:95
 #: Sources/Gui/UI/Components/LimboMenu.cpp:325
@@ -1138,8 +1138,8 @@ msgctxt "Client"
 msgid "Send"
 msgstr "Enviar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:246
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:455
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:247
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:456
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:575
 #: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:54
 msgctxt "Client"
@@ -1315,219 +1315,208 @@ msgctxt "CreateProfileScreen"
 msgid "You can change it later in the Setup dialog."
 msgstr "Puede cambiarlo más tarde en el cuadro de diálogo Configurar."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:113
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:114
 msgctxt "MainScreen"
 msgid "Rename Demo"
 msgstr "Renombrar demo"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:128
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:445
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:129
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:446
 msgctxt "MainScreen"
 msgid "Rename"
 msgstr "Renombrar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:135
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:136
 msgctxt "MainScreen"
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:245
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:246
 msgctxt "MainScreen"
 msgid "Connect"
 msgstr "Conectar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:257
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:258
 msgctxt "MainScreen"
 msgid "Quick Connect"
 msgstr "Conexión rapida"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:274
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:379
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:275
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:380
 msgctxt "MainScreen"
 msgid "0.75"
 msgstr "0.75"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:285
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:392
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:286
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:393
 msgctxt "MainScreen"
 msgid "0.76"
 msgstr "0.76"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:301
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:302
 msgctxt "MainScreen"
 msgid "Server Name"
 msgstr "Nombre del servidor"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:309
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:310
 msgctxt "MainScreen"
 msgid "Slots"
 msgstr "Slots"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:318
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:319
 msgctxt "MainScreen"
 msgid "Map Name"
 msgstr "Nombre del mapa"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:326
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:485
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:327
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:486
 msgctxt "MainScreen"
 msgid "Game Mode"
 msgstr "Modo de juego"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:335
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:336
 msgctxt "MainScreen"
 msgid "Ver."
 msgstr "Ver."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:344
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:345
 msgctxt "MainScreen"
 msgid "Ping"
 msgstr "Ping"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:369
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:416
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:370
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:417
 msgctxt "MainScreen"
 msgid "Filter"
 msgstr "Filtro"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:406
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:407
 msgctxt "MainScreen"
 msgid "Not Full"
 msgstr "No lleno"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:428
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:429
 msgctxt "MainScreen"
 msgid "Select a demo"
 msgstr "Seleccione una demo"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:436
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:437
 msgctxt "MainScreen"
 msgid "Delete"
 msgstr "Borrar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:454
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:455
 msgctxt "MainScreen"
 msgid "Play"
 msgstr "Reproducir"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:471
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:472
 msgctxt "MainScreen"
 msgid "Server"
 msgstr "Servidor"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:478
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:479
 msgctxt "MainScreen"
 msgid "Map"
 msgstr "Mapa"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:492
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:493
 msgctxt "MainScreen"
 msgid "Timestamp"
 msgstr "Fecha y hora"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:499
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:596
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:500
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:597
 msgctxt "MainScreen"
 msgid "Size"
 msgstr "Tamaño"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:515
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:516
 msgctxt "MainScreen"
 msgid "Download official mods..."
 msgstr "Descargar mods oficiales..."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:525
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:526
 msgctxt "MainScreen"
 msgid "Disable all"
 msgstr "Desactivar todo"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:534
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:535
 msgctxt "MainScreen"
 msgid "Apply changes"
 msgstr "Aplicar cambios"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:561
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:562
 msgctxt "MainScreen"
 msgid "Status"
 msgstr "Estado"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:568
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:569
 msgctxt "MainScreen"
 msgid "Apply Order"
 msgstr "Orden"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:575
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:576
 msgctxt "MainScreen"
 msgid "Type"
 msgstr "Tipo"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:582
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:583
 msgctxt "MainScreen"
 msgid "Mod"
 msgstr "Mod"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:589
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:590
 msgctxt "MainScreen"
 msgid "Author"
 msgstr "Autor"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:624
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:625
 msgctxt "MainScreen"
 msgid "Servers"
 msgstr "Servidores"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:625
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:626
 msgctxt "MainScreen"
 msgid "Demos"
 msgstr "Demos"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:629
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:630
 msgctxt "MainScreen"
 msgid "Mods"
 msgstr "Mods"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:644
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:645
 msgctxt "MainScreen"
 msgid "Quit"
 msgstr "Salir"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:653
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:654
 msgctxt "MainScreen"
 msgid "Credits"
 msgstr "Créditos"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:661
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:662
 msgctxt "MainScreen"
 msgid "Setup"
 msgstr "Configurar"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:822
-msgctxt "MainScreen"
-msgid "Press 'Apply changes' to restart and apply your mods."
-msgstr "Presione 'Aplicar cambios' para reiniciar y aplicar sus mods."
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:866
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:867
 msgctxt "MainScreen"
 msgid "These are mods reviewed and hosted by the ZeroSpades team."
 msgstr "Estos son mods revisados ​​y alojados por el equipo de ZeroSpades."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:868
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:869
 msgctxt "MainScreen"
 msgid "Source: "
 msgstr "Fuente: "
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:914
-msgctxt "MainScreen"
-msgid "Disable all mods? This takes effect after a restart."
-msgstr ""
-"¿Desactivar todos los mods? Esto se aplicará después de reiniciar el juego."
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:965
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1011
 msgctxt "MainScreen"
 msgid "Mod download failed:"
 msgstr "Error al descargar el mod:"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1003
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1049
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1537,12 +1526,12 @@ msgstr ""
 "¿Está seguro de que desea eliminar '{0}'?\n"
 "Esta acción no se puede deshacer."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1041
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1087
 msgctxt "MainScreen"
 msgid "Failed to rename demo."
 msgstr "No se pudo cambiar el nombre de la demo."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1263
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1309
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -4072,42 +4061,42 @@ msgctxt "MessageBox"
 msgid "Open this link in your browser?"
 msgstr "¿Abrir este enlace en su navegador?"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:603
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:604
 msgctxt "MainScreen"
 msgid "Official"
 msgstr "Oficial"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:839
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:840
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0}: {1} is available."
 msgstr "Mods oficiales {0}: {1} está disponible."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:846
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:854
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:847
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:855
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0} (up to date)."
 msgstr "Mods oficiales {0} (actualizados)."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:849
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:850
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0}: {1} needs a newer ZeroSpades."
 msgstr "Mods oficiales {0}: {1} requiere un ZeroSpades más reciente."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:856
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:857
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0}."
 msgstr "Mods oficiales {0}."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:864
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:865
 msgctxt "MainScreen"
 msgid "Download the latest official ZeroSpades mods?"
 msgstr "¿Descargar los últimos mods oficiales de ZeroSpades?"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:869
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:870
 msgctxt "MainScreen"
 msgid ""
 "They are saved into your Mods/ folder, replacing the official mods installed "
@@ -4117,7 +4106,7 @@ msgstr ""
 "antes. Los mods que añadiste tú se conservan, salvo que un pak nuevo tenga "
 "el mismo nombre."
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:876
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:877
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -4147,62 +4136,62 @@ msgstr ""
 "Los mods oficiales {0} requieren un ZeroSpades más reciente. Haz clic para "
 "actualizar el juego."
 
-#: Sources/Gui/ModsScreenHelper.cpp:445
+#: Sources/Gui/ModsScreenHelper.cpp:446
 msgctxt "ModsScreenHelper"
 msgid "The downloaded file is not a zip."
 msgstr "El archivo descargado no es un zip."
 
-#: Sources/Gui/ModsScreenHelper.cpp:459
+#: Sources/Gui/ModsScreenHelper.cpp:460
 msgctxt "ModsScreenHelper"
 msgid "The downloaded zip is damaged."
 msgstr "El zip descargado está dañado."
 
-#: Sources/Gui/ModsScreenHelper.cpp:474
+#: Sources/Gui/ModsScreenHelper.cpp:475
 msgctxt "ModsScreenHelper"
 msgid "The release has no paks."
 msgstr "La versión no contiene paks."
 
-#: Sources/Gui/ModsScreenHelper.cpp:480
+#: Sources/Gui/ModsScreenHelper.cpp:481
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Installing official mods {0}: {1}"
 msgstr "Instalando mods oficiales {0}: {1}"
 
-#: Sources/Gui/ModsScreenHelper.cpp:487
+#: Sources/Gui/ModsScreenHelper.cpp:488
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: cannot read it from the zip."
 msgstr "{0}: no se puede leer del zip."
 
-#: Sources/Gui/ModsScreenHelper.cpp:493 Sources/Gui/ModsScreenHelper.cpp:517
+#: Sources/Gui/ModsScreenHelper.cpp:494 Sources/Gui/ModsScreenHelper.cpp:518
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: cannot write it."
 msgstr "{0}: no se puede escribir."
 
-#: Sources/Gui/ModsScreenHelper.cpp:509
+#: Sources/Gui/ModsScreenHelper.cpp:510
 msgctxt "ModsScreenHelper"
 msgid "The release is too big to install."
 msgstr "La versión es demasiado grande para instalarla."
 
-#: Sources/Gui/ModsScreenHelper.cpp:515
+#: Sources/Gui/ModsScreenHelper.cpp:516
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: damaged in the zip."
 msgstr "{0}: dañado en el zip."
 
-#: Sources/Gui/ModsScreenHelper.cpp:565
+#: Sources/Gui/ModsScreenHelper.cpp:566
 msgctxt "ModsScreenHelper"
 msgid "Looking for the latest official mods..."
 msgstr "Buscando los últimos mods oficiales..."
 
-#: Sources/Gui/ModsScreenHelper.cpp:570
+#: Sources/Gui/ModsScreenHelper.cpp:571
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Cannot list the official mods: {0}"
 msgstr "No se pueden listar los mods oficiales: {0}"
 
-#: Sources/Gui/ModsScreenHelper.cpp:576
+#: Sources/Gui/ModsScreenHelper.cpp:577
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid ""
@@ -4212,42 +4201,42 @@ msgstr ""
 "Los mods oficiales {0} requieren una versión más reciente de ZeroSpades. "
 "Actualiza el juego para obtenerlos."
 
-#: Sources/Gui/ModsScreenHelper.cpp:581
+#: Sources/Gui/ModsScreenHelper.cpp:582
 msgctxt "ModsScreenHelper"
 msgid "No official mods have been released for this version of ZeroSpades yet."
 msgstr ""
 "Todavía no se han publicado mods oficiales para esta versión de ZeroSpades."
 
-#: Sources/Gui/ModsScreenHelper.cpp:597
+#: Sources/Gui/ModsScreenHelper.cpp:598
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Downloading official mods {0}"
 msgstr "Descargando mods oficiales {0}"
 
-#: Sources/Gui/ModsScreenHelper.cpp:612
+#: Sources/Gui/ModsScreenHelper.cpp:613
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Cannot download the official mods {0}: {1}"
 msgstr "No se pueden descargar los mods oficiales {0}: {1}"
 
-#: Sources/Gui/ModsScreenHelper.cpp:624
+#: Sources/Gui/ModsScreenHelper.cpp:625
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Cannot install the official mods {0}: {1}"
 msgstr "No se pueden instalar los mods oficiales {0}: {1}"
 
-#: Sources/Gui/ModsScreenHelper.cpp:633
+#: Sources/Gui/ModsScreenHelper.cpp:634
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "Installing official mods {0}..."
 msgstr "Instalando mods oficiales {0}..."
 
-#: Sources/Gui/ModsScreenHelper.cpp:649
+#: Sources/Gui/ModsScreenHelper.cpp:650
 msgctxt "ModsScreenHelper"
 msgid "Cannot write Mods/index.txt."
 msgstr "No se puede escribir Mods/index.txt."
 
-#: Sources/Gui/ModsScreenHelper.cpp:654
+#: Sources/Gui/ModsScreenHelper.cpp:655
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid ""
@@ -4256,7 +4245,7 @@ msgstr ""
 "No se pudieron instalar {0} pak(s); descarga de nuevo los mods oficiales "
 "para reintentar:"
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:832
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:833
 msgctxt "MainScreen"
 msgid ""
 "Mods/index.txt is missing, so no mod can be verified as official. Download "
@@ -4264,3 +4253,89 @@ msgid ""
 msgstr ""
 "Falta Mods/index.txt, así que ningún mod puede verificarse como oficial. "
 "Descarga los mods oficiales para crearlo."
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:823
+msgctxt "MainScreen"
+msgid "Press 'Apply changes' to apply your mods."
+msgstr "Presione 'Aplicar cambios' para aplicar sus mods."
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:918
+msgctxt "MainScreen"
+msgid "The mods were not applied:"
+msgstr "No se aplicaron los mods:"
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:924
+msgctxt "MainScreen"
+msgid "These changes need a restart:"
+msgstr "Estos cambios requieren reiniciar:"
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:926
+msgctxt "MainScreen"
+msgid "Restart now? Otherwise they apply the next time the game starts."
+msgstr ""
+"¿Reiniciar ahora? Si no, se aplicarán la próxima vez que se inicie el juego."
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:940
+msgctxt "MainScreen"
+msgid "Your changes apply the next time the game starts."
+msgstr "Tus cambios se aplicarán la próxima vez que se inicie el juego."
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:950
+msgctxt "MainScreen"
+msgid "Mods applied."
+msgstr "Mods aplicados."
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:960
+msgctxt "MainScreen"
+msgid "Disable all mods? This takes effect on Apply."
+msgstr "¿Desactivar todos los mods? Surte efecto al aplicar."
+
+#: Sources/Gui/ModOverlay.cpp:293
+#, c++-format
+msgctxt "ModOverlay"
+msgid "{0} changes '{1}', which the menus use."
+msgstr "{0} cambia '{1}', que usan los menús."
+
+#: Sources/Gui/ModOverlay.cpp:296
+#, c++-format
+msgctxt "ModOverlay"
+msgid "{0} changes the game's fonts ({1})."
+msgstr "{0} cambia las fuentes del juego ({1})."
+
+#: Sources/Gui/ModOverlay.cpp:298
+#, c++-format
+msgctxt "ModOverlay"
+msgid "{0} changes the game's shaders ({1})."
+msgstr "{0} cambia los shaders del juego ({1})."
+
+#: Sources/Gui/ModOverlay.cpp:300
+#, c++-format
+msgctxt "ModOverlay"
+msgid "{0} changes the game's translations ({1})."
+msgstr "{0} cambia las traducciones del juego ({1})."
+
+#: Sources/Gui/ModOverlay.cpp:302
+#, c++-format
+msgctxt "ModOverlay"
+msgid "{0} changes '{1}', which the game reads when it starts."
+msgstr "{0} cambia '{1}', que el juego lee al iniciarse."
+
+#: Sources/Gui/ModOverlay.cpp:368
+msgctxt "ModOverlay"
+msgid "Mods can't be applied while trying a mod."
+msgstr "No se pueden aplicar mods mientras pruebas un mod."
+
+#: Sources/Gui/ModOverlay.cpp:468
+msgctxt "ModOverlay"
+msgid "These mods failed to load and were disabled:"
+msgstr "Estos mods no se pudieron cargar y se desactivaron:"
+
+#: Sources/Gui/ModOverlay.cpp:469
+msgctxt "ModOverlay"
+msgid "These mods failed to load:"
+msgstr "Estos mods no se pudieron cargar:"
+
+#: Sources/Gui/MainScreenHelper.cpp:551
+msgctxt "MainScreen"
+msgid "The main screen is gone."
+msgstr "La pantalla principal ya no existe."
