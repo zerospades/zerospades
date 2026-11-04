@@ -568,4 +568,63 @@ namespace spades {
 		return nullptr;
 	}
 
+	Matrix4 LocalTransform(const Vector3& position, const Vector4& rotation, const Vector3& scale) {
+		return Matrix4::Translate(position) * Quaternion(rotation).ToRotationMatrix() *
+		       Matrix4::Scale(scale);
+	}
+
+	namespace {
+		// The rotation of an orthonormal, right-handed frame, built from its
+		// largest part so a half turn never divides by zero.
+		Vector4 RotationOf(const Vector3& a, const Vector3& b, const Vector3& c) {
+			const float r00 = a.x, r10 = a.y, r20 = a.z, r01 = b.x, r11 = b.y, r21 = b.z;
+			const float r02 = c.x, r12 = c.y, r22 = c.z;
+			const float trace = r00 + r11 + r22;
+			Vector4 q;
+			if (trace > 0.0F) {
+				const float s = std::sqrt(trace + 1.0F) * 2.0F;
+				q = MakeVector4((r21 - r12) / s, (r02 - r20) / s, (r10 - r01) / s, 0.25F * s);
+			} else if (r00 > r11 && r00 > r22) {
+				const float s = std::sqrt(1.0F + r00 - r11 - r22) * 2.0F;
+				q = MakeVector4(0.25F * s, (r01 + r10) / s, (r02 + r20) / s, (r21 - r12) / s);
+			} else if (r11 > r22) {
+				const float s = std::sqrt(1.0F + r11 - r00 - r22) * 2.0F;
+				q = MakeVector4((r01 + r10) / s, 0.25F * s, (r12 + r21) / s, (r02 - r20) / s);
+			} else {
+				const float s = std::sqrt(1.0F + r22 - r00 - r11) * 2.0F;
+				q = MakeVector4((r02 + r20) / s, (r12 + r21) / s, 0.25F * s, (r10 - r01) / s);
+			}
+			return q.Normalize();
+		}
+	} // namespace
+
+	bool DecomposeTransform(const Matrix4& m, Vector3& position, Vector4& rotation,
+	                        Vector3& scale) {
+		Vector3 axis[3] = {m.GetAxis(0), m.GetAxis(1), m.GetAxis(2)};
+		float s[3];
+		bool exact = true;
+		for (int k = 0; k < 3; k++) {
+			s[k] = axis[k].GetLength();
+			if (s[k] > 1.0e-6F)
+				axis[k] = axis[k] * (1.0F / s[k]);
+			else
+				exact = false; // flattened along it: no turn says which way it faced
+		}
+		// The axes of a turned and scaled frame stay square to one another; a
+		// shear tilts them, which nothing here can hold.
+		constexpr float kSquare = 1.0e-3F;
+		for (int k = 0; k < 3 && exact; k++) {
+			if (std::fabs(Vector3::Dot(axis[k], axis[(k + 1) % 3])) > kSquare)
+				exact = false;
+		}
+		if (Vector3::Dot(Vector3::Cross(axis[0], axis[1]), axis[2]) < 0.0F) {
+			s[0] = -s[0]; // mirrored: one axis carries the reflection
+			axis[0] = axis[0] * -1.0F;
+		}
+		position = m.GetOrigin();
+		rotation = RotationOf(axis[0], axis[1], axis[2]);
+		scale = MakeVector3(s[0], s[1], s[2]);
+		return exact;
+	}
+
 } // namespace spades
