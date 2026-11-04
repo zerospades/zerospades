@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+
 #include <cstdint>
 #include <vector>
 
@@ -31,6 +34,7 @@ namespace spades {
 	}
 	namespace draw {
 		class GLRenderer;
+		class GLDynamicLight;
 		class IGLDevice;
 		class GLProgram;
 		class GLSettings;
@@ -54,7 +58,15 @@ namespace spades {
 			std::vector<uint32_t> bitmap;
 
 			IGLDevice::UInteger texture;     // water color
-			IGLDevice::UInteger waveTexture; // bumpmap
+			/**
+			 * The waves' bumpmap, a texture per frame in turn: rewriting the one the
+			 * GPU is still drawing an earlier frame with would hold the CPU up until it
+			 * is done, every frame. There are as many as frames a driver queues, and
+			 * one more.
+			 */
+			static constexpr std::size_t WaveTextureCount = 3;
+			std::array<IGLDevice::UInteger, WaveTextureCount> waveTextures;
+			std::size_t currentWaveTexture = 0;
 
 			struct Vertex;
 
@@ -78,7 +90,8 @@ namespace spades {
 
 			static void PreloadShaders(GLRenderer &);
 
-			void Render();
+			/** Draws the water, lit by the sun, the sky and `lights` as well. */
+			void Render(const std::vector<GLDynamicLight>& lights);
 
 			void Update(float dt);
 

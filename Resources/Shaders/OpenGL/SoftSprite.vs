@@ -26,8 +26,12 @@ uniform vec3 frontVector;
 uniform vec3 viewOriginVector;
 uniform vec2 zNearFar;
 
+#include "SpriteLight.glsl"
+
 attribute vec4 positionAttribute;
-attribute vec3 spritePosAttribute;
+// The corner on the sprite, its rotation, and 1 if it scatters the light it is lit
+// by, 0 if it emits its own
+attribute vec4 spritePosAttribute;
 attribute vec4 colorAttribute;
 
 varying vec4 color;
@@ -55,6 +59,9 @@ void main() {
 	pos += right * sprP.x;
 	pos += up * sprP.y;
 
+	// Lit where the corner really is, before it is moved forward below
+	vec3 corner = pos;
+
 	// move sprite to the front of the volume
 	float centerDepth = dot(center - viewOriginVector, frontVector);
 	depthRange.xy = vec2(centerDepth) + vec2(-1.0, 1.0) * radius;
@@ -65,11 +72,20 @@ void main() {
 	frontDepth = min(frontDepth, depthRange.y);
 	depthRange.w = frontDepth;
 
-	pos += frontVector * (frontDepth - centerDepth);
+	// Along the lines of sight, so the sprite still covers the same pixels: the
+	// quad faces the camera, so all of it is at `centerDepth`, and scaling it about
+	// the eye brings all of it to `frontDepth`. A centre at or behind the eye has
+	// no such projection to keep.
+	if (centerDepth > 0.001)
+		pos = viewOriginVector + (pos - viewOriginVector) * (frontDepth / centerDepth);
+	else
+		pos += frontVector * (frontDepth - centerDepth);
 
 	gl_Position = projectionViewMatrix * vec4(pos, 1.0);
 
 	color = colorAttribute;
+	if (spritePosAttribute.w > 0.5)
+		color = LightSprite(color, SpriteLight(center, corner, frontVector));
 
 	// sprite texture coord
 	texCoord.xy = spritePosAttribute.xy * 0.5 + 0.5;

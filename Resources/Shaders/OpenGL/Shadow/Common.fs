@@ -25,6 +25,11 @@ uniform sampler2D ssaoTexture;
 uniform vec2 ssaoTextureUVScale;
 #endif
 
+// The factor the sun's light is drawn with; at night there is none, and the sun casts
+// no light and no shadow. The sky's light is drawn at the daylight by the radiosity
+// evaluators.
+uniform float sunlight;
+
 float EvaluateMapShadow();
 float EvaluteModelShadow();
 vec3 EvaluateRadiosity(float detailAmbientOcclusion, float ssao);
@@ -35,7 +40,7 @@ float VisibilityOfSunLight() {
 }
 
 vec3 EvaluateSunLight() {
-	return vec3(0.6) * VisibilityOfSunLight();
+	return vec3(0.6 * sunlight) * VisibilityOfSunLight();
 }
 
 vec3 EvaluateAmbientLight(float detailAmbientOcclusion) {

@@ -22,6 +22,8 @@
 
 #include <array>
 
+#include "Flashlight.h"
+#include "FlashlightGlare.h"
 #include "Player.h"
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
@@ -60,8 +62,17 @@ namespace spades {
 
 			Vector3 viewWeaponOffset;
 			Vector3 lastFront;
-			Vector3 flashlightOrientation;
 			Vector3 classicViewWeaponOrigin;
+
+			/** This player's lamp as the camera sees it, this frame. */
+			FlashlightGlare flashlightGlare;
+
+			/** The dropouts of this player's beam, if its Light Config flickers. */
+			FlashlightFlicker flashlightFlicker;
+
+			/** Whether this player's beam is lit right now: switched on, giving light,
+			 * and not in a flicker's dropout. */
+			bool IsFlashlightLit();
 
 			asIScriptObject* spadeSkin;
 			asIScriptObject* blockSkin;
@@ -77,6 +88,8 @@ namespace spades {
 
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
+			/** Where this player's flashlight points. */
+			Vector3 GetFlashlightDirection();
 			std::array<Vector3, 3> GetFlashlightAxes();
 
 			/**
@@ -84,6 +97,38 @@ namespace spades {
 			 * Zombies use a dedicated model set, everyone else uses the regular one.
 			 */
 			std::string GetModelPath();
+
+			/**
+			 * Whether a lamp at `lightOrigin` sits inside a solid voxel, in which case
+			 * it would light the far side of that block: the map only hides a light
+			 * from the blocks between it and its own. Only meaningful for a lamp the
+			 * camera isn't standing at.
+			 */
+			bool IsLampBuried(const Vector3& lightOrigin);
+
+			/** Where the glare shows: on the front of the headlamp worn by `head`. */
+			Vector3 GetHeadlampLens(const Matrix4& head);
+
+			/** The headlamp model's bounds, in its own voxels. */
+			AABB3 GetHeadlampBounds();
+
+			/**
+			 * Offer this player's flashlight, from `lightOrigin`, to the client's
+			 * `FlashlightBudget`, if it should be lit at all; `viewed` when the camera
+			 * looks through this player's eyes. Shared by the first- and third-person
+			 * paths, which differ only in where the lamp sits.
+			 */
+			void AddFlashlightToScene(const Vector3& lightOrigin, bool viewed);
+
+			/** How far this player's lamp has come up since it was switched on, from
+			 * 0 to 1. */
+			float GetFlashlightFadeIn();
+
+			/**
+			 * Work out this frame's glare of this player's lamp, which sits at
+			 * `lampPosition`. Only for a lamp the camera isn't standing at.
+			 */
+			void UpdateFlashlightGlare(const Vector3& lampPosition);
 
 			void AddToSceneThirdPersonView();
 			void AddToSceneFirstPersonView();
@@ -108,6 +153,15 @@ namespace spades {
 			void Update(float dt);
 			void AddToScene();
 			void Draw2D();
+
+			/** How strongly the glare of this player's lamp worked out by `AddToScene`
+			 * shows (see `FlashlightGlare::GetStrength`). */
+			float GetFlashlightGlareStrength() const { return flashlightGlare.GetStrength(); }
+
+			/** Adds the glare of this player's lamp worked out by `AddToScene` to the
+			 * scene, in a scene as bright as `ambient`, keeping `share` of it (see
+			 * `FlashlightGlare::AddToScene`). */
+			void AddFlashlightGlareToScene(float ambient, float share);
 
 			bool IsChangingTool();
 			void FiredWeapon();
