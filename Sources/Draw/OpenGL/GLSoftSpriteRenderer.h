@@ -25,6 +25,7 @@
 
 #include "GLProgramAttribute.h"
 #include "GLProgramUniform.h"
+#include "GLSpriteLight.h"
 #include "IGLSpriteRenderer.h"
 #include <Core/Math.h>
 
@@ -41,6 +42,8 @@ namespace spades {
 				float radius;
 				float angle;
 				Vector4 color;
+				/** Whether it scatters the light it is lit by, rather than emitting its own */
+				bool scattering;
 				float area;
 			};
 
@@ -52,6 +55,8 @@ namespace spades {
 				// point coord
 				float sx, sy;
 				float angle;
+				// 1 if it scatters the light it is lit by, 0 if it emits its own
+				float scattering;
 
 				// color
 				float r, g, b, a;
@@ -67,6 +72,7 @@ namespace spades {
 			std::vector<Vertex> vertices;
 			std::vector<uint32_t> indices;
 
+			GLSpriteLight spriteLight;
 			GLProgram *program;
 			GLProgramUniform projectionViewMatrix;
 			GLProgramUniform rightVector;

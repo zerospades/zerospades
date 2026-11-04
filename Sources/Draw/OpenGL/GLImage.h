@@ -34,6 +34,10 @@ namespace spades {
 			float invWidth, invHeight;
 			bool autoDelete;
 			bool valid;
+			/** The wrap mode last set through this image, or `0` when unknown. */
+			IGLDevice::Enum wrap = static_cast<IGLDevice::Enum>(0);
+			/** The minification filter last set through this image, or `0` when unknown. */
+			IGLDevice::Enum minFilter = static_cast<IGLDevice::Enum>(0);
 			void MakeSureValid();
 
 		protected:
@@ -44,6 +48,16 @@ namespace spades {
 			        bool autoDelete = true);
 			static Handle<GLImage> FromBitmap(Bitmap&, IGLDevice*);
 			void Bind(IGLDevice::Enum target);
+
+			/**
+			 * Sets how the image wraps on both axes. It must be bound to `Texture2D`. The
+			 * driver is only told when the mode changes, since changing a texture's
+			 * parameters makes it validate the texture again.
+			 */
+			void SetWrap(IGLDevice::Enum wrapMode);
+
+			/** Sets the image's minification filter, the same way as `SetWrap`. */
+			void SetMinFilter(IGLDevice::Enum filter);
 
 			float GetWidth() override { return width; }
 			float GetHeight() override { return height; }

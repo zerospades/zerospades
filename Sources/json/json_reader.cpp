@@ -563,8 +563,8 @@ Reader::readArray( Token &tokenStart )
       {
          ok = readToken( token );
       }
-      bool badTokenType = ( token.type_ == tokenArraySeparator  &&  
-                            token.type_ == tokenArrayEnd );
+      bool badTokenType = ( token.type_ != tokenArraySeparator  &&
+                            token.type_ != tokenArrayEnd );
       if ( !ok  ||  badTokenType )
       {
          return addErrorAndRecover( "Missing ',' or ']' in array declaration", 
@@ -849,7 +849,7 @@ Reader::getLocationLineAndColumn( Location location ) const
    int line, column;
    getLocationLineAndColumn( location, line, column );
    char buffer[18+16+16+1];
-   sprintf( buffer, "Line %d, Column %d", line, column );
+   snprintf( buffer, sizeof(buffer), "Line %d, Column %d", line, column );
    return buffer;
 }
 

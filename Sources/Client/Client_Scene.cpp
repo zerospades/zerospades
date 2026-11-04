@@ -19,6 +19,10 @@
 
  */
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 #include "Client.h"
 
 #include <Core/ConcurrentDispatch.h>
@@ -28,6 +32,7 @@
 #include "BloodMarks.h"
 #include "Corpse.h"
 #include "CTFGameMode.h"
+#include "DaytimeWeather.h"
 #include "GameProperties.h"
 #include "IGameMode.h"
 #include "Player.h"
@@ -197,6 +202,12 @@ namespace spades {
 			if (world) {
 				IntVector3 fogColor = world->GetFogColor();
 				renderer->SetFogColor(ConvertColorRGB(fogColor));
+
+				// Without a time of day the scene keeps its default, full daylight.
+				if (stmp::optional<TimeOfDay> timeOfDay = activeNet->GetTimeOfDay()) {
+					def.sunlight = GetSunlight(*timeOfDay);
+					def.daylight = GetDaylight(*timeOfDay);
+				}
 
 				int shakeLevel = cg_shake;
 
@@ -669,12 +680,48 @@ namespace spades {
 			if (world) {
 				stmp::optional<Player&> maybePlayer = world->GetLocalPlayer();
 
+				// How lit the world around the lamps is: dynamic lights aside, all of it
+				// is drawn with the scene's daylight.
+				const float ambient = lastSceneDef.daylight;
+
+				// Each player's glare and how strongly it shows, worked out by `AddToScene`
+				std::vector<std::pair<float, ClientPlayer*>> glares;
+
 				for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
 					if (world->GetPlayer(static_cast<unsigned int>(i))) {
 						SPAssert(clientPlayers[i]);
 						clientPlayers[i]->AddToScene();
+						const float strength = clientPlayers[i]->GetFlashlightGlareStrength();
+						if (strength > 0.0F)
+							glares.emplace_back(strength, clientPlayers[i].GetPointerOrNull());
 					}
 				}
+
+				// Only the strongest glares are drawn. Each gives up as much strength as
+				// the strongest one left out has, so that the weakest of them fades out
+				// as it gets overtaken instead of popping off.
+				{
+					float cut = 0.0F;
+					if (glares.size() > FlashlightGlare::MaxShown) {
+						const auto boundary = glares.begin() + FlashlightGlare::MaxShown;
+						std::nth_element(glares.begin(), boundary, glares.end(),
+						                 [](const std::pair<float, ClientPlayer*>& a,
+						                    const std::pair<float, ClientPlayer*>& b) {
+							                 return a.first > b.first;
+						                 });
+						cut = boundary->first;
+						glares.erase(boundary, glares.end());
+					}
+					for (const auto& glare : glares)
+						glare.second->AddFlashlightGlareToScene(ambient,
+						                                         1.0F - cut / glare.first);
+				}
+
+				// Every lit flashlight was offered: light the scene with those that
+				// matter most.
+				if (map)
+					flashlightBudget.Submit(*renderer, *map, lastSceneDef);
+				flashlightBudget.Clear();
 
 				for (const auto& nade : world->GetAllGrenades())
 					AddGrenadeToScene(*nade);
