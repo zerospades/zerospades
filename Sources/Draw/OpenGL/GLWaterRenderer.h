@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+
 #include <cstdint>
 #include <vector>
 
@@ -54,7 +57,15 @@ namespace spades {
 			std::vector<uint32_t> bitmap;
 
 			IGLDevice::UInteger texture;     // water color
-			IGLDevice::UInteger waveTexture; // bumpmap
+			/**
+			 * The waves' bumpmap, a texture per frame in turn: rewriting the one the
+			 * GPU is still drawing an earlier frame with would hold the CPU up until it
+			 * is done, every frame. There are as many as frames a driver queues, and
+			 * one more.
+			 */
+			static constexpr std::size_t WaveTextureCount = 3;
+			std::array<IGLDevice::UInteger, WaveTextureCount> waveTextures;
+			std::size_t currentWaveTexture = 0;
 
 			struct Vertex;
 

@@ -18,36 +18,18 @@
 
  */
 
-uniform vec3 dynamicLightOrigin;
-uniform mat4 dynamicLightSpotMatrix;
-
-uniform bool dynamicLightIsLinear;
-uniform vec3 dynamicLightLinearDirection;
-uniform float dynamicLightLinearLength;
-
 void PrepareForMapShadow(vec3 vertexCoord);
 
-varying vec3 lightPos;
-varying vec3 lightNormal;
-varying vec3 lightTexCoord;
+// Where the vertex is and how it faces, in world space. The lights are evaluated
+// per fragment, so a draw can take several of them.
+varying vec3 dynamicLightWorldPosition;
+varying vec3 dynamicLightNormal;
 
 void PrepareForDynamicLightNoBump(vec3 vertexCoord, vec3 normal) {
 	PrepareForMapShadow(vertexCoord);
 
-	vec3 lightPosition = dynamicLightOrigin;
-	if (dynamicLightIsLinear) {
-		// Linear light approximation - choose the closest point on the light
-		// geometry as the representative light source
-		float d = dot((vertexCoord - dynamicLightOrigin), dynamicLightLinearDirection);
-		d = clamp(d, 0.0, dynamicLightLinearLength);
-		lightPosition += dynamicLightLinearDirection * d;
-	}
-
-	lightPos = lightPosition - vertexCoord;
-	lightNormal = normal;
-
-	// projection
-	lightTexCoord = (dynamicLightSpotMatrix * vec4(vertexCoord, 1.0)).xyw;
+	dynamicLightWorldPosition = vertexCoord;
+	dynamicLightNormal = normal;
 }
 
 // TODO: bumpmapping variant (requires tangent vector)

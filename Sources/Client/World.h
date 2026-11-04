@@ -47,6 +47,8 @@ namespace spades {
 		class HitTestDebugger;
 		struct GameProperties;
 
+		/** One slot per possible player id byte, so a raw id indexes safely. Slot `255`
+		 * stays empty: Player Limit reserves that id for the server. */
 		constexpr std::size_t NumPlayerSlots = 256;
 
 		class World {

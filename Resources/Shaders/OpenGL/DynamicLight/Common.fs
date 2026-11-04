@@ -35,39 +35,15 @@ float EvaluateDynamicLightShadow() {
 
 // -- lighting (without bumpmapping)
 
-uniform vec3 dynamicLightColor;
-uniform float dynamicLightRadius;
-uniform float dynamicLightRadiusInversed;
-uniform sampler2D dynamicLightProjectionTexture;
+vec3 EvaluateDynamicLights(vec3 position, vec3 normal);
 
-varying vec3 lightPos;
-varying vec3 lightNormal;
-varying vec3 lightTexCoord;
+varying vec3 dynamicLightWorldPosition;
+varying vec3 dynamicLightNormal;
 
 vec3 EvaluateDynamicLightNoBump() {
-	if (lightTexCoord.z < 0.0 || any(lessThan(lightTexCoord.xy, vec2(0.0))) ||
-	    any(greaterThan(lightTexCoord.xy, vec2(lightTexCoord.z))))
-		discard;
-
-	// diffuse lighting
-	float intensity = dot(normalize(lightPos), normalize(lightNormal));
-	if (intensity < 0.0)
-		discard;
-
-	// attenuation
-	float distance = length(lightPos);
-	if (distance >= dynamicLightRadius)
-		discard;
-	distance = max(1.0 - distance * dynamicLightRadiusInversed, 0.0);
-	float attenuation = distance * distance;
-
-	// apply attenuation
-	intensity *= attenuation;
-
-	vec3 texValue = texture2DProj(dynamicLightProjectionTexture, lightTexCoord).xyz;
-
-	// TODO: specular lighting?
-	return dynamicLightColor * intensity * EvaluateDynamicLightShadow() * texValue;
+	vec3 normal = normalize(dynamicLightNormal);
+	return EvaluateDynamicLights(dynamicLightWorldPosition, normal) *
+		EvaluateDynamicLightShadow();
 }
 
 // TODO: bumpmapping variant (requires tangent vector)

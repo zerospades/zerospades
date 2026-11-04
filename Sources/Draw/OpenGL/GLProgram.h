@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <string>
+#include <unordered_map>
+
 #include "IGLDevice.h"
 
 namespace spades {
@@ -31,6 +34,11 @@ namespace spades {
 			IGLDevice::UInteger handle;
 			bool linked;
 			std::string name;
+
+			/** Locations looked up by name, kept because asking the driver is slow and
+			 * one `GLProgramUniform` or `GLProgramAttribute` serves many programs. */
+			std::unordered_map<std::string, IGLDevice::Integer> uniformLocations;
+			std::unordered_map<std::string, IGLDevice::Integer> attributeLocations;
 
 		public:
 			GLProgram(IGLDevice*, std::string name = "(unnamed)");
@@ -46,6 +54,10 @@ namespace spades {
 			void Use();
 
 			IGLDevice::UInteger GetHandle() const { return handle; }
+
+			/** The location of a uniform or attribute, `-1` when the program has none. */
+			IGLDevice::Integer GetUniformLocation(const std::string& name);
+			IGLDevice::Integer GetAttributeLocation(const std::string& name);
 
 			IGLDevice* GetDevice() const { return device; }
 		};
