@@ -132,7 +132,7 @@ namespace spades {
 		void UpdateNotice::Render() {
 			Refresh();
 			if (!isMouseInteractive) {
-				if (showUpToDate && upToDate)
+				if (showUpToDate && upToDate && !(upToDateCovered && upToDateCovered()))
 					RenderUpToDate();
 				return;
 			}

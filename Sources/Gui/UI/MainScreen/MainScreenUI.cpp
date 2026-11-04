@@ -37,6 +37,7 @@
 #include <Gui/UI/Components/UpdateNotice.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/DrawUtils.h>
+#include <Gui/OfficialMods.h>
 #include <Gui/UpdateChecker.h>
 
 SPADES_SETTING(cg_playerName); // defined in Gui/MainScreen.cpp
@@ -64,6 +65,7 @@ namespace spades {
 			// Runs once per process; the main screen is rebuilt on every return from
 			// a game, and keeps the first answer.
 			UpdateChecker::Get().Start();
+			OfficialModsChecker::Get().Start();
 
 			// Let the new player choose their IGN
 			std::string nameStr = cg_playerName;

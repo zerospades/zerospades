@@ -139,17 +139,23 @@ namespace spades {
 			ModsProgressBar* modsProgressBar;
 			bool modsDownloading = false;
 			bool modsDirty = false; // enabled set changed this session; restart to apply
+			// The official mods check's state last shown in the status line (an
+			// OfficialModsChecker::State), so the line follows it when it changes.
+			int modsCheckState = -1;
 			float modsCheckColWidth;
 			float modsOrderColWidth;
 			float modsTagColWidth;
 			float modsNameColWidth;
 			float modsAuthorColWidth;
+			float modsOfficialColWidth;
 			float modsSizeColWidth;
 
 			void OnTabChanged(ui::UIElement& sender);
 			int EnabledIndex(const std::vector<std::string>& enabled, const std::string& name);
 			void UpdateModsStatus();
 			void OnDownloadModsPressed(ui::UIElement& sender);
+			// Switches to the Mods tab and offers to download the official mods.
+			void OfferOfficialModsDownload();
 			void OnDownloadConfirmed(ui::UIElement& sender);
 			void OnApplyModsPressed(ui::UIElement& sender);
 			void OnResetModsPressed(ui::UIElement& sender);

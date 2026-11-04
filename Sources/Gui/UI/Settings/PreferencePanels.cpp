@@ -534,7 +534,6 @@ namespace spades {
 			l.AddInputField(_Tr("Preferences", "Server List URL"), "cl_serverListUrl", true, true);
 			l.AddInputField(_Tr("Preferences", "Server List Alt. URL"), "cl_serverListUrlFallback",
 			                true, true);
-			l.AddInputField(_Tr("Preferences", "Mod List URL"), "cl_modsIndexUrl", true, true);
 			l.AddToggleField(_Tr("Preferences", "Allow Unicode"), "cg_unicode");
 			l.AddHelp(_Tr("Preferences",
 				"Lets you use other alphabets and symbols (such as Cyrillic or Japanese) "

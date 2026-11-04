@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 
+#include "OfficialMods.h"
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
 
@@ -37,16 +38,29 @@ namespace spades {
 		public:
 			ModsScreenHelper();
 
-			// Async fetch of the official mod repo listing + download of every
-			// listed pak into the user Mods/ folder: loose paks land at
-			// Mods/<name>, folder mods at Mods/<folder>/<name>.
+			// Async download of the latest official mods release this build can
+			// use (see OfficialMods.h). Its paks land loose in Mods/, replacing
+			// any copies of the same name. One runs at a time in the whole
+			// process: a helper made while one runs (the main screen rebuilt)
+			// follows it, and starting another only follows it too.
 			void StartRefresh();
+			// Whether a download is running; false once PollRefreshState has
+			// returned true for it.
+			bool IsRefreshing();
 			bool PollRefreshState();
+			// Empty after a successful download, otherwise what went wrong.
 			std::string GetRefreshMessage();
 
-			// The resolved index URL (canonical unless the user set a genuine
-			// override). Pure — safe to call for display.
-			std::string GetIndexUrl();
+			// The official mods release last installed, e.g. "v1.4", or empty if
+			// they were never downloaded.
+			std::string GetInstalledOfficialVersion();
+			// Whether a pak the last release installed is enabled, so that
+			// installing it changed what the next launch mounts.
+			bool IsInstalledOfficialPakEnabled();
+
+			// What Mods/index.txt says of the mod: verified only for a loose pak
+			// the official mods installed, untouched since.
+			OfficialPakState GetModOfficialState(std::string modName);
 
 			// CATEGORY-NAME-AUTHOR parsing for the list UI. Category and author
 			// are empty when the name doesn't follow the convention, in which
@@ -55,10 +69,10 @@ namespace spades {
 			std::string GetModDisplayName(std::string modName);
 			std::string GetModAuthor(std::string modName);
 
-			// Live progress while a refresh is running.
-			int GetRefreshTotal();
-			int GetRefreshDone();
-			std::string GetRefreshCurrentItem();
+			// Live progress while a refresh is running: the fraction of the current
+			// step done (negative while it is unknown) and a line describing it.
+			float GetRefreshFraction();
+			std::string GetRefreshStatus();
 
 			std::vector<std::string> GetModNames();
 			int GetModPakCount(std::string modName);
@@ -87,24 +101,29 @@ namespace spades {
 
 		private:
 			class RefreshQuery;
+			struct RefreshJob;
 
 			struct ModEntry {
 				std::string name;
-				bool isFolder = false; // true: Mods/<name>/*.pak; false: Mods/<name> (single pak)
+				// Relative to Mods/: "X.pak" for a loose pak, "<name>/X.pak" for
+				// each pak of a folder mod.
 				std::vector<std::string> paks;
 				std::int64_t totalSize = 0;
+				OfficialPakState official = OfficialPakState::Unverified;
+				bool officialChecked = false; // `official` is known (GetModOfficialState)
 			};
 
-			stmp::atomic_unique_ptr<std::string> resultCell;
-			RefreshQuery* query;
+			// The download this helper follows, if any.
+			std::shared_ptr<RefreshJob> job;
+			// The download running in the process, if any.
+			static std::mutex runningJobMutex;
+			static std::weak_ptr<RefreshJob> runningJob;
 			std::string lastMessage;
 			std::vector<ModEntry> mods;
 			bool modsCached;
-
-			std::atomic<int> progressTotal;
-			std::atomic<int> progressDone;
-			std::mutex progressMutex;
-			std::string progressItem;
+			// Mods/index.txt as GetModOfficialState read it since the last scan.
+			std::optional<OfficialModsIndex> officialIndex;
+			bool officialIndexRead = false;
 
 			void RebuildModsCache();
 			const ModEntry* FindMod(const std::string& name) const;
