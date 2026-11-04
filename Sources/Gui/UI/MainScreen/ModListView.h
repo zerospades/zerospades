@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include <Gui/OfficialMods.h>
 #include <Gui/UI/Widgets/ButtonBase.h>
 #include <Gui/UI/Widgets/ListView.h>
 
@@ -46,12 +47,14 @@ namespace spades {
 			std::int64_t totalSize;
 			bool enabled; // present in the apply history
 			bool exists;  // mod still present on disk
+			OfficialPakState official; // what Mods/index.txt says of it
 			int orderNum; // 1-based apply position, 0 when disabled
 			float checkColWidth;
 			float orderColWidth;
 			float tagColWidth;
 			float nameColWidth;
 			float authorColWidth;
+			float sizeColWidth;
 
 			// Draw the tag cell: a weapon icon for weapon categories, a text pill
 			// for other structured categories, nothing for an unstructured name.
@@ -64,8 +67,9 @@ namespace spades {
 			ModListItem(ui::UIManager* manager, const std::string& modName,
 			            const std::string& category, const std::string& displayName,
 			            const std::string& author, std::int64_t totalSize, bool enabled, bool exists,
-			            int orderNum, float checkColWidth, float orderColWidth, float tagColWidth,
-			            float nameColWidth, float authorColWidth, float sizeColWidth);
+			            OfficialPakState official, int orderNum, float checkColWidth, float orderColWidth,
+			            float tagColWidth, float nameColWidth, float authorColWidth,
+			            float sizeColWidth);
 			void Render() override;
 		};
 

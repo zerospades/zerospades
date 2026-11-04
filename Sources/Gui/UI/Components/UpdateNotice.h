@@ -36,7 +36,8 @@ namespace spades {
 		 * add it once and never have to poll the check themselves.
 		 *
 		 * With `showUpToDate`, a confirmed up-to-date check is shown as a small,
-		 * non-interactive mark at the right end of the strip.
+		 * non-interactive mark at the right end of the strip, unless
+		 * `upToDateCovered` says another strip covers it.
 		 *
 		 * `releasePageOpened` runs once the browser has the release page, and is
 		 * where the owner closes the application so the update can be installed.
@@ -53,6 +54,9 @@ namespace spades {
 		public:
 			UpdateNotice(ui::UIManager* manager, std::function<void()> releasePageOpened,
 			             bool showUpToDate = false);
+
+			/** Whether another strip drawn over this one hides its up-to-date mark. */
+			std::function<bool()> upToDateCovered;
 
 			void OnActivated() override;
 			void Render() override;

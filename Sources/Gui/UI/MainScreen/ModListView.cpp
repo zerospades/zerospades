@@ -22,6 +22,7 @@
 #include <Client/IFont.h>
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
+#include <Core/Strings.h>
 #include <Gui/ModsScreenHelper.h>
 #include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/UI/Framework/UIManager.h>
@@ -52,6 +53,13 @@ namespace spades {
 					return "Gfx/Hotbar/Grenade.png";
 				return std::string{};
 			}
+
+			// The mark of a verified official mod; it reads apart from the enabled
+			// green. A modified one is told in a warning amber.
+			const Vector4 kOfficialColor = MakeVector4(0.45F, 0.75F, 1.0F, 1.0F);
+			const Vector4 kModifiedColor = MakeVector4(1.0F, 0.7F, 0.3F, 1.0F);
+			constexpr float kOfficialMarkSize = 10.0F;
+			constexpr float kOfficialMarkThickness = 2.0F;
 		} // namespace
 
 		// -- ModListItem --
@@ -59,9 +67,9 @@ namespace spades {
 		ModListItem::ModListItem(UIManager* manager, const std::string& modName,
 		                         const std::string& category, const std::string& displayName,
 		                         const std::string& author, std::int64_t totalSize, bool enabled,
-		                         bool exists, int orderNum, float checkColWidth, float orderColWidth,
-		                         float tagColWidth, float nameColWidth, float authorColWidth,
-		                         float sizeColWidth)
+		                         bool exists, OfficialPakState official, int orderNum, float checkColWidth,
+		                         float orderColWidth, float tagColWidth, float nameColWidth,
+		                         float authorColWidth, float sizeColWidth)
 		    : ui::ButtonBase(manager),
 		      category(category),
 		      displayName(displayName),
@@ -69,15 +77,15 @@ namespace spades {
 		      totalSize(totalSize),
 		      enabled(enabled),
 		      exists(exists),
+		      official(official),
 		      orderNum(orderNum),
 		      checkColWidth(checkColWidth),
 		      orderColWidth(orderColWidth),
 		      tagColWidth(tagColWidth),
 		      nameColWidth(nameColWidth),
 		      authorColWidth(authorColWidth),
-		      modName(modName) {
-			(void)sizeColWidth;
-		}
+		      sizeColWidth(sizeColWidth),
+		      modName(modName) {}
 
 		void ModListItem::RenderTag(client::IRenderer& r, client::IFont* font, float cellX,
 		                            float cellY, float cellH, const Vector4& fgcolor) {
@@ -166,6 +174,26 @@ namespace spades {
 			x += authorColWidth;
 			font->Draw(exists ? FormatFileSize(totalSize) : "-", MakeVector2(x, pos.y + 2.0F), 1.0F,
 			           fgcolor);
+
+			// Official: a check mark for a verified pak, drawn as two strokes so it
+			// does not depend on the font carrying a check glyph; "Modified" for an
+			// official pak changed since it was installed; nothing for the
+			// player's own.
+			x += sizeColWidth;
+			if (official == OfficialPakState::Modified) {
+				font->Draw(_Tr("MainScreen", "Modified"), MakeVector2(x, pos.y + 2.0F), 1.0F,
+				           kModifiedColor);
+			} else if (official == OfficialPakState::Verified) {
+				const float s = kOfficialMarkSize;
+				const float mx = x + 4.0F;
+				const float my = pos.y + (sz.y - s) * 0.5F;
+				const Vector2 start = MakeVector2(mx, my + s * 0.55F);
+				const Vector2 corner = MakeVector2(mx + s * 0.38F, my + s * 0.9F);
+				const Vector2 end = MakeVector2(mx + s, my + s * 0.1F);
+				SetColorNP(r, kOfficialColor);
+				r.DrawLine(start, corner, kOfficialMarkThickness);
+				r.DrawLine(corner, end, kOfficialMarkThickness);
+			}
 		}
 
 		// -- ModListModel --
@@ -205,8 +233,8 @@ namespace spades {
 				std::string author = helper->GetModAuthor(name);
 				Handle<ModListItem> item = Handle<ModListItem>::New(
 				    manager, name, category, displayName, author, size, orders[row] > 0, ex,
-				    orders[row], checkColWidth, orderColWidth, tagColWidth, nameColWidth,
-				    authorColWidth, sizeColWidth);
+				    helper->GetModOfficialState(name), orders[row], checkColWidth, orderColWidth,
+				    tagColWidth, nameColWidth, authorColWidth, sizeColWidth);
 				item->activated = [this](UIElement& s) { OnItemClicked(s); };
 				itemElements[row] = item;
 			}

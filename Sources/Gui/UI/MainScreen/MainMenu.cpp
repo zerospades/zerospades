@@ -30,6 +30,9 @@
 #include <Core/Strings.h>
 #include <Gui/MainScreenHelper.h>
 #include <Gui/ModsScreenHelper.h>
+#include <Gui/OfficialMods.h>
+#include <Gui/UpdateChecker.h>
+#include <Gui/UI/Components/OfficialModsNotice.h>
 #include <Gui/UI/Components/UpdateNotice.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Settings/PreferenceView.h>
@@ -191,7 +194,10 @@ namespace spades {
 			modsNameColWidth = 200.0F;
 			modsAuthorColWidth = 150.0F;
 			modsSizeColWidth = 100.0F;
+			modsOfficialColWidth = 80.0F;
 			modsHelper = Handle<ModsScreenHelper>::New();
+			// A download started before the main screen was rebuilt goes on.
+			modsDownloading = modsHelper->IsRefreshing();
 
 			float sw = manager->screenWidth;
 			float sh = manager->screenHeight;
@@ -589,6 +595,13 @@ namespace spades {
 						header->SetBounds(AABB2(x, headerPos, modsSizeColWidth, headerHeight));
 						header->text = _Tr("MainScreen", "Size");
 						modsPanel->AddChild(header.GetPointerOrNull());
+						x += modsSizeColWidth;
+					}
+					{
+						Handle<ModListHeader> header = Handle<ModListHeader>::New(manager);
+						header->SetBounds(AABB2(x, headerPos, modsOfficialColWidth, headerHeight));
+						header->text = _Tr("MainScreen", "Official");
+						modsPanel->AddChild(header.GetPointerOrNull());
 					}
 				}
 				{
@@ -653,12 +666,22 @@ namespace spades {
 			}
 
 			// Above the title logo: the new release banner, or a small up-to-date
-			// mark once the check has confirmed this build is the latest.
+			// mark once the check has confirmed this build is the latest. In the
+			// same strip, the same size, a newer official mods release: it hides
+			// while a game update is announced, and covers the up-to-date mark.
 			{
+				const AABB2 strip(contentsLeft, 20.0F, contentsWidth, 30.0F);
 				Handle<UpdateNotice> notice = Handle<UpdateNotice>::New(
 				  manager, [this] { this->ui->shouldExit = true; }, true);
-				notice->SetBounds(AABB2(contentsLeft, 20.0F, contentsWidth, 30.0F));
+				notice->SetBounds(strip);
 				AddChild(notice.GetPointerOrNull());
+				if (!helper->IsTryingMod()) {
+					Handle<OfficialModsNotice> modsNotice = Handle<OfficialModsNotice>::New(
+					  manager, [this] { OfferOfficialModsDownload(); });
+					modsNotice->SetBounds(strip);
+					AddChild(modsNotice.GetPointerOrNull());
+					notice->upToDateCovered = [modsNotice] { return modsNotice->IsShown(); };
+				}
 			}
 
 			LoadServerList();
@@ -774,26 +797,17 @@ namespace spades {
 		}
 
 		void MainScreenMainMenu::UpdateModsStatus() {
+			const OfficialModsChecker::Result check = OfficialModsChecker::Get().GetResult();
+			modsCheckState = static_cast<int>(check.state);
 			if (modsApplyButton != nullptr) {
 				// Toggles already persist; Apply only restarts to make pending
 				// changes live, so it's actionable only when something changed.
 				modsApplyButton->enable = modsDirty && !modsDownloading;
 			}
 			if (modsDownloading) {
-				int done = modsHelper->GetRefreshDone();
-				int total = modsHelper->GetRefreshTotal();
-				std::string item = modsHelper->GetRefreshCurrentItem();
-				if (total <= 0) {
-					modsStatusLabel->text = _Tr("MainScreen", "Fetching mod list...");
-					modsProgressBar->fraction = 0.0F;
-				} else {
-					std::string label = std::to_string(done) + " / " + std::to_string(total);
-					if (item.size() > 0)
-						label += " — " + item;
-					modsStatusLabel->text = label;
-					modsProgressBar->fraction =
-					    static_cast<float>(done) / static_cast<float>(total);
-				}
+				// A negative fraction means the step has no measurable progress yet.
+				modsStatusLabel->text = modsHelper->GetRefreshStatus();
+				modsProgressBar->fraction = std::max(modsHelper->GetRefreshFraction(), 0.0F);
 				modsProgressBar->visible = true;
 				return;
 			}
@@ -808,24 +822,72 @@ namespace spades {
 				    _Tr("MainScreen", "Press 'Apply changes' to restart and apply your mods.");
 				return;
 			}
-			modsStatusLabel->text = "";
+			std::string installed = modsHelper->GetInstalledOfficialVersion();
+			if (installed.empty()) {
+				// Only here, never as a banner: a player with only mods of their own
+				// has nothing to fix.
+				modsStatusLabel->text =
+				  modsHelper->GetModNames().empty()
+				    ? std::string{}
+				    : _Tr("MainScreen", "Mods/index.txt is missing, so no mod can be verified as "
+				                        "official. Download the official mods to write it.");
+				return;
+			}
+			switch (check.state) {
+				case OfficialModsChecker::State::UpdateAvailable:
+					modsStatusLabel->text =
+					  _Tr("MainScreen", "Official mods {0}: {1} is available.", installed,
+					      check.latestVersion.ToString());
+					break;
+				case OfficialModsChecker::State::GameUpdateNeeded:
+					// With no game update out yet, these are the latest this game can use.
+					if (UpdateChecker::Get().GetResult().state == UpdateChecker::State::UpToDate)
+						modsStatusLabel->text =
+						  _Tr("MainScreen", "Official mods {0} (up to date).", installed);
+					else
+						modsStatusLabel->text =
+						  _Tr("MainScreen", "Official mods {0}: {1} needs a newer ZeroSpades.",
+						      installed, check.latestVersion.ToString());
+					break;
+				case OfficialModsChecker::State::UpToDate:
+					modsStatusLabel->text =
+					  _Tr("MainScreen", "Official mods {0} (up to date).", installed);
+					break;
+				default: modsStatusLabel->text = _Tr("MainScreen", "Official mods {0}.", installed);
+			}
 		}
 
 		void MainScreenMainMenu::OnDownloadModsPressed(UIElement&) {
 			if (modsDownloading)
 				return;
 			std::string body =
-			    _Tr("MainScreen", "Download the official ZeroSpades mod pack?") + "\n\n";
+			    _Tr("MainScreen", "Download the latest official ZeroSpades mods?") + "\n\n";
 			body +=
 			    _Tr("MainScreen", "These are mods reviewed and hosted by the ZeroSpades team.") +
 			    "\n\n";
-			body += _Tr("MainScreen", "Source: ") + modsHelper->GetIndexUrl() + "\n";
-			body += _Tr("MainScreen", "Files will be saved into your Mods/ folder, overwriting "
-			                          "any existing copies.");
+			body += _Tr("MainScreen", "Source: ") + kOfficialModsReleasesPageUrl + "\n";
+			body += _Tr("MainScreen", "They are saved into your Mods/ folder, replacing the "
+			                          "official mods installed before. Mods you added yourself "
+			                          "stay, unless a new pak has the same name.");
+			// A game update comes first: newer mods may need it.
+			UpdateChecker::Result game = UpdateChecker::Get().GetResult();
+			if (game.state == UpdateChecker::State::UpdateAvailable)
+				body += "\n\n" + _Tr("MainScreen",
+				                     "ZeroSpades {0} is available: update the game first to get "
+				                     "the newest mods.",
+				                     game.latestVersion.ToString());
 			Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(
 			    this, body, std::min(500.0F, GetManager().screenHeight - 100.0F), true);
 			cs->closed = [this](UIElement& s) { OnDownloadConfirmed(s); };
 			cs->Run();
+		}
+
+		void MainScreenMainMenu::OfferOfficialModsDownload() {
+			serverPanel->visible = false;
+			demoPanel->visible = false;
+			modsPanel->visible = true;
+			LoadModList();
+			OnDownloadModsPressed(*this);
 		}
 
 		void MainScreenMainMenu::OnDownloadConfirmed(UIElement& sender) {
@@ -880,10 +942,19 @@ namespace spades {
 		}
 
 		void MainScreenMainMenu::CheckModsRefresh() {
-			if (!modsDownloading)
+			if (!modsDownloading) {
+				// The update check answers in the background: show its answer.
+				if (static_cast<int>(OfficialModsChecker::Get().GetResult().state) !=
+				    modsCheckState)
+					UpdateModsStatus();
 				return;
+			}
 			if (modsHelper->PollRefreshState()) {
 				modsDownloading = false;
+				// Enabled paks it replaced load their new content only on restart.
+				if (modsHelper->GetRefreshMessage().empty() &&
+				    modsHelper->IsInstalledOfficialPakEnabled())
+					modsDirty = true;
 				LoadModList();
 				// A non-empty refresh message means the download failed. The
 				// status label keeps it (sticky), but also raise a loud alert so
