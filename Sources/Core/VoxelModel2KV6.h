@@ -142,6 +142,19 @@ namespace spades {
 		VoxelObject() : position(0, 0, 0), rotation(0, 0, 0, 1), scale(1, 1, 1) {}
 	};
 
+	/** What a local position, rotation and scale do to a point: scale it, turn
+	 *  it, then move it, as an object's transform does to its voxels. */
+	Matrix4 LocalTransform(const Vector3& position, const Vector4& rotation, const Vector3& scale);
+
+	/**
+	 * `m` back into a position, a rotation and a scale, LocalTransform's
+	 * inverse. False when they cannot hold it exactly: it shears (an object
+	 * turned within a parent scaled unevenly), or flattens an axis; they are
+	 * then the nearest that leave the shear out.
+	 */
+	bool DecomposeTransform(const Matrix4& m, Vector3& position, Vector4& rotation,
+	                        Vector3& scale);
+
 	/**
 	 * .2kv6 file format handler for hierarchical scenes of named voxel objects.
 	 *

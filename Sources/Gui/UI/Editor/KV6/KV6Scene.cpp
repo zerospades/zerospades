@@ -31,6 +31,7 @@
 #include <Client/IRenderer.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/StdStream.h>
+#include <Core/VoxelModelLoader.h>
 #include <Core/VoxelModel.h>
 #include <Gui/UI/Components/Gizmo/GizmoView.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
@@ -42,8 +43,97 @@ namespace spades {
 
 		namespace {
 			Matrix4 LocalMatrix(const VoxelObject& o) {
-				return Matrix4::Translate(o.position) * Quaternion(o.rotation).ToRotationMatrix() *
-				       Matrix4::Scale(o.scale);
+				return LocalTransform(o.position, o.rotation, o.scale);
+			}
+
+			bool StartsWith(const NodePath& path, const NodePath& prefix) {
+				return path.size() >= prefix.size() &&
+				       std::equal(prefix.begin(), prefix.end(), path.begin());
+			}
+
+			NodePath ParentOf(const NodePath& path) {
+				return NodePath(path.begin(), path.end() - 1);
+			}
+
+			// `q` once the node at `removed` is taken out of the tree; false when
+			// `q` is that node or under it, and so goes with it.
+			bool AfterRemoval(NodePath& q, const NodePath& removed) {
+				if (StartsWith(q, removed))
+					return false;
+				const std::size_t level = removed.size() - 1;
+				if (q.size() > level && std::equal(removed.begin(), removed.end() - 1, q.begin()) &&
+				    q[level] > removed[level])
+					q[level]--;
+				return true;
+			}
+
+			// `q` once a node is put in at `inserted`.
+			void AfterInsertion(NodePath& q, const NodePath& inserted) {
+				const std::size_t level = inserted.size() - 1;
+				if (q.size() > level && std::equal(inserted.begin(), inserted.end() - 1, q.begin()) &&
+				    q[level] >= inserted[level])
+					q[level]++;
+			}
+
+			// Voxels of its own for `o` and everything under it.
+			void CloneModels(VoxelObject& o) {
+				if (o.model) {
+					const VoxelModel& from = *o.model;
+					Handle<VoxelModel> copy =
+					  Handle<VoxelModel>::New(from.GetWidth(), from.GetHeight(), from.GetDepth());
+					copy->SetOrigin(from.GetOrigin());
+					for (int x = 0; x < from.GetWidth(); x++) {
+						for (int y = 0; y < from.GetHeight(); y++) {
+							copy->GetSolidBitsAt(x, y) = from.GetSolidBitsAt(x, y);
+							for (int z = 0; z < from.GetDepth(); z++)
+								copy->GetColor(x, y, z) = from.GetColor(x, y, z);
+						}
+					}
+					o.model = std::move(copy);
+				}
+				for (VoxelObject& child : o.children)
+					CloneModels(child);
+			}
+
+			// `name`, or else it with ".001", ".002"... (in place of such an
+			// ending it has), whichever `taken` does not hold.
+			std::string UniqueName(const std::string& name, const std::vector<std::string>& taken) {
+				auto free = [&](const std::string& n) {
+					return std::find(taken.begin(), taken.end(), n) == taken.end();
+				};
+				if (free(name))
+					return name;
+				std::string stem = name;
+				const std::size_t dot = name.rfind('.');
+				if (dot != std::string::npos && name.size() - dot - 1 >= 3 &&
+				    std::all_of(name.begin() + long(dot) + 1, name.end(),
+				                [](char c) { return c >= '0' && c <= '9'; }))
+					stem = name.substr(0, dot);
+				for (int n = 1;; n++) {
+					char number[16];
+					std::snprintf(number, sizeof(number), ".%03d", n);
+					if (free(stem + number))
+						return stem + number;
+				}
+			}
+
+			// The tracks keying the node named `from` (by its path of names), or
+			// anything under it, key it as `to`.
+			void RetargetTracks(std::vector<AnimationClip>& clips, const std::string& from,
+			                    const std::string& to) {
+				for (AnimationClip& clip : clips) {
+					for (AnimationTrack& track : clip.tracks) {
+						if (track.path == from)
+							track.path = to;
+						else if (track.path.compare(0, from.size() + 1, from + "/") == 0)
+							track.path = to + track.path.substr(from.size());
+					}
+				}
+			}
+
+			// What a node shows as in messages: its name, or that it has none.
+			std::string Quoted(const VoxelObject& o) {
+				return o.name.empty() ? std::string("an unnamed object") : "\"" + o.name + "\"";
 			}
 
 			Vector3 Point(const Matrix4& m, const Vector3& p) {
@@ -83,9 +173,8 @@ namespace spades {
 			}
 			metadata = std::move(loaded.metadata);
 			clips = std::move(loaded.clips);
-			picked = 0;
-			history.clear();
-			undoTop = 0;
+			Restart();
+			Pick(0);
 			changeCount = savedChangeCount = 0;
 			return true;
 		}
@@ -122,30 +211,176 @@ namespace spades {
 			metadata.clear();
 			clips.clear();
 			Index();
-			picked = 0;
-			history.clear();
-			undoTop = 0;
+			Restart();
+			Pick(0);
 			changeCount = 1; // a scene never saved has changes to save
 			savedChangeCount = 0;
 		}
 
+		void KV6Scene::Restart() {
+			selection.clear();
+			active.clear();
+			picked = -1;
+			folded.clear();
+			dragging = false;
+			history.clear();
+			undoTop = 0;
+		}
+
 		void KV6Scene::Index() {
+			// The render models are kept: an object keeps its own wherever it
+			// went in the tree.
+			std::vector<Entry> previous = std::move(entries);
 			entries.clear();
 			std::vector<const VoxelObject*> parents;
+			NodePath path;
 			std::function<void(VoxelObject&)> visit = [&](VoxelObject& o) {
 				if (o.model) {
 					Entry e;
 					e.object = &o;
+					e.path = path;
 					e.parents = parents;
+					for (Entry& old : previous) {
+						if (old.renderedFrom == o.model.GetPointerOrNull()) {
+							e.renderModel = std::move(old.renderModel);
+							e.renderedFrom = old.renderedFrom;
+							old.renderedFrom = nullptr;
+							break;
+						}
+					}
 					entries.push_back(std::move(e));
 				}
 				parents.push_back(&o);
-				for (VoxelObject& child : o.children)
-					visit(child);
+				for (std::size_t i = 0; i < o.children.size(); i++) {
+					path.push_back(int(i));
+					visit(o.children[i]);
+					path.pop_back();
+				}
 				parents.pop_back();
 			};
-			for (VoxelObject& root : roots)
-				visit(root);
+			for (std::size_t i = 0; i < roots.size(); i++) {
+				path.assign(1, int(i));
+				visit(roots[i]);
+			}
+			shapeVersion++;
+		}
+
+		// --- The tree ----------------------------------------------------------
+
+		const std::vector<VoxelObject>* KV6Scene::ChildrenOf(const NodePath& parent) const {
+			const std::vector<VoxelObject>* level = &roots;
+			for (int i : parent) {
+				if (i < 0 || std::size_t(i) >= level->size())
+					return nullptr;
+				level = &(*level)[std::size_t(i)].children;
+			}
+			return level;
+		}
+
+		std::vector<VoxelObject>* KV6Scene::ChildrenOf(const NodePath& parent) {
+			return const_cast<std::vector<VoxelObject>*>(
+			  static_cast<const KV6Scene*>(this)->ChildrenOf(parent));
+		}
+
+		const VoxelObject* KV6Scene::Node(const NodePath& path) const {
+			if (path.empty())
+				return nullptr;
+			const std::vector<VoxelObject>* level = ChildrenOf(ParentOf(path));
+			if (!level || path.back() < 0 || std::size_t(path.back()) >= level->size())
+				return nullptr;
+			return &(*level)[std::size_t(path.back())];
+		}
+
+		VoxelObject* KV6Scene::MutableNode(const NodePath& path) {
+			return const_cast<VoxelObject*>(static_cast<const KV6Scene*>(this)->Node(path));
+		}
+
+		int KV6Scene::ObjectIndexAt(const NodePath& path) const {
+			for (std::size_t i = 0; i < entries.size(); i++) {
+				if (entries[i].path == path)
+					return int(i);
+			}
+			return -1;
+		}
+
+		bool KV6Scene::Shown(const NodePath& path) const {
+			for (std::size_t n = 1; n <= path.size(); n++) {
+				const VoxelObject* o = Node(NodePath(path.begin(), path.begin() + long(n)));
+				if (!o || o->hidden)
+					return false;
+			}
+			return true;
+		}
+
+		bool KV6Scene::Shown(int index) const {
+			const Entry& e = entries[std::size_t(index)];
+			if (e.object->hidden)
+				return false;
+			for (const VoxelObject* parent : e.parents) {
+				if (parent->hidden)
+					return false;
+			}
+			return true;
+		}
+
+		Matrix4 KV6Scene::NodeMatrix(const NodePath& path) const {
+			Matrix4 m = Matrix4::Identity();
+			for (std::size_t n = 1; n <= path.size(); n++)
+				m = m * LocalMatrix(*Node(NodePath(path.begin(), path.begin() + long(n))));
+			return m;
+		}
+
+		std::string KV6Scene::NamePath(const NodePath& path) const {
+			std::string names;
+			for (std::size_t n = 1; n <= path.size(); n++) {
+				const VoxelObject& o = *Node(NodePath(path.begin(), path.begin() + long(n)));
+				names += (n == 1 ? "" : "/") + o.name;
+			}
+			return names;
+		}
+
+		// --- Selecting ---------------------------------------------------------
+
+		void KV6Scene::Pick(int index) {
+			if (index < 0 || index >= Count())
+				Select({}, {});
+			else
+				Select({PathOf(index)}, PathOf(index));
+		}
+
+		bool KV6Scene::IsSelected(const NodePath& path) const {
+			return std::find(selection.begin(), selection.end(), path) != selection.end();
+		}
+
+		void KV6Scene::Select(std::vector<NodePath> nodes, NodePath newActive) {
+			selection.clear();
+			for (NodePath& p : nodes) {
+				if (Node(p) && !IsSelected(p))
+					selection.push_back(std::move(p));
+			}
+			active = IsSelected(newActive) ? std::move(newActive) : NodePath();
+			SyncPicked();
+		}
+
+		void KV6Scene::SyncPicked() {
+			// A drag of the picked object ends with it: whatever it was moving
+			// may be elsewhere now.
+			const int now = active.empty() ? -1 : ObjectIndexAt(active);
+			if (now != picked)
+				dragging = false;
+			picked = now;
+		}
+
+		bool KV6Scene::IsFolded(const NodePath& path) const {
+			return std::find(folded.begin(), folded.end(), path) != folded.end();
+		}
+
+		void KV6Scene::SetFolded(const NodePath& path, bool fold) {
+			auto it = std::find(folded.begin(), folded.end(), path);
+			if (fold && it == folded.end() && Node(path))
+				folded.push_back(path);
+			else if (!fold && it != folded.end())
+				folded.erase(it);
 		}
 
 		// --- Objects -----------------------------------------------------------
@@ -175,10 +410,9 @@ namespace spades {
 			int best = -1;
 			float bestDistance = std::numeric_limits<float>::max();
 			for (int i = 0; i < Count(); i++) {
-				const VoxelObject& o = Object(i);
-				if (o.hidden)
+				if (!Shown(i))
 					continue;
-				const VoxelModel& model = *o.model;
+				const VoxelModel& model = *Object(i).model;
 				const Matrix4 world = WorldMatrix(i);
 				const Matrix4 toLocal = world.Inversed();
 				// The ray in the object's voxel indices, voxel `i` centred on `i`.
@@ -294,10 +528,529 @@ namespace spades {
 			size = std::max(extent.x, std::max(extent.y, extent.z));
 		}
 
+		// --- Changing the tree -------------------------------------------------
+
+		NodePath KV6Scene::Relocation::Apply(const NodePath& path) const {
+			for (std::size_t i = 0; i < from.size(); i++) {
+				if (StartsWith(path, from[i])) {
+					NodePath moved = to[i];
+					moved.insert(moved.end(), path.begin() + long(from[i].size()), path.end());
+					return moved;
+				}
+			}
+			// Taken out last first, so each path taken out still names its
+			// node, then put in first first, so each path put in names where
+			// its node goes: a node after one in its parent's children moves up
+			// a place, then down one for one put in before it.
+			NodePath q = path;
+			for (std::size_t i = from.size(); i-- > 0;)
+				AfterRemoval(q, from[i]);
+			for (const NodePath& t : to)
+				AfterInsertion(q, t);
+			return q;
+		}
+
+		void KV6Scene::Relocate(const Relocation& r, const std::vector<Placement>& placements) {
+			std::vector<VoxelObject> taken(r.from.size());
+			for (std::size_t i = r.from.size(); i-- > 0;) {
+				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(r.from[i]));
+				const auto at = level.begin() + r.from[i].back();
+				taken[i] = std::move(*at);
+				level.erase(at);
+			}
+			for (std::size_t i = 0; i < r.to.size(); i++) {
+				Place(taken[i], placements[i], true);
+				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(r.to[i]));
+				level.insert(level.begin() + r.to[i].back(), std::move(taken[i]));
+			}
+			for (NodePath& p : selection)
+				p = r.Apply(p);
+			if (!active.empty())
+				active = r.Apply(active);
+			for (NodePath& p : folded)
+				p = r.Apply(p);
+			Index();
+			SyncPicked();
+		}
+
+		bool KV6Scene::PlanMove(const std::vector<NodePath>& nodes, const NodePath& parent,
+		                        int position, MoveStep& plan, std::string& why) const {
+			why.clear();
+			// The nodes that move: a node under another that moves goes with it.
+			const std::vector<NodePath> from = TopMost(nodes);
+			const std::vector<VoxelObject>* level = ChildrenOf(parent);
+			if (from.empty() || !CanHold(parent)) {
+				why = "nothing to move there";
+				return false;
+			}
+			const std::string holder = parent.empty() ? std::string("the scene") : Quoted(*Node(parent));
+
+			for (const NodePath& p : from) {
+				const VoxelObject& o = *Node(p);
+				if (o.locked) {
+					why = Quoted(o) + " is held in place by its template";
+					return false;
+				}
+				if (StartsWith(parent, p)) {
+					why = "an object cannot go into itself or what is under it";
+					return false;
+				}
+			}
+
+			// Children are found by name: none may share one.
+			std::vector<std::string> names;
+			for (std::size_t i = 0; i < level->size(); i++) {
+				NodePath child = parent;
+				child.push_back(int(i));
+				if (!std::binary_search(from.begin(), from.end(), child))
+					names.push_back((*level)[i].name);
+			}
+			for (const NodePath& p : from) {
+				const std::string& name = Node(p)->name;
+				if (std::find(names.begin(), names.end(), name) != names.end()) {
+					why = holder + " already holds " +
+					      (name.empty() ? std::string("an unnamed object")
+					                    : "an object named \"" + name + "\"");
+					return false;
+				}
+				names.push_back(name);
+			}
+
+			// Where they land: the gap they go into, as it is once they are out.
+			const int count = int(level->size());
+			int gap = position < 0 || position > count ? count : position;
+			NodePath parentAfter = parent;
+			for (std::size_t i = from.size(); i-- > 0;) {
+				if (ParentOf(from[i]) == parent && from[i].back() < gap)
+					gap--;
+				AfterRemoval(parentAfter, from[i]);
+			}
+			Relocation r;
+			r.from = from;
+			for (std::size_t i = 0; i < from.size(); i++) {
+				NodePath t = parentAfter;
+				t.push_back(gap + int(i));
+				r.to.push_back(std::move(t));
+			}
+			if (r.from == r.to)
+				return false; // where they are already
+
+			// Each keeps where it is in the world: its placement, its keys and
+			// the clips' keys of it are brought from its old parent's frame into
+			// its new one's.
+			const Matrix4 toParent = NodeMatrix(parent).Inversed();
+			std::vector<AnimationClip> clipsAfter = clips;
+			std::vector<Placement> before, after;
+			for (const NodePath& p : from) {
+				const VoxelObject& o = *Node(p);
+				before.push_back(PlacementOf(o, true));
+				Placement placed = before.back();
+				const std::string oldName = NamePath(p);
+				if (ParentOf(p) != parent) {
+					const Matrix4 change = toParent * NodeMatrix(ParentOf(p));
+					bool exact = DecomposeTransform(
+					  change * LocalTransform(o.position, o.rotation, o.scale), placed.position,
+					  placed.rotation, placed.scale);
+					for (TransformKeyframe& k : placed.keyframes)
+						exact = exact && DecomposeTransform(
+						                   change * LocalTransform(k.position, k.rotation, k.scale),
+						                   k.position, k.rotation, k.scale);
+					for (AnimationClip& clip : clipsAfter) {
+						for (AnimationTrack& track : clip.tracks) {
+							if (track.path != oldName)
+								continue;
+							for (TransformKeyframe& k : track.keyframes)
+								exact = exact &&
+								        DecomposeTransform(
+								          change * LocalTransform(k.position, k.rotation, k.scale),
+								          k.position, k.rotation, k.scale);
+						}
+					}
+					if (!exact) {
+						why = Quoted(o) + " would be skewed in " + holder +
+						      ": a parent scaled unevenly cannot hold it turned as it is";
+						return false;
+					}
+				}
+				after.push_back(std::move(placed));
+
+				// The tracks keying it, or anything under it, follow it.
+				RetargetTracks(clipsAfter, oldName,
+				               (parent.empty() ? std::string() : NamePath(parent) + "/") + o.name);
+			}
+			plan.relocation = std::move(r);
+			plan.before = std::move(before);
+			plan.after = std::move(after);
+			plan.clipsBefore = clips;
+			plan.clipsAfter = std::move(clipsAfter);
+			plan.selectionBefore = selection;
+			plan.activeBefore = active;
+			return true;
+		}
+
+		std::string KV6Scene::WhyNotMove(const std::vector<NodePath>& nodes, const NodePath& parent,
+		                                 int position) const {
+			MoveStep plan;
+			std::string why;
+			PlanMove(nodes, parent, position, plan, why);
+			return why;
+		}
+
+		bool KV6Scene::Move(const std::vector<NodePath>& nodes, const NodePath& parent, int position,
+		                    std::string& why) {
+			auto plan = std::unique_ptr<MoveStep>(new MoveStep());
+			if (!PlanMove(nodes, parent, position, *plan, why))
+				return false;
+			CancelDrag();
+			const Relocation& r = plan->relocation;
+			Relocate(r, plan->after);
+			clips = plan->clipsAfter;
+			// The moved nodes stay selected, the active one among them if it
+			// moved, else the first of them.
+			const bool activeMoved = std::find(r.to.begin(), r.to.end(), active) != r.to.end();
+			Select(r.to, activeMoved ? active : r.to.front());
+			plan->selectionAfter = selection;
+			plan->activeAfter = active;
+
+			Step step;
+			step.kind = Step::Kind::Move;
+			step.move = std::move(plan);
+			Record(std::move(step));
+			return true;
+		}
+
+		std::vector<NodePath> KV6Scene::TopMost(const std::vector<NodePath>& nodes) const {
+			std::vector<NodePath> top;
+			for (const NodePath& p : nodes) {
+				if (p.empty() || !Node(p))
+					continue;
+				bool carried = false;
+				for (const NodePath& q : nodes)
+					carried = carried || (!q.empty() && q.size() < p.size() && StartsWith(p, q));
+				if (!carried)
+					top.push_back(p);
+			}
+			std::sort(top.begin(), top.end());
+			top.erase(std::unique(top.begin(), top.end()), top.end());
+			return top;
+		}
+
+		bool KV6Scene::CanHold(const NodePath& parent) const {
+			return parent.empty() || Node(parent) != nullptr;
+		}
+
+		void KV6Scene::InsertNodes(const std::vector<NodePath>& paths,
+		                           const std::vector<VoxelObject>& nodes) {
+			for (std::size_t i = 0; i < paths.size(); i++) {
+				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(paths[i]));
+				level.insert(level.begin() + paths[i].back(), nodes[i]);
+			}
+			auto follow = [&](NodePath& q) {
+				for (const NodePath& p : paths)
+					AfterInsertion(q, p);
+			};
+			for (NodePath& q : selection)
+				follow(q);
+			follow(active);
+			for (NodePath& q : folded)
+				follow(q);
+			Index();
+			SyncPicked();
+		}
+
+		void KV6Scene::RemoveNodes(const std::vector<NodePath>& paths) {
+			for (std::size_t i = paths.size(); i-- > 0;) {
+				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(paths[i]));
+				level.erase(level.begin() + paths[i].back());
+			}
+			// What went with them is forgotten; what stays follows.
+			auto follow = [&](NodePath& q) {
+				for (std::size_t i = paths.size(); i-- > 0;) {
+					if (!AfterRemoval(q, paths[i]))
+						return false;
+				}
+				return true;
+			};
+			auto gone = [&](NodePath& q) { return !follow(q); };
+			selection.erase(std::remove_if(selection.begin(), selection.end(), gone), selection.end());
+			if (!active.empty() && !follow(active))
+				active.clear();
+			folded.erase(std::remove_if(folded.begin(), folded.end(), gone), folded.end());
+			Index();
+			SyncPicked();
+		}
+
+		void KV6Scene::RecordInsert(Step::Kind kind, std::unique_ptr<InsertStep> insert) {
+			Step step;
+			step.kind = kind;
+			step.insert = std::move(insert);
+			Record(std::move(step));
+		}
+
+		bool KV6Scene::HoldsVoxels(const NodePath& path) const {
+			std::function<bool(const VoxelObject&)> holds = [&](const VoxelObject& o) {
+				if (o.model)
+					return true;
+				for (const VoxelObject& child : o.children)
+					if (holds(child))
+						return true;
+				return false;
+			};
+			const VoxelObject* o = Node(path);
+			return o && holds(*o);
+		}
+
+		Handle<VoxelModel> KV6Scene::ModelOf(const NodePath& path, std::string& why) const {
+			why.clear();
+			const VoxelObject* node = Node(path);
+			if (!node) {
+				why = "there is nothing there";
+				return Handle<VoxelModel>();
+			}
+			if (node->children.empty()) {
+				if (!node->model)
+					why = Quoted(*node) + " holds no voxels";
+				return node->model;
+			}
+			// In its own frame, shown whatever it is set to: what hangs under it
+			// lands where it does, the hidden left out as the game leaves them.
+			VoxelObject object = *node;
+			object.position = MakeVector3(0.0F, 0.0F, 0.0F);
+			object.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+			object.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+			object.hidden = false;
+			try {
+				IntVector3 low;
+				Handle<VoxelModel> model =
+				  VoxelModelLoader::MergeScene(std::vector<VoxelObject>(1, object), &low);
+				model->SetOrigin(MakeVector3(float(low.x), float(low.y), float(low.z)));
+				return model;
+			} catch (const std::exception&) {
+				why = Quoted(*node) + " shows no voxels: what holds them is hidden";
+				return Handle<VoxelModel>();
+			}
+		}
+
+		std::vector<KV6Scene::CopiedObject> KV6Scene::Copy(const std::vector<NodePath>& nodes) const {
+			std::vector<CopiedObject> copied;
+			for (const NodePath& p : TopMost(nodes)) {
+				CopiedObject c{*Node(p), NodeMatrix(p)};
+				// Edits to the original after the copy never reach it.
+				CloneModels(c.object);
+				copied.push_back(std::move(c));
+			}
+			return copied;
+		}
+
+		void KV6Scene::InsertUnder(const NodePath& parent, std::vector<VoxelObject> nodes) {
+			CancelDrag();
+			const std::vector<VoxelObject>& level = *ChildrenOf(parent);
+			std::vector<std::string> taken;
+			for (const VoxelObject& o : level)
+				taken.push_back(o.name);
+			auto step = std::unique_ptr<InsertStep>(new InsertStep());
+			for (std::size_t i = 0; i < nodes.size(); i++) {
+				nodes[i].name = UniqueName(nodes[i].name, taken);
+				taken.push_back(nodes[i].name);
+				NodePath path = parent;
+				path.push_back(int(level.size() + i));
+				step->paths.push_back(std::move(path));
+			}
+			step->nodes = std::move(nodes);
+			step->clipsBefore = step->clipsAfter = clips;
+			step->selectionBefore = selection;
+			step->activeBefore = active;
+			InsertNodes(step->paths, step->nodes);
+			SetFolded(parent, false);
+			Select(step->paths, step->paths.front());
+			step->selectionAfter = selection;
+			step->activeAfter = active;
+			RecordInsert(Step::Kind::Insert, std::move(step));
+		}
+
+		bool KV6Scene::Paste(const std::vector<CopiedObject>& objects, const NodePath& parent,
+		                     std::string& why) {
+			why.clear();
+			if (objects.empty() || !CanHold(parent)) {
+				why = "nothing to paste there";
+				return false;
+			}
+			const std::string holder = parent.empty() ? std::string("the scene") : Quoted(*Node(parent));
+			// Each lands where it was in the world: its placement and its keys
+			// are brought into the new parent's frame.
+			const Matrix4 toParent = NodeMatrix(parent).Inversed();
+			std::vector<VoxelObject> nodes;
+			for (const CopiedObject& c : objects) {
+				VoxelObject o = c.object;
+				CloneModels(o); // each paste its own voxels
+				const Matrix4 change =
+				  toParent * c.world * LocalTransform(o.position, o.rotation, o.scale).Inversed();
+				bool exact = DecomposeTransform(toParent * c.world, o.position, o.rotation, o.scale);
+				for (TransformKeyframe& k : o.keyframes)
+					exact = exact &&
+					        DecomposeTransform(change * LocalTransform(k.position, k.rotation, k.scale),
+					                           k.position, k.rotation, k.scale);
+				if (!exact) {
+					why = Quoted(o) + " would be skewed in " + holder +
+					      ": a parent scaled unevenly cannot hold it turned as it is";
+					return false;
+				}
+				nodes.push_back(std::move(o));
+			}
+			InsertUnder(parent, std::move(nodes));
+			return true;
+		}
+
+		bool KV6Scene::AddChild(const NodePath& parent, Handle<VoxelModel> model,
+		                        const std::string& name, std::string& why) {
+			why.clear();
+			if (!model || !CanHold(parent)) {
+				why = "nothing to add there";
+				return false;
+			}
+			VoxelObject o;
+			o.name = name;
+			// Voxel `i` lands at the position plus `i`; the pivot, voxel
+			// `-origin`, lands on the parent's origin.
+			o.position = model->GetOrigin();
+			o.model = std::move(model);
+			InsertUnder(parent, std::vector<VoxelObject>(1, std::move(o)));
+			return true;
+		}
+
+		std::string KV6Scene::WhyNotDelete(const std::vector<NodePath>& nodes) const {
+			const std::vector<NodePath> top = TopMost(nodes);
+			if (top.empty())
+				return "nothing to delete";
+			for (const NodePath& p : top) {
+				const VoxelObject& o = *Node(p);
+				const VoxelObject* locked = nullptr;
+				std::function<void(const VoxelObject&)> find = [&](const VoxelObject& n) {
+					if (!locked && n.locked)
+						locked = &n;
+					for (const VoxelObject& child : n.children)
+						find(child);
+				};
+				find(o);
+				if (locked == &o)
+					return Quoted(o) + " is held in place by its template";
+				if (locked)
+					return Quoted(o) + " holds " + Quoted(*locked) +
+					       ", which its template holds in place";
+			}
+			return std::string();
+		}
+
+		bool KV6Scene::Delete(const std::vector<NodePath>& nodes, std::string& why) {
+			why = WhyNotDelete(nodes);
+			if (!why.empty())
+				return false;
+			CancelDrag();
+			auto step = std::unique_ptr<InsertStep>(new InsertStep());
+			step->paths = TopMost(nodes);
+			step->clipsBefore = step->clipsAfter = clips;
+			// The clips' tracks of what goes, go with it.
+			for (const NodePath& p : step->paths) {
+				step->nodes.push_back(*Node(p));
+				const std::string name = NamePath(p);
+				for (AnimationClip& clip : step->clipsAfter) {
+					clip.tracks.erase(
+					  std::remove_if(clip.tracks.begin(), clip.tracks.end(),
+					                 [&](const AnimationTrack& t) {
+						                 return t.path == name ||
+						                        t.path.compare(0, name.size() + 1, name + "/") == 0;
+					                 }),
+					  clip.tracks.end());
+				}
+			}
+			step->selectionBefore = selection;
+			step->activeBefore = active;
+			RemoveNodes(step->paths);
+			clips = step->clipsAfter;
+			step->selectionAfter = selection;
+			step->activeAfter = active;
+			RecordInsert(Step::Kind::Remove, std::move(step));
+			return true;
+		}
+
+		std::string KV6Scene::WhyNotRename(const NodePath& path, const std::string& name) const {
+			const VoxelObject* o = Node(path);
+			if (!o)
+				return "there is nothing to rename";
+			if (name == o->name)
+				return std::string();
+			if (o->locked)
+				return Quoted(*o) + " keeps the name its template gave it";
+			if (name.empty())
+				return "a name cannot be empty";
+			if (name.size() > 255)
+				return "a name is at most 255 bytes long";
+			if (name.find('/') != std::string::npos)
+				return "a name cannot hold '/', which separates the names of a path";
+			if (name[0] == '#')
+				return "a name cannot start with '#'";
+			const std::vector<VoxelObject>& siblings = *ChildrenOf(ParentOf(path));
+			for (std::size_t i = 0; i < siblings.size(); i++) {
+				if (int(i) != path.back() && siblings[i].name == name) {
+					const NodePath parent = ParentOf(path);
+					return (parent.empty() ? std::string("the scene") : Quoted(*Node(parent))) +
+					       " already holds an object named \"" + name + "\"";
+				}
+			}
+			return std::string();
+		}
+
+		bool KV6Scene::Rename(const NodePath& path, const std::string& name, std::string& why) {
+			why = WhyNotRename(path, name);
+			VoxelObject* o = MutableNode(path);
+			if (!why.empty() || !o || o->name == name)
+				return false;
+			auto step = std::unique_ptr<RenameStep>(new RenameStep());
+			step->before = o->name;
+			step->after = name;
+			step->clipsBefore = step->clipsAfter = clips;
+			const std::string parent = path.size() > 1 ? NamePath(ParentOf(path)) + "/" : std::string();
+			RetargetTracks(step->clipsAfter, NamePath(path), parent + name);
+			o->name = name;
+			clips = step->clipsAfter;
+			Step s;
+			s.kind = Step::Kind::Rename;
+			s.path = path;
+			s.rename = std::move(step);
+			Record(std::move(s));
+			return true;
+		}
+
+		void KV6Scene::ApplyHidden(const NodePath& path, bool hidden) {
+			MutableNode(path)->hidden = hidden;
+			if (!hidden)
+				return;
+			selection.erase(std::remove_if(selection.begin(), selection.end(),
+			                               [&](const NodePath& p) { return StartsWith(p, path); }),
+			                selection.end());
+			if (!active.empty() && StartsWith(active, path))
+				active.clear();
+			SyncPicked();
+		}
+
+		void KV6Scene::SetHidden(const NodePath& path, bool hidden) {
+			VoxelObject* o = MutableNode(path);
+			if (!o || o->hidden == hidden)
+				return;
+			CancelDrag();
+			ApplyHidden(path, hidden);
+			Step step;
+			step.kind = Step::Kind::Hide;
+			step.path = path;
+			step.hidden = hidden;
+			Record(std::move(step));
+		}
+
 		// --- Placing -----------------------------------------------------------
 
 		bool KV6Scene::PickedPose(GizmoPose& pose) const {
-			if (picked < 0 || picked >= Count())
+			// No gizmo on what cannot be seen.
+			if (picked < 0 || picked >= Count() || !Shown(picked))
 				return false;
 			const VoxelObject& o = Object(picked);
 			const Matrix4 world = WorldMatrix(picked);
@@ -313,14 +1066,19 @@ namespace spades {
 			return true;
 		}
 
-		KV6Scene::Placement KV6Scene::PlacementOf(const VoxelObject& o) {
-			return Placement{o.position, o.rotation, o.scale};
+		KV6Scene::Placement KV6Scene::PlacementOf(const VoxelObject& o, bool withKeyframes) {
+			Placement p{o.position, o.rotation, o.scale, {}};
+			if (withKeyframes)
+				p.keyframes = o.keyframes;
+			return p;
 		}
 
-		void KV6Scene::Place(VoxelObject& o, const Placement& p) {
+		void KV6Scene::Place(VoxelObject& o, const Placement& p, bool withKeyframes) {
 			o.position = p.position;
 			o.rotation = p.rotation;
 			o.scale = p.scale;
+			if (withKeyframes)
+				o.keyframes = p.keyframes;
 		}
 
 		void KV6Scene::BeginDrag() {
@@ -368,11 +1126,20 @@ namespace spades {
 			if (now.position == dragStart.position && now.rotation == dragStart.rotation &&
 			    now.scale == dragStart.scale)
 				return false;
+			Step step;
+			step.kind = Step::Kind::Place;
+			step.path = PathOf(picked);
+			step.before = dragStart;
+			step.after = now;
+			Record(std::move(step));
+			return true;
+		}
+
+		void KV6Scene::Record(Step&& step) {
 			history.resize(std::size_t(undoTop));
-			history.push_back(Step{picked, dragStart, now});
+			history.push_back(std::move(step));
 			undoTop++;
 			changeCount++;
-			return true;
 		}
 
 		void KV6Scene::CancelDrag() {
@@ -394,18 +1161,76 @@ namespace spades {
 		void KV6Scene::Undo() {
 			if (!CanUndo())
 				return;
+			CancelDrag();
 			const Step& step = history[std::size_t(--undoTop)];
-			Place(Object(step.index), step.before);
-			picked = step.index;
+			switch (step.kind) {
+				case Step::Kind::Place:
+					Place(*MutableNode(step.path), step.before);
+					Select({step.path}, step.path);
+					break;
+				case Step::Kind::Hide: MutableNode(step.path)->hidden = !step.hidden; break;
+				case Step::Kind::Move: {
+					const MoveStep& m = *step.move;
+					Relocate(m.relocation.Reversed(), m.before);
+					clips = m.clipsBefore;
+					Select(m.selectionBefore, m.activeBefore);
+					break;
+				}
+				case Step::Kind::Insert:
+				case Step::Kind::Remove: {
+					const InsertStep& m = *step.insert;
+					if (step.kind == Step::Kind::Insert)
+						RemoveNodes(m.paths);
+					else
+						InsertNodes(m.paths, m.nodes);
+					clips = m.clipsBefore;
+					Select(m.selectionBefore, m.activeBefore);
+					break;
+				}
+				case Step::Kind::Rename:
+					MutableNode(step.path)->name = step.rename->before;
+					clips = step.rename->clipsBefore;
+					Select({step.path}, step.path);
+					break;
+			}
 			changeCount++;
 		}
 
 		void KV6Scene::Redo() {
 			if (!CanRedo())
 				return;
+			CancelDrag();
 			const Step& step = history[std::size_t(undoTop++)];
-			Place(Object(step.index), step.after);
-			picked = step.index;
+			switch (step.kind) {
+				case Step::Kind::Place:
+					Place(*MutableNode(step.path), step.after);
+					Select({step.path}, step.path);
+					break;
+				case Step::Kind::Hide: ApplyHidden(step.path, step.hidden); break;
+				case Step::Kind::Move: {
+					const MoveStep& m = *step.move;
+					Relocate(m.relocation, m.after);
+					clips = m.clipsAfter;
+					Select(m.selectionAfter, m.activeAfter);
+					break;
+				}
+				case Step::Kind::Insert:
+				case Step::Kind::Remove: {
+					const InsertStep& m = *step.insert;
+					if (step.kind == Step::Kind::Insert)
+						InsertNodes(m.paths, m.nodes);
+					else
+						RemoveNodes(m.paths);
+					clips = m.clipsAfter;
+					Select(m.selectionAfter, m.activeAfter);
+					break;
+				}
+				case Step::Kind::Rename:
+					MutableNode(step.path)->name = step.rename->after;
+					clips = step.rename->clipsAfter;
+					Select({step.path}, step.path);
+					break;
+			}
 			changeCount++;
 		}
 
@@ -419,7 +1244,7 @@ namespace spades {
 			for (int i = 0; i < Count(); i++) {
 				Entry& e = entries[std::size_t(i)];
 				VoxelObject& o = *e.object;
-				if (o.hidden)
+				if (!Shown(i))
 					continue;
 				if (!e.renderModel || e.renderedFrom != o.model.GetPointerOrNull()) {
 					e.renderModel = renderer.CreateModel(*o.model);
@@ -431,19 +1256,24 @@ namespace spades {
 				renderer.RenderModel(*e.renderModel, param);
 			}
 
-			if (picked < 0 || picked >= Count())
-				return;
-			// The picked object's volume, outlined where it lies.
-			const VoxelModel& model = *Object(picked).model;
-			const Matrix4 world = WorldMatrix(picked);
-			const Vector3 a = MakeVector3(-0.5F, -0.5F, -0.5F);
-			const Vector3 b = MakeVector3(float(model.GetWidth()) - 0.5F,
-			                              float(model.GetHeight()) - 0.5F,
-			                              float(model.GetDepth()) - 0.5F);
-			const Vector4 color = MakeVector4(1.0F, 0.65F, 0.2F, 1.0F);
-			ForEachBoxEdge(a, b, [&](const Vector3& p, const Vector3& q) {
-				renderer.AddDebugLine(Point(world, p), Point(world, q), color);
-			});
+			// The selected objects' volumes, outlined where they lie: the active
+			// one brighter, as its row is in the tree.
+			for (const NodePath& path : selection) {
+				const int i = ObjectIndexAt(path);
+				if (i < 0 || !Shown(i))
+					continue;
+				const VoxelModel& model = *Object(i).model;
+				const Matrix4 world = WorldMatrix(i);
+				const Vector3 a = MakeVector3(-0.5F, -0.5F, -0.5F);
+				const Vector3 b = MakeVector3(float(model.GetWidth()) - 0.5F,
+				                              float(model.GetHeight()) - 0.5F,
+				                              float(model.GetDepth()) - 0.5F);
+				const Vector4 color = i == picked ? MakeVector4(1.0F, 0.65F, 0.2F, 1.0F)
+				                                  : MakeVector4(0.85F, 0.42F, 0.12F, 1.0F);
+				ForEachBoxEdge(a, b, [&](const Vector3& p, const Vector3& q) {
+					renderer.AddDebugLine(Point(world, p), Point(world, q), color);
+				});
+			}
 		}
 	} // namespace gui
 } // namespace spades
