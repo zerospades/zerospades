@@ -32,6 +32,7 @@
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 #include <Gui/DocumentTypes.h>
+#include <Gui/UI/Components/ContextMenu.h>
 #include <Gui/UI/Components/EditorMenu.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
@@ -43,6 +44,7 @@
 
 #include "KV6Document.h"
 #include "KV6Scene.h"
+#include "SceneTreePanel.h"
 
 namespace spades {
 	namespace client {
@@ -65,9 +67,10 @@ namespace spades {
 		 * for the 2D UI (which may be shared across views).
 		 *
 		 * With a scene open, the editor has Object mode (see IObjectModeHost):
-		 * the scene's objects are shown in place, one is picked and placed with
-		 * the gizmo, and Edit mode edits its voxels, the document being them
-		 * for as long as it lasts.
+		 * the scene's objects are shown in place, with their tree down the left
+		 * (SceneTreePanel); one is picked and placed with the gizmo, and Edit
+		 * mode edits its voxels, the document being them for as long as it
+		 * lasts.
 		 */
 		class KV6EditorView : public View,
 		                      public IVoxelEditorHost,
@@ -150,6 +153,29 @@ namespace spades {
 			long editedState = 0;
 			/** Whether the scene's objects are shown (Object mode on a scene). */
 			bool ShowingObjects() const;
+
+			// The scene's tree, shown with its objects. It takes the presses on
+			// its rows before the tools; a press the tools took stays theirs
+			// until it is released, wherever the cursor goes.
+			std::unique_ptr<SceneTreePanel> tree;
+			bool leftToEditor = false, rightToEditor = false;
+			bool metaHeld = false; // Cmd, which adds to a selection as Ctrl does
+			bool altHeld = false;  // Option, which moves a caret by words on macOS
+			/** Starts typing a new name for the node at `path`, in its row. */
+			void RenameInTree(const NodePath& path);
+			/** Settles a name being typed before the tree's rows are used for
+			 *  anything else; if it is refused, it is given up, and said why. */
+			void SettleRename();
+			/** Whether a press at the cursor goes to the tree. */
+			bool TreeTakesPress() const;
+			// The menu a right press on a row opens: what goes into the tree,
+			// and what comes out of it.
+			std::unique_ptr<ContextMenu> contextMenu;
+			// Objects copied, kept while other scenes are opened, to paste there.
+			std::vector<KV6Scene::CopiedObject> objectClipboard;
+			void OpenTreeMenu();
+			/** A new object of one voxel, as a new model starts, under `parent`. */
+			void AddObjectUnder(const NodePath& parent);
 			/** Hands the voxels being edited back to the picked object, which
 			 *  stays where it was whatever its volume did. */
 			void TakeBackEditedObject();
@@ -246,11 +272,21 @@ namespace spades {
 			void NewDocument();
 			/**
 			 * Shows the shared model file browser over the editor, starting in the
-			 * document's folder; `picked` gets the chosen path.
+			 * document's folder; `picked` gets the chosen path. Saving offers the
+			 * type `writes` only, the document's own unless told otherwise.
 			 */
 			void ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
 			                         const std::string& initialName,
-			                         std::function<void(const std::string&)> picked);
+			                         std::function<void(const std::string&)> picked,
+			                         DocumentKind writes);
+			void ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
+			                         const std::string& initialName,
+			                         std::function<void(const std::string&)> picked) {
+				ShowModelFileDialog(title, purpose, initialName, std::move(picked),
+				                    GetDocumentKind());
+			}
+			/** Asks where, then saves the node at `path` as a .kv6 (ModelOf). */
+			void SaveNodeAsModel(const NodePath& path);
 			/** A plain message over the editor with a single way out. */
 			void ShowMessage(const std::string& text);
 			/**

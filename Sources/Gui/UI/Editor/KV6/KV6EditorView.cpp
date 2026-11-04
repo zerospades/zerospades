@@ -101,6 +101,12 @@ namespace spades {
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
 
+			// The scene's tree: in from the left edge, under the bars, and
+			// clear of the hint lines along the bottom.
+			constexpr float kTreeLeft = 14.0F;
+			constexpr float kTreeTopGap = 12.0F;
+			constexpr float kTreeBottomGap = 60.0F;
+
 			// The view keys: back to the opening view, and frame the selection.
 			// Named as SDL names them (Home), compared ignoring case.
 			// What the view is drawn on.
@@ -115,6 +121,8 @@ namespace spades {
 			const Vector3 kRenderKeyFirst = MakeVector3(0.30F, 0.00F, 0.02F);
 			const Vector3 kRenderKeySecond = MakeVector3(0.00F, 0.30F, 0.02F);
 			const char* const kHomeViewKey = "Home";
+			// Renames the active object in the tree, as in file managers.
+			const char* const kRenameKey = "F2";
 			const char* const kFrameSelectionKey = "F";
 			// Blender's Numpad 5, which this keyboard may not have, and the
 			// digits belong to the sub-tools: the key beside F it is.
@@ -165,6 +173,9 @@ namespace spades {
 			                           &*fontManager, *this, softwareCursor);
 			editor = std::make_unique<VoxelEditor>(document, *this, *renderer, *fontManager, *ui,
 			                                       *softwareCursor, VoxelEditor::Config());
+			tree = std::make_unique<SceneTreePanel>(*renderer, fontManager->GetSmallGuiFont());
+			contextMenu = std::make_unique<ContextMenu>(*renderer, fontManager->GetSmallGuiFont(),
+			                                            audioDevice.GetPointerOrNull());
 
 			// The editor always opens with a document. A file the player asked to
 			// create is started under its name; one that exists but cannot be read
@@ -198,6 +209,122 @@ namespace spades {
 		}
 
 		bool KV6EditorView::ShowingObjects() const { return scene && editor->InObjectMode(); }
+
+		void KV6EditorView::OpenTreeMenu() {
+			NodePath row;
+			if (!tree->ContextRow(*scene, softwareCursor->GetPosition(), row))
+				return;
+			ui->GetOptionBar()->EndEditing(true);
+			editor->CancelToolInteraction();
+			auto objects = [](std::size_t n) {
+				return n == 1 ? std::string("1 object") : std::to_string(n) + " objects";
+			};
+			// Copying and deleting act on the selection, which the row is in;
+			// adding and pasting go under the row.
+			const bool onScene = row.empty();
+			const std::vector<NodePath> selection = scene->Selection();
+			const bool selected = !onScene && !selection.empty();
+			const VoxelObject* node = scene->Node(row);
+			std::vector<ContextMenuItem> items;
+			items.push_back(ContextMenuItem{onScene ? "Add Object" : "Add Child",
+			                                [this, row] { AddObjectUnder(row); }, true, false});
+			if (!onScene) {
+				items.push_back(ContextMenuItem{"Rename", [this, row] { RenameInTree(row); },
+				                                node && !node->locked, false});
+				items.push_back(ContextMenuItem{"Save as KV6...", [this, row] { SaveNodeAsModel(row); },
+				                                scene->HoldsVoxels(row), false});
+			}
+			items.push_back(ContextMenuItem{"Copy",
+			                                [this, selection, objects] {
+				                                objectClipboard = scene->Copy(selection);
+				                                editor->SetStatus("Copied " +
+				                                                  objects(objectClipboard.size()));
+			                                },
+			                                selected, true});
+			items.push_back(ContextMenuItem{onScene ? "Paste" : "Paste Into",
+			                                [this, row, objects] {
+				                                std::string why;
+				                                if (scene->Paste(objectClipboard, row, why)) {
+					                                tree->Reveal(*scene, scene->Active());
+					                                editor->SetStatus(
+					                                  "Pasted " + objects(scene->Selection().size()));
+				                                } else {
+					                                editor->SetStatus("Cannot paste there: " + why);
+				                                }
+			                                },
+			                                !objectClipboard.empty(), false});
+			items.push_back(ContextMenuItem{"Delete",
+			                                [this, selection, objects] {
+				                                std::string why;
+				                                const std::size_t n = selection.size();
+				                                if (scene->Delete(selection, why))
+					                                editor->SetStatus("Deleted " + objects(n));
+				                                else
+					                                editor->SetStatus("Cannot delete: " + why);
+			                                },
+			                                selected, true});
+			contextMenu->Open(softwareCursor->GetPosition(), std::move(items));
+		}
+
+		void KV6EditorView::RenameInTree(const NodePath& path) {
+			ui->GetOptionBar()->EndEditing(true);
+			editor->CancelToolInteraction();
+			std::string why;
+			if (!tree->BeginRename(*scene, path, globalTime, why))
+				editor->SetStatus("Cannot rename: " + why);
+		}
+
+		void KV6EditorView::SettleRename() {
+			if (!tree->IsRenaming() || !scene)
+				return;
+			std::string said;
+			if (!tree->CommitRename(*scene, said)) {
+				tree->CancelRename();
+				said = "Not renamed: " + said;
+			}
+			if (!said.empty())
+				editor->SetStatus(said);
+		}
+
+		void KV6EditorView::SaveNodeAsModel(const NodePath& path) {
+			const VoxelObject* node = scene->Node(path);
+			if (!node)
+				return;
+			const std::string stem = node->name.empty() ? std::string("Object") : node->name;
+			ShowModelFileDialog(
+			  "Save \"" + stem + "\" as KV6", FileBrowserPurpose::Save,
+			  stem + DefaultExtension(DocumentKind::Model),
+			  [this, path](const std::string& file) {
+				  // Made as the file is written, from the node as it is then.
+				  std::string why;
+				  Handle<VoxelModel> model = scene ? scene->ModelOf(path, why) : Handle<VoxelModel>();
+				  if (!model) {
+					  editor->SetStatus("Cannot save: " + why);
+					  return;
+				  }
+				  if (KV6ModelIO::Save(*model, file))
+					  editor->SetStatus("Saved " + LocalFileSystem::GetFileName(file));
+				  else
+					  editor->SetStatus("Could not write " + file);
+			  },
+			  DocumentKind::Model);
+		}
+
+		void KV6EditorView::AddObjectUnder(const NodePath& parent) {
+			std::string why;
+			if (!scene->AddChild(parent, SeedModel(kNewModelSize), "Object", why)) {
+				editor->SetStatus("Cannot add an object there: " + why);
+				return;
+			}
+			tree->Reveal(*scene, scene->Active());
+			editor->SetStatus("Added " + scene->Node(scene->Active())->name);
+		}
+
+		bool KV6EditorView::TreeTakesPress() const {
+			return ShowingObjects() && !leftToEditor && !rightToEditor &&
+			       !ui->GetColorPicker()->IsOverPicker(softwareCursor->GetPosition()) &&
+			       tree->IsOver(*scene, softwareCursor->GetPosition());
+		}
 
 		bool KV6EditorView::HasUnsavedChanges() const { return IsDirty() || editor->HasPlacement(); }
 
@@ -311,6 +438,7 @@ namespace spades {
 			// Edit mode first, while the scene is still there to take the voxels
 			// back; then nothing is left that offers Object mode.
 			editor->SetObjectMode(false);
+			tree->Reset();
 			scene.reset();
 		}
 
@@ -395,6 +523,8 @@ namespace spades {
 		bool KV6EditorView::PickObjectAtCursor() {
 			const int index = scene->ObjectAt(cam.View(), softwareCursor->GetPosition());
 			scene->Pick(index);
+			if (index >= 0)
+				tree->Reveal(*scene, scene->PathOf(index));
 			if (index >= 0)
 				editor->SetStatus("Picked " + PickedObjectName());
 			return index >= 0;
@@ -611,7 +741,8 @@ namespace spades {
 
 		void KV6EditorView::ShowModelFileDialog(const std::string& title, FileBrowserPurpose purpose,
 		                                        const std::string& initialName,
-		                                        std::function<void(const std::string&)> picked) {
+		                                        std::function<void(const std::string&)> picked,
+		                                        DocumentKind writes) {
 			// The same options the model tab on the main screen is built from, so a
 			// model file behaves the same way wherever it is picked.
 			FileBrowserOptions options = EditorBrowserOptions();
@@ -623,7 +754,7 @@ namespace spades {
 			// under a name promising something else.
 			if (purpose != FileBrowserPurpose::Open) {
 				options.filters.clear();
-				options.filters.push_back(FileFilter{DocumentFilterLabel(), {GetDocumentExtension()}});
+				options.filters.push_back(FileFilter{DocumentFilterLabel(), {DefaultExtension(writes)}});
 			}
 			options.homeDir = EditorHomeDir();
 			// The document's own folder is where this document's dialogs belong;
@@ -725,7 +856,7 @@ namespace spades {
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
 			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
 			       EqualsIgnoringCase(key, kFrameSelectionKey) ||
-			       EqualsIgnoringCase(key, kProjectionKey);
+			       EqualsIgnoringCase(key, kProjectionKey) || EqualsIgnoringCase(key, kRenameKey);
 		}
 
 		bool KV6EditorView::ClickViewportWidget(const Vector2& cursor) {
@@ -886,6 +1017,16 @@ namespace spades {
 			// so the drag never runs into the screen's edge.
 			if (!editor->HoldsPointer())
 				softwareCursor->Accumulate(dx, dy);
+			if (contextMenu->IsOpen())
+				return; // it follows the cursor as it is drawn
+			// The tree's press follows the cursor; over its rows, nothing under
+			// them answers to it.
+			if (tree->IsHolding() && scene) {
+				tree->Move(*scene, softwareCursor->GetPosition());
+				return;
+			}
+			if (TreeTakesPress())
+				return;
 			editor->PointerMoved(MakeVector2(dx, dy));
 		}
 
@@ -893,6 +1034,12 @@ namespace spades {
 			if (ui->GetOverlay()->WheelEvent(x, y))
 				return;
 			if (ui->GetMenuBar()->IsOpen())
+				return;
+			if (contextMenu->IsOpen()) {
+				contextMenu->Close();
+				return;
+			}
+			if (ShowingObjects() && tree->Wheel(*scene, softwareCursor->GetPosition(), y))
 				return;
 			cam.Zoom(y);
 		}
@@ -902,10 +1049,60 @@ namespace spades {
 			// keys, or a Ctrl released during the menu stays "held" afterwards.
 			editor->TrackModifiers(key, down);
 			cam.TrackModifiers(key, down);
+			if (key == "Meta")
+				metaHeld = down;
+			if (key == "Alt")
+				altHeld = down;
 
 			// A modal dialog (file browser) owns every key while it is up.
 			if (ui->GetOverlay()->KeyEvent(key, down))
 				return;
+
+			// So does the tree's menu, but for releases of keys held from before
+			// it opened, which have to be let go.
+			if (contextMenu->IsOpen()) {
+				const Vector2& at = softwareCursor->GetPosition();
+				if (key == "LeftMouseButton" || key == "RightMouseButton") {
+					if (down) {
+						contextMenu->Press(at);
+						// A right press on another row opens its menu there.
+						if (!contextMenu->IsOpen() && key == "RightMouseButton" && TreeTakesPress())
+							OpenTreeMenu();
+					} else if (key == "LeftMouseButton") {
+						contextMenu->Release(at);
+					}
+					return;
+				}
+				if (down) {
+					contextMenu->Key(key);
+					return;
+				}
+			}
+
+			// A name being typed in the tree owns the keyboard as a dialog would:
+			// letters, Escape and Enter are the name's. A press anywhere but on
+			// it settles it first, then goes on to do what it does.
+			if (tree->IsRenaming() && scene) {
+				const Vector2& at = softwareCursor->GetPosition();
+				if (key == "LeftMouseButton" || key == "RightMouseButton") {
+					if (down && key == "LeftMouseButton" && tree->IsOverRename(*scene, at)) {
+						tree->Press(*scene, at, false, editor->IsShiftHeld(), globalTime);
+						return;
+					}
+					if (down)
+						SettleRename();
+				} else if (down) {
+					TextEntry::Modifiers m;
+					m.shift = editor->IsShiftHeld();
+					m.ctrl = editor->IsCtrlHeld();
+					m.alt = altHeld;
+					m.meta = metaHeld;
+					const std::string said = tree->RenameKey(*scene, key, m);
+					if (!said.empty())
+						editor->SetStatus(said);
+					return;
+				}
+			}
 
 			// A menu of the bar owns the keyboard while it is down, Escape
 			// included: it is what Escape puts away first.
@@ -929,7 +1126,8 @@ namespace spades {
 			// asking about unsaved work first; everything else the editor can
 			// be told to do is on the menu bar, in sight.
 			if (down && key == "Escape") {
-				if (!editor->EscapeOnce()) {
+				// A drag in the tree first, then what the editor has in hand.
+				if (!tree->CancelDrag() && !editor->EscapeOnce()) {
 					editor->ReleaseHeldInput();
 					ConfirmDiscardChanges([this] { wantsClose = true; });
 				}
@@ -982,10 +1180,41 @@ namespace spades {
 				return;
 			}
 			if (key == "LeftMouseButton") {
+				if (down && TreeTakesPress()) {
+					// As a press anywhere off the option bar does, it settles a
+					// number being typed there.
+					ui->GetOptionBar()->EndEditing(true);
+					editor->CancelToolInteraction();
+					if (editor->IsCtrlHeld())
+						cam.CancelCtrlDescent(); // Ctrl is the default descend key
+					const std::string said =
+					  tree->Press(*scene, softwareCursor->GetPosition(),
+					              editor->IsCtrlHeld() || metaHeld, editor->IsShiftHeld(), globalTime);
+					if (!said.empty())
+						editor->SetStatus(said);
+					return;
+				}
+				if (!down && tree->IsHolding()) {
+					const std::string said =
+					  scene ? tree->Release(*scene, softwareCursor->GetPosition()) : std::string();
+					if (!said.empty())
+						editor->SetStatus(said);
+					return;
+				}
+				leftToEditor = down;
 				editor->ButtonEvent(PointerButton::Left, down);
 				return;
 			}
 			if (key == "RightMouseButton") {
+				// A right press on a row opens its menu; its release, and any
+				// release the tools never had the press of, are nobody's.
+				if (down && TreeTakesPress()) {
+					OpenTreeMenu();
+					return;
+				}
+				if (!down && !rightToEditor)
+					return;
+				rightToEditor = down;
 				editor->ButtonEvent(PointerButton::Right, down);
 				return;
 			}
@@ -1007,32 +1236,51 @@ namespace spades {
 				return;
 			if (down && !editor->IsCtrlHeld() && ViewKey(key))
 				return;
+			if (down && ShowingObjects() && EqualsIgnoringCase(key, kRenameKey)) {
+				if (!scene->Active().empty())
+					RenameInTree(scene->Active());
+				return;
+			}
 			editor->ToolKey(key, down);
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
-			// A dialog takes typing over everything; otherwise it belongs to the
-			// number being typed into, in the option bar or the transform panel.
-			if (ui->GetOverlay()->IsActive())
+			// A dialog takes typing over everything; otherwise it belongs to a
+			// name being typed in the tree, or to the number being typed into,
+			// in the option bar or the transform panel.
+			if (ui->GetOverlay()->IsActive()) {
 				ui->GetOverlay()->TextInputEvent(text);
-			else
+			} else if (tree->IsRenaming()) {
+				TextEntry::Modifiers m;
+				m.ctrl = editor->IsCtrlHeld();
+				m.alt = altHeld;
+				m.meta = metaHeld;
+				if (TextEntry::Types(m)) // not the letter of a shortcut
+					tree->RenameText(text);
+			} else {
 				editor->TextInput(text);
+			}
 		}
 
 		void KV6EditorView::TextEditingEvent(const std::string& text, int start, int len) {
 			if (ui->GetOverlay()->IsActive())
 				ui->GetOverlay()->TextEditingEvent(text, start, len);
+			else if (tree->IsRenaming())
+				tree->RenameComposition(text);
 			else
 				editor->TextComposition(text);
 		}
 
 		bool KV6EditorView::AcceptsTextInput() {
-			return ui->GetOverlay()->AcceptsTextInput() || editor->AcceptsTextInput();
+			return ui->GetOverlay()->AcceptsTextInput() || tree->IsRenaming() ||
+			       editor->AcceptsTextInput();
 		}
 
 		AABB2 KV6EditorView::GetTextInputRect() {
 			if (ui->GetOverlay()->IsActive())
 				return ui->GetOverlay()->GetTextInputRect();
+			if (tree->IsRenaming() && scene)
+				return tree->RenameRect(*scene);
 			return editor->TextInputRect();
 		}
 
@@ -1146,7 +1394,23 @@ namespace spades {
 			// The transform panel, in the view's bottom right corner, its foot
 			// level with the colour picker's.
 			editor->SetPanelCorner(sw - kNaviCubeMargin, sh - kPanelBottomGap);
+
+			// The scene's tree, down the left between the bars and the hint
+			// lines, in Object mode only.
+			if (ShowingObjects()) {
+				tree->SetSceneName(filePath.empty() ? std::string("Scene")
+				                                    : LocalFileSystem::GetFileName(filePath));
+				tree->Layout(kTreeLeft, VoxelEditor::BarsHeight() + kTreeTopGap, sh - kTreeBottomGap);
+				tree->Draw(*scene, softwareCursor->GetPosition(), globalTime);
+			} else {
+				if (tree->IsHolding())
+					tree->CancelDrag(); // left for Edit mode mid-drag
+				tree->CancelRename();
+				contextMenu->Close();
+			}
+
 			editor->DrawPanels();
+			contextMenu->Draw(softwareCursor->GetPosition());
 			// Over everything, the bars included: a menu hangs from the ribbon
 			// across them, though it answers for its presses before they do.
 			ui->GetMenuBar()->DrawOpenMenu(*renderer, *fontManager,
