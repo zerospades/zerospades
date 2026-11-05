@@ -30,7 +30,7 @@ namespace spades {
 		namespace {
 			// Long enough for a signed number with a few decimals, short enough
 			// that nothing pathological is ever parsed or drawn.
-			const int kMaxLength = 16;
+			const std::size_t kMaxLength = 16;
 
 			bool IsNumberChar(char c) {
 				return (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == ',';
@@ -61,82 +61,165 @@ namespace spades {
 			return true;
 		}
 
-		void NumberEntry::Begin(float value, int decimals) {
-			editing = true;
-			fresh = true;
-			text = Format(value, decimals);
-			caret = int(text.size());
+		NumberEntry::NumberEntry() : entry(kMaxLength) {}
+
+		namespace {
+			// A recursive descent over: sum := product (('+'|'-') product)*,
+			// product := factor (('*'|'/') factor)*, factor := ('+'|'-') factor |
+			// number | '(' sum ')'.
+			class Arithmetic {
+			public:
+				explicit Arithmetic(const std::string& text) : text(text) {}
+
+				bool Run(double& out) {
+					if (!Sum(out))
+						return false;
+					Skip();
+					return at == text.size() && std::isfinite(out);
+				}
+
+			private:
+				const std::string& text;
+				std::size_t at = 0;
+				int depth = 0;
+
+				void Skip() {
+					while (at < text.size() && (text[at] == ' ' || text[at] == '\t'))
+						at++;
+				}
+				bool Take(char c) {
+					Skip();
+					if (at < text.size() && text[at] == c) {
+						at++;
+						return true;
+					}
+					return false;
+				}
+				bool Sum(double& out) {
+					if (!Product(out))
+						return false;
+					while (true) {
+						double rhs;
+						if (Take('+')) {
+							if (!Product(rhs))
+								return false;
+							out += rhs;
+						} else if (Take('-')) {
+							if (!Product(rhs))
+								return false;
+							out -= rhs;
+						} else {
+							return true;
+						}
+					}
+				}
+				bool Product(double& out) {
+					if (!Factor(out))
+						return false;
+					while (true) {
+						double rhs;
+						if (Take('*')) {
+							if (!Factor(rhs))
+								return false;
+							out *= rhs;
+						} else if (Take('/')) {
+							if (!Factor(rhs) || rhs == 0.0)
+								return false;
+							out /= rhs;
+						} else {
+							return true;
+						}
+					}
+				}
+				bool Factor(double& out) {
+					if (++depth > 64) // nothing typed nests that deep
+						return false;
+					bool ok;
+					if (Take('-')) {
+						ok = Factor(out);
+						out = -out;
+					} else if (Take('+')) {
+						ok = Factor(out);
+					} else if (Take('(')) {
+						ok = Sum(out) && Take(')');
+					} else {
+						ok = Number(out);
+					}
+					depth--;
+					return ok;
+				}
+				bool Number(double& out) {
+					Skip();
+					std::string digits;
+					while (at < text.size() &&
+					       ((text[at] >= '0' && text[at] <= '9') || text[at] == '.' || text[at] == ',')) {
+						digits += text[at] == ',' ? '.' : text[at];
+						at++;
+					}
+					if (digits.empty() || digits == ".")
+						return false;
+					char* end = nullptr;
+					out = std::strtod(digits.c_str(), &end);
+					return end && *end == '\0';
+				}
+			};
+		} // namespace
+
+		bool NumberEntry::Evaluate(const std::string& text, float& out) {
+			double value = 0.0;
+			if (!Arithmetic(text).Run(value) || std::fabs(value) > 1.0e30)
+				return false;
+			out = float(value);
+			return true;
 		}
 
-		void NumberEntry::End() {
-			editing = false;
-			fresh = false;
-			text.clear();
-			caret = 0;
+		void NumberEntry::Begin(float value, int decimals) {
+			entry.Begin(Format(value, decimals), true);
+		}
+
+		void NumberEntry::End() { entry.End(); }
+
+		void NumberEntry::Settle() {
+			if (entry.HasSelection())
+				entry.SetCaret(entry.Caret(), false);
 		}
 
 		void NumberEntry::Insert(const std::string& s) {
-			if (!editing)
+			if (!IsEditing())
 				return;
 			std::string accepted;
 			for (char c : s)
 				if (IsNumberChar(c))
 					accepted += c;
-			if (accepted.empty())
-				return;
-			// The first thing typed stands in for the value that was there, as
-			// typing into a field that selected its text on focus would.
-			if (fresh) {
-				text.clear();
-				caret = 0;
-				fresh = false;
-			}
-			if (int(text.size()) + int(accepted.size()) > kMaxLength)
-				return;
-			text.insert(size_t(caret), accepted);
-			caret += int(accepted.size());
+			if (!accepted.empty())
+				entry.Insert(accepted); // in place of the value, first time round
 		}
 
 		void NumberEntry::Backspace() {
-			if (!editing)
-				return;
-			fresh = false;
-			if (caret <= 0)
-				return;
-			text.erase(size_t(caret - 1), 1);
-			caret--;
+			Settle();
+			entry.Backspace(false);
 		}
 
 		void NumberEntry::Delete() {
-			if (!editing)
-				return;
-			fresh = false;
-			if (caret >= int(text.size()))
-				return;
-			text.erase(size_t(caret), 1);
+			Settle();
+			entry.Delete(false);
 		}
 
 		void NumberEntry::MoveCaret(int by) {
-			if (!editing)
-				return;
-			fresh = false;
-			caret = std::max(0, std::min(int(text.size()), caret + by));
+			Settle();
+			entry.Move(by, false);
 		}
 
 		void NumberEntry::CaretToStart() {
-			if (!editing)
-				return;
-			fresh = false;
-			caret = 0;
+			Settle();
+			entry.ToStart(false);
 		}
 
 		void NumberEntry::CaretToEnd() {
-			if (!editing)
-				return;
-			fresh = false;
-			caret = int(text.size());
+			Settle();
+			entry.ToEnd(false);
 		}
 
-		bool NumberEntry::Value(float& out) const { return editing && Parse(text, out); }
+		bool NumberEntry::Value(float& out) const { return IsEditing() && Parse(Text(), out); }
 	} // namespace gui
 } // namespace spades

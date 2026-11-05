@@ -112,13 +112,8 @@ namespace spades {
 						if (toggle)
 							toggled = !toggled;
 						OnActivated();
-						if (GetManager().time - lastActivate < 0.35F &&
-						    (clientPosition - lastActivatePosition).GetManhattanLength() < 10.0F) {
+						if (doubleClick.Click(clientPosition, GetManager().time))
 							OnDoubleClicked();
-						}
-
-						lastActivate = GetManager().time;
-						lastActivatePosition = clientPosition;
 					}
 
 					if (repeat && hover)
