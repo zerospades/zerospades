@@ -118,15 +118,12 @@ namespace spades {
 		  "                           front bottom top), iso, iso+x-y, iso-x-y,\n"
 		  "                           iso-x+y\n"
 		  "\n"
-		  "  meta-list FILE [--object OBJECT]\n"
-		  "                           the scene's named data (or OBJECT's): name,\n"
-		  "                           type, size\n"
-		  "  meta-set FILE NAME text|audio|image|script FROM [--object OBJECT]\n"
-		  "                           store the file FROM under NAME, replacing it;\n"
-		  "                           checked against its type: UTF-8 text or script,\n"
-		  "                           Opus audio in Ogg, PNG image, nothing else\n"
-		  "  meta-get FILE NAME OUT [--object OBJECT]   write it to the file OUT\n"
-		  "  meta-remove FILE NAME [--object OBJECT]\n"
+		  "  meta-list FILE           the scene's named notes: name, bytes\n"
+		  "  meta-set FILE NAME TEXT | meta-set FILE NAME --from TEXTFILE\n"
+		  "                           note TEXT (or the file's text, UTF-8) under\n"
+		  "                           NAME, replacing what was there\n"
+		  "  meta-get FILE NAME       print it\n"
+		  "  meta-remove FILE NAME\n"
 		  "\n"
 		  "  clip-list FILE           the animation clips: name, seconds, locks, tracks\n"
 		  "  clip-add FILE NAME SECONDS [--lock-name] [--lock-duration]\n"
@@ -365,28 +362,6 @@ namespace spades {
 			return stream.ReadAllBytes();
 		}
 
-		MetadataType ParseMetadataType(const std::string& name) {
-			if (name == "text")
-				return MetadataType::Text;
-			if (name == "audio")
-				return MetadataType::Audio;
-			if (name == "image")
-				return MetadataType::Image;
-			if (name == "script")
-				return MetadataType::Script;
-			throw UsageError("a type is text, audio, image or script");
-		}
-
-		const char* MetadataTypeName(MetadataType type) {
-			switch (type) {
-				case MetadataType::Text: return "text";
-				case MetadataType::Audio: return "audio";
-				case MetadataType::Image: return "image";
-				case MetadataType::Script: return "script";
-			}
-			return "?";
-		}
-
 		AnimationClip* FindClip(SceneFile& file, const std::string& name) {
 			for (AnimationClip& clip : file.clips)
 				if (clip.name == name)
@@ -480,35 +455,31 @@ namespace spades {
 
 		// One edit of `scene` (`a` is the command and its arguments, without
 		// the file). Returns false when `a` is no edit. Throws on a bad edit.
-		// The metadata table --object names, or the scene's own.
-		std::vector<MetadataEntry>& MetadataTable(SceneFile& file, const Options& o) {
-			if (!o.Has("--object"))
-				return file.metadata;
-			return Find(file.objects, o.Values("--object")[0]).Object().metadata;
-		}
-
 		bool Edit(SceneFile& file, const std::vector<std::string>& a) {
 			Scene& scene = file.objects;
 			const std::string& cmd = a[0];
 
 			if (cmd == "meta-set" || cmd == "meta-remove") {
-				const Options o = TakeOptions(a, 1, {{"--object", 1}});
-				std::vector<MetadataEntry>& table = MetadataTable(file, o);
+				std::vector<MetadataEntry>& table = file.metadata;
 				if (cmd == "meta-remove") {
-					Need(o.rest, 1, "meta-remove NAME [--object OBJECT]");
-					const auto it = std::find_if(table.begin(), table.end(), [&](const MetadataEntry& e) {
-						return e.name == o.rest[0];
-					});
+					Need(a, 2, "meta-remove NAME");
+					const auto it = std::find_if(table.begin(), table.end(),
+					                             [&](const MetadataEntry& e) { return e.name == a[1]; });
 					if (it == table.end())
-						throw std::runtime_error("no metadata named '" + o.rest[0] + "'");
+						throw std::runtime_error("no metadata named '" + a[1] + "'");
 					table.erase(it);
 					return true;
 				}
-				Need(o.rest, 3, "meta-set NAME text|audio|image|script FROM [--object OBJECT]");
+				const Options o = TakeOptions(a, 1, {{"--from", 1}});
 				MetadataEntry entry;
+				if (o.Has("--from")) {
+					Need(o.rest, 1, "meta-set NAME --from TEXTFILE");
+					entry.text = ReadWholeFile(o.Values("--from")[0]);
+				} else {
+					Need(o.rest, 2, "meta-set NAME TEXT");
+					entry.text = o.rest[1];
+				}
 				entry.name = o.rest[0];
-				entry.type = ParseMetadataType(o.rest[1]);
-				entry.data = ReadWholeFile(o.rest[2]);
 				VoxelModel2KV6::Validate(entry); // refused before anything changes
 				for (MetadataEntry& existing : table)
 					if (existing.name == entry.name) {
@@ -906,28 +877,22 @@ namespace spades {
 			SceneFile file = LoadSceneFile(path);
 			Scene& scene = file.objects;
 
-			if (cmd == "meta-list" || cmd == "meta-get") {
-				const Options o = TakeOptions(rest, 1, {{"--object", 1}});
-				const std::vector<MetadataEntry>& table = MetadataTable(file, o);
-				if (cmd == "meta-list") {
-					Need(o.rest, 0, "meta-list FILE [--object OBJECT]");
-					for (const MetadataEntry& e : table)
-						std::printf("%s %s %zu\n", e.name.c_str(), MetadataTypeName(e.type),
-						            e.data.size());
-					return 0;
-				}
-				Need(o.rest, 2, "meta-get FILE NAME OUT [--object OBJECT]");
-				for (const MetadataEntry& e : table) {
-					if (e.name != o.rest[0])
-						continue;
-					std::FILE* f = LocalFileSystem::OpenFile(o.rest[1], "wb");
-					if (!f)
-						throw std::runtime_error("cannot write " + o.rest[1]);
-					StdStream stream(f, true);
-					stream.Write(e.data.data(), e.data.size());
-					return 0;
-				}
-				throw std::runtime_error("no metadata named '" + o.rest[0] + "'");
+			if (cmd == "meta-list") {
+				Need(rest, 1, "meta-list FILE");
+				for (const MetadataEntry& e : file.metadata)
+					std::printf("%s %zu\n", e.name.c_str(), e.text.size());
+				return 0;
+			}
+			if (cmd == "meta-get") {
+				Need(rest, 2, "meta-get FILE NAME");
+				for (const MetadataEntry& e : file.metadata)
+					if (e.name == rest[1]) {
+						std::fwrite(e.text.data(), 1, e.text.size(), stdout);
+						if (e.text.empty() || e.text.back() != '\n')
+							std::fputc('\n', stdout);
+						return 0;
+					}
+				throw std::runtime_error("no metadata named '" + rest[1] + "'");
 			}
 			if (cmd == "clip-list") {
 				Need(rest, 1, "clip-list FILE");
