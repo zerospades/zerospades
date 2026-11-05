@@ -33,6 +33,7 @@
 #include <Core/StdStream.h>
 #include <Core/VoxelModelLoader.h>
 #include <Core/VoxelModel.h>
+#include <Gui/UI/Components/EditorTheme.h>
 #include <Gui/UI/Components/Gizmo/GizmoView.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 #include <Gui/UI/Editor/Voxel/VoxelOverlayLines.h>
@@ -1390,7 +1391,7 @@ namespace spades {
 				const Vector3 b = MakeVector3(float(previewModel->GetWidth()) - 0.5F,
 				                              float(previewModel->GetHeight()) - 0.5F,
 				                              float(previewModel->GetDepth()) - 0.5F);
-				const Vector4 color = MakeVector4(0.35F, 0.85F, 1.0F, 1.0F);
+				const Vector4 color = EditorTheme::DropTarget();
 				ForEachBoxEdge(a, b, [&](const Vector3& p, const Vector3& q) {
 					renderer.AddDebugLine(Point(previewFrame, p), Point(previewFrame, q), color);
 				});
@@ -1423,8 +1424,7 @@ namespace spades {
 				const Vector3 b = MakeVector3(float(model.GetWidth()) - 0.5F,
 				                              float(model.GetHeight()) - 0.5F,
 				                              float(model.GetDepth()) - 0.5F);
-				const Vector4 color = i == picked ? MakeVector4(1.0F, 0.65F, 0.2F, 1.0F)
-				                                  : MakeVector4(0.85F, 0.42F, 0.12F, 1.0F);
+				const Vector4 color = i == picked ? EditorTheme::Active() : EditorTheme::Selected();
 				ForEachBoxEdge(a, b, [&](const Vector3& p, const Vector3& q) {
 					renderer.AddDebugLine(Point(world, p), Point(world, q), color);
 				});

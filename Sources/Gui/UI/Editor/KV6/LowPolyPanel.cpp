@@ -25,6 +25,8 @@
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Gui/OverlayPaint.h>
+#include <Gui/UI/Components/EditorTheme.h>
+#include <Gui/UIWidgetPainter.h>
 
 namespace spades {
 	namespace gui {
@@ -45,19 +47,6 @@ namespace spades {
 			constexpr float kHeight =
 			  kPad + kTitleH + kLabelH + kChipH + 8.0F + kLineH * 2.0F + 10.0F + kButtonH + 6.0F +
 			  kLineH + kPad - 6.0F;
-
-			// As the context menu draws, so the editor's floating panels match.
-			const Vector4 kBackground = MakeVector4(0.11F, 0.115F, 0.13F, 0.96F);
-			const Vector4 kBorder = MakeVector4(0.30F, 0.32F, 0.37F, 1.0F);
-			const Vector4 kDropShadow = MakeVector4(0.0F, 0.0F, 0.0F, 0.35F);
-			const Vector4 kText = MakeVector4(0.90F, 0.91F, 0.93F, 1.0F);
-			const Vector4 kDim = MakeVector4(0.60F, 0.62F, 0.67F, 1.0F);
-			const Vector4 kFaint = MakeVector4(0.45F, 0.47F, 0.52F, 1.0F);
-			const Vector4 kAccent = MakeVector4(0.24F, 0.42F, 0.72F, 1.0F);
-			const Vector4 kAccentHover = MakeVector4(0.30F, 0.50F, 0.82F, 1.0F);
-			const Vector4 kControl = MakeVector4(0.18F, 0.19F, 0.22F, 1.0F);
-			const Vector4 kControlHover = MakeVector4(0.24F, 0.25F, 0.29F, 1.0F);
-			const Vector4 kRefused = MakeVector4(1.0F, 0.42F, 0.36F, 1.0F);
 
 			// A count with thousands set apart: 41,232.
 			std::string Count(long n) {
@@ -208,27 +197,25 @@ namespace spades {
 			if (!open)
 				return;
 			const float textScale = 0.9F;
-			const float textH = font.Measure("Ag").y;
 			auto text = [&](const std::string& s, float tx, float ty, float scale, const Vector4& c) {
-				font.Draw(s, MakeVector2(tx, ty), scale, c);
+				font.DrawShadow(s, MakeVector2(tx, ty), scale, c, EditorTheme::TextShadow());
 			};
 
-			OverlayColorNP(renderer, kDropShadow);
-			OverlayFillRect(renderer, x + 3.0F, y + 4.0F, kWidth, kHeight);
-			OverlayColorNP(renderer, kBackground);
-			OverlayFillRect(renderer, x, y, kWidth, kHeight);
-			OverlayStrokeRect(renderer, x, y, kWidth, kHeight, 1.0F, kBorder);
+			EditorTheme::PaintPanel(renderer, x, y, kWidth, kHeight);
 
 			float ty = y + kPad;
-			text("Low-poly KV6", x + kPad, ty, 1.0F, kText);
+			text("Low-poly KV6", x + kPad, ty, 1.0F, EditorTheme::Text());
 			const float titleW = font.Measure("Low-poly KV6  ").x;
 			std::string shown = name;
 			while (!shown.empty() && font.Measure(shown).x * textScale > kWidth - kPad * 2.0F - titleW)
 				shown.pop_back();
-			text(shown == name ? shown : shown + "...", x + kPad + titleW, ty + 1.0F, textScale, kDim);
+			text(shown == name ? shown : shown + "...", x + kPad + titleW, ty + 1.0F, textScale,
+			     EditorTheme::TextDim());
 			ty += kTitleH;
-			text("Resolution: one voxel for every N each way", x + kPad, ty, 0.8F, kDim);
+			text("Resolution: one voxel for every N each way", x + kPad, ty, 0.8F,
+			     EditorTheme::TextDim());
 
+			// The factors, as the toolbar's buttons: the chosen one held down.
 			const int overChip = ChipAt(cursor);
 			if (overChip != hoverChip && overChip >= 0 && kFactors[overChip] != factor)
 				sounds.Hover();
@@ -236,23 +223,20 @@ namespace spades {
 			for (int i = 0; i < kFactorCount; i++) {
 				float cx, cy, cw, ch;
 				ChipRect(i, cx, cy, cw, ch);
-				const bool chosen = kFactors[i] == factor;
-				OverlayColorNP(renderer, chosen ? kAccent : (i == overChip ? kControlHover : kControl));
-				OverlayFillRect(renderer, cx, cy, cw, ch);
-				const std::string label = "1/" + std::to_string(kFactors[i]);
-				const float lw = font.Measure(label).x * textScale;
-				text(label, cx + (cw - lw) * 0.5F, cy + (ch - textH * textScale) * 0.5F, textScale,
-				     chosen ? kText : kDim);
+				widgets::PaintButton(renderer, font, MakeVector2(cx, cy), MakeVector2(cw, ch),
+				                     "1/" + std::to_string(kFactors[i]), MakeVector2(0.5F, 0.5F),
+				                     std::string(), MakeVector2(1.0F, 0.5F), true, i == overChip,
+				                     false, kFactors[i] == factor, textScale);
 			}
 
 			ty = y + kPad + kTitleH + kLabelH + kChipH + 8.0F;
 			if (voxels > 0) {
-				text(Size(sourceSize) + "  ->  " + Size(size), x + kPad, ty, 0.85F, kText);
+				text(Size(sourceSize) + "  ->  " + Size(size), x + kPad, ty, 0.85F, EditorTheme::Text());
 				text(Count(sourceVoxels) + " voxels  ->  " + Count(voxels), x + kPad, ty + kLineH, 0.85F,
-				     kText);
+				     EditorTheme::Text());
 			} else {
-				text("Too coarse: nothing of it is left.", x + kPad, ty, 0.85F, kRefused);
-				text("Choose a finer resolution.", x + kPad, ty + kLineH, 0.85F, kDim);
+				text("Too coarse: nothing of it is left.", x + kPad, ty, 0.85F, EditorTheme::Refused());
+				text("Choose a finer resolution.", x + kPad, ty + kLineH, 0.85F, EditorTheme::TextDim());
 			}
 
 			const Button over = ButtonAt(cursor);
@@ -262,23 +246,17 @@ namespace spades {
 			for (Button b : {Button::Cancel, Button::Create}) {
 				float bx, by, bw, bh;
 				ButtonRect(b, bx, by, bw, bh);
-				const bool primary = b == Button::Create;
-				const bool enabled = !primary || CanCreate();
-				Vector4 fill = primary ? (b == over ? kAccentHover : kAccent)
-				                       : (b == over ? kControlHover : kControl);
-				if (!enabled)
-					fill = kControl;
-				OverlayColorNP(renderer, fill);
-				OverlayFillRect(renderer, bx, by, bw, bh);
-				const std::string label = primary ? "Create" : "Cancel";
-				const float lw = font.Measure(label).x * textScale;
-				text(label, bx + (bw - lw) * 0.5F, by + (bh - textH * textScale) * 0.5F, textScale,
-				     enabled ? kText : kFaint);
+				const bool enabled = b != Button::Create || CanCreate();
+				widgets::PaintButton(renderer, font, MakeVector2(bx, by), MakeVector2(bw, bh),
+				                     b == Button::Create ? "Create" : "Cancel", MakeVector2(0.5F, 0.5F),
+				                     std::string(), MakeVector2(1.0F, 0.5F), enabled,
+				                     enabled && b == over, pressed == b, false, textScale);
 			}
 
 			// The keys.
 			const float hy = y + kHeight - kPad - kLineH + 6.0F;
-			text("[Left/Right] resolution   [Enter] create   [Esc] cancel", x + kPad, hy, 0.75F, kFaint);
+			text("[Left/Right] resolution   [Enter] create   [Esc] cancel", x + kPad, hy, 0.75F,
+			     EditorTheme::TextFaint());
 		}
 	} // namespace gui
 } // namespace spades
