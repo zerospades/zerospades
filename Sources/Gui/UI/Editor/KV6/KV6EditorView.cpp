@@ -242,6 +242,7 @@ namespace spades {
 			}
 			tree->Reveal(*scene, scene->Active());
 			editor->SetStatus("Pasted " + Objects(scene->Selection().size()));
+			editor->ObjectSelectionChanged();
 		}
 
 		void KV6EditorView::DeleteObjects(const std::vector<NodePath>& nodes) {
@@ -250,6 +251,7 @@ namespace spades {
 				editor->SetStatus("Deleted " + Objects(nodes.size()));
 			else
 				editor->SetStatus("Cannot delete: " + why);
+			editor->ObjectSelectionChanged();
 		}
 
 		void KV6EditorView::RenameInTree(const NodePath& path) {
@@ -346,6 +348,7 @@ namespace spades {
 			}
 			tree->Reveal(*scene, scene->Active());
 			editor->SetStatus("Added " + scene->Node(scene->Active())->name);
+			editor->ObjectSelectionChanged();
 		}
 
 		ITransformTarget& KV6EditorView::ObjectTransform() {
@@ -573,6 +576,75 @@ namespace spades {
 			if (index >= 0)
 				editor->SetStatus("Picked " + PickedObjectName());
 			return index >= 0;
+		}
+
+		bool KV6EditorView::SelectObjectAtCursor(SelectHow how) {
+			const int index = scene->ObjectAt(cam.View(), softwareCursor->GetPosition());
+			if (index < 0) {
+				if (how == SelectHow::Only)
+					scene->Select({}, {});
+				return false;
+			}
+			const NodePath path = scene->PathOf(index);
+			std::vector<NodePath> selection = scene->Selection();
+			NodePath active = scene->Active();
+			const auto at = std::find(selection.begin(), selection.end(), path);
+			const bool in = at != selection.end();
+			if (how == SelectHow::Toggle)
+				how = in ? SelectHow::Remove : SelectHow::Add;
+			switch (how) {
+				case SelectHow::Only:
+					selection.assign(1, path);
+					active = path;
+					break;
+				case SelectHow::Add:
+					if (!in)
+						selection.push_back(path);
+					active = path;
+					break;
+				case SelectHow::Remove:
+					if (in)
+						selection.erase(at);
+					if (active == path)
+						active = selection.empty() ? NodePath() : selection.front();
+					break;
+				case SelectHow::Toggle: break;
+			}
+			scene->Select(selection, active);
+			if (scene->IsSelected(path))
+				tree->Reveal(*scene, path);
+			return true;
+		}
+
+		int KV6EditorView::SelectObjectsOnScreen(const std::function<bool(const Vector2&)>& inside,
+		                                         bool through, bool removing) {
+			const std::vector<int> found = scene->ObjectsOnScreen(cam.View(), inside, through);
+			std::vector<NodePath> selection = scene->Selection();
+			NodePath active = scene->Active();
+			for (int index : found) {
+				const NodePath& path = scene->PathOf(index);
+				const auto at = std::find(selection.begin(), selection.end(), path);
+				if (removing && at != selection.end()) {
+					selection.erase(at);
+				} else if (!removing && at == selection.end()) {
+					selection.push_back(path);
+					if (active.empty())
+						active = path; // the gizmo goes on the first taken
+				}
+			}
+			if (std::find(selection.begin(), selection.end(), active) == selection.end())
+				active = selection.empty() ? NodePath() : selection.front();
+			scene->Select(selection, active);
+			return int(found.size());
+		}
+
+		bool KV6EditorView::HasSelectedObjects() const {
+			return scene && !scene->Selection().empty();
+		}
+
+		void KV6EditorView::SelectNoObject() {
+			if (scene)
+				scene->Select({}, {});
 		}
 
 		bool KV6EditorView::HasPickedObject() const { return scene && scene->Picked() >= 0; }
@@ -1152,6 +1224,7 @@ namespace spades {
 					              editor->IsCtrlHeld() || metaHeld, editor->IsShiftHeld(), globalTime);
 					if (!said.empty())
 						editor->SetStatus(said);
+					editor->ObjectSelectionChanged(); // a row picked shows its gizmo
 					return;
 				}
 				if (!down && tree->IsHolding()) {
@@ -1159,6 +1232,7 @@ namespace spades {
 					  scene ? tree->Release(*scene, softwareCursor->GetPosition()) : std::string();
 					if (!said.empty())
 						editor->SetStatus(said);
+					editor->ObjectSelectionChanged();
 					return;
 				}
 				leftToEditor = down;

@@ -55,6 +55,7 @@
 
 #include "DrawTool.h"
 #include "ObjectModeHost.h"
+#include "ObjectSelectTool.h"
 #include "ObjectTool.h"
 #include "SubTool.h"
 #include "VoxelDocument.h"
@@ -126,7 +127,6 @@ namespace spades {
 			}
 					// The toolbar id of Object mode's own tool, which no registered
 			// tool takes.
-			const char* const kObjectToolId = "object";
 } // namespace
 
 		/**
@@ -188,7 +188,20 @@ namespace spades {
 			transformPanel.reset(new TransformPanel(renderer, fontManager.GetSmallGuiFont()));
 			pivotTarget.reset(new PivotTarget(*this));
 
-			objectTool = std::make_unique<ObjectTool>();
+			// Object mode's own tools, with the keys Edit mode's Select and
+			// Transform have.
+			{
+				VoxelToolSlot select;
+				select.tool.reset(new ObjectSelectTool());
+				select.id = kObjectSelectToolId;
+				select.hotKey = "Q";
+				objectTools.push_back(std::move(select));
+				VoxelToolSlot transform;
+				transform.tool.reset(new ObjectTool());
+				transform.id = kObjectTransformToolId;
+				transform.hotKey = "T";
+				objectTools.push_back(std::move(transform));
+			}
 
 			// The tools come from the registry (toolbar order = registration),
 			// narrowed to the ones this editor offers.
@@ -273,8 +286,9 @@ namespace spades {
 				OpenModeMenu(anchor);
 			};
 			ui.GetToolbar()->OnToolClicked = [this](const std::string& id) {
-				if (currentMode == EditorMode::Object && id == kObjectToolId)
-					SetObjectModeTool(-1);
+				const int own = currentMode == EditorMode::Object ? OwnObjectToolIndex(id) : -1;
+				if (own >= 0)
+					SetOwnObjectTool(own);
 				else
 					SetActiveTool(ToolIndex(id));
 			};
@@ -2278,6 +2292,12 @@ namespace spades {
 			if (mode == EditorMode::Edit && InObjectMode(toolIndex))
 				toolIndex = defaultTool;
 			activeTool = toolIndex;
+			// Object mode opens on the gizmo when something is selected, else on
+			// Select; another tool of its own stays.
+			if (mode == EditorMode::Object && currentMode != EditorMode::Object && objects &&
+			    objectModeTool < 0)
+				objectOwnTool = OwnObjectToolIndex(objects->HasSelectedObjects() ? kObjectTransformToolId
+				                                                                 : kObjectSelectToolId);
 			currentMode = mode;
 			// The scene takes the voxels back as Edit mode is left, and hands the
 			// picked object's over as it is entered.
@@ -2342,6 +2362,14 @@ namespace spades {
 			// Never mid-press: the tool taking over would see a drag it never saw start.
 			if (key.empty() || lmbHeld || rmbHeld || KeyIsTaken(key))
 				return false;
+			if (currentMode == EditorMode::Object && ObjectMode()) {
+				for (std::size_t i = 0; i < objectTools.size(); i++) {
+					if (EqualsIgnoringCase(objectTools[i].hotKey, key)) {
+						SetOwnObjectTool(int(i));
+						return true;
+					}
+				}
+			}
 			for (size_t i = 0; i < tools.size(); i++) {
 				// Only the tools of the mode the editor is in.
 				if ((currentMode == EditorMode::Object) != InObjectMode(int(i)))
@@ -2367,7 +2395,7 @@ namespace spades {
 			if (currentMode == EditorMode::Object && ObjectMode()) {
 				if (InObjectMode(objectModeTool))
 					return tools[std::size_t(objectModeTool)].tool.get();
-				return objectTool.get();
+				return objectTools[std::size_t(objectOwnTool)].tool.get();
 			}
 			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()) &&
 			    !InObjectMode(activeTool))
@@ -2413,16 +2441,69 @@ namespace spades {
 			// part of the same user action, so it undoes with it.
 			if (pendingTool.empty())
 				return;
-			const std::string id = pendingTool;
+			std::string id = pendingTool;
 			pendingTool.clear();
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
 			if (clearingSelection) {
 				clearingSelection = false;
-				if (!edit.selection.Empty()) {
+				// What is selected in the mode the editor is in: voxels, or objects.
+				if (objects) {
+					objects->SelectNoObject();
+				} else if (!edit.selection.Empty()) {
 					ClearSelection();
 					SetStatus("Selection cleared");
 				}
 			}
-			SetActiveTool(ToolIndex(id));
+			// Select, in Object mode, is its own.
+			if (objects && id == "select")
+				id = kObjectSelectToolId;
+			const int own = objects ? OwnObjectToolIndex(id) : -1;
+			if (own >= 0)
+				SetOwnObjectTool(own);
+			else
+				SetActiveTool(ToolIndex(id));
+		}
+
+		std::string VoxelEditor::ActiveToolName() {
+			VoxelTool* t = ActiveTool();
+			return t ? t->Label() : std::string();
+		}
+
+		int VoxelEditor::OwnObjectToolIndex(const std::string& id) const {
+			for (std::size_t i = 0; i < objectTools.size(); i++)
+				if (objectTools[i].id == id)
+					return int(i);
+			return -1;
+		}
+
+		void VoxelEditor::SetOwnObjectTool(int index) {
+			if (index < 0 || index >= int(objectTools.size()) ||
+			    (objectModeTool < 0 && objectOwnTool == index))
+				return;
+			ui.GetOptionBar()->EndEditing(true);
+			SettlePanel();
+			VoxelTool* previous = ActiveTool();
+			objectModeTool = -1;
+			objectOwnTool = index;
+			VoxelTool* current = ActiveTool();
+			if (previous == current)
+				return;
+			if (previous)
+				previous->OnDeactivate(*this);
+			if (current)
+				current->OnActivate(*this);
+		}
+
+		void VoxelEditor::ObjectSelectionChanged() {
+			IObjectModeHost* objects = ObjectMode();
+			if (currentMode != EditorMode::Object || !objects || objectModeTool >= 0)
+				return;
+			const int select = OwnObjectToolIndex(kObjectSelectToolId);
+			const int transform = OwnObjectToolIndex(kObjectTransformToolId);
+			if (objects->HasSelectedObjects() && objectOwnTool == select)
+				SetOwnObjectTool(transform);
+			else if (!objects->HasSelectedObjects() && objectOwnTool == transform)
+				SetOwnObjectTool(select);
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
@@ -2856,11 +2937,15 @@ namespace spades {
 			std::vector<Toolbar::ToolbarButton> toolButtons;
 			const bool objectTools = currentMode == EditorMode::Object && ObjectMode();
 			if (objectTools) {
-				Toolbar::ToolbarButton btn;
-				btn.id = kObjectToolId;
-				btn.label = objectTool->Label();
-				btn.active = objectModeTool < 0;
-				toolButtons.push_back(btn);
+				for (int i = 0; i < int(this->objectTools.size()); i++) {
+					const VoxelToolSlot& slot = this->objectTools[std::size_t(i)];
+					Toolbar::ToolbarButton btn;
+					btn.id = slot.id;
+					btn.label = slot.tool->Label();
+					btn.hotKey = KeyIsTaken(slot.hotKey) ? std::string() : slot.hotKey;
+					btn.active = objectModeTool < 0 && objectOwnTool == i;
+					toolButtons.push_back(btn);
+				}
 			}
 			const int toolCount =
 			  (currentMode == EditorMode::Edit || objectTools) ? int(tools.size()) : 0;

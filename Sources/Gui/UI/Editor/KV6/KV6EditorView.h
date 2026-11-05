@@ -110,6 +110,11 @@ namespace spades {
 			// --- IObjectModeHost ----------------------------------------------
 			void SceneBox(Vector3& lo, Vector3& hi) const override { scene->Box(lo, hi); }
 			bool PickObjectAtCursor() override;
+			bool SelectObjectAtCursor(SelectHow how) override;
+			int SelectObjectsOnScreen(const std::function<bool(const Vector2&)>& inside, bool through,
+			                          bool removing) override;
+			bool HasSelectedObjects() const override;
+			void SelectNoObject() override;
 			bool HasPickedObject() const override;
 			std::string PickedObjectName() const override;
 			bool PickedObjectPose(GizmoPose& pose) const override;
