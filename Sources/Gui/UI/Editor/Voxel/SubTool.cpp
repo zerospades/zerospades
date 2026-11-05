@@ -579,8 +579,13 @@ namespace spades {
 			if (!e.IsLeft())
 				return;
 			if (e.IsDown()) {
-				if (gizmo.IsDragging() || !SyncPose(ed))
+				if (gizmo.IsDragging())
 					return;
+				// With nothing to handle there is no gizmo: every press is away.
+				if (!SyncPose(ed)) {
+					OnClickAway(ed);
+					return;
+				}
 				const GizmoView view = ed.GetGizmoView();
 				// Off the handles is away from the gizmo. A press on a handle that
 				// cannot be grabbed right now (an axis seen end-on) is not.
@@ -674,10 +679,18 @@ namespace spades {
 			ed.TransformPlacement(WholeStep(total)); // one undo step
 		}
 
+		void GizmoSubTool::ReturnToSelectIfOnNothing(IVoxelEditContext& ed) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				ed.ReturnToSelect();
+		}
+
 		void TransformSubTool::OnClickAway(IVoxelEditContext& ed) {
 			// A selection has moved already; only a paste or an import waits.
 			if (ed.HasPlacement())
 				ed.ApplyPlacement();
+			else
+				ReturnToSelectIfOnNothing(ed);
 		}
 
 		void TransformSubTool::OnKey(IVoxelEditContext& ed, const KeyInput& e) {
