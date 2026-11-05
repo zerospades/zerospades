@@ -59,6 +59,13 @@ namespace spades {
 		/**
 		 * FreeType2 based font renderer.
 		 *
+		 * Its sizes and measures are in the renderer's 2D units, but its glyphs
+		 * are rasterized at the display's pixel density (IRenderer::
+		 * ScreenPixelRatio): a high-DPI display gets text as sharp as its
+		 * pixels, not glyphs of 2D units stretched over several of them. The
+		 * glyphs are rasterized again should the density change (the window
+		 * moved to another display).
+		 *
 		 * Warning: only one thread can access multiple FTFonts sharing the same FTFontSet
 		 *			at the same time.
 		 */
@@ -95,6 +102,8 @@ namespace spades {
 			/** em height */
 			float height;
 			float baselineY;
+			/** Pixels a glyph is rasterized with per 2D unit. */
+			float density;
 
 			bool rendererIsLowQuality;
 
@@ -109,8 +118,15 @@ namespace spades {
 			void SplitTextIntoGlyphs(const std::string &, T glyphHandler, T3 fallbackHandler,
 									 T2 lineBreakHandler);
 
+			/** Follows the display's pixel density, rasterizing the glyphs
+			 *  again when it changed. */
+			void UpdateDensity();
+			/** `target` (2D units) on the nearest pixel, so glyphs stay crisp. */
+			Vector2 SnapToPixel(const Vector2 &target) const;
 			void RenderGlyph(Glyph &);
 			void RenderBlurGlyph(Glyph &);
+			/** `bmp` blurred once, grown by the kernel's reach on every side. */
+			static Handle<Bitmap> BlurOnce(Bitmap &bmp);
 			void RenderOutlineGlyph(Glyph &);
 
 		protected:
