@@ -22,6 +22,8 @@
 
 #include <string>
 
+#include "TextEntry.h"
+
 namespace spades {
 	namespace gui {
 		/**
@@ -39,10 +41,13 @@ namespace spades {
 		 *
 		 * Editing is on the text, not on the value: what is typed stays exactly
 		 * as typed until it is read, so a half-finished "-" or "1." is never
-		 * corrected under the caret or mistaken for a number.
+		 * corrected under the caret or mistaken for a number. The text is a
+		 * TextEntry's, holding only what a number is written with.
 		 */
 		class NumberEntry {
 		public:
+			NumberEntry();
+
 			/** Writes `value` with `decimals` places. */
 			static std::string Format(float value, int decimals);
 			/**
@@ -51,6 +56,13 @@ namespace spades {
 			 * empty, half typed ("-", "1.e") or not finite.
 			 */
 			static bool Parse(const std::string& text, float& out);
+			/**
+			 * Works out arithmetic typed for a number, as a professional tool's
+			 * field takes it: + - * / and parentheses over numbers (commas for
+			 * points, as Parse), "12*2" or "-(4+0.5)". False when it is anything
+			 * else, divides by zero or is not finite.
+			 */
+			static bool Evaluate(const std::string& text, float& out);
 
 			/**
 			 * Starts editing `value`. The caret sits at the end and the first
@@ -59,11 +71,11 @@ namespace spades {
 			 */
 			void Begin(float value, int decimals);
 			void End();
-			bool IsEditing() const { return editing; }
+			bool IsEditing() const { return entry.IsEditing(); }
 
-			const std::string& Text() const { return text; }
+			const std::string& Text() const { return entry.Text(); }
 			/** Byte index of the caret within `Text()`. */
-			int Caret() const { return caret; }
+			int Caret() const { return entry.Caret(); }
 
 			/** Takes the digits, signs and separators in `s`; ignores the rest. */
 			void Insert(const std::string& s);
@@ -78,12 +90,10 @@ namespace spades {
 			bool Value(float& out) const;
 
 		private:
-			bool editing = false;
-			// True until the first character is typed, which then replaces the
-			// text rather than adding to it.
-			bool fresh = false;
-			std::string text;
-			int caret = 0;
+			// Begun with all of it selected, so the first character typed
+			// replaces it; anything else lets the selection go first.
+			TextEntry entry;
+			void Settle();
 		};
 	} // namespace gui
 } // namespace spades
