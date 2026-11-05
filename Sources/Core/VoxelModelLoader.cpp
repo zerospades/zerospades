@@ -271,8 +271,13 @@ namespace spades {
 		std::string pathStr(path);
 
 		// "scene.2kv6#Gun/Bolt" names one object of a scene, with everything
-		// under it: a part a script draws and moves on its own.
+		// under it: a part a script draws and moves on its own. Composed into
+		// the scene's frame, it has the scene's resolution; "scene.2kv6##Gun/
+		// Bolt" is the same part in its own frame, at the resolution it was
+		// modelled at, for one the scene scales down (finer than the rest) to
+		// be drawn with its transform. No name starts with '#'.
 		std::string partPath;
+		bool ownFrame = false;
 		{
 			std::string lower = pathStr;
 			for (char& ch : lower)
@@ -281,6 +286,10 @@ namespace spades {
 			if (at != std::string::npos) {
 				partPath = pathStr.substr(at + 6);
 				pathStr.resize(at + 5);
+				if (!partPath.empty() && partPath[0] == '#') {
+					ownFrame = true;
+					partPath.erase(0, 1);
+				}
 			}
 		}
 
@@ -331,10 +340,17 @@ namespace spades {
 				// Drawn when asked for by name, even if the scene hides it.
 				VoxelObject shown = *part;
 				shown.hidden = false;
+				if (ownFrame) {
+					shown.position = MakeVector3(0.0F, 0.0F, 0.0F);
+					shown.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+					shown.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+					parent = Matrix4::Identity();
+				}
 				voxelModel = MergeSceneObjects({shown}, parent, &low);
 			}
 			// A scene's pivot is its origin, so every part of one, drawn with the
-			// same matrix, lands where it belongs in it.
+			// same matrix, lands where it belongs in it (a part in its own frame,
+			// drawn with its transform).
 			voxelModel->SetOrigin(MakeVector3(float(low.x), float(low.y), float(low.z)));
 		} else {
 			// Load .kv6 file (regular single-model)
