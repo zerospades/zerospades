@@ -44,7 +44,7 @@
 
 #include "KV6Document.h"
 #include "KV6Scene.h"
-#include "LowPolyPanel.h"
+#include "LowPolyTool.h"
 #include "SceneTreePanel.h"
 
 namespace spades {
@@ -162,12 +162,13 @@ namespace spades {
 			void SettleRename();
 			/** Whether a press at the cursor goes to the tree. */
 			bool TreeTakesPress() const;
-			// The menu a right press on a row opens: what goes into the tree,
-			// and what comes out of it.
-			std::unique_ptr<ContextMenu> contextMenu;
 			// Objects copied, kept while other scenes are opened, to paste there.
 			std::vector<KV6Scene::CopiedObject> objectClipboard;
 			void OpenTreeMenu();
+			// The tree's commands, on nodes the menu was opened on.
+			void CopyObjects(const std::vector<NodePath>& nodes);
+			void PasteObjects(const NodePath& parent);
+			void DeleteObjects(const std::vector<NodePath>& nodes);
 			/** A new object of one voxel, as a new model starts, under `parent`. */
 			void AddObjectUnder(const NodePath& parent);
 			/** Hands the voxels being edited back to the picked object, which
@@ -273,19 +274,11 @@ namespace spades {
 			/** Asks where, then saves the node at `path` as a .kv6 (ModelOf). */
 			void SaveNodeAsModel(const NodePath& path);
 
-			// A low-poly model of a node, made with LowPolyPanel: shown in the
-			// node's place, which is hidden meanwhile, until created or not.
-			std::unique_ptr<LowPolyPanel> lowPoly;
-			NodePath lowPolyNode;
-			Handle<VoxelModel> lowPolySource; // the node composed, as Composed has it
-			Vector3 lowPolyBase = MakeVector3(0.0F, 0.0F, 0.0F);
-			long lowPolySourceVoxels = 0;
-			Handle<VoxelModel> lowPolyModel; // at the factor chosen
+			// Low-poly models of a node, previewed in its place.
+			std::unique_ptr<LowPolyTool> lowPoly;
 			void OpenLowPoly(const NodePath& path);
-			/** Makes the model at the panel's factor and shows it. */
-			void UpdateLowPoly();
-			void EndLowPoly(bool create);
-			/** A key or button while the panel is up; true when taken. */
+			/** A key or button while it is open; true when taken: its own,
+			 *  the camera's, and nothing that would change the scene. */
 			bool LowPolyInput(const std::string& key, bool down);
 			/** A plain message over the editor with a single way out. */
 			void ShowMessage(const std::string& text);

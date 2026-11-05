@@ -32,6 +32,7 @@
 namespace spades {
 	namespace gui {
 		class ColorPicker;
+		class ContextMenu;
 		class EditorMenu;
 		class IEditorMenuHost;
 		class OptionBar;
@@ -41,8 +42,9 @@ namespace spades {
 
 		/**
 		 * The chrome every editor view shares: the toolbar, the option bar, the
-		 * colour picker, the Esc menu, and the overlay its modal dialogs (the
-		 * file browser) are shown in. It only owns them; the view lays them
+		 * colour picker, the Esc menu, the menu popped up over the view (a right
+		 * click's, a dropdown's), and the overlay its modal dialogs (the file
+		 * browser) are shown in. It only owns them; the view lays them
 		 * out, draws them and routes input to them.
 		 */
 		class EditorUI : public IGameModeUI {
@@ -55,6 +57,7 @@ namespace spades {
 			std::unique_ptr<OptionBar> optionBar;
 			std::unique_ptr<ColorPicker> colorPicker;
 			std::unique_ptr<EditorMenu> editorMenu;
+			std::unique_ptr<ContextMenu> contextMenu;
 
 			bool shouldClose = false;
 
@@ -91,6 +94,7 @@ namespace spades {
 			OptionBar* GetOptionBar() { return optionBar.get(); }
 			ColorPicker* GetColorPicker() { return colorPicker.get(); }
 			EditorMenu* GetEditorMenu() { return editorMenu.get(); }
+			ContextMenu* GetContextMenu() { return contextMenu.get(); }
 			/** Hosts modal `spades::ui` dialogs (the file browser) over the editor. */
 			UIOverlayHost* GetOverlay() { return overlay.get(); }
 		};
