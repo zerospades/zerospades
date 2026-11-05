@@ -51,9 +51,14 @@ namespace spades {
 			std::string shortcut;
 			/** Marked as the one in effect (a mode of several). */
 			bool checked = false;
+			/** Items it opens beside it, in place of running anything. */
+			std::vector<ContextMenuItem> submenu;
 
 			ContextMenuItem(std::string caption, std::function<void()> run)
 			    : caption(std::move(caption)), run(std::move(run)) {}
+			/** An item opening `items` beside it: hovered, clicked, or Right. */
+			ContextMenuItem(std::string caption, std::vector<ContextMenuItem> items)
+			    : caption(std::move(caption)), submenu(std::move(items)) {}
 			ContextMenuItem& Enabled(bool on) {
 				enabled = on;
 				return *this;
@@ -77,7 +82,9 @@ namespace spades {
 		 * the cursor by a right press, or under a control that drops one down
 		 * (a mode selector). While it is open it owns the pointer and the
 		 * keyboard: a click on an item runs it, a click anywhere else or
-		 * Escape closes it, and the arrows and Enter choose from it.
+		 * Escape closes it, and the arrows and Enter choose from it. An item
+		 * with a submenu opens it beside itself as the pointer comes onto it
+		 * (or on a click, Right or Enter); Left or Escape closes it again.
 		 *
 		 * EditorUI owns the one every editor shares; its view routes input to
 		 * it first while it is open, and draws it last.
@@ -95,16 +102,17 @@ namespace spades {
 			void OpenBelow(const AABB2& anchor, std::vector<ContextMenuItem> items,
 			               const void* owner = nullptr);
 			void Close();
-			bool IsOpen() const { return open; }
+			bool IsOpen() const { return !levels.empty(); }
 			/** Whether it is open, for `owner`: a dropdown shows itself held
 			 *  down while its own list is. */
-			bool IsOpenFor(const void* owner) const { return open && owner == openedBy; }
+			bool IsOpenFor(const void* owner) const { return IsOpen() && owner == openedBy; }
 
 			/** A press of either button: one off the menu closes it. */
 			void Press(const Vector2& at);
 			/** A left release on the item the press was on runs it. */
 			void Release(const Vector2& at);
-			/** A key down while open: Up, Down, Enter, Escape; all are taken. */
+			/** A key down while open: Up, Down, Left, Right, Enter, Escape; all
+			 *  are taken. */
 			void Key(const std::string& key);
 
 			void Draw(const Vector2& cursor);
@@ -113,17 +121,30 @@ namespace spades {
 			client::IRenderer& renderer;
 			client::IFont& font;
 			ui::FeedbackSounds sounds;
-			std::vector<ContextMenuItem> items;
-			bool open = false;
+			/** The menu, then each submenu open from the one before it. */
+			struct Level {
+				std::vector<ContextMenuItem> items;
+				float x = 0.0F, y = 0.0F, width = 0.0F, height = 0.0F;
+				int highlighted = -1;
+				int from = -1; // the item of the level before that opened it
+			};
+			std::vector<Level> levels;
 			const void* openedBy = nullptr;
-			float x = 0.0F, y = 0.0F, width = 0.0F, height = 0.0F;
-			int highlighted = -1;
-			int pressed = -1;
+			int pressedLevel = -1, pressed = -1;
 			Vector2 lastCursor = MakeVector2(-1.0F, -1.0F);
 
-			float ItemTop(int index) const;
-			int ItemAt(const Vector2& at) const;
-			void Run(int index);
+			/** A level of `items` sized to them, its top left at `at` kept on
+			 *  screen; to the left of `leftOf` instead when it runs off the right. */
+			Level Lay(std::vector<ContextMenuItem> items, const Vector2& at, float leftOf) const;
+			float ItemTop(const Level& level, int index) const;
+			int ItemAt(const Level& level, const Vector2& at) const;
+			/** The deepest level `at` is on, or -1. */
+			int LevelAt(const Vector2& at) const;
+			/** Opens item `index`'s submenu of level `depth`, closing deeper ones. */
+			void OpenSubmenu(int depth, int index);
+			/** Runs the item, or opens its submenu: `byKey` then chooses its
+			 *  first item, as the arrows would. */
+			void Run(int depth, int index, bool byKey);
 			void Step(int direction);
 		};
 	} // namespace gui
