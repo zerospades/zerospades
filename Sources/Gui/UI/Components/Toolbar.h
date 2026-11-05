@@ -81,6 +81,8 @@ namespace spades {
 			 * OnColorSwatchClicked. Hidden until set.
 			 */
 			void SetColorSwatch(uint32_t color, bool open);
+			/** Takes the swatch off the bar, where no colour is chosen. */
+			void HideColorSwatch() { hasSwatch = false; }
 
 			/** Runs the callback of the enabled button under `p`; false if there is none. */
 			bool Click(const Vector2& p, float screenWidth);

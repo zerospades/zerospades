@@ -33,7 +33,7 @@ namespace spades {
 		class ObjectTool : public GizmoTool {
 		public:
 			ObjectTool();
-			const char* Label() const override { return "Object"; }
+			const char* Label() const override { return "Transform"; }
 			std::string Hint(IVoxelEditContext&) override;
 		};
 	} // namespace gui

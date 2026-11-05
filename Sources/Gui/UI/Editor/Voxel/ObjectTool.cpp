@@ -52,7 +52,7 @@ namespace spades {
 			class ObjectGizmoSubTool : public GizmoSubTool {
 			public:
 				ObjectGizmoSubTool() : GizmoSubTool(ObjectSnap(), ObjectHandles()) {}
-				const char* Label() const override { return "Object"; }
+				const char* Label() const override { return "Transform"; }
 
 				void OnPointer(IVoxelEditContext& ed, const PointerInput& e) override {
 					// With nothing picked there is no gizmo, and the gizmo's own
