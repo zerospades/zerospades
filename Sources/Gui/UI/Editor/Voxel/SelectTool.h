@@ -47,11 +47,18 @@ namespace spades {
 			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
 			                         bool committed) override;
 			std::string Hint(IVoxelEditContext& ed) override;
+			// A click on nothing selects nothing, whichever way of selecting is
+			// active, as in every modeller: but for a box or a cylinder being
+			// placed, whose next point may well be in empty space.
+			void OnPointer(IVoxelEditContext& ed, const PointerInput& e) override;
 
 		private:
 			ToolOptions options;
 			ScreenSelectSettings screen; // Rect's and Brush's
 			int rectIndex = -1, brushIndex = -1;
+			// The press that may turn out a click on nothing.
+			bool pressOnNothing = false;
+			Vector2 pressAt = MakeVector2(0.0F, 0.0F);
 		};
 	} // namespace gui
 } // namespace spades
