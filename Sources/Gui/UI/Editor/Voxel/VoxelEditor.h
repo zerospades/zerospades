@@ -180,6 +180,9 @@ namespace spades {
 			/** Whether a number is being scrubbed: the pointer's motion is then
 			 *  its, the host holding the pointer still. */
 			bool HoldsPointer() const;
+			/** Whether `at` is on the view itself: under the bars, off the colour
+			 *  picker and the transform panel, no button held for a tool. */
+			bool IsFreeViewportPoint(const Vector2& at);
 			/** The editor's own keys (delete); true if taken. Before the host's
 			 *  movement keys, which never reach the tools. */
 			bool CommandKey(const std::string& key, bool down);

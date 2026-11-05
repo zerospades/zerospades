@@ -171,13 +171,29 @@ namespace spades {
 			bool TreeTakesPress() const;
 			// Objects copied, kept while other scenes are opened, to paste there.
 			std::vector<KV6Scene::CopiedObject> objectClipboard;
+			/** The menu of the row under the cursor, if any. */
 			void OpenTreeMenu();
+			/** The menu of the object under the cursor in the view, selecting
+			 *  it first if it is not; false when none is there to have one. */
+			bool OpenObjectMenu();
+			/** The menu of the node at `row` (the scene, for an empty path). */
+			void OpenNodeMenu(const NodePath& row);
 			// The tree's commands, on nodes the menu was opened on.
 			void CopyObjects(const std::vector<NodePath>& nodes);
 			void PasteObjects(const NodePath& parent);
 			void DeleteObjects(const std::vector<NodePath>& nodes);
+			/** Asks for a .kv6 or .2kv6, from the scene's folder, to add under
+			 *  `parent`. */
+			void OpenAddChildFile(const NodePath& parent);
 			/** A new object of one voxel, as a new model starts, under `parent`. */
 			void AddObjectUnder(const NodePath& parent);
+			/** The model or scene at `file` under `parent`, named after it. */
+			void AddFileUnder(const NodePath& parent, const std::string& file);
+			/** After a node was added: shows it, says so, gives it the gizmo. */
+			void ShowAdded();
+			/** Where the document's dialogs open: its folder, or for one never
+			 *  saved, wherever the player was last. */
+			std::string DialogFolder() const;
 			/** Hands the voxels being edited back to the picked object, which
 			 *  stays where it was whatever its volume did. */
 			void TakeBackEditedObject();

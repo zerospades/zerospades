@@ -189,8 +189,31 @@ namespace spades {
 
 		void KV6EditorView::OpenTreeMenu() {
 			NodePath row;
-			if (!tree->ContextRow(*scene, softwareCursor->GetPosition(), row))
-				return;
+			if (tree->ContextRow(*scene, softwareCursor->GetPosition(), row))
+				OpenNodeMenu(row);
+		}
+
+		bool KV6EditorView::OpenObjectMenu() {
+			const Vector2& at = softwareCursor->GetPosition();
+			Vector3 toward;
+			if (!editor->IsFreeViewportPoint(at) || naviCube.HomeAt(at) ||
+			    naviCube.DirectionAt(cam.View(), at, toward))
+				return false;
+			const int index = scene->ObjectAt(cam.View(), at);
+			if (index < 0)
+				return false; // on nothing: the tools' (a box taking objects away)
+			// The object becomes the selection unless it is in it already, as a
+			// right press on a row of a file manager does; the menu acts on it.
+			const NodePath path = scene->PathOf(index);
+			if (!scene->IsSelected(path))
+				scene->Select({path}, path);
+			tree->Reveal(*scene, path);
+			editor->ObjectSelectionChanged();
+			OpenNodeMenu(path);
+			return true;
+		}
+
+		void KV6EditorView::OpenNodeMenu(const NodePath& row) {
 			ui->GetOptionBar()->EndEditing(true);
 			editor->CancelToolInteraction();
 			// Copying and deleting act on the selection, which the row is in;
@@ -201,7 +224,11 @@ namespace spades {
 			const VoxelObject* node = scene->Node(row);
 			const bool voxels = scene->HoldsVoxels(row);
 			std::vector<ContextMenuItem> items;
-			items.push_back(ContextMenuItem("Add Child", [this, row] { AddObjectUnder(row); }));
+			items.push_back(ContextMenuItem(
+			  "Add Child",
+			  std::vector<ContextMenuItem>{
+			    ContextMenuItem("Single Voxel", [this, row] { AddObjectUnder(row); }),
+			    ContextMenuItem("KV6 or 2KV6 File...", [this, row] { OpenAddChildFile(row); })}));
 			if (!onScene)
 				items.push_back(ContextMenuItem("Rename", [this, row] { RenameInTree(row); })
 				                  .Enabled(node && !node->locked)
@@ -340,15 +367,72 @@ namespace spades {
 			return true;
 		}
 
+		void KV6EditorView::OpenAddChildFile(const NodePath& parent) {
+			SettleTyping();
+			FileBrowserOptions options = EditorBrowserOptions();
+			options.purpose = FileBrowserPurpose::Open;
+			options.filters.clear();
+			options.filters.push_back(FileFilter{
+			  "KV6 models and 2KV6 scenes",
+			  {DefaultExtension(DocumentKind::Model), DefaultExtension(DocumentKind::Scene)}});
+			options.homeDir = EditorHomeDir();
+			options.initialDir = DialogFolder();
+			editor->ReleaseHeldInput();
+			// The tree cannot change while the browser is up, so `parent` still
+			// names the node once a file is picked.
+			ShowEditorFileDialog(*ui->GetOverlay(), "Add Child from File", std::move(options),
+			                     [this, parent](const std::string& file) {
+				                     if (scene)
+					                     AddFileUnder(parent, file);
+			                     });
+		}
+
 		void KV6EditorView::AddObjectUnder(const NodePath& parent) {
 			std::string why;
 			if (!scene->AddChild(parent, SeedModel(kNewModelSize), "Object", why)) {
 				editor->SetStatus("Cannot add an object there: " + why);
 				return;
 			}
+			ShowAdded();
+		}
+
+		void KV6EditorView::AddFileUnder(const NodePath& parent, const std::string& file) {
+			// Named after the file, as a scene's names allow: no leading '#',
+			// at most 255 bytes (a file name never holds a '/').
+			std::string name = LocalFileSystem::GetFileName(file);
+			if (name.rfind('.') != std::string::npos && name.rfind('.') > 0)
+				name.erase(name.rfind('.'));
+			name.erase(0, name.find_first_not_of('#'));
+			if (name.size() > 255)
+				name.resize(255);
+			if (name.empty())
+				name = "Object";
+			std::string why;
+			bool added;
+			if (LocalFileSystem::HasExtension(file, DefaultExtension(DocumentKind::Scene))) {
+				added = scene->AddScene(parent, file, name, why);
+			} else {
+				Handle<VoxelModel> model = KV6ModelIO::Load(file);
+				if (!model)
+					why = "it is not a model this editor can read";
+				added = model && scene->AddChild(parent, model, name, why);
+			}
+			if (!added) {
+				editor->SetStatus("Cannot add " + LocalFileSystem::GetFileName(file) + ": " + why);
+				return;
+			}
+			ShowAdded();
+		}
+
+		void KV6EditorView::ShowAdded() {
 			tree->Reveal(*scene, scene->Active());
 			editor->SetStatus("Added " + scene->Node(scene->Active())->name);
 			editor->ObjectSelectionChanged();
+		}
+
+		std::string KV6EditorView::DialogFolder() const {
+			return filePath.empty() ? EditorRememberedFolder(EditorHomeDir())
+			                        : LocalFileSystem::ParentDir(filePath);
 		}
 
 		ITransformTarget& KV6EditorView::ObjectTransform() {
@@ -835,8 +919,7 @@ namespace spades {
 			// The document's own folder is where this document's dialogs belong;
 			// anything else opens where the player last was, here or on the main
 			// screen.
-			options.initialDir = filePath.empty() ? EditorRememberedFolder(EditorHomeDir())
-			                                      : LocalFileSystem::ParentDir(filePath);
+			options.initialDir = DialogFolder();
 			options.initialName = initialName;
 
 			// A dialog takes over input: nothing should stay held while it is up.
@@ -907,8 +990,7 @@ namespace spades {
 			options.describeEntry = nullptr;
 			options.appendFilterExtension = false;
 			options.homeDir = EditorHomeDir();
-			options.initialDir = filePath.empty() ? EditorRememberedFolder(EditorHomeDir())
-			                                      : LocalFileSystem::ParentDir(filePath);
+			options.initialDir = DialogFolder();
 			editor->ReleaseHeldInput();
 			ShowEditorFileDialog(*ui->GetOverlay(), title, std::move(options), std::move(picked));
 		}
@@ -1119,9 +1201,14 @@ namespace spades {
 				if (key == "LeftMouseButton" || key == "RightMouseButton") {
 					if (down) {
 						ui->GetContextMenu()->Press(at);
-						// A right press on another row opens its menu there.
-						if (!ui->GetContextMenu()->IsOpen() && key == "RightMouseButton" && TreeTakesPress())
-							OpenTreeMenu();
+						// A right press on another row, or object, opens its
+						// menu there.
+						if (!ui->GetContextMenu()->IsOpen() && key == "RightMouseButton") {
+							if (TreeTakesPress())
+								OpenTreeMenu();
+							else if (ShowingObjects())
+								OpenObjectMenu();
+						}
 					} else if (key == "LeftMouseButton") {
 						ui->GetContextMenu()->Release(at);
 					}
@@ -1246,6 +1333,10 @@ namespace spades {
 					OpenTreeMenu();
 					return;
 				}
+				// On an object in the view, its menu; with no button held for
+				// a tool, so a drag is still cancelled by it.
+				if (down && ShowingObjects() && !leftToEditor && OpenObjectMenu())
+					return;
 				if (!down && !rightToEditor)
 					return;
 				rightToEditor = down;

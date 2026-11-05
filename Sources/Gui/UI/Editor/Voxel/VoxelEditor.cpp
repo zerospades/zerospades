@@ -250,6 +250,14 @@ namespace spades {
 
 		bool VoxelEditor::HoldsPointer() const { return transformPanel->IsHolding(); }
 
+		bool VoxelEditor::IsFreeViewportPoint(const Vector2& at) {
+			if (lmbHeld || rmbHeld || pickerHeld || transformPanel->IsHolding())
+				return false;
+			if (at.y < BarsHeight() || ui.GetColorPicker()->IsOverPicker(at))
+				return false;
+			return !(PanelTarget() && transformPanel->Contains(at));
+		}
+
 		bool VoxelEditor::OnPanel(const Vector2& at) {
 			return transformPanel->Contains(at) && !ui.GetColorPicker()->IsOverPicker(at);
 		}
