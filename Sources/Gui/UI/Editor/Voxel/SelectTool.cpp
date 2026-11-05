@@ -19,6 +19,8 @@
  */
 
 #include "SelectTool.h"
+
+#include <algorithm>
 #include "VoxelEditContext.h"
 
 namespace spades {
@@ -31,6 +33,8 @@ namespace spades {
 			const char* const kCopyOption = "clipboard.copy";
 			const char* const kCutOption = "clipboard.cut";
 			const char* const kPasteOption = "clipboard.paste";
+			const char* const kDiameterOption = "select.diameter";
+			const char* const kXRayOption = "select.xray";
 		} // namespace
 
 		SelectTool::SelectTool() {
@@ -48,6 +52,11 @@ namespace spades {
 			subs.push_back(std::unique_ptr<VoxelTool>(new ByColourSubTool()));
 			subs.push_back(std::unique_ptr<VoxelTool>(
 			  new CylinderSubTool({select, "select"}, {deselect, "deselect"})));
+			subs.push_back(std::unique_ptr<VoxelTool>(new PlaneSelectSubTool()));
+			rectIndex = int(subs.size());
+			subs.push_back(std::unique_ptr<VoxelTool>(new RectSelectSubTool(screen)));
+			brushIndex = int(subs.size());
+			subs.push_back(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(screen)));
 
 			// Whole-selection commands, available whichever sub-tool is active.
 			// Their keys work in every tool; these buttons are their one home.
@@ -58,6 +67,9 @@ namespace spades {
 			options.AddAction(kCopyOption, "Copy", "Clipboard");
 			options.AddAction(kCutOption, "Cut", "Clipboard");
 			options.AddAction(kPasteOption, "Paste", "Clipboard");
+			// The screen selections' settings, shown with them only.
+			options.AddNumber(kDiameterOption, "Size", "Brush", 5.0F, 0);
+			options.AddBool(kXRayOption, "X-Ray", "", screen.through);
 		}
 
 		ToolOptions* SelectTool::Options() { return &options; }
@@ -70,6 +82,22 @@ namespace spades {
 			options.SetEnabled(kCopyOption, selected);
 			options.SetEnabled(kCutOption, selected);
 			options.SetEnabled(kPasteOption, ed.CanPaste());
+			options.SetVisible(kDiameterOption, active == brushIndex);
+			options.SetVisible(kXRayOption, active == rectIndex || active == brushIndex);
+			options.SetNumber(kDiameterOption, screen.diameter);
+			options.SetBool(kXRayOption, screen.through);
+		}
+
+		void SelectTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) {
+			if (id == kXRayOption)
+				screen.through = value;
+		}
+
+		void SelectTool::OnOptionNumberChanged(IVoxelEditContext&, const std::string& id, float value,
+		                                       bool) {
+			if (id == kDiameterOption)
+				screen.diameter = std::max(ScreenSelectSettings::kMinDiameter,
+				                           std::min(ScreenSelectSettings::kMaxDiameter, value));
 		}
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {

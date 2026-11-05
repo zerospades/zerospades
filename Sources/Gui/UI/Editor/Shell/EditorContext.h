@@ -56,6 +56,14 @@ namespace spades {
 			/** Draws `gizmo` over the finished scene; call from a tool's DrawOverlay. */
 			virtual void DrawGizmo(const TransformGizmo& gizmo) = 0;
 
+			// --- Marks on the screen -------------------------------------------
+			// Over the finished scene, in screen pixels, what a tool marks on the
+			// screen itself rather than in the scene (a marquee, a brush's
+			// reach); call from a tool's DrawOverlay.
+			virtual void DrawScreenRect(const AABB2& rect, const Vector4& color) = 0;
+			virtual void DrawScreenCircle(const Vector2& centre, float radius,
+			                              const Vector4& color) = 0;
+
 			// --- Feedback -----------------------------------------------------
 			// A transient message: what an action did, or why it did nothing.
 			// What a tool's buttons and keys do belongs in BasicEditorTool::Hint.

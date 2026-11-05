@@ -191,6 +191,8 @@ namespace spades {
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			GizmoView GetGizmoView() const override;
 			void DrawGizmo(const TransformGizmo& gizmo) override;
+			void DrawScreenRect(const AABB2& rect, const Vector4& color) override;
+			void DrawScreenCircle(const Vector2& centre, float radius, const Vector4& color) override;
 			void SetStatus(const std::string&) override;
 
 			// --- IVoxelEditContext --------------------------------------------
@@ -214,6 +216,10 @@ namespace spades {
 			void PreviewRecolorSelection(std::uint32_t color) override;
 			int SelectionCount() const override;
 			std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const override;
+			std::vector<IntVector3> CoplanarFaces(const IntVector3& solid,
+			                                      const IntVector3& normal) const override;
+			std::vector<IntVector3> CellsOnScreen(const std::function<bool(const Vector2&)>& inside,
+			                                      bool through) const override;
 			void SelectAll() override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
@@ -444,6 +450,21 @@ namespace spades {
 			// The host's view in document coordinates (see DocumentOrigin):
 			// what picking, projecting and the gizmos go through.
 			GizmoView DocumentView() const;
+			/**
+			 * The first solid voxel the ray from `eye` along `dir` (document
+			 * coordinates) meets inside the volume, and the cell it passed
+			 * through last before it; false when it meets none.
+			 */
+			bool FirstSolidAlong(const Vector3& eye, const Vector3& dir, IntVector3& solid,
+			                     IntVector3& before) const;
+			/** Whether the view sees voxel `v`: one of its faces shows and the
+			 *  eye's ray through it meets `v` first. */
+			bool Seen(const IntVector3& v, const GizmoView& view) const;
+			// The solid voxels, and those of them with a face showing, kept for
+			// the document's version: what the screen selections look through.
+			mutable std::uint64_t cellsVersion = ~std::uint64_t(0);
+			mutable std::vector<IntVector3> solidCells, surfaceCells;
+			void IndexCells() const;
 			bool pickHit = false;
 			IntVector3 pickSolid = IntVector3::Make(0, 0, 0); // solid voxel hit
 			IntVector3 pickPlace = IntVector3::Make(0, 0, 0); // adjacent empty cell

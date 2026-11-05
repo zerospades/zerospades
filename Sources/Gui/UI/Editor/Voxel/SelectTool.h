@@ -21,12 +21,15 @@
 #pragma once
 
 #include "ContainerTool.h"
+#include "SelectSubTools.h"
 
 namespace spades {
 	namespace gui {
-		// Select voxels: Voxel (single), Box (box region), By Colour. Its bar holds
+		// Select voxels: Voxel (single), Box (box region), By Colour, Cylinder,
+		// Plane (a flat face), and on the screen Rect and Brush. Its bar holds
 		// the commands that act on the selection, clipboard included, and the
-		// colour picker recolours what is selected.
+		// screen selections' settings; the colour picker recolours what is
+		// selected.
 		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
@@ -36,6 +39,9 @@ namespace spades {
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
+			                           bool committed) override;
 			// A colour chosen on the picker recolours the selection, live while
 			// it is being chosen.
 			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
@@ -44,6 +50,8 @@ namespace spades {
 
 		private:
 			ToolOptions options;
+			ScreenSelectSettings screen; // Rect's and Brush's
+			int rectIndex = -1, brushIndex = -1;
 		};
 	} // namespace gui
 } // namespace spades
