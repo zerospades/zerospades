@@ -22,6 +22,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include <Core/Math.h>
@@ -131,9 +132,16 @@ namespace spades {
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
 			/**
-			 * Gives the selection up and makes Select the active tool: what a
-			 * click on nothing does in a tool that works on the selection, and
-			 * can do nothing without one. Done once the tool's event is over.
+			 * Makes the tool registered as `id` the active one, once the active
+			 * tool is done with its event, as part of the same user action: a
+			 * tool hands over to another without being switched from inside
+			 * itself.
+			 */
+			virtual void SwitchTool(const std::string& id) = 0;
+			/**
+			 * Gives the selection up and switches to Select: what a click on
+			 * nothing does in a tool that works on the selection, and can do
+			 * nothing without one. Done once the tool's event is over.
 			 */
 			virtual void ReturnToSelect() = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
