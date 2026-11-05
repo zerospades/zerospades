@@ -48,7 +48,13 @@ namespace spades {
 				Vector3 rotation; // degrees
 				Vector3 scale;
 			};
+			/** What it has to set, which the panel shows rows for. */
+			enum Rows : unsigned { kLocation = 1, kRotation = 2, kScale = 4, kAllRows = 7 };
 			virtual ~ITransformTarget() {}
+
+			virtual unsigned ShownRows() const { return kAllRows; }
+			/** The panel's title: what is set ("Transform", "Pivot"). */
+			virtual std::string Title() const { return "Transform"; }
 
 			/** What there is to show: false when nothing. `name` titles it;
 			 *  `onlyMoves` when its rotation and scale cannot be set. */
@@ -107,6 +113,10 @@ namespace spades {
 			std::vector<std::unique_ptr<NumberField>> fields; // location, rotation, scale; x y z
 			float right = 0.0F, top = 0.0F;
 			bool shown = false;
+			unsigned rows = ITransformTarget::kAllRows; // as the target last said
+			int RowCount() const;
+			/** Where row `row` is drawn among those shown; -1 when it is not. */
+			int Slot(int row) const;
 			int active = -1; // the field being set
 			ITransformTarget::Transform editing; // as it was when the field began, then as set
 

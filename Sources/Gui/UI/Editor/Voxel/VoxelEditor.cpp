@@ -46,6 +46,8 @@
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/UI/Components/Toolbar.h>
+#include <Gui/UI/Components/TransformPanel.h>
+#include <Gui/UI/Widgets/TextEntry.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
 #include <Gui/UI/Editor/Shell/EditorKeys.h>
 #include <Gui/UI/Editor/Shell/EditorUI.h>
@@ -121,6 +123,50 @@ namespace spades {
 			}
 		} // namespace
 
+		/**
+		 * The model's pivot, as the transform panel sets it: a Location only,
+		 * previewed live and kept as one Set Pivot step.
+		 */
+		class VoxelEditor::PivotTarget final : public ITransformTarget {
+		public:
+			explicit PivotTarget(VoxelEditor& editor) : editor(editor) {}
+
+			unsigned ShownRows() const override { return kLocation; }
+			std::string Title() const override { return "Pivot"; }
+
+			bool CurrentTransform(Transform& t, std::string& name, bool& onlyMoves) const override {
+				t.position = editor.GetPivot();
+				t.rotation = MakeVector3(0.0F, 0.0F, 0.0F);
+				t.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+				name = "of the " + editor.document.Noun();
+				onlyMoves = true;
+				return true;
+			}
+			void PreviewTransform(const Transform& t) override {
+				previewing = true;
+				value = t.position;
+				editor.PreviewPivot(value);
+			}
+			void CommitTransform() override {
+				if (!previewing)
+					return;
+				previewing = false;
+				editor.EndPreviews(); // where it was, so the step runs from there
+				editor.SetPivot(value);
+			}
+			void CancelTransform() override {
+				if (!previewing)
+					return;
+				previewing = false;
+				editor.EndPreviews();
+			}
+
+		private:
+			VoxelEditor& editor;
+			bool previewing = false;
+			Vector3 value = MakeVector3(0.0F, 0.0F, 0.0F);
+		};
+
 		VoxelEditor::VoxelEditor(IVoxelDocument& document, IVoxelEditorHost& host,
 		                         client::IRenderer& renderer, client::FontManager& fontManager,
 		                         EditorUI& ui, SoftwareCursor& cursor, const Config& config)
@@ -133,6 +179,8 @@ namespace spades {
 		      undo(*this, config.undo),
 		      placeAtAim(config.placeAtAim) {
 			SPADES_MARK_FUNCTION();
+			transformPanel.reset(new TransformPanel(renderer, fontManager.GetSmallGuiFont()));
+			pivotTarget.reset(new PivotTarget(*this));
 
 			// The tools come from the registry (toolbar order = registration),
 			// narrowed to the ones this editor offers.
@@ -159,6 +207,51 @@ namespace spades {
 		}
 
 		VoxelEditor::~VoxelEditor() { SPADES_MARK_FUNCTION(); }
+
+		ITransformTarget& VoxelEditor::PivotTransform() { return *pivotTarget; }
+
+		ITransformTarget* VoxelEditor::PanelTarget() {
+			VoxelTool* t = ActiveTool();
+			return t ? t->TransformTarget(*this) : nullptr;
+		}
+
+		void VoxelEditor::SettlePanel() {
+			if (!transformPanel->IsTyping() && !transformPanel->IsHolding())
+				return;
+			if (ITransformTarget* target = PanelTarget())
+				transformPanel->Settle(*target);
+		}
+
+		bool VoxelEditor::IsTyping() const {
+			return transformPanel->IsTyping() || ui.GetOptionBar()->IsEditing();
+		}
+
+		bool VoxelEditor::HoldsPointer() const { return transformPanel->IsHolding(); }
+
+		void VoxelEditor::TextInput(const std::string& text) {
+			if (transformPanel->IsTyping()) {
+				TextEntry::Modifiers m;
+				m.ctrl = ctrlHeld;
+				m.alt = altHeld;
+				m.meta = metaHeld;
+				if (TextEntry::Types(m)) // not the letter of a shortcut
+					transformPanel->Insert(text);
+				return;
+			}
+			ui.GetOptionBar()->TextInputEvent(text);
+		}
+
+		void VoxelEditor::TextComposition(const std::string& text) {
+			if (transformPanel->IsTyping())
+				transformPanel->Compose(text);
+		}
+
+		bool VoxelEditor::AcceptsTextInput() const { return IsTyping(); }
+
+		AABB2 VoxelEditor::TextInputRect() const {
+			return transformPanel->IsTyping() ? transformPanel->TextRect()
+			                                  : ui.GetOptionBar()->EditingRect();
+		}
 
 		void VoxelEditor::WireUI() {
 			// Buttons report ids, resolved against the modes and tools as they are
@@ -294,6 +387,8 @@ namespace spades {
 		// --- Escape -----------------------------------------------------------
 
 		VoxelEditor::EscapeLayer VoxelEditor::NextEscape() {
+			if (transformPanel->IsTyping() || transformPanel->IsHolding())
+				return EscapeLayer::Number;
 			if (ui.GetColorPicker()->GetEyedropperMode())
 				return EscapeLayer::Eyedropper;
 			if (VoxelTool* tool = ActiveTool()) {
@@ -309,6 +404,7 @@ namespace spades {
 
 		std::string VoxelEditor::EscapeLabel(EscapeLayer layer) {
 			switch (layer) {
+				case EscapeLayer::Number: return "give the number up";
 				case EscapeLayer::Eyedropper: return "stop picking";
 				case EscapeLayer::Tool: return ActiveTool()->EscapeLabel(*this);
 				case EscapeLayer::Placement: return "drop the pending voxels";
@@ -320,6 +416,12 @@ namespace spades {
 
 		void VoxelEditor::Escape(EscapeLayer layer) {
 			switch (layer) {
+				case EscapeLayer::Number:
+					if (ITransformTarget* target = PanelTarget()) {
+						if (!transformPanel->CancelScrub(*target))
+							transformPanel->Key(*target, "Escape", TextEntry::Modifiers(), clock);
+					}
+					break;
 				case EscapeLayer::Eyedropper: ui.GetColorPicker()->SetEyedropperMode(false); break;
 				case EscapeLayer::Tool: ActiveTool()->OnEscape(*this); break;
 				case EscapeLayer::Placement: CancelPlacement(); break;
@@ -2060,10 +2162,11 @@ namespace spades {
 		void VoxelEditor::Activate(int toolIndex, EditorMode mode) {
 			if (toolIndex == activeTool && mode == currentMode)
 				return;
-			// A number being typed into the sub-toolbar belongs to the tool whose
-			// box it is: it is settled here, while that tool is still the one
-			// listening. Left to the bar, the edit would be dropped on the next
-			// rebuild with whatever it was previewing still showing.
+			// A number being typed into the sub-toolbar, or the panel, belongs to
+			// the tool whose box it is: it is settled here, while that tool is
+			// still the one listening. Left to the bar, the edit would be dropped
+			// on the next rebuild with whatever it was previewing still showing.
+			SettlePanel();
 			ui.GetOptionBar()->EndEditing(true);
 			// Leaving a tool ends what it had in progress: this is where a pending
 			// placement reaches the document.
@@ -2167,6 +2270,7 @@ namespace spades {
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
+			SettlePanel();
 			// A colour being chosen is abandoned like a drag: its live recolour
 			// is put back, and the colour stays the brush colour.
 			if (pickerHeld)
@@ -2215,6 +2319,8 @@ namespace spades {
 				altHeld = down;
 			if (key == "Shift")
 				shiftHeld = down;
+			if (key == "Meta")
+				metaHeld = down;
 		}
 
 		bool VoxelEditor::IsEditShortcut(const std::string& key) {
@@ -2248,7 +2354,17 @@ namespace spades {
 			// While a dialog is up the cursor drives its widgets, not the editor.
 			if (ui.GetOverlay()->IsActive())
 				return;
+			ITransformTarget* target = PanelTarget();
+			// A number being scrubbed takes the motion; over the panel, nothing
+			// under it answers to the pointer.
+			if (transformPanel->IsHolding()) {
+				if (target)
+					transformPanel->Drag(*target, delta.x, shiftHeld, ctrlHeld);
+				return;
+			}
 			const Vector2& at = cursor.GetPosition();
+			if (target && transformPanel->Contains(at))
+				return;
 			if (ui.GetColorPicker()->IsOpen())
 				ui.GetColorPicker()->MouseMove(at);
 
@@ -2268,7 +2384,24 @@ namespace spades {
 			// A release reaches the tool only when its press did: presses the
 			// picker, the bars, the host's widgets or colour sampling took are
 			// none of the tool's business, and start no user action to end.
+			ITransformTarget* target = PanelTarget();
+			const bool onPanel = target && transformPanel->Contains(at);
+			// A number being typed is settled by a press anywhere but on its
+			// panel, which answers for its own fields.
+			if (down && !onPanel)
+				SettlePanel();
+
 			if (button == PointerButton::Left) {
+				if (!down && transformPanel->IsHolding()) {
+					if (target)
+						transformPanel->Release(*target, clock);
+					return;
+				}
+				if (down && onPanel) {
+					ui.GetOptionBar()->EndEditing(true);
+					transformPanel->Press(*target, at);
+					return;
+				}
 				if (!down) {
 					ui.GetColorPicker()->MouseUp();
 					if (pickerHeld)
@@ -2326,6 +2459,8 @@ namespace spades {
 			}
 
 			if (button == PointerButton::Right) {
+				if (down && onPanel)
+					return; // nothing to do on it
 				if (!down) {
 					if (rmbHeld) {
 						rmbHeld = false;
@@ -2342,6 +2477,17 @@ namespace spades {
 		}
 
 		bool VoxelEditor::OptionBarKey(const std::string& key) {
+			if (transformPanel->IsTyping()) {
+				if (ITransformTarget* target = PanelTarget()) {
+					TextEntry::Modifiers m;
+					m.shift = shiftHeld;
+					m.ctrl = ctrlHeld;
+					m.alt = altHeld;
+					m.meta = metaHeld;
+					transformPanel->Key(*target, key, m, clock);
+				}
+				return true;
+			}
 			return ui.GetOptionBar()->KeyEvent(key);
 		}
 
@@ -2393,6 +2539,7 @@ namespace spades {
 		// --- Frame ------------------------------------------------------------
 
 		void VoxelEditor::Update(float dt) {
+			clock += dt;
 			if (statusTimer > 0.0F)
 				statusTimer -= dt;
 			RefreshPlacementModel(); // what edits since the last frame left stale
@@ -2596,6 +2743,10 @@ namespace spades {
 			ui.GetColorPicker()->Draw(*renderer, *fontManager, cursor.GetPosition());
 			if (VoxelTool* tool = ActiveTool())
 				tool->DrawOverlay(*this);
+			if (ITransformTarget* target = PanelTarget()) {
+				transformPanel->Layout(panelRight, panelTop);
+				transformPanel->Draw(*target, cursor.GetPosition(), clock);
+			}
 		}
 	} // namespace gui
 } // namespace spades

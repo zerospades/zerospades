@@ -31,6 +31,8 @@
 
 namespace spades {
 	namespace gui {
+		class ITransformTarget;
+
 		/**
 		 * A whole-voxel change to voxels being moved: `quarterTurns` right-handed
 		 * quarter turns about the world axis `axis` (0 = x, 1 = y, 2 = z) through
@@ -223,6 +225,8 @@ namespace spades {
 			// step. A preview lasts until the user action ends or a command runs:
 			// commit it with SetPivot before then, or the pivot goes back.
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
+			/** The pivot, as the transform panel sets it by number. */
+			virtual ITransformTarget& PivotTransform() = 0;
 
 			// --- Sweeping the selection (Extrude, Pocket) ----------------------
 			/**

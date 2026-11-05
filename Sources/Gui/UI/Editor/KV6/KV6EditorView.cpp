@@ -87,6 +87,8 @@ namespace spades {
 			constexpr float kNaviCubeMargin = 16.0F;
 			constexpr float kNaviCubeTopGap = 8.0F;
 			constexpr float kNaviCubeInset = 14.0F;
+			// The transform panel, under the cube's home button.
+			constexpr float kPanelGap = 34.0F;
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
@@ -553,7 +555,10 @@ namespace spades {
 				cam.Look(dx, dy);
 				return;
 			}
-			softwareCursor->Accumulate(dx, dy);
+			// A number being scrubbed takes the motion, the pointer held still,
+			// so the drag never runs into the screen's edge.
+			if (!editor->HoldsPointer())
+				softwareCursor->Accumulate(dx, dy);
 			editor->PointerMoved(MakeVector2(dx, dy));
 		}
 
@@ -581,6 +586,12 @@ namespace spades {
 				editor->ReleaseHeldInput();
 				return;
 			}
+
+			// A number being typed has the keyboard, its Ctrl shortcuts too:
+			// Ctrl+Z undoes what was typed, not the document.
+			if (down && editor->IsTyping() && key.find("MouseButton") == std::string::npos &&
+			    editor->OptionBarKey(key))
+				return;
 
 			if (down && editor->IsCtrlHeld() &&
 			    (IsFileShortcut(key) || VoxelEditor::IsEditShortcut(key))) {
@@ -651,26 +662,29 @@ namespace spades {
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
-			// A dialog takes typing over everything; otherwise it belongs to a
-			// number box on the sub-toolbar, when one is being typed into.
+			// A dialog takes typing over everything; otherwise it belongs to the
+			// number being typed into, in the option bar or the transform panel.
 			if (ui->GetOverlay()->IsActive())
 				ui->GetOverlay()->TextInputEvent(text);
 			else
-				ui->GetOptionBar()->TextInputEvent(text);
+				editor->TextInput(text);
 		}
 
 		void KV6EditorView::TextEditingEvent(const std::string& text, int start, int len) {
-			ui->GetOverlay()->TextEditingEvent(text, start, len);
+			if (ui->GetOverlay()->IsActive())
+				ui->GetOverlay()->TextEditingEvent(text, start, len);
+			else
+				editor->TextComposition(text);
 		}
 
 		bool KV6EditorView::AcceptsTextInput() {
-			return ui->GetOverlay()->AcceptsTextInput() || ui->GetOptionBar()->IsEditing();
+			return ui->GetOverlay()->AcceptsTextInput() || editor->AcceptsTextInput();
 		}
 
 		AABB2 KV6EditorView::GetTextInputRect() {
 			if (ui->GetOverlay()->IsActive())
 				return ui->GetOverlay()->GetTextInputRect();
-			return ui->GetOptionBar()->EditingRect();
+			return editor->TextInputRect();
 		}
 
 		void KV6EditorView::RunFrame(float dt) {
@@ -727,6 +741,9 @@ namespace spades {
 			naviCube.Draw(*renderer, fontManager->GetSmallGuiFont(), cam.View(),
 			              softwareCursor->GetPosition());
 
+			// The transform panel, under the navigation cube and its home button.
+			editor->SetPanelAnchor(sw - kNaviCubeMargin,
+			                       VoxelEditor::BarsHeight() + kNaviCubeTopGap + kNaviCubeBox + kPanelGap);
 			editor->DrawPanels();
 			ui->GetEditorMenu()->Draw();
 
