@@ -563,7 +563,7 @@ namespace spades {
 				level.erase(at);
 			}
 			for (std::size_t i = 0; i < r.to.size(); i++) {
-				Place(taken[i], placements[i], true);
+				Place(taken[i], placements[i]);
 				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(r.to[i]));
 				level.insert(level.begin() + r.to[i].back(), std::move(taken[i]));
 			}
@@ -647,7 +647,7 @@ namespace spades {
 			std::vector<Placement> before, after;
 			for (const NodePath& p : from) {
 				const VoxelObject& o = *Node(p);
-				before.push_back(PlacementOf(o, true));
+				before.push_back(PlacementOf(o));
 				Placement placed = before.back();
 				const std::string oldName = NamePath(p);
 				if (ParentOf(p) != parent) {
@@ -655,10 +655,6 @@ namespace spades {
 					bool exact = DecomposeTransform(
 					  change * LocalTransform(o.position, o.rotation, o.scale), placed.position,
 					  placed.rotation, placed.scale);
-					for (TransformKeyframe& k : placed.keyframes)
-						exact = exact && DecomposeTransform(
-						                   change * LocalTransform(k.position, k.rotation, k.scale),
-						                   k.position, k.rotation, k.scale);
 					for (AnimationClip& clip : clipsAfter) {
 						for (AnimationTrack& track : clip.tracks) {
 							if (track.path != oldName)
@@ -979,21 +975,14 @@ namespace spades {
 				return false;
 			}
 			const std::string holder = parent.empty() ? std::string("the scene") : Quoted(*Node(parent));
-			// Each lands where it was in the world: its placement and its keys
-			// are brought into the new parent's frame.
+			// Each lands where it was in the world: its placement is brought
+			// into the new parent's frame.
 			const Matrix4 toParent = NodeMatrix(parent).Inversed();
 			std::vector<VoxelObject> nodes;
 			for (const CopiedObject& c : objects) {
 				VoxelObject o = c.object;
 				CloneModels(o); // each paste its own voxels
-				const Matrix4 change =
-				  toParent * c.world * LocalTransform(o.position, o.rotation, o.scale).Inversed();
-				bool exact = DecomposeTransform(toParent * c.world, o.position, o.rotation, o.scale);
-				for (TransformKeyframe& k : o.keyframes)
-					exact = exact &&
-					        DecomposeTransform(change * LocalTransform(k.position, k.rotation, k.scale),
-					                           k.position, k.rotation, k.scale);
-				if (!exact) {
+				if (!DecomposeTransform(toParent * c.world, o.position, o.rotation, o.scale)) {
 					why = Quoted(o) + " would be skewed in " + holder +
 					      ": a parent scaled unevenly cannot hold it turned as it is";
 					return false;
@@ -1169,19 +1158,14 @@ namespace spades {
 			return true;
 		}
 
-		KV6Scene::Placement KV6Scene::PlacementOf(const VoxelObject& o, bool withKeyframes) {
-			Placement p{o.position, o.rotation, o.scale, {}};
-			if (withKeyframes)
-				p.keyframes = o.keyframes;
-			return p;
+		KV6Scene::Placement KV6Scene::PlacementOf(const VoxelObject& o) {
+			return Placement{o.position, o.rotation, o.scale};
 		}
 
-		void KV6Scene::Place(VoxelObject& o, const Placement& p, bool withKeyframes) {
+		void KV6Scene::Place(VoxelObject& o, const Placement& p) {
 			o.position = p.position;
 			o.rotation = p.rotation;
 			o.scale = p.scale;
-			if (withKeyframes)
-				o.keyframes = p.keyframes;
 		}
 
 		void KV6Scene::BeginDrag() {
