@@ -22,6 +22,7 @@
 
 #include <string>
 
+#include <Gui/UI/Framework/DoubleClick.h>
 #include <Gui/UI/Framework/Timer.h>
 #include <Gui/UI/Framework/UIElement.h>
 
@@ -37,8 +38,7 @@ namespace spades {
 				Handle<Timer> repeatTimer;
 
 				// for double click detection
-				float lastActivate = -1.0F;
-				Vector2 lastActivatePosition;
+				DoubleClick doubleClick;
 
 			public:
 				bool pressed = false;

@@ -77,6 +77,14 @@ namespace spades {
 			};
 			std::vector<Sprite> sprites;
 
+			// An image laid flat (see IRenderer::AddImagePlane).
+			struct Plane {
+				Handle<SWImage> img;
+				Vector3 origin, axisU, axisV;
+				Vector4 color;
+			};
+			std::vector<Plane> planes;
+
 			struct LongSprite {
 				Handle<SWImage> img;
 				Vector3 start;
@@ -178,6 +186,8 @@ namespace spades {
 
 			void AddSprite(client::IImage &, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage &, Vector3 p1, Vector3 p2, float radius) override;
+			void AddImagePlane(client::IImage &, Vector3 origin, Vector3 axisU,
+			                   Vector3 axisV) override;
 
 			void EndScene() override;
 
@@ -197,6 +207,9 @@ namespace spades {
 			               const AABB2 &inRect) override;
 
 			void DrawFilledTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2) override;
+			void DrawShadedTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2,
+			                        const Vector4& c0, const Vector4& c1,
+			                        const Vector4& c2) override;
 			void DrawFilledRectFade(float x0, float y0, float x1, float y1,
                             Vector4 colorTop, Vector4 colorBottom, bool horizontal) override;
 
@@ -210,6 +223,7 @@ namespace spades {
 
 			float ScreenWidth() override;
 			float ScreenHeight() override;
+			float ScreenPixelRatio() override { return 1.0F; }
 
 			const Matrix4 &GetProjectionMatrix() const { return projectionMatrix; }
 			const Matrix4 &GetProjectionViewMatrix() const { return projectionViewMatrix; }

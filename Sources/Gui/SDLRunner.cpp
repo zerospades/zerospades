@@ -24,6 +24,10 @@
 
 #include "SDLRunner.h"
 
+#include <Client/ScreenShot.h>
+
+#include "AutomationOptions.h"
+
 #include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
@@ -165,6 +169,10 @@ namespace spades {
 					break;
 				case SDL_KEYUP: view.KeyEvent(TranslateKey(event.key.keysym), false); break;
 				case SDL_TEXTINPUT: view.TextInputEvent(event.text.text); break;
+				// A file is opened with this program at startup, not by dropping it on
+				// a running one. The name still has to be released: SDL allocated it
+				// for a receiver, and here there is none.
+				case SDL_DROPFILE: SDL_free(event.drop.file); break;
 				case SDL_TEXTEDITING:
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
@@ -188,6 +196,8 @@ namespace spades {
 			{
 				Handle<View> view(CreateView(renderer, audio), false);
 				Uint32 ot = SDL_GetTicks();
+				const Uint32 startTicks = ot;
+				bool quitAfterFrame = false;
 
 				bool running = true;
 				bool lastShift = false;
@@ -227,9 +237,30 @@ namespace spades {
 						// (closing a subview, restoring renderer state) — that work must
 						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
+
+						// --screenshot-quit: the frame drawn that long after the start
+						// is saved, and the program quits.
+						const float screenshotAfter = Automation().screenshotQuitAfter;
+						if (screenshotAfter >= 0.0F &&
+						    float(SDL_GetTicks() - startTicks) / 1000.0F >= screenshotAfter) {
+							try {
+								SPLog("Screenshot taken before quitting: %s",
+								      client::SaveScreenShot(*renderer).c_str());
+							} catch (const std::exception& ex) {
+								SPLog("[!] Screenshot before quitting failed: %s", ex.what());
+							}
+							quitAfterFrame = true;
+						}
+
 						renderer->Flip();
 
 						view->RunFrameLate((float)dt / 1000.0F);
+					}
+
+					if (quitAfterFrame) {
+						view->Closing();
+						SPLog("Quitting after the screenshot (--screenshot-quit)");
+						break;
 					}
 
 					if (view->WantsToBeClosed()) {
@@ -473,7 +504,12 @@ namespace spades {
 				Uint32 sdlFlags = 0;
 				switch (rtype) {
 					case RendererType::GL:
-						sdlFlags = SDL_WINDOW_OPENGL;
+						// High-DPI: the window keeps its size in window units (layout and
+						// mouse input are unchanged) while the GL framebuffer gets every
+						// pixel the display has. The GL renderer reads both sizes from
+						// SDLGLDevice. The SW renderer blits a window surface sized in
+						// window units, so it stays out of this.
+						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
