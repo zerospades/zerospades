@@ -27,6 +27,7 @@
 namespace spades {
 	namespace gui {
 		struct GizmoPose;
+		class ITransformTarget;
 		struct GizmoTransform;
 
 		/**
@@ -78,6 +79,10 @@ namespace spades {
 			 * is in Edit mode; leaving, the host takes them back into the object.
 			 */
 			virtual void EditModeChanged(bool entering) = 0;
+
+			/** The picked node's position, rotation and scale, as the transform
+			 *  panel sets them by number while Object mode's tool is active. */
+			virtual ITransformTarget& ObjectTransform() = 0;
 		};
 	} // namespace gui
 } // namespace spades

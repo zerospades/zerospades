@@ -109,6 +109,11 @@ namespace spades {
 			AddSnapOptions();
 		}
 
+		ITransformTarget* ObjectTool::TransformTarget(IVoxelEditContext& ed) {
+			IObjectModeHost* objects = ed.ObjectMode();
+			return objects ? &objects->ObjectTransform() : nullptr;
+		}
+
 		std::string ObjectTool::Hint(IVoxelEditContext& ed) {
 			IObjectModeHost* objects = ed.ObjectMode();
 			if (!objects || !objects->HasPickedObject())
