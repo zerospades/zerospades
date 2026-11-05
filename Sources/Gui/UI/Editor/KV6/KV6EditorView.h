@@ -36,6 +36,7 @@
 #include <Gui/UI/Components/EditorMenu.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
+#include <Gui/UI/Components/TransformPanel.h>
 #include <Gui/UI/Editor/Shell/EditorCamera.h>
 #include <Gui/UI/Editor/Shell/NavigationCube.h>
 #include <Gui/UI/Editor/Voxel/ObjectModeHost.h>
@@ -45,6 +46,7 @@
 #include "KV6Document.h"
 #include "KV6Scene.h"
 #include "LowPolyTool.h"
+#include "SceneTransformTarget.h"
 #include "SceneTreePanel.h"
 
 namespace spades {
@@ -289,6 +291,20 @@ namespace spades {
 			}
 			/** Asks where, then saves the node at `path` as a .kv6 (ModelOf). */
 			void SaveNodeAsModel(const NodePath& path);
+
+			// The active node's position, rotation and scale, set by number,
+			// down the right under the navigation cube in Object mode.
+			std::unique_ptr<TransformPanel> transformPanel;
+			SceneTransformTarget transformTarget;
+			/** The panel's target, on the scene open now. */
+			ITransformTarget& TransformTarget();
+			/** Whether a press at the cursor goes to the panel. */
+			bool PanelTakesPress() const;
+			/** Ends whatever is being typed (a name, a number) as a click
+			 *  elsewhere would, before something else takes the input. */
+			void SettleTyping();
+			/** The modifiers held, for what is typed. */
+			TextEntry::Modifiers HeldModifiers() const;
 
 			// Low-poly models of a node, previewed in its place.
 			std::unique_ptr<LowPolyTool> lowPoly;

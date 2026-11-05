@@ -154,24 +154,12 @@ namespace spades {
 			return (Quaternion(a) * Quaternion(b)).Normalize().v;
 		}
 
-		// About X, then Y, then Z, each about the fixed axes.
+		// About X, then Y, then Z, each about the fixed axes, as the editors.
 		Vector4 FromEuler(float rx, float ry, float rz) {
-			return Compose(AxisAngle(2, rz), Compose(AxisAngle(1, ry), AxisAngle(0, rx)));
+			return RotationFromEuler(MakeVector3(rx, ry, rz));
 		}
 
-		Vector3 ToEuler(const Vector4& q) {
-			const float x = q.x, y = q.y, z = q.z, w = q.w;
-			const float r00 = 1 - 2 * (y * y + z * z), r10 = 2 * (x * y + w * z);
-			const float r20 = 2 * (x * z - w * y), r21 = 2 * (y * z + w * x);
-			const float r22 = 1 - 2 * (x * x + y * y), r11 = 1 - 2 * (x * x + z * z);
-			const float r12 = 2 * (y * z - w * x);
-			const float toDeg = 180.0F / float(M_PI);
-			const float sy = std::max(-1.0F, std::min(1.0F, -r20));
-			if (std::fabs(sy) > 0.9999F) // looking straight along Y: X takes it all
-				return MakeVector3(std::atan2(-r12, r11) * toDeg, std::asin(sy) * toDeg, 0.0F);
-			return MakeVector3(std::atan2(r21, r22) * toDeg, std::asin(sy) * toDeg,
-			                   std::atan2(r10, r00) * toDeg);
-		}
+		Vector3 ToEuler(const Vector4& q) { return EulerFromRotation(q); }
 
 		Matrix4 LocalTransform(const VoxelObject& o) {
 			return spades::LocalTransform(o.position, o.rotation, o.scale);

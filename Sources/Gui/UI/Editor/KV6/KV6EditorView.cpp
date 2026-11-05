@@ -97,6 +97,8 @@ namespace spades {
 			// The transform panel's foot, as far up from the bottom as the
 			// colour picker's, clear of the hint lines.
 			constexpr float kPanelBottomGap = 44.0F;
+			// The transform panel, under the cube's home button.
+			constexpr float kTransformPanelGap = 34.0F;
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
@@ -177,6 +179,7 @@ namespace spades {
 			tree = std::make_unique<SceneTreePanel>(*renderer, fontManager->GetSmallGuiFont());
 			lowPoly = std::make_unique<LowPolyTool>(*renderer, fontManager->GetSmallGuiFont(),
 			                                        audioDevice.GetPointerOrNull());
+			transformPanel = std::make_unique<TransformPanel>(*renderer, fontManager->GetSmallGuiFont());
 
 			// The editor always opens with a document. A file the player asked to
 			// create is started under its name; one that exists but cannot be read
@@ -277,6 +280,7 @@ namespace spades {
 		}
 
 		void KV6EditorView::RenameInTree(const NodePath& path) {
+			transformPanel->Settle(TransformTarget());
 			ui->GetOptionBar()->EndEditing(true);
 			editor->CancelToolInteraction();
 			std::string why;
@@ -328,7 +332,7 @@ namespace spades {
 		// --- Low-poly models -----------------------------------------------------
 
 		void KV6EditorView::OpenLowPoly(const NodePath& path) {
-			SettleRename();
+			SettleTyping();
 			ui->GetOptionBar()->EndEditing(true);
 			editor->CancelToolInteraction();
 			std::string why;
@@ -370,6 +374,30 @@ namespace spades {
 			}
 			tree->Reveal(*scene, scene->Active());
 			editor->SetStatus("Added " + scene->Node(scene->Active())->name);
+		}
+
+		ITransformTarget& KV6EditorView::TransformTarget() {
+			transformTarget.SetScene(scene.get());
+			return transformTarget;
+		}
+
+		bool KV6EditorView::PanelTakesPress() const {
+			return ShowingObjects() && !leftToEditor && !rightToEditor &&
+			       transformPanel->Contains(softwareCursor->GetPosition());
+		}
+
+		void KV6EditorView::SettleTyping() {
+			SettleRename();
+			transformPanel->Settle(TransformTarget());
+		}
+
+		TextEntry::Modifiers KV6EditorView::HeldModifiers() const {
+			TextEntry::Modifiers m;
+			m.shift = editor->IsShiftHeld();
+			m.ctrl = editor->IsCtrlHeld();
+			m.alt = altHeld;
+			m.meta = metaHeld;
+			return m;
 		}
 
 		bool KV6EditorView::TreeTakesPress() const {
@@ -491,6 +519,8 @@ namespace spades {
 			// back; then nothing is left that offers Object mode.
 			editor->SetObjectMode(false);
 			lowPoly->Cancel(*scene);
+			transformPanel->Settle(TransformTarget());
+			transformTarget.SetScene(nullptr);
 			tree->Reset();
 			scene.reset();
 		}
@@ -1070,6 +1100,10 @@ namespace spades {
 			}
 			// A number being scrubbed takes the motion, the pointer held still,
 			// so the drag never runs into the screen's edge.
+			if (transformPanel->IsHolding()) {
+				transformPanel->Drag(TransformTarget(), dx, editor->IsShiftHeld(), editor->IsCtrlHeld());
+				return;
+			}
 			if (!editor->HoldsPointer())
 				softwareCursor->Accumulate(dx, dy);
 			if (ui->GetContextMenu()->IsOpen() || lowPoly->IsOpen())
@@ -1080,7 +1114,7 @@ namespace spades {
 				tree->Move(*scene, softwareCursor->GetPosition());
 				return;
 			}
-			if (TreeTakesPress())
+			if (TreeTakesPress() || PanelTakesPress())
 				return;
 			editor->PointerMoved(MakeVector2(dx, dy));
 		}
@@ -1164,6 +1198,21 @@ namespace spades {
 				}
 			}
 
+			// So does a number being typed in the transform panel; a press
+			// anywhere but on its fields keeps it, then does what it does.
+			if (transformPanel->IsTyping()) {
+				if (key == "LeftMouseButton" || key == "RightMouseButton") {
+					if (down && !(key == "LeftMouseButton" && PanelTakesPress()))
+						transformPanel->Settle(TransformTarget());
+				} else if (down) {
+					transformPanel->Key(TransformTarget(), key, HeldModifiers(), globalTime);
+					return;
+				}
+			}
+			// Escape gives up a number being scrubbed.
+			if (down && key == "Escape" && transformPanel->CancelScrub(TransformTarget()))
+				return;
+
 			// A menu of the bar owns the keyboard while it is down, Escape
 			// included: it is what Escape puts away first.
 			if (ui->GetMenuBar()->KeyEvent(key, down)) {
@@ -1240,6 +1289,19 @@ namespace spades {
 				return;
 			}
 			if (key == "LeftMouseButton") {
+				if (down && PanelTakesPress()) {
+					SettleRename();
+					ui->GetOptionBar()->EndEditing(true);
+					editor->CancelToolInteraction();
+					if (editor->IsCtrlHeld())
+						cam.CancelCtrlDescent(); // Ctrl is the default descend key
+					transformPanel->Press(TransformTarget(), softwareCursor->GetPosition());
+					return;
+				}
+				if (!down && transformPanel->IsHolding()) {
+					transformPanel->Release(TransformTarget(), globalTime);
+					return;
+				}
 				if (down && TreeTakesPress()) {
 					// As a press anywhere off the option bar does, it settles a
 					// number being typed there.
@@ -1272,6 +1334,8 @@ namespace spades {
 					OpenTreeMenu();
 					return;
 				}
+				if (down && PanelTakesPress())
+					return; // nothing to open on it
 				if (!down && !rightToEditor)
 					return;
 				rightToEditor = down;
@@ -1310,13 +1374,11 @@ namespace spades {
 			// in the option bar or the transform panel.
 			if (ui->GetOverlay()->IsActive()) {
 				ui->GetOverlay()->TextInputEvent(text);
-			} else if (tree->IsRenaming()) {
-				TextEntry::Modifiers m;
-				m.ctrl = editor->IsCtrlHeld();
-				m.alt = altHeld;
-				m.meta = metaHeld;
-				if (TextEntry::Types(m)) // not the letter of a shortcut
-					tree->RenameText(text);
+			} else if (tree->IsRenaming() || transformPanel->IsTyping()) {
+				if (!TextEntry::Types(HeldModifiers())) // the letter of a shortcut
+					return;
+				tree->RenameText(text);
+				transformPanel->Insert(text);
 			} else {
 				editor->TextInput(text);
 			}
@@ -1327,13 +1389,15 @@ namespace spades {
 				ui->GetOverlay()->TextEditingEvent(text, start, len);
 			else if (tree->IsRenaming())
 				tree->RenameComposition(text);
+			else if (!ui->GetOverlay()->IsActive() && transformPanel->IsTyping())
+				transformPanel->Compose(text);
 			else
 				editor->TextComposition(text);
 		}
 
 		bool KV6EditorView::AcceptsTextInput() {
 			return ui->GetOverlay()->AcceptsTextInput() || tree->IsRenaming() ||
-			       editor->AcceptsTextInput();
+			       transformPanel->IsTyping() || editor->AcceptsTextInput();
 		}
 
 		AABB2 KV6EditorView::GetTextInputRect() {
@@ -1341,6 +1405,8 @@ namespace spades {
 				return ui->GetOverlay()->GetTextInputRect();
 			if (tree->IsRenaming() && scene)
 				return tree->RenameRect(*scene);
+			if (transformPanel->IsTyping())
+				return transformPanel->TextRect();
 			return editor->TextInputRect();
 		}
 
@@ -1464,10 +1530,16 @@ namespace spades {
 				tree->Draw(*scene, softwareCursor->GetPosition(), globalTime);
 				lowPoly->Draw(kTreeLeft + kTreeWidth + 16.0F, VoxelEditor::BarsHeight() + kTreeTopGap,
 				              softwareCursor->GetPosition());
+				// Under the navigation cube and its home button, along the same
+				// right edge.
+				transformPanel->Layout(sw - kNaviCubeMargin, VoxelEditor::BarsHeight() + kNaviCubeTopGap +
+				                                               kNaviCubeBox + kTransformPanelGap);
+				transformPanel->Draw(TransformTarget(), softwareCursor->GetPosition(), globalTime);
 			} else {
 				if (tree->IsHolding())
 					tree->CancelDrag(); // left for Edit mode mid-drag
 				tree->CancelRename();
+				transformPanel->Settle(TransformTarget());
 				ui->GetContextMenu()->Close();
 				if (scene)
 					lowPoly->Cancel(*scene);
