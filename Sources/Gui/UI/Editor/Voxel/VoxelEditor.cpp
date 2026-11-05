@@ -228,6 +228,10 @@ namespace spades {
 
 		bool VoxelEditor::HoldsPointer() const { return transformPanel->IsHolding(); }
 
+		bool VoxelEditor::OnPanel(const Vector2& at) {
+			return transformPanel->Contains(at) && !ui.GetColorPicker()->IsOverPicker(at);
+		}
+
 		void VoxelEditor::TextInput(const std::string& text) {
 			if (transformPanel->IsTyping()) {
 				TextEntry::Modifiers m;
@@ -2363,7 +2367,7 @@ namespace spades {
 				return;
 			}
 			const Vector2& at = cursor.GetPosition();
-			if (target && transformPanel->Contains(at))
+			if (target && OnPanel(at))
 				return;
 			if (ui.GetColorPicker()->IsOpen())
 				ui.GetColorPicker()->MouseMove(at);
@@ -2385,7 +2389,7 @@ namespace spades {
 			// picker, the bars, the host's widgets or colour sampling took are
 			// none of the tool's business, and start no user action to end.
 			ITransformTarget* target = PanelTarget();
-			const bool onPanel = target && transformPanel->Contains(at);
+			const bool onPanel = target && OnPanel(at);
 			// A number being typed is settled by a press anywhere but on its
 			// panel, which answers for its own fields.
 			if (down && !onPanel)
@@ -2740,13 +2744,16 @@ namespace spades {
 		}
 
 		void VoxelEditor::DrawPanels() {
+			// The transform panel first: the colour picker, when it is open, goes
+			// over it.
+			if (ITransformTarget* target = PanelTarget()) {
+				transformPanel->LayoutAbove(panelRight, panelBottom);
+				transformPanel->Draw(*target, cursor.GetPosition(), clock);
+			}
 			ui.GetColorPicker()->Draw(*renderer, *fontManager, cursor.GetPosition());
 			if (VoxelTool* tool = ActiveTool())
 				tool->DrawOverlay(*this);
-			if (ITransformTarget* target = PanelTarget()) {
-				transformPanel->Layout(panelRight, panelTop);
-				transformPanel->Draw(*target, cursor.GetPosition(), clock);
-			}
+
 		}
 	} // namespace gui
 } // namespace spades
