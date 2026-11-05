@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cmath>
 #include <ft2build.h>
 
@@ -203,7 +204,6 @@ namespace spades {
 			SPAssert(renderer);
 			SPAssert(fontSet);
 
-			baselineY = std::floor(height * 1.0F);
 			rendererIsLowQuality = dynamic_cast<draw::SWRenderer*>(renderer);
 
 			density = 0.0F;
@@ -230,13 +230,9 @@ namespace spades {
 
 			// Every glyph rasterized for the last density goes, with the bins
 			// holding them; their advances, in 2D units, stay.
-			for (auto& entry : glyphs) {
-				Glyph& g = entry.second;
-				g.image.reset();
-				g.blurImage.reset();
-				g.outlineImage.reset();
-				g.bmp = Handle<Bitmap>();
-			}
+			for (auto& entry : glyphs)
+				entry.second.rasters.clear();
+			sizes.clear();
 			bins.clear();
 			binSize = 256;
 			const int targetSize = static_cast<int>(std::min(height * density * 4.0F, 4000.0F));
@@ -247,6 +243,56 @@ namespace spades {
 
 		Vector2 FTFont::SnapToPixel(const Vector2& target) const {
 			return (target * density + 0.5F).Floor() / density;
+		}
+
+		namespace {
+			// Sizes are told apart to a quarter of a pixel.
+			constexpr float kSizeSteps = 4.0F;
+			// The sizes a font keeps rasterized: what its users draw it at, which
+			// text whose scale is animated would otherwise make without end.
+			constexpr std::size_t kMaxSizes = 24;
+		} // namespace
+
+		int FTFont::RasterSize(float scale) {
+			const int wanted = std::max(1, int(std::lround(height * scale * density * kSizeSteps)));
+			if (std::find(sizes.begin(), sizes.end(), wanted) != sizes.end())
+				return wanted;
+			if (sizes.size() < kMaxSizes) {
+				sizes.push_back(wanted);
+				return wanted;
+			}
+			int nearest = sizes.front();
+			for (int size : sizes)
+				if (std::abs(size - wanted) < std::abs(nearest - wanted))
+					nearest = size;
+			return nearest;
+		}
+
+		void FTFont::Store(stmp::optional<GlyphImage>& slot, Bitmap& bmp, const Vector2& offset) {
+			// A glyph larger than the shared bins (text drawn very large) gets a
+			// bin of its own.
+			if (bmp.GetWidth() >= binSize || bmp.GetHeight() >= binSize) {
+				int size = binSize;
+				while (size <= std::max(bmp.GetWidth(), bmp.GetHeight()))
+					size <<= 1;
+				bins.emplace_front(size, size, *renderer);
+				auto result = bins.front().Place(bmp);
+				SPAssert(result);
+				slot.reset((*result).image, AABB2(float((*result).x), float((*result).y),
+				                                   float(bmp.GetWidth() - 1), float(bmp.GetHeight() - 1)),
+				           offset);
+				return;
+			}
+			auto result = bins.back().Place(bmp);
+			if (!result) { // bin full
+				bins.emplace_back(binSize, binSize, *renderer);
+				result = bins.back().Place(bmp);
+				SPAssert(result);
+			}
+			slot.reset((*result).image,
+			           AABB2(float((*result).x), float((*result).y), float(bmp.GetWidth() - 1),
+			                 float(bmp.GetHeight() - 1)),
+			           offset);
 		}
 
 		stmp::optional<FTFont::Glyph&> FTFont::GetGlyph(uint32_t code) {
@@ -333,12 +379,14 @@ namespace spades {
 			return Vector2(maxWidth, lines * lineHeight);
 		}
 
-		void FTFont::RenderGlyph(Glyph& g) {
-			if (g.image)
-				return;
+		FTFont::Raster& FTFont::RenderGlyph(Glyph& g, int size) {
+			Raster& r = g.rasters[size];
+			if (r.image)
+				return r;
 
-			// At the display's density: its pixels, not the 2D units'.
-			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(height * density * 64.0F), 72, 72);
+			// At the size it is drawn at: its pixels are the display's.
+			const float pixels = float(size) / kSizeSteps;
+			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(pixels * 64.0F), 72, 72);
 			FT_Load_Glyph(g.face, g.charIndex, FT_LOAD_NO_HINTING);
 			FT_Render_Glyph(g.face->glyph, FT_RENDER_MODE_NORMAL);
 
@@ -367,67 +415,33 @@ namespace spades {
 				}
 			}
 
-			// allocate bin
-			auto result = bins.back().Place(*spbmp);
-			if (!result) { // bin full
-				bins.emplace_back(binSize, binSize, *renderer);
-				result = bins.back().Place(*spbmp);
-				SPAssert(result);
-			}
-
-			AABB2 bounds(
-				(float)(*result).x,
-				(float)(*result).y,
-				(float)spW - 1,
-				(float)spH - 1
-			);
-
-			// In the glyph's pixels, as its bitmap is; Draw brings it to 2D units.
-			Vector2 offs(
-				(float)g.face->glyph->bitmap_left,
-				baselineY * density - g.face->glyph->bitmap_top
-			);
-
-			g.image.reset((*result).image, bounds, offs);
-			g.bmp = spbmp;
+			// Whole pixels from the pen, the baseline whole pixels below it.
+			Store(r.image, *spbmp,
+			      Vector2((float)g.face->glyph->bitmap_left,
+			              std::floor(pixels) - (float)g.face->glyph->bitmap_top));
+			r.bmp = spbmp;
+			return r;
 		}
 
-		void FTFont::RenderBlurGlyph(Glyph& g) {
-			RenderGlyph(g);
-			if (g.blurImage)
-				return;
+		FTFont::Raster& FTFont::RenderBlurGlyph(Glyph& g, int size) {
+			Raster& r = RenderGlyph(g, size);
+			if (r.blurImage)
+				return r;
 
 			enum { KernelSize = 6 };
 
-			// The blur spreads as far in 2D units at any density: its kernel is
-			// in pixels, and blurring again widens it by the square root of the
-			// number of passes.
-			const int passes = std::max(1, static_cast<int>(std::lround(density * density)));
-			Handle<Bitmap> blurred = g.bmp;
+			// The blur spreads as far for the glyph's size whatever its pixels:
+			// its kernel is in pixels, and blurring again widens it by the square
+			// root of the number of passes.
+			const float pixelsPerUnit = float(size) / kSizeSteps / height;
+			const int passes =
+			  std::max(1, static_cast<int>(std::lround(pixelsPerUnit * pixelsPerUnit)));
+			Handle<Bitmap> blurred = r.bmp;
 			for (int pass = 0; pass < passes; ++pass)
 				blurred = BlurOnce(*blurred);
-			Handle<Bitmap> newbmp = blurred;
-			int const newW = newbmp->GetWidth();
-			int const newH = newbmp->GetHeight();
-
-			// allocate bin
-			auto result = bins.back().Place(*newbmp);
-			if (!result) { // bin full
-				bins.emplace_back(binSize, binSize, *renderer);
-				result = bins.back().Place(*newbmp);
-				SPAssert(result);
-			}
-
-			AABB2 bounds(
-				(float)(*result).x,
-				(float)(*result).y,
-				(float)newW - 1,
-				(float)newH - 1
-			);
-
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (KernelSize * 0.5F * passes);
-
-			g.blurImage.reset((*result).image, bounds, offs);
+			Store(r.blurImage, *blurred,
+			      (*r.image).offset - Vector2(1, 1) * (KernelSize * 0.5F * passes));
+			return r;
 		}
 
 		Handle<Bitmap> FTFont::BlurOnce(Bitmap& orig) {
@@ -497,15 +511,16 @@ namespace spades {
 			return newbmp;
 		}
 
-		void FTFont::RenderOutlineGlyph(Glyph &g) {
-			RenderGlyph(g);
-			if (g.outlineImage)
-				return;
+		FTFont::Raster& FTFont::RenderOutlineGlyph(Glyph &g, int size) {
+			Raster &r = RenderGlyph(g, size);
+			if (r.outlineImage)
+				return r;
 
-			// One 2D unit thick at any density.
-			const int Thickness = std::max(1, static_cast<int>(std::lround(density)));
+			// As thick for the glyph's size whatever its pixels.
+			const int Thickness =
+			  std::max(1, static_cast<int>(std::lround(float(size) / kSizeSteps / height)));
 
-			auto &orig = *g.bmp;
+			auto &orig = *r.bmp;
 			int const origW = orig.GetWidth();
 			int const origH = orig.GetHeight();
 
@@ -539,157 +554,76 @@ namespace spades {
 				}
 			}
 
-			auto result = bins.back().Place(*newbmp);
-			if (!result) {
-				bins.emplace_back(binSize, binSize, *renderer);
-				result = bins.back().Place(*newbmp);
-				SPAssert(result);
-			}
+			Store(r.outlineImage, *newbmp, (*r.image).offset - Vector2(1, 1) * (float)Thickness);
+			return r;
+		}
 
-			AABB2 bounds(
-				(float)(*result).x,
-				(float)(*result).y,
-				(float)newW - 1,
-				(float)newH - 1
-			);
+		template <class ImageOf>
+		void FTFont::DrawGlyphs(const std::string& str, Vector2 offset, float scale, Vector4 color,
+		                        ImageOf imageOf) {
+			UpdateDensity();
+			const int size = RasterSize(scale);
+			// 2D units per pixel of the glyphs: a display pixel exactly, unless
+			// they come from the nearest size kept.
+			const float texel = height * scale / (float(size) / kSizeSteps);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (float)Thickness;
+			float x = 0.0F;
+			float y = 0.0F;
 
-			g.outlineImage.reset((*result).image, bounds, offs);
+			color = Vector4(color.x * color.w, color.y * color.w, color.z * color.w, color.w);
+			renderer->SetColorAlphaPremultiplied(color);
+
+			SplitTextIntoGlyphs(
+			  str,
+			  [&](Glyph& g) {
+				  const GlyphImage& img = imageOf(g, size);
+				  // The pen on a whole pixel, the glyph whole pixels from it: every
+				  // glyph of a line hangs from one baseline.
+				  const Vector2 pen = SnapToPixel(offset + Vector2(x, y) * scale);
+				  const Vector2 target = pen + img.offset * texel;
+				  AABB2 srcBounds = img.bounds;
+				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * texel,
+				                   srcBounds.GetHeight() * texel);
+
+				  if (!rendererIsLowQuality) {
+					  srcBounds = srcBounds.Inflate(0.5F);
+					  destBounds = destBounds.Inflate(0.5F * texel);
+				  }
+
+				  renderer->DrawImage(&img.img, destBounds, srcBounds);
+
+				  x += (int)roundf(g.advance.x);
+				  y += (int)roundf(g.advance.y);
+			  },
+			  [&](uint32_t codepoint) {
+				  DrawFallback(codepoint, offset + Vector2(x, y) * scale, height * scale, color);
+				  x += MeasureFallback(codepoint, height);
+			  },
+			  [&]() {
+				  x = 0.0F;
+				  y += lineHeight;
+			  });
 		}
 
 		void FTFont::Draw(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
-			UpdateDensity();
-
-			float x = 0.0F;
-			float y = 0.0F;
-
-			color = Vector4(color.x * color.w, color.y * color.w, color.z * color.w, color.w);
-
-			renderer->SetColorAlphaPremultiplied(color);
-
-			SplitTextIntoGlyphs(
-			  str,
-			  [&](Glyph& g) {
-				  RenderGlyph(g);
-
-				  auto& img = *g.image;
-				  auto srcBounds = img.bounds;
-				  // The glyph's pixels are 1 / density of a 2D unit.
-				  const float texel = scale / density;
-				  auto target = offset + (Vector2(x, y) + img.offset / density) * scale;
-				  target = SnapToPixel(target); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * texel,
-								   srcBounds.GetHeight() * texel);
-
-				  if (!rendererIsLowQuality) {
-					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * texel);
-				  }
-
-				  renderer->DrawImage(&img.img, destBounds, srcBounds);
-
-				  x += (int)roundf(g.advance.x);
-				  y += (int)roundf(g.advance.y);
-			  },
-			  [&](uint32_t codepoint) {
-				  DrawFallback(codepoint, offset + Vector2(x, y) * scale, height * scale, color);
-				  x += MeasureFallback(codepoint, height);
-			  },
-			  [&]() {
-				  x = 0.0F;
-				  y += lineHeight;
-			  });
+			DrawGlyphs(str, offset, scale, color, [this](Glyph& g, int size) -> const GlyphImage& {
+				return *RenderGlyph(g, size).image;
+			});
 		}
 
 		void FTFont::DrawBlurred(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
-			UpdateDensity();
-
-			float x = 0.0F;
-			float y = 0.0F;
-
-			color = Vector4(color.x * color.w, color.y * color.w, color.z * color.w, color.w);
-			renderer->SetColorAlphaPremultiplied(color);
-
-			SplitTextIntoGlyphs(
-			  str,
-			  [&](Glyph& g) {
-				  RenderBlurGlyph(g);
-
-				  auto& img = *g.blurImage;
-				  auto srcBounds = img.bounds;
-				  // The glyph's pixels are 1 / density of a 2D unit.
-				  const float texel = scale / density;
-				  auto target = offset + (Vector2(x, y) + img.offset / density) * scale;
-				  target = SnapToPixel(target); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * texel,
-								   srcBounds.GetHeight() * texel);
-
-				  if (!rendererIsLowQuality) {
-					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * texel);
-				  }
-
-				  renderer->DrawImage(&img.img, destBounds, srcBounds);
-
-				  x += (int)roundf(g.advance.x);
-				  y += (int)roundf(g.advance.y);
-			  },
-			  [&](uint32_t codepoint) {
-				  DrawFallback(codepoint, offset + Vector2(x, y) * scale, height * scale, color);
-				  x += MeasureFallback(codepoint, height);
-			  },
-			  [&]() {
-				  x = 0.0F;
-				  y += lineHeight;
-			  });
+			DrawGlyphs(str, offset, scale, color, [this](Glyph& g, int size) -> const GlyphImage& {
+				return *RenderBlurGlyph(g, size).blurImage;
+			});
 		}
 
 		void FTFont::DrawOutlined(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
-			UpdateDensity();
-
-			float x = 0.0F;
-			float y = 0.0F;
-
-			color = Vector4(color.x * color.w, color.y * color.w, color.z * color.w, color.w);
-			renderer->SetColorAlphaPremultiplied(color);
-
-			SplitTextIntoGlyphs(
-				str,
-				[&](Glyph &g) {
-					RenderOutlineGlyph(g);
-
-					auto &img = *g.outlineImage;
-					auto srcBounds = img.bounds;
-					const float texel = scale / density;
-					auto target = offset + (Vector2(x, y) + img.offset / density) * scale;
-					target = SnapToPixel(target);
-					AABB2 destBounds(target.x, target.y,
-									 srcBounds.GetWidth() * texel,
-									 srcBounds.GetHeight() * texel);
-
-					if (!rendererIsLowQuality) {
-						srcBounds = srcBounds.Inflate(0.5F);
-						destBounds = destBounds.Inflate(0.5F * texel);
-					}
-
-					renderer->DrawImage(&img.img, destBounds, srcBounds);
-
-					x += (int)roundf(g.advance.x);
-					y += (int)roundf(g.advance.y);
-				},
-				[&](uint32_t codepoint) {
-					DrawFallback(codepoint, offset + Vector2(x, y) * scale, height * scale, color);
-					x += MeasureFallback(codepoint, height);
-				},
-				[&]() {
-					x = 0.0F;
-					y += lineHeight;
-				}
-			);
+			DrawGlyphs(str, offset, scale, color, [this](Glyph& g, int size) -> const GlyphImage& {
+				return *RenderOutlineGlyph(g, size).outlineImage;
+			});
 		}
 
 		void FTFont::DrawShadow(const std::string& text, const Vector2& offset, float scale,
