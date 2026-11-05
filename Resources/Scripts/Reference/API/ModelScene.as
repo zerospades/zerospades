@@ -45,6 +45,19 @@ namespace spades {
          */
         Model@ Part(const string& in path) {}
 
+        /**
+         * The same object in its own frame, at the resolution it was modelled
+         * at, to be drawn with `Transform(path)`. A part the scene scales down
+         * (finer than the rest, as iron sights may be) loses its detail
+         * composed into the scene's frame by `Part`; this keeps it:
+         *
+         *     param.matrix = weapon * sten.Transform("RearSight");
+         *     renderer.AddModel(sten.NativePart("RearSight"), param);
+         *
+         * Throws when there is no such object.
+         */
+        Model@ NativePart(const string& in path) {}
+
         /** Whether the scene has an object at `path`, and only one. */
         bool Has(const string& in path) {}
 

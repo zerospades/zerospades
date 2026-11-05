@@ -50,6 +50,10 @@ namespace spades {
 				return renderer->RegisterModel((path + "#" + part).c_str()).Unmanage();
 			}
 
+			IModel* NativePart(const std::string& part) {
+				return renderer->RegisterModel((path + "##" + part).c_str()).Unmanage();
+			}
+
 			bool Has(const std::string& part) { return Find(part) != nullptr; }
 
 			Matrix4 Transform(const std::string& part) {
@@ -101,6 +105,14 @@ namespace spades {
 					return nullptr;
 				}
 			}
+			IModel* SceneNativePart(const std::string& part, ScriptModelScene* s) {
+				try {
+					return s->NativePart(part);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+					return nullptr;
+				}
+			}
 			bool SceneHas(const std::string& part, ScriptModelScene* s) { return s->Has(part); }
 			Matrix4 SceneTransform(const std::string& part, ScriptModelScene* s) {
 				try {
@@ -143,6 +155,9 @@ namespace spades {
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("ModelScene", "Model@ Part(const string& in)",
 						                              asFUNCTION(ScenePart), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("ModelScene", "Model@ NativePart(const string& in)",
+						                              asFUNCTION(SceneNativePart), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod("ModelScene", "bool Has(const string& in)",
 						                              asFUNCTION(SceneHas), asCALL_CDECL_OBJLAST);
