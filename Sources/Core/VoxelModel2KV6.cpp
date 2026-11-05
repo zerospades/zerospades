@@ -598,6 +598,35 @@ namespace spades {
 		}
 	} // namespace
 
+	namespace {
+		Vector4 TurnAbout(int axis, float degrees) {
+			const float half = degrees * float(M_PI) / 360.0F;
+			const float s = std::sin(half);
+			return MakeVector4(axis == 0 ? s : 0.0F, axis == 1 ? s : 0.0F, axis == 2 ? s : 0.0F,
+			                   std::cos(half));
+		}
+	} // namespace
+
+	Vector4 RotationFromEuler(const Vector3& degrees) {
+		const Quaternion x(TurnAbout(0, degrees.x)), y(TurnAbout(1, degrees.y)),
+		  z(TurnAbout(2, degrees.z));
+		return (z * (y * x)).Normalize().v;
+	}
+
+	Vector3 EulerFromRotation(const Vector4& q) {
+		const float x = q.x, y = q.y, z = q.z, w = q.w;
+		const float r00 = 1 - 2 * (y * y + z * z), r10 = 2 * (x * y + w * z);
+		const float r20 = 2 * (x * z - w * y), r21 = 2 * (y * z + w * x);
+		const float r22 = 1 - 2 * (x * x + y * y), r11 = 1 - 2 * (x * x + z * z);
+		const float r12 = 2 * (y * z - w * x);
+		const float toDeg = 180.0F / float(M_PI);
+		const float sy = std::max(-1.0F, std::min(1.0F, -r20));
+		if (std::fabs(sy) > 0.9999F) // looking straight along Y: X takes it all
+			return MakeVector3(std::atan2(-r12, r11) * toDeg, std::asin(sy) * toDeg, 0.0F);
+		return MakeVector3(std::atan2(r21, r22) * toDeg, std::asin(sy) * toDeg,
+		                   std::atan2(r10, r00) * toDeg);
+	}
+
 	bool DecomposeTransform(const Matrix4& m, Vector3& position, Vector4& rotation,
 	                        Vector3& scale) {
 		Vector3 axis[3] = {m.GetAxis(0), m.GetAxis(1), m.GetAxis(2)};
