@@ -137,6 +137,8 @@ namespace spades {
 			std::string ToolLabel(int index) const;
 			/** Makes tool `index` the active one, as its toolbar button does. */
 			void SelectTool(int index);
+			/** The tool active in Edit mode, as SelectTool takes it. */
+			int ActiveToolIndex() const { return activeTool; }
 
 			// --- Input, in the host's routing order ---------------------------
 			/** Every key, even while a modal has the keyboard, so no modifier
@@ -243,6 +245,7 @@ namespace spades {
 			                                      bool through) const override;
 			void SelectAll() override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
+			void ReturnToSelect() override { returningToSelect = true; }
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
 			void CopySelection() override;
 			bool CutSelection() override;
@@ -502,6 +505,7 @@ namespace spades {
 			 *  drawn over it, leaves it showing. */
 			bool OnPanel(const Vector2& at);
 			float clock = 0.0F; // seconds, for the caret and double clicks
+			bool returningToSelect = false; // ReturnToSelect, once the event is over
 			/** What the active tool sets by number, or null. */
 			ITransformTarget* PanelTarget();
 			/** Ends a number being typed or scrubbed, as a click elsewhere does. */

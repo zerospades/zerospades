@@ -130,6 +130,12 @@ namespace spades {
 			virtual void SelectAll() = 0;
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
+			/**
+			 * Gives the selection up and makes Select the active tool: what a
+			 * click on nothing does in a tool that works on the selection, and
+			 * can do nothing without one. Done once the tool's event is over.
+			 */
+			virtual void ReturnToSelect() = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
 
 			// --- Clipboard ----------------------------------------------------

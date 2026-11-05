@@ -2271,6 +2271,16 @@ namespace spades {
 			if (e.IsRight() && !t->RightButtonInverts())
 				return;
 			t->OnPointer(*this, e);
+			// Switched after the tool is done with the event, never from inside
+			// it; as part of the same user action, so it undoes with it.
+			if (returningToSelect) {
+				returningToSelect = false;
+				if (edit.selection.Empty() == false) {
+					ClearSelection();
+					SetStatus("Selection cleared");
+				}
+				SetActiveTool(ToolIndex("select"));
+			}
 		}
 
 		void VoxelEditor::CancelToolInteraction() {

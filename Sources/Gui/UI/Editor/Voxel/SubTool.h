@@ -236,6 +236,9 @@ namespace spades {
 			 * gizmo, so work it left pending is completed here.
 			 */
 			virtual void OnClickAway(IVoxelEditContext&) {}
+			/** For a tool that works on the selection: a press on nothing (no
+			 *  voxel under it) gives the selection up for Select. */
+			static void ReturnToSelectIfOnNothing(IVoxelEditContext& ed);
 
 		private:
 			bool SyncPose(IVoxelEditContext& ed);
@@ -269,7 +272,8 @@ namespace spades {
 			// A drag only previews: the voxels move once, on release.
 			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
 			void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override;
-			// Places a waiting paste or import where it is.
+			// Places a waiting paste or import where it is; with none, a press on
+			// nothing gives the selection up for Select.
 			void OnClickAway(IVoxelEditContext& ed) override;
 		};
 
@@ -289,6 +293,8 @@ namespace spades {
 			void DrawScene(IVoxelEditContext&) override;
 
 		protected:
+			// A press on nothing gives the selection up for Select.
+			void OnClickAway(IVoxelEditContext& ed) override { ReturnToSelectIfOnNothing(ed); }
 			bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override;
 			void OnGizmoBegin(IVoxelEditContext& ed) override;
 			void OnGizmoDrag(IVoxelEditContext& ed) override;
