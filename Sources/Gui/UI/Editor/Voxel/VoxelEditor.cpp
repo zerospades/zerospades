@@ -2642,8 +2642,12 @@ namespace spades {
 			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
 			const bool wasEditing = currentMode == EditorMode::Edit;
-			if (wasEditing && mode != EditorMode::Edit)
+			if (wasEditing && mode != EditorMode::Edit) {
 				EndUserAction(); // nothing previewed is carried out of the document
+				// No colour is chosen outside Edit mode: its picker goes with it.
+				ui.GetColorPicker()->SetEyedropperMode(false);
+				ui.GetColorPicker()->Close();
+			}
 			if (mode == EditorMode::Edit && InObjectMode(toolIndex))
 				toolIndex = defaultTool;
 			activeTool = toolIndex;
@@ -3394,7 +3398,12 @@ namespace spades {
 			}
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
-			ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
+			// The brush colour is what voxels are painted with: only Edit mode,
+			// which edits them, offers it.
+			if (currentMode == EditorMode::Edit)
+				ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
+			else
+				ui.GetToolbar()->HideColorSwatch();
 			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
 			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
 			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
