@@ -53,6 +53,9 @@ namespace spades {
 			virtual ~ITransformTarget() {}
 
 			virtual unsigned ShownRows() const { return kAllRows; }
+			/** Whether its scale's lock is offered (IsScaleLocked), on the
+			 *  panel's Scale row. */
+			virtual bool CanLockScale() const { return false; }
 			/** The panel's title: what is set ("Transform", "Pivot"). */
 			virtual std::string Title() const { return "Transform"; }
 
@@ -64,6 +67,15 @@ namespace spades {
 			virtual void CommitTransform() = 0;
 			virtual void CancelTransform() = 0;
 		};
+
+		/**
+		 * Whether scaling keeps proportions, wherever the lock is offered: one
+		 * axis set in the panel sets the others by the same factor, and a
+		 * gizmo scales evenly only. One setting for the editor, kept across
+		 * sessions.
+		 */
+		bool IsScaleLocked();
+		void SetScaleLocked(bool locked);
 
 		/**
 		 * Location, Rotation and Scale as three numbers each, as professional
@@ -128,6 +140,14 @@ namespace spades {
 			int Slot(int row) const;
 			int active = -1; // the field being set
 			ITransformTarget::Transform editing; // as it was when the field began, then as set
+			Vector3 begunScale; // the scale when the field began, which a locked one keeps the
+			                    // proportions of
+			bool lockShown = false; // the Scale row's lock, as drawn last frame
+			bool lockUsable = false;
+			bool scaleLocked = false; // the lock, for the field being set
+			/** Where the lock sits, at the end of the Scale row's label. */
+			AABB2 LockRect() const;
+			void DrawLock(const Vector2& cursor);
 
 			float Left() const;
 			float Height() const;

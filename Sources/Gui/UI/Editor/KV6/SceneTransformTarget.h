@@ -39,6 +39,8 @@ namespace spades {
 			/** The scene it works on; null for none. */
 			void SetScene(KV6Scene* s);
 
+			bool CanLockScale() const override { return true; }
+
 			bool CurrentTransform(Transform& transform, std::string& name,
 			                      bool& onlyMoves) const override;
 			void PreviewTransform(const Transform& transform) override;
