@@ -149,12 +149,19 @@ namespace spades {
 			void SelectTool(int index);
 			/** The tool active in Edit mode, as SelectTool takes it. */
 			int ActiveToolIndex() const { return activeTool; }
+			/** The label of the tool active now, in whichever mode; empty for
+			 *  none. */
+			std::string ActiveToolName();
 
 			// --- Modes ---------------------------------------------------------
 			/** Object mode, when the host offers it (IVoxelEditorHost::ObjectMode),
 			 *  else Edit mode, as the toolbar's mode buttons switch them. */
 			void SetObjectMode(bool on);
 			bool InObjectMode() const { return currentMode == EditorMode::Object; }
+			/** The host changed which objects are selected (its tree): Object mode
+			 *  shows the gizmo when some are, as its Select tool does, and goes
+			 *  back to Select when none are. */
+			void ObjectSelectionChanged();
 
 			// --- Input, in the host's routing order ---------------------------
 			/** Every key, even while a modal has the keyboard, so no modifier
@@ -363,12 +370,18 @@ namespace spades {
 			// --- Tools --------------------------------------------------------
 			std::vector<VoxelToolSlot> tools;
 			int activeTool = 0;
-			// Object mode's own tool, picking and placing the scene's objects.
-			std::unique_ptr<VoxelTool> objectTool;
-			// The tool active in Object mode: -1 for its own, or a registered
-			// tool that works on the scene rather than on voxels (see
-			// InObjectMode).
+			// Object mode's own tools, on the scene's objects: Select, then
+			// Transform, whose gizmo places the picked one.
+			std::vector<VoxelToolSlot> objectTools;
+			// The tool active in Object mode: -1 for one of its own (the one at
+			// `objectOwnTool`), or a registered tool that works on the scene
+			// rather than on voxels (see InObjectMode).
 			int objectModeTool = -1;
+			int objectOwnTool = 0;
+			/** Object mode's own tool by its id, or -1. */
+			int OwnObjectToolIndex(const std::string& id) const;
+			/** Makes Object mode's own tool `index` the active one. */
+			void SetOwnObjectTool(int index);
 			// The Edit tool the editor opens on, which Edit mode falls back to.
 			int defaultTool = 0;
 			// Whether registered tool `index` belongs to Object mode rather than
