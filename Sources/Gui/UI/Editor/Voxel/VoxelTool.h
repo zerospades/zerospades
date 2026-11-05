@@ -28,6 +28,7 @@
 namespace spades {
 	namespace gui {
 		class IVoxelEditContext;
+		class ITransformTarget;
 
 		/** A tool of a voxel editor: one working on cells through IVoxelEditContext. */
 		class VoxelTool : public BasicEditorTool<IVoxelEditContext> {
@@ -37,6 +38,9 @@ namespace spades {
 			// whose action has no inverse (recolouring) says no, and the editor
 			// then keeps the right button from all of its sub-tools.
 			virtual bool RightButtonInverts() const { return true; }
+			// What this tool sets by number, which the editor's transform panel
+			// shows while it is active (Pivot's pivot); null for nothing.
+			virtual ITransformTarget* TransformTarget(IVoxelEditContext&) { return nullptr; }
 
 			// The user changed the brush colour on the colour picker. `committed`
 			// is false while the picker is still being dragged -- show it, but

@@ -20,6 +20,8 @@
 
 #include "TransformPanel.h"
 
+#include <algorithm>
+
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Gui/OverlayPaint.h>
@@ -97,8 +99,25 @@ namespace spades {
 
 		float TransformPanel::Left() const { return right - kWidth; }
 
+		int TransformPanel::RowCount() const {
+			int n = 0;
+			for (int row = 0; row < 3; row++)
+				n += (rows >> row) & 1;
+			return n;
+		}
+
+		int TransformPanel::Slot(int row) const {
+			if (!((rows >> row) & 1))
+				return -1;
+			int slot = 0;
+			for (int r = 0; r < row; r++)
+				slot += (rows >> r) & 1;
+			return slot;
+		}
+
 		float TransformPanel::Height() const {
-			return kPad * 2.0F + kTitleH + 3.0F * kRowH + 2.0F * kRowGap;
+			const int n = RowCount();
+			return kPad * 2.0F + kTitleH + float(n) * kRowH + float(std::max(0, n - 1)) * kRowGap;
 		}
 
 		void TransformPanel::Layout(float r, float t) {
@@ -110,9 +129,9 @@ namespace spades {
 		void TransformPanel::Place() {
 			const float fieldW = (kWidth - kPad * 2.0F - kLabelW - kFieldGap * 2.0F) / 3.0F;
 			for (int i = 0; i < 9; i++) {
-				const int row = i / 3, axis = i % 3;
+				const int slot = std::max(0, Slot(i / 3)), axis = i % 3;
 				const float x = Left() + kPad + kLabelW + float(axis) * (fieldW + kFieldGap);
-				const float y = top + kPad + kTitleH + float(row) * (kRowH + kRowGap);
+				const float y = top + kPad + kTitleH + float(slot) * (kRowH + kRowGap);
 				fields[std::size_t(i)]->SetRect(AABB2(x, y, fieldW, kRowH));
 			}
 		}
@@ -134,7 +153,7 @@ namespace spades {
 			bool onlyMoves = false;
 			if (!target.CurrentTransform(editing, name, onlyMoves))
 				return false;
-			if (onlyMoves && index >= 3)
+			if ((onlyMoves && index >= 3) || Slot(index / 3) < 0)
 				return false;
 			active = index;
 			fields[std::size_t(index)]->SetValue(Component(editing, index));
@@ -241,6 +260,10 @@ namespace spades {
 			std::string name;
 			bool onlyMoves = false;
 			shown = target.CurrentTransform(now, name, onlyMoves);
+			if (rows != target.ShownRows()) {
+				rows = target.ShownRows();
+				Place();
+			}
 			if (!shown) {
 				if (active >= 0)
 					Settle(target); // what it was setting is gone
@@ -252,8 +275,9 @@ namespace spades {
 			auto text = [&](const std::string& s, float tx, float ty, float scale, const Vector4& c) {
 				font.DrawShadow(s, MakeVector2(tx, ty), scale, c, EditorTheme::TextShadow());
 			};
-			text("Transform", x + kPad, top + kPad, 0.95F, EditorTheme::Text());
-			const float titleW = font.Measure("Transform  ").x * 0.95F;
+			const std::string title = target.Title();
+			text(title, x + kPad, top + kPad, 0.95F, EditorTheme::Text());
+			const float titleW = font.Measure(title + "  ").x * 0.95F;
 			std::string shownName = name;
 			while (!shownName.empty() &&
 			       font.Measure(shownName).x * 0.85F > kWidth - kPad * 2.0F - titleW)
@@ -263,7 +287,13 @@ namespace spades {
 
 			const float labelH = font.Measure("Ag").y * kTextScale;
 			for (int row = 0; row < 3; row++) {
-				const float y = top + kPad + kTitleH + float(row) * (kRowH + kRowGap);
+				const int slot = Slot(row);
+				if (slot < 0) {
+					for (int axis = 0; axis < 3; axis++)
+						fields[std::size_t(row * 3 + axis)]->SetEnabled(false); // Tab passes it by
+					continue;
+				}
+				const float y = top + kPad + kTitleH + float(slot) * (kRowH + kRowGap);
 				const bool settable = row == 0 || !onlyMoves;
 				text(kRows[row], x + kPad, y + (kRowH - labelH) * 0.5F, kTextScale,
 				     settable ? EditorTheme::TextDim() : EditorTheme::TextFaint());
