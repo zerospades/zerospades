@@ -334,6 +334,11 @@ namespace spades {
 				const char* label;
 			};
 			static const std::vector<ModeInfo>& Modes();
+			/** The key that goes between Object and Edit mode, as Blender's. */
+			static const char* const kModeToggleKey;
+			/** Drops the list of modes the document has under `anchor` (the
+			 *  toolbar's mode selector). */
+			void OpenModeMenu(const AABB2& anchor);
 
 			// --- Tools --------------------------------------------------------
 			std::vector<VoxelToolSlot> tools;

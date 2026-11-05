@@ -24,6 +24,7 @@
 #include <Gui/UIWidgetPainter.h>
 #include <Client/IRenderer.h>
 #include <Client/Fonts.h>
+#include <Client/IFont.h>
 #include <Core/Math.h>
 
 namespace spades {
@@ -37,13 +38,17 @@ namespace spades {
 		static const float kTbSep = 14.0F;
 		static const float kUndoBtnW = 50.0F;
 		static const float kSwatchW = 40.0F;
+		static const float kModeSelectorW = 150.0F;
 		static const float kTbX0 = 12.0F;
 		static const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 
 		Toolbar::Toolbar(client::IAudioDevice* audioDevice) : sounds(audioDevice) {}
 
-		void Toolbar::SetModeButtons(const std::vector<ToolbarButton>& buttons) {
-			modeButtons = buttons;
+		void Toolbar::SetModeSelector(const std::string& label, const std::string& hotKey,
+		                              bool open) {
+			modeLabel = label;
+			modeHotKey = hotKey;
+			modeOpen = open;
 		}
 
 		void Toolbar::SetToolButtons(const std::vector<ToolbarButton>& buttons) {
@@ -63,14 +68,15 @@ namespace spades {
 		std::vector<Toolbar::Slot> Toolbar::Layout(float screenWidth) const {
 			std::vector<Slot> slots;
 			float x = kTbX0;
-			for (int i = 0; i < int(modeButtons.size()); i++) {
-				slots.push_back({Kind::Mode, i, x, kTbBtn, false});
-				x += kTbBtn + kTbGap;
+			const bool selector = !modeLabel.empty();
+			if (selector) {
+				slots.push_back({Kind::ModeSelector, -1, x, kModeSelectorW, false});
+				x += kModeSelectorW + kTbGap;
 			}
 			for (int i = 0; i < int(toolButtons.size()); i++) {
 				// The first tool is set apart from the modes, and every later one
 				// from its predecessor when it starts another group.
-				bool separator = (i == 0) ? !modeButtons.empty()
+				bool separator = (i == 0) ? selector
 				                          : toolButtons[i].group != toolButtons[i - 1].group;
 				if (separator)
 					x += kTbSep;
@@ -79,7 +85,7 @@ namespace spades {
 			}
 			if (hasSwatch) {
 				// Its own group: it belongs to no one tool.
-				const bool separator = !modeButtons.empty() || !toolButtons.empty();
+				const bool separator = selector || !toolButtons.empty();
 				if (separator)
 					x += kTbSep;
 				slots.push_back({Kind::ColorSwatch, -1, x, kSwatchW, separator});
@@ -93,8 +99,12 @@ namespace spades {
 		}
 
 		Toolbar::ToolbarButton Toolbar::ButtonOf(const Slot& slot) const {
-			if (slot.kind == Kind::Mode)
-				return modeButtons[slot.index];
+			if (slot.kind == Kind::ModeSelector) {
+				ToolbarButton selector;
+				selector.label = modeLabel;
+				selector.active = modeOpen;
+				return selector;
+			}
 			if (slot.kind == Kind::Tool)
 				return toolButtons[slot.index];
 			if (slot.kind == Kind::ColorSwatch) {
@@ -107,6 +117,29 @@ namespace spades {
 			history.label = undo ? "Undo" : "Redo";
 			history.enabled = undo ? undoEnabled : redoEnabled;
 			return history;
+		}
+
+		void Toolbar::DrawModeSelector(client::IRenderer& renderer, client::IFont& font,
+		                               const Slot& slot, bool hover) const {
+			// A button like the others, its label on the left; then the key that
+			// switches modes, dimmed, and the arrow that says it drops down.
+			widgets::PaintButton(renderer, font, MakeVector2(slot.x, kTbY),
+			                     MakeVector2(slot.width, kTbH), modeLabel, MakeVector2(0.0F, 0.5F),
+			                     std::string(), MakeVector2(1.0F, 0.5F), true, hover, false, modeOpen,
+			                     1.0F);
+			const float midY = kTbY + kTbH * 0.5F;
+			const float arrowX = slot.x + slot.width - 13.0F;
+			const Vector2 arrow[3] = {MakeVector2(arrowX - 4.0F, midY - 2.0F),
+			                          MakeVector2(arrowX + 4.0F, midY - 2.0F),
+			                          MakeVector2(arrowX, midY + 3.0F)};
+			OverlayFillConvexPolygon(renderer, arrow, 3, MakeVector4(1.0F, 1.0F, 1.0F, 0.85F));
+			if (!modeHotKey.empty()) {
+				const std::string key = "[" + modeHotKey + "]";
+				const Vector2 size = font.Measure(key) * 0.85F;
+				font.DrawShadow(key, MakeVector2(arrowX - 10.0F - size.x, midY - size.y * 0.5F), 0.85F,
+				                MakeVector4(1.0F, 1.0F, 1.0F, 0.55F),
+				                MakeVector4(0.0F, 0.0F, 0.0F, 0.1F));
+			}
 		}
 
 		void Toolbar::DrawColorSwatch(client::IRenderer& renderer, const Slot& slot,
@@ -129,11 +162,9 @@ namespace spades {
 					return false; // greyed out: the click does nothing
 				// Ids are copied: a handler may change the buttons they belong to.
 				switch (slot.kind) {
-					case Kind::Mode:
-						if (OnModeClicked) {
-							const std::string id = modeButtons[slot.index].id;
-							OnModeClicked(id);
-						}
+					case Kind::ModeSelector:
+						if (OnModeSelectorClicked)
+							OnModeSelectorClicked(AABB2(slot.x, kTbY, slot.width, kTbH));
 						break;
 					case Kind::Tool:
 						if (OnToolClicked) {
@@ -185,6 +216,10 @@ namespace spades {
 
 				if (slot.kind == Kind::ColorSwatch) {
 					DrawColorSwatch(renderer, slot, hover);
+					continue;
+				}
+				if (slot.kind == Kind::ModeSelector) {
+					DrawModeSelector(renderer, font, slot, hover);
 					continue;
 				}
 

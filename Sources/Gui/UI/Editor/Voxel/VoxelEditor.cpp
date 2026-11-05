@@ -40,6 +40,7 @@
 #include <Core/VoxelModel.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/ContextMenu.h>
 #include <Gui/UI/Components/EditorMenu.h>
 #include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
@@ -268,11 +269,8 @@ namespace spades {
 		void VoxelEditor::WireUI() {
 			// Buttons report ids, resolved against the modes and tools as they are
 			// now; the toolbar only reports clicks on enabled buttons.
-			ui.GetToolbar()->OnModeClicked = [this](const std::string& id) {
-				for (const ModeInfo& info : Modes()) {
-					if (id == info.id && ModeSupported(info.mode))
-						SetMode(info.mode);
-				}
+			ui.GetToolbar()->OnModeSelectorClicked = [this](const AABB2& anchor) {
+				OpenModeMenu(anchor);
 			};
 			ui.GetToolbar()->OnToolClicked = [this](const std::string& id) {
 				if (currentMode == EditorMode::Object && id == kObjectToolId)
@@ -2286,6 +2284,25 @@ namespace spades {
 				current->OnActivate(*this);
 		}
 
+		const char* const VoxelEditor::kModeToggleKey = "Tab";
+
+		void VoxelEditor::OpenModeMenu(const AABB2& anchor) {
+			CancelToolInteraction();
+			std::vector<ContextMenuItem> items;
+			for (const ModeInfo& info : Modes()) {
+				if (!ModeSupported(info.mode))
+					continue;
+				const EditorMode mode = info.mode;
+				ContextMenuItem item(std::string(info.label) + " Mode", [this, mode] { SetMode(mode); });
+				item.Checked(mode == currentMode);
+				// Tab goes between these two: it says so on both.
+				if (mode == EditorMode::Object || mode == EditorMode::Edit)
+					item.Shortcut(kModeToggleKey);
+				items.push_back(std::move(item));
+			}
+			ui.GetContextMenu()->OpenBelow(anchor, std::move(items), this);
+		}
+
 		const std::vector<VoxelEditor::ModeInfo>& VoxelEditor::Modes() {
 			static const std::vector<ModeInfo> modes = {
 			  {EditorMode::Object, "object", "Object"},
@@ -2631,7 +2648,8 @@ namespace spades {
 		bool VoxelEditor::CommandKey(const std::string& key, bool down) {
 			// Tab goes between the scene's objects and the picked one's voxels,
 			// as in Blender.
-			if (down && key == "Tab" && ModeSupported(EditorMode::Object) && !lmbHeld && !rmbHeld) {
+			if (down && key == kModeToggleKey && ModeSupported(EditorMode::Object) && !lmbHeld &&
+			    !rmbHeld) {
 				CancelToolInteraction();
 				SetObjectMode(currentMode != EditorMode::Object);
 				return true;
@@ -2813,21 +2831,20 @@ namespace spades {
 		void VoxelEditor::DrawToolbar(float sw) {
 			screenWidth = sw; // for hit tests in ButtonEvent
 
-			// Mode buttons, for the modes this document has; a document with
-			// only one has nothing to switch between, and shows none.
-			std::vector<Toolbar::ToolbarButton> modeButtons;
+			// The mode selector, for a document of several modes; one with only
+			// one has nothing to switch between, and shows none.
+			std::string modeLabel;
+			int supported = 0;
 			for (const ModeInfo& info : Modes()) {
 				if (!ModeSupported(info.mode))
 					continue;
-				Toolbar::ToolbarButton btn;
-				btn.id = info.id;
-				btn.label = info.label;
-				btn.active = info.mode == currentMode;
-				modeButtons.push_back(btn);
+				supported++;
+				if (info.mode == currentMode)
+					modeLabel = std::string(info.label) + " Mode";
 			}
-			if (modeButtons.size() < 2)
-				modeButtons.clear();
-			ui.GetToolbar()->SetModeButtons(modeButtons);
+			ui.GetToolbar()->SetModeSelector(supported < 2 ? std::string() : modeLabel,
+			                                 ModeSupported(EditorMode::Object) ? kModeToggleKey : "",
+			                                 ui.GetContextMenu()->IsOpenFor(this));
 
 			// Tool buttons. A hot key the editor already uses for something else
 			// never reaches the tool, so the button does not claim it.

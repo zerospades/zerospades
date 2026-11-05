@@ -33,10 +33,12 @@ namespace spades {
 		class IRenderer;
 		class FontManager;
 		class IAudioDevice;
+		class IFont;
 	} // namespace client
 	namespace gui {
 		/**
-		 * Unified top toolbar: modes on the left, a separator, then the tools
+		 * Unified top toolbar: the mode selector on the left (a dropdown showing
+		 * the current mode, the key that switches it beside), a separator, then the tools
 		 * available in the current mode, optionally a colour swatch (the colour
 		 * the tools draw with, whichever is active), then undo/redo buttons on
 		 * the right.
@@ -63,7 +65,13 @@ namespace spades {
 
 			Toolbar(client::IAudioDevice* audioDevice = nullptr);
 
-			void SetModeButtons(const std::vector<ToolbarButton>& buttons);
+			/**
+			 * The mode selector: `label` (the current mode), `hotKey` beside it,
+			 * and an arrow, held down while `open` (its list showing); hidden
+			 * for an empty label. A click calls OnModeSelectorClicked with where
+			 * it is drawn, to drop the list of modes from.
+			 */
+			void SetModeSelector(const std::string& label, const std::string& hotKey, bool open);
 			void SetToolButtons(const std::vector<ToolbarButton>& buttons);
 			void SetUndoButton(bool enabled);
 			void SetRedoButton(bool enabled);
@@ -80,14 +88,14 @@ namespace spades {
 			         const Vector2& cursorPos, bool menuActive, float screenWidth);
 
 			// Called with the clicked button's id.
-			std::function<void(const std::string& id)> OnModeClicked;
+			std::function<void(const AABB2& anchor)> OnModeSelectorClicked;
 			std::function<void(const std::string& id)> OnToolClicked;
 			std::function<void()> OnUndoClicked;
 			std::function<void()> OnRedoClicked;
 			std::function<void()> OnColorSwatchClicked;
 
 		private:
-			enum class Kind { Mode, Tool, ColorSwatch, Undo, Redo };
+			enum class Kind { ModeSelector, Tool, ColorSwatch, Undo, Redo };
 
 			// One button placed on the bar; `index` is into its kind's list.
 			struct Slot {
@@ -98,7 +106,8 @@ namespace spades {
 			};
 
 			ui::FeedbackSounds sounds;
-			std::vector<ToolbarButton> modeButtons;
+			std::string modeLabel, modeHotKey;
+			bool modeOpen = false;
 			std::vector<ToolbarButton> toolButtons;
 			bool undoEnabled = false;
 			bool redoEnabled = false;
@@ -112,6 +121,8 @@ namespace spades {
 			std::vector<Slot> Layout(float screenWidth) const;
 			ToolbarButton ButtonOf(const Slot& slot) const;
 			void DrawColorSwatch(client::IRenderer& renderer, const Slot& slot, bool hover) const;
+			void DrawModeSelector(client::IRenderer& renderer, client::IFont& font, const Slot& slot,
+			                      bool hover) const;
 		};
 	} // namespace gui
 } // namespace spades
