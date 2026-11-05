@@ -225,6 +225,7 @@ namespace spades {
 			picked = -1;
 			folded.clear();
 			dragging = false;
+			placing = false;
 			history.clear();
 			undoTop = 0;
 		}
@@ -553,6 +554,7 @@ namespace spades {
 		}
 
 		void KV6Scene::Relocate(const Relocation& r, const std::vector<Placement>& placements) {
+			CancelPlacement();
 			std::vector<VoxelObject> taken(r.from.size());
 			for (std::size_t i = r.from.size(); i-- > 0;) {
 				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(r.from[i]));
@@ -743,6 +745,7 @@ namespace spades {
 
 		void KV6Scene::InsertNodes(const std::vector<NodePath>& paths,
 		                           const std::vector<VoxelObject>& nodes) {
+			CancelPlacement();
 			for (std::size_t i = 0; i < paths.size(); i++) {
 				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(paths[i]));
 				level.insert(level.begin() + paths[i].back(), nodes[i]);
@@ -761,6 +764,7 @@ namespace spades {
 		}
 
 		void KV6Scene::RemoveNodes(const std::vector<NodePath>& paths) {
+			CancelPlacement();
 			for (std::size_t i = paths.size(); i-- > 0;) {
 				std::vector<VoxelObject>& level = *ChildrenOf(ParentOf(paths[i]));
 				level.erase(level.begin() + paths[i].back());
@@ -1248,6 +1252,65 @@ namespace spades {
 			dragging = false;
 		}
 
+		bool KV6Scene::LocalPlacementOf(const NodePath& path, LocalPlacement& out) const {
+			const VoxelObject* o = Node(path);
+			if (!o)
+				return false;
+			out = LocalPlacement{o->position, o->rotation, o->scale};
+			return true;
+		}
+
+		bool KV6Scene::KeepsTurnAndScale(const NodePath& path) const {
+			const VoxelObject* o = Node(path);
+			return o && o->locked;
+		}
+
+		void KV6Scene::PreviewPlacement(const NodePath& path, const LocalPlacement& p) {
+			VoxelObject* o = MutableNode(path);
+			if (!o)
+				return;
+			if (!placing || placingPath != path) {
+				CancelPlacement();
+				CancelDrag();
+				placing = true;
+				placingPath = path;
+				placingStart = PlacementOf(*o);
+			}
+			o->position = p.position;
+			if (!o->locked) {
+				o->rotation = Quaternion(p.rotation).Normalize().v;
+				o->scale = MakeVector3(KeepScale(p.scale.x), KeepScale(p.scale.y), KeepScale(p.scale.z));
+			}
+		}
+
+		bool KV6Scene::CommitPlacement() {
+			if (!placing)
+				return false;
+			placing = false;
+			VoxelObject* o = MutableNode(placingPath);
+			if (!o)
+				return false;
+			const Placement now = PlacementOf(*o);
+			if (now.position == placingStart.position && now.rotation == placingStart.rotation &&
+			    now.scale == placingStart.scale)
+				return false;
+			Step step;
+			step.kind = Step::Kind::Place;
+			step.path = placingPath;
+			step.before = placingStart;
+			step.after = now;
+			Record(std::move(step));
+			return true;
+		}
+
+		void KV6Scene::CancelPlacement() {
+			if (!placing)
+				return;
+			placing = false;
+			if (VoxelObject* o = MutableNode(placingPath))
+				Place(*o, placingStart);
+		}
+
 		void KV6Scene::CompensateShift(int index, const Vector3& shift) {
 			if (shift.x == 0.0F && shift.y == 0.0F && shift.z == 0.0F)
 				return;
@@ -1300,6 +1363,7 @@ namespace spades {
 			if (!CanUndo())
 				return;
 			CancelDrag();
+			CancelPlacement();
 			const Step& step = history[std::size_t(--undoTop)];
 			switch (step.kind) {
 				case Step::Kind::Place:
@@ -1338,6 +1402,7 @@ namespace spades {
 			if (!CanRedo())
 				return;
 			CancelDrag();
+			CancelPlacement();
 			const Step& step = history[std::size_t(undoTop++)];
 			switch (step.kind) {
 				case Step::Kind::Place:

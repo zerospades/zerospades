@@ -169,6 +169,29 @@ namespace spades {
 			 */
 			Handle<VoxelModel> Composed(const NodePath& path, Vector3& base, std::string& why) const;
 
+			// --- A node's own placement, typed or dragged in a panel -----------
+			/** Where a node is in its parent's frame: what scripts and the file
+			 *  call its position, rotation and scale. */
+			struct LocalPlacement {
+				Vector3 position;
+				Vector4 rotation;
+				Vector3 scale;
+			};
+			bool LocalPlacementOf(const NodePath& path, LocalPlacement& out) const;
+			/** Whether the node is held in place by its template: it then keeps
+			 *  its rotation and scale, and may only be moved. */
+			bool KeepsTurnAndScale(const NodePath& path) const;
+			/**
+			 * Shows the node at `p` while an edit of it goes on, recording
+			 * nothing; the first call keeps where it was. A locked node takes
+			 * only the position, and no scale goes below a hundredth.
+			 */
+			void PreviewPlacement(const NodePath& path, const LocalPlacement& p);
+			/** Keeps the edit as one step; false when it changed nothing. */
+			bool CommitPlacement();
+			/** Puts the node back where the edit found it. */
+			void CancelPlacement();
+
 			// --- Low-poly models ----------------------------------------------
 			/**
 			 * Where voxel `i` of a model made `factor` times coarser from the
@@ -337,6 +360,11 @@ namespace spades {
 
 			bool dragging = false;
 			Placement dragStart;
+
+			// A node's placement being edited in a panel.
+			bool placing = false;
+			NodePath placingPath;
+			Placement placingStart;
 
 			std::vector<Step> history;
 			int undoTop = 0;

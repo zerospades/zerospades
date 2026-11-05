@@ -155,6 +155,13 @@ namespace spades {
 	bool DecomposeTransform(const Matrix4& m, Vector3& position, Vector4& rotation,
 	                        Vector3& scale);
 
+	/** The rotation of turns about X, then Y, then Z, each about the fixed
+	 *  axes, in degrees: as --2kv6-tools and the editors set and show turns. */
+	Vector4 RotationFromEuler(const Vector3& degrees);
+	/** The turns RotationFromEuler takes to make `rotation`; looking straight
+	 *  along Y, X takes all of the turn about Z. */
+	Vector3 EulerFromRotation(const Vector4& rotation);
+
 	/**
 	 * .2kv6 file format handler for hierarchical scenes of named voxel objects.
 	 *
