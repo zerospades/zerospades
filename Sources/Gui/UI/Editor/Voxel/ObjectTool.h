@@ -35,6 +35,8 @@ namespace spades {
 			ObjectTool();
 			const char* Label() const override { return "Transform"; }
 			std::string Hint(IVoxelEditContext&) override;
+			// The picked object's position, rotation and scale, set by number.
+			ITransformTarget* TransformTarget(IVoxelEditContext& ed) override;
 		};
 	} // namespace gui
 } // namespace spades
