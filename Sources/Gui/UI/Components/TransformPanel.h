@@ -83,6 +83,9 @@ namespace spades {
 
 			/** Its top right corner. */
 			void Layout(float right, float top);
+			/** Its bottom right corner: it grows up from there, as tall as the
+			 *  rows its target has. */
+			void LayoutAbove(float right, float bottom);
 			/** Whether it showed last frame, and `at` is on it. */
 			bool Contains(const Vector2& at) const;
 
@@ -112,6 +115,8 @@ namespace spades {
 			client::IFont& font;
 			std::vector<std::unique_ptr<NumberField>> fields; // location, rotation, scale; x y z
 			float right = 0.0F, top = 0.0F;
+			bool fromBottom = false;
+			float bottom = 0.0F;
 			bool shown = false;
 			unsigned rows = ITransformTarget::kAllRows; // as the target last said
 			int RowCount() const;

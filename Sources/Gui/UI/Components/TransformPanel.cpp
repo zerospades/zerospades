@@ -121,8 +121,17 @@ namespace spades {
 		}
 
 		void TransformPanel::Layout(float r, float t) {
+			fromBottom = false;
 			right = r;
 			top = t;
+			Place();
+		}
+
+		void TransformPanel::LayoutAbove(float r, float b) {
+			fromBottom = true;
+			right = r;
+			bottom = b;
+			top = bottom - Height();
 			Place();
 		}
 
@@ -262,6 +271,8 @@ namespace spades {
 			shown = target.CurrentTransform(now, name, onlyMoves);
 			if (rows != target.ShownRows()) {
 				rows = target.ShownRows();
+				if (fromBottom)
+					top = bottom - Height(); // as tall as its rows, up from its foot
 				Place();
 			}
 			if (!shown) {
