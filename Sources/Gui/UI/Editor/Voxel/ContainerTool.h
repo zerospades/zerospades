@@ -52,6 +52,10 @@ namespace spades {
 			std::string Hint(IVoxelEditContext&) override;
 			void DrawScene(IVoxelEditContext&) override;
 			void DrawOverlay(IVoxelEditContext&) override;
+			ITransformTarget* TransformTarget(IVoxelEditContext& ed) override {
+				VoxelTool* t = Cur();
+				return t ? t->TransformTarget(ed) : nullptr;
+			}
 
 		protected:
 			std::vector<std::unique_ptr<VoxelTool>> subs;

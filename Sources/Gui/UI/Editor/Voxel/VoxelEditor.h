@@ -44,6 +44,8 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		class EditorUI;
+		class ITransformTarget;
+		class TransformPanel;
 		class IVoxelDocument;
 		class IVoxelEditorHost;
 		class SoftwareCursor;
@@ -148,8 +150,20 @@ namespace spades {
 			void PointerMoved(const Vector2& delta);
 			/** A press or release of the left or right button. */
 			void ButtonEvent(PointerButton button, bool down);
-			/** A key typed into a number box of the option bar; true if taken. */
+			/** A key typed into a number (a box of the option bar, a field of
+			 *  the transform panel); true if taken. */
 			bool OptionBarKey(const std::string& key);
+			/** Whether a number is being typed: it then has the keyboard, its
+			 *  Ctrl shortcuts included. */
+			bool IsTyping() const;
+			// What is typed, for the number being typed into.
+			void TextInput(const std::string& text);
+			void TextComposition(const std::string& text);
+			bool AcceptsTextInput() const;
+			AABB2 TextInputRect() const;
+			/** Whether a number is being scrubbed: the pointer's motion is then
+			 *  its, the host holding the pointer still. */
+			bool HoldsPointer() const;
 			/** The editor's own keys (delete); true if taken. Before the host's
 			 *  movement keys, which never reach the tools. */
 			bool CommandKey(const std::string& key, bool down);
@@ -176,9 +190,15 @@ namespace spades {
 			void DrawViewportOverlays(float sw, float sh, const std::string& help);
 			/** The toolbar and the option bar under the host's ribbon. */
 			void DrawBars(float sw);
-			/** The colour picker and the active tool's overlay, over everything
-			 *  but the host's menu and dialogs. */
+			/** The colour picker, the transform panel and the active tool's
+			 *  overlay, over everything but the host's menu and dialogs. */
 			void DrawPanels();
+			/** Where the transform panel's top right corner goes (under the
+			 *  host's navigation cube). */
+			void SetPanelAnchor(float right, float top) {
+				panelRight = right;
+				panelTop = top;
+			}
 
 			// --- Layout: the bars the editor draws across the top ------------
 			static float RibbonHeight();
@@ -191,6 +211,7 @@ namespace spades {
 			void DrawLine3D(const Vector3& a, const Vector3& b, const Vector4& color) override;
 			GizmoView GetGizmoView() const override;
 			void DrawGizmo(const TransformGizmo& gizmo) override;
+			ITransformTarget& PivotTransform() override;
 			void DrawScreenRect(const AABB2& rect, const Vector4& color) override;
 			void DrawScreenCircle(const Vector2& centre, float radius, const Vector4& color) override;
 			void SetStatus(const std::string&) override;
@@ -470,7 +491,18 @@ namespace spades {
 			IntVector3 pickPlace = IntVector3::Make(0, 0, 0); // adjacent empty cell
 
 			// --- Input --------------------------------------------------------
-			bool ctrlHeld = false, altHeld = false, shiftHeld = false;
+			bool ctrlHeld = false, altHeld = false, shiftHeld = false, metaHeld = false;
+
+			// --- Setting by number (the transform panel) ---------------------
+			class PivotTarget;
+			std::unique_ptr<TransformPanel> transformPanel;
+			std::unique_ptr<PivotTarget> pivotTarget;
+			float panelRight = 0.0F, panelTop = 0.0F;
+			float clock = 0.0F; // seconds, for the caret and double clicks
+			/** What the active tool sets by number, or null. */
+			ITransformTarget* PanelTarget();
+			/** Ends a number being typed or scrubbed, as a click elsewhere does. */
+			void SettlePanel();
 			bool lmbHeld = false, rmbHeld = false;
 			PointerInput MakePointer(PointerButton b, PointerPhase ph,
 			                         const Vector2& delta = MakeVector2(0, 0)) const;
@@ -506,7 +538,7 @@ namespace spades {
 			// --- Escape -------------------------------------------------------
 			// What Escape backs out of, top-most first. Escape does it and the
 			// hint line names it, both from here, so the line says what it does.
-			enum class EscapeLayer { None, Eyedropper, Tool, Placement, Selection };
+			enum class EscapeLayer { None, Number, Eyedropper, Tool, Placement, Selection };
 			EscapeLayer NextEscape();
 			std::string EscapeLabel(EscapeLayer layer);
 			void Escape(EscapeLayer layer);
