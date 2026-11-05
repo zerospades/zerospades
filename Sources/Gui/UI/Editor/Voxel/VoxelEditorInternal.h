@@ -46,6 +46,7 @@
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/BarLayout.h>
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/ContextMenu.h>
 #include <Gui/UI/Components/MenuBar.h>
 #include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>

@@ -326,6 +326,21 @@ namespace spades {
 		void VoxelEditor::DrawToolbar(float sw) {
 			screenWidth = sw; // for hit tests in ButtonEvent
 
+			// The mode selector, for a document of several modes; one with only
+			// one has nothing to switch between, and shows none.
+			std::string modeLabel;
+			int supported = 0;
+			for (const ModeInfo& info : Modes()) {
+				if (!ModeSupported(info.mode))
+					continue;
+				supported++;
+				if (info.mode == currentMode)
+					modeLabel = std::string(info.label) + " Mode";
+			}
+			ui.GetToolbar()->SetModeSelector(supported < 2 ? std::string() : modeLabel,
+			                                 ModeSupported(EditorMode::Object) ? kModeToggleKey : "",
+			                                 ui.GetContextMenu()->IsOpenFor(this));
+
 			// Tool buttons. A hot key the editor already uses for something else
 			// never reaches the tool, so the button does not claim it.
 			// Each mode shows its own tools: Object mode its own first.

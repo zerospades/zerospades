@@ -414,7 +414,8 @@ namespace spades {
 		bool VoxelEditor::CommandKey(const std::string& key, bool down) {
 			// Tab goes between the scene's objects and the picked one's voxels,
 			// as in Blender.
-			if (down && key == "Tab" && ModeSupported(EditorMode::Object) && !lmbHeld && !rmbHeld) {
+			if (down && key == kModeToggleKey && ModeSupported(EditorMode::Object) && !lmbHeld &&
+			    !rmbHeld) {
 				CancelToolInteraction();
 				SetObjectMode(currentMode != EditorMode::Object);
 				return true;
