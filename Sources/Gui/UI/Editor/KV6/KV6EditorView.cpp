@@ -87,8 +87,9 @@ namespace spades {
 			constexpr float kNaviCubeMargin = 16.0F;
 			constexpr float kNaviCubeTopGap = 8.0F;
 			constexpr float kNaviCubeInset = 14.0F;
-			// The transform panel, under the cube's home button.
-			constexpr float kPanelGap = 34.0F;
+			// The transform panel's foot, as far up from the bottom as the
+			// colour picker's, clear of the hint lines.
+			constexpr float kPanelBottomGap = 44.0F;
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
@@ -741,9 +742,9 @@ namespace spades {
 			naviCube.Draw(*renderer, fontManager->GetSmallGuiFont(), cam.View(),
 			              softwareCursor->GetPosition());
 
-			// The transform panel, under the navigation cube and its home button.
-			editor->SetPanelAnchor(sw - kNaviCubeMargin,
-			                       VoxelEditor::BarsHeight() + kNaviCubeTopGap + kNaviCubeBox + kPanelGap);
+			// The transform panel, in the view's bottom right corner, its foot
+			// level with the colour picker's.
+			editor->SetPanelCorner(sw - kNaviCubeMargin, sh - kPanelBottomGap);
 			editor->DrawPanels();
 			ui->GetEditorMenu()->Draw();
 

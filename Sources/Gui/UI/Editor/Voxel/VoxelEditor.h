@@ -193,11 +193,11 @@ namespace spades {
 			/** The colour picker, the transform panel and the active tool's
 			 *  overlay, over everything but the host's menu and dialogs. */
 			void DrawPanels();
-			/** Where the transform panel's top right corner goes (under the
-			 *  host's navigation cube). */
-			void SetPanelAnchor(float right, float top) {
+			/** Where the transform panel's bottom right corner goes: over the
+			 *  view's bottom right, under the colour picker. */
+			void SetPanelCorner(float right, float bottom) {
 				panelRight = right;
-				panelTop = top;
+				panelBottom = bottom;
 			}
 
 			// --- Layout: the bars the editor draws across the top ------------
@@ -497,7 +497,10 @@ namespace spades {
 			class PivotTarget;
 			std::unique_ptr<TransformPanel> transformPanel;
 			std::unique_ptr<PivotTarget> pivotTarget;
-			float panelRight = 0.0F, panelTop = 0.0F;
+			float panelRight = 0.0F, panelBottom = 0.0F;
+			/** Whether `at` is on the transform panel where the colour picker,
+			 *  drawn over it, leaves it showing. */
+			bool OnPanel(const Vector2& at);
 			float clock = 0.0F; // seconds, for the caret and double clicks
 			/** What the active tool sets by number, or null. */
 			ITransformTarget* PanelTarget();
