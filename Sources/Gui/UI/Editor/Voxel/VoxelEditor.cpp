@@ -2271,16 +2271,24 @@ namespace spades {
 			if (e.IsRight() && !t->RightButtonInverts())
 				return;
 			t->OnPointer(*this, e);
-			// Switched after the tool is done with the event, never from inside
-			// it; as part of the same user action, so it undoes with it.
-			if (returningToSelect) {
-				returningToSelect = false;
-				if (edit.selection.Empty() == false) {
+			SwitchAsAsked();
+		}
+
+		void VoxelEditor::SwitchAsAsked() {
+			// After the tool is done with the event, never from inside it; as
+			// part of the same user action, so it undoes with it.
+			if (pendingTool.empty())
+				return;
+			const std::string id = pendingTool;
+			pendingTool.clear();
+			if (clearingSelection) {
+				clearingSelection = false;
+				if (!edit.selection.Empty()) {
 					ClearSelection();
 					SetStatus("Selection cleared");
 				}
-				SetActiveTool(ToolIndex("select"));
 			}
+			SetActiveTool(ToolIndex(id));
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
@@ -2538,6 +2546,7 @@ namespace spades {
 				undo.BeginAction();
 			UserActionEnd end(*this, ownAction);
 			t->OnKey(*this, e);
+			SwitchAsAsked();
 		}
 
 		void VoxelEditor::ReleaseHeldInput() {

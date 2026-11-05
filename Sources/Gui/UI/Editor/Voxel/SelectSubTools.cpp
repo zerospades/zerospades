@@ -57,6 +57,24 @@ namespace spades {
 			}
 		} // namespace
 
+		// --- Voxels, as the screen selections take them ------------------------
+
+		int VoxelsOnScreen::TakeOnScreen(IVoxelEditContext& ed,
+		                                 const std::function<bool(const Vector2&)>& inside,
+		                                 bool through, bool removing) {
+			const std::vector<IntVector3> cells = ed.CellsOnScreen(inside, through);
+			Take(ed, cells, removing);
+			return int(cells.size());
+		}
+
+		bool VoxelsOnScreen::TakeAtCursor(IVoxelEditContext& ed, bool removing) {
+			ed.DoPick();
+			if (!ed.HasPick())
+				return false;
+			Take(ed, std::vector<IntVector3>(1, ed.PickSolid()), removing);
+			return true;
+		}
+
 		// --- Plane -------------------------------------------------------------
 
 		std::string PlaneSelectSubTool::Hint(IVoxelEditContext&) {
@@ -131,21 +149,21 @@ namespace spades {
 			end = e.pos;
 			const AABB2 rect = Rect();
 			if (rect.GetWidth() < kClickReach && rect.GetHeight() < kClickReach) {
-				// A click: the voxel under it.
-				ed.DoPick();
-				if (ed.HasPick())
-					Take(ed, std::vector<IntVector3>(1, ed.PickSolid()), removing);
+				// A click: what is under it.
+				target.TakeAtCursor(ed, removing);
+				target.Done(ed, removing);
 				return;
 			}
-			const std::vector<IntVector3> cells = ed.CellsOnScreen(
+			const int taken = target.TakeOnScreen(
+			  ed,
 			  [&](const Vector2& p) {
 				  return p.x >= rect.GetMinX() && p.x <= rect.GetMaxX() && p.y >= rect.GetMinY() &&
 				         p.y <= rect.GetMaxY();
 			  },
-			  settings.through);
-			Take(ed, cells, removing);
-			ed.SetStatus((removing ? "Deselected " : "Selected ") + std::to_string(cells.size()) +
-			             " voxels");
+			  settings.through, removing);
+			ed.SetStatus((removing ? "Deselected " : "Selected ") + std::to_string(taken) + " " +
+			             target.Noun());
+			target.Done(ed, removing);
 		}
 
 		void RectSelectSubTool::DrawOverlay(IVoxelEditContext& ed) {
@@ -165,11 +183,9 @@ namespace spades {
 			const float radius = settings.diameter * 0.5F;
 			// Between two events the pointer may have moved far: everything the
 			// brush passed over on the way is taken, not only where it stopped.
-			Take(ed,
-			     ed.CellsOnScreen(
-			       [&](const Vector2& p) { return DistanceToSegment(p, from, to) <= radius; },
-			       settings.through),
-			     removing);
+			target.TakeOnScreen(
+			  ed, [&](const Vector2& p) { return DistanceToSegment(p, from, to) <= radius; },
+			  settings.through, removing);
 		}
 
 		void BrushSelectSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
@@ -187,6 +203,7 @@ namespace spades {
 				last = e.pos;
 			} else if (e.IsUp() && e.IsRight() == removing) {
 				painting = false;
+				target.Done(ed, removing);
 			}
 		}
 

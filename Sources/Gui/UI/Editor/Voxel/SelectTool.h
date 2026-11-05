@@ -55,6 +55,7 @@ namespace spades {
 		private:
 			ToolOptions options;
 			ScreenSelectSettings screen; // Rect's and Brush's
+			VoxelsOnScreen voxels;       // what they select
 			int rectIndex = -1, brushIndex = -1;
 			// The press that may turn out a click on nothing.
 			bool pressOnNothing = false;

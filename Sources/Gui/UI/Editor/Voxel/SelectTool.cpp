@@ -56,9 +56,9 @@ namespace spades {
 			  new CylinderSubTool({select, "select"}, {deselect, "deselect"})));
 			subs.push_back(std::unique_ptr<VoxelTool>(new PlaneSelectSubTool()));
 			rectIndex = int(subs.size());
-			subs.push_back(std::unique_ptr<VoxelTool>(new RectSelectSubTool(screen)));
+			subs.push_back(std::unique_ptr<VoxelTool>(new RectSelectSubTool(voxels, screen)));
 			brushIndex = int(subs.size());
-			subs.push_back(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(screen)));
+			subs.push_back(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(voxels, screen)));
 
 			// Whole-selection commands, available whichever sub-tool is active.
 			// Their keys work in every tool; these buttons are their one home.

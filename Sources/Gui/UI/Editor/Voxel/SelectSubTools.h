@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include <Core/Math.h>
 
 #include "VoxelTool.h"
@@ -39,6 +41,42 @@ namespace spades {
 		};
 
 		/**
+		 * What Rect and Brush select on the screen: voxels in Edit mode, the
+		 * scene's objects in Object mode. The sub-tools say where on the screen
+		 * and whether to add or take away; this decides what that takes.
+		 */
+		class IScreenSelectable {
+		public:
+			virtual ~IScreenSelectable() {}
+			/**
+			 * Selects what the view shows where `inside` says (screen pixels),
+			 * or takes it out of the selection (`removing`): what is in sight,
+			 * or with `through` all there. Returns how many it took.
+			 */
+			virtual int TakeOnScreen(IVoxelEditContext& ed,
+			                         const std::function<bool(const Vector2&)>& inside, bool through,
+			                         bool removing) = 0;
+			/** A click: what is under the cursor; false when there is nothing. */
+			virtual bool TakeAtCursor(IVoxelEditContext& ed, bool removing) = 0;
+			/** A rectangle or a stroke is over. */
+			virtual void Done(IVoxelEditContext& ed, bool removing) {
+				(void)ed;
+				(void)removing;
+			}
+			/** What it selects, in messages: "voxels". */
+			virtual const char* Noun() const = 0;
+		};
+
+		/** The document's voxels, as Rect and Brush select them in Edit mode. */
+		class VoxelsOnScreen final : public IScreenSelectable {
+		public:
+			int TakeOnScreen(IVoxelEditContext& ed, const std::function<bool(const Vector2&)>& inside,
+			                 bool through, bool removing) override;
+			bool TakeAtCursor(IVoxelEditContext& ed, bool removing) override;
+			const char* Noun() const override { return "voxels"; }
+		};
+
+		/**
 		 * Selects a flat face of the model (Select's "Plane"), as a modeller
 		 * selects coplanar faces: a click on a voxel's face takes every voxel
 		 * reached from it face to face in that plane whose face that way shows;
@@ -53,14 +91,15 @@ namespace spades {
 		};
 
 		/**
-		 * Selects what a rectangle dragged on the screen takes in (Select's
-		 * "Rect"): the voxels in sight there, or with X-Ray every one. A click
-		 * without a drag takes the voxel under it. LMB adds, RMB removes;
-		 * Escape gives the rectangle up.
+ * Selects what a rectangle dragged on the screen takes in (Select's
+		 * "Rect"): what is in sight there, or with X-Ray all of it. A click
+		 * without a drag takes what is under it. LMB adds, RMB removes; Escape
+		 * gives the rectangle up.
 		 */
 		class RectSelectSubTool : public VoxelTool {
 		public:
-			explicit RectSelectSubTool(const ScreenSelectSettings& settings) : settings(settings) {}
+			RectSelectSubTool(IScreenSelectable& target, const ScreenSelectSettings& settings)
+			    : target(target), settings(settings) {}
 			const char* Label() const override { return "Rect"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
@@ -70,6 +109,7 @@ namespace spades {
 			void DrawOverlay(IVoxelEditContext&) override;
 
 		private:
+			IScreenSelectable& target;
 			const ScreenSelectSettings& settings;
 			bool dragging = false;
 			bool removing = false;
@@ -78,14 +118,15 @@ namespace spades {
 		};
 
 		/**
-		 * Paints a selection with a round brush on the screen (Select's
-		 * "Brush"), of a diameter set on the bar or with [ and ]: the voxels in
-		 * sight under it, or with X-Ray every one. A stroke takes all it sweeps
+ * Paints a selection with a round brush on the screen (Select's
+		 * "Brush"), of a diameter set on the bar or with [ and ]: what is in
+		 * sight under it, or with X-Ray all of it. A stroke takes all it sweeps
 		 * over, as one step. LMB adds, RMB removes.
 		 */
 		class BrushSelectSubTool : public VoxelTool {
 		public:
-			explicit BrushSelectSubTool(ScreenSelectSettings& settings) : settings(settings) {}
+			BrushSelectSubTool(IScreenSelectable& target, ScreenSelectSettings& settings)
+			    : target(target), settings(settings) {}
 			const char* Label() const override { return "Brush"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
@@ -94,6 +135,7 @@ namespace spades {
 			void DrawOverlay(IVoxelEditContext&) override;
 
 		private:
+			IScreenSelectable& target;
 			ScreenSelectSettings& settings;
 			bool painting = false;
 			bool removing = false;
