@@ -20,7 +20,10 @@
 
 #include "ObjectTool.h"
 
+#include <cmath>
+
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
+#include <Gui/UI/Components/TransformPanel.h>
 
 #include "ObjectModeHost.h"
 #include "SubTool.h"
@@ -33,6 +36,21 @@ namespace spades {
 			// press anywhere inside the rings, where a click should pick.
 			GizmoHandleSet ObjectHandles() {
 				return GizmoHandleSet::All().Without(GizmoHandle::RotateTrackball);
+			}
+
+			// With the scale locked (IsScaleLocked), every scale handle scales
+			// evenly: the factor the drag gave the axes it stretches (those
+			// farthest from 1) goes to all three.
+			GizmoTransform Proportional(GizmoTransform t) {
+				if (!IsScaleLocked())
+					return t;
+				float f = t.scale.x;
+				for (float c : {t.scale.y, t.scale.z}) {
+					if (std::fabs(c - 1.0F) > std::fabs(f - 1.0F))
+						f = c;
+				}
+				t.scale = MakeVector3(f, f, f);
+				return t;
 			}
 
 			// Turns snap to 15 degrees, scaling to tenths; moves take the tool's
@@ -79,12 +97,12 @@ namespace spades {
 
 				void OnGizmoDrag(IVoxelEditContext& ed) override {
 					if (IObjectModeHost* objects = ed.ObjectMode())
-						objects->PreviewObjectDrag(gizmo.Total());
+						objects->PreviewObjectDrag(Proportional(gizmo.Total()));
 				}
 
 				void OnGizmoEnd(IVoxelEditContext& ed, const GizmoTransform& total) override {
 					if (IObjectModeHost* objects = ed.ObjectMode()) {
-						objects->PreviewObjectDrag(total);
+						objects->PreviewObjectDrag(Proportional(total));
 						objects->CommitObjectDrag();
 					}
 				}
