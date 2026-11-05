@@ -35,6 +35,8 @@ namespace spades {
 			const char* const kPasteOption = "clipboard.paste";
 			const char* const kDiameterOption = "select.diameter";
 			const char* const kXRayOption = "select.xray";
+			// Pixels a press may move and still be a click.
+			constexpr float kClickReach = 4.0F;
 		} // namespace
 
 		SelectTool::SelectTool() {
@@ -73,6 +75,27 @@ namespace spades {
 		}
 
 		ToolOptions* SelectTool::Options() { return &options; }
+
+		void SelectTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (e.IsDown() && e.IsLeft()) {
+				// Asked before the sub-tool sees the press: a box under way says so.
+				const bool placing = Cur() && !Cur()->EscapeLabel(ed).empty();
+				ed.DoPick();
+				pressOnNothing = !placing && !ed.HasPick();
+				pressAt = e.pos;
+			}
+			if (e.IsDrag() && pressOnNothing &&
+			    (e.pos - pressAt).GetManhattanLength() > kClickReach)
+				pressOnNothing = false; // a drag, not a click
+			ContainerTool::OnPointer(ed, e);
+			if (e.IsUp() && e.IsLeft() && pressOnNothing) {
+				pressOnNothing = false;
+				if (ed.SelectionCount() > 0) {
+					ed.ClearSelection();
+					ed.SetStatus("Selection cleared");
+				}
+			}
+		}
 
 		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
 			const bool selected = ed.SelectionCount() > 0;
