@@ -51,7 +51,7 @@ namespace spades {
 		// axes) and a scale. Z points down, as in the game.
 
 		const char* const kUsage =
-		  "usage: --2kv6-tools COMMAND FILE [ARGS...]\n"
+		  "usage: --debug-tools --2kv6-tools COMMAND FILE [ARGS...]\n"
 		  "\n"
 		  "Reads and edits .2kv6 scenes without opening the game: a tree of\n"
 		  "objects, each with its own voxels (a model) or none (a hinge, a joint\n"
