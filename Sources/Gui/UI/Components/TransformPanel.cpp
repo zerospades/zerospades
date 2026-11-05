@@ -21,16 +21,23 @@
 #include "TransformPanel.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
+#include <Core/Settings.h>
 #include <Gui/OverlayPaint.h>
 
 #include "EditorTheme.h"
 #include "NumberField.h"
 
+DEFINE_SPADES_SETTING(cl_editorScaleLocked, "0"); // scaling keeps proportions
+
 namespace spades {
 	namespace gui {
+		bool IsScaleLocked() { return static_cast<bool>(cl_editorScaleLocked); }
+		void SetScaleLocked(bool locked) { cl_editorScaleLocked = locked ? 1 : 0; }
+
 		namespace {
 			constexpr float kWidth = 300.0F;
 			constexpr float kPad = 10.0F;
@@ -40,6 +47,9 @@ namespace spades {
 			constexpr float kLabelW = 64.0F;
 			constexpr float kFieldGap = 4.0F;
 			constexpr float kTextScale = 0.85F;
+			constexpr float kLockW = 18.0F; // the Scale row's lock, before its fields
+			// No scale set through the lock goes below the fields' own floor.
+			constexpr float kMinScale = 0.01F;
 
 			const char* const kRows[] = {"Location", "Rotation", "Scale"};
 			const char* const kAxes[] = {"X", "Y", "Z"};
@@ -185,11 +195,66 @@ namespace spades {
 			if ((onlyMoves && index >= 3) || Slot(index / 3) < 0)
 				return false;
 			active = index;
+			begunScale = editing.scale;
+			scaleLocked = target.CanLockScale() && IsScaleLocked();
 			fields[std::size_t(index)]->SetValue(Component(editing, index));
 			return true;
 		}
 
-		void TransformPanel::Put(int index, float value) { Component(editing, index) = value; }
+		void TransformPanel::Put(int index, float value) {
+			if (index < 6 || !scaleLocked) {
+				Component(editing, index) = value;
+				return;
+			}
+			// Every axis by the factor the one set changed by, from where the
+			// field began; an axis of no size has none to give, so all take
+			// the value.
+			const float from = index == 6 ? begunScale.x : index == 7 ? begunScale.y : begunScale.z;
+			if (std::fabs(from) < 1.0e-6F) {
+				editing.scale = MakeVector3(value, value, value);
+				return;
+			}
+			const float f = value / from;
+			editing.scale = MakeVector3(std::max(kMinScale, begunScale.x * f),
+			                            std::max(kMinScale, begunScale.y * f),
+			                            std::max(kMinScale, begunScale.z * f));
+			Component(editing, index) = value; // exactly as typed
+		}
+
+		AABB2 TransformPanel::LockRect() const {
+			const float y = top + kPad + kTitleH + float(std::max(0, Slot(2))) * (kRowH + kRowGap);
+			return AABB2(Left() + kPad + kLabelW - kLockW - 3.0F, y, kLockW, kRowH);
+		}
+
+		void TransformPanel::DrawLock(const Vector2& cursor) {
+			const AABB2 r = LockRect();
+			const bool locked = IsScaleLocked();
+			const bool hot = lockUsable && r.Contains(cursor);
+			if (hot) {
+				OverlayColorNP(renderer, EditorTheme::Highlight());
+				OverlayFillRect(renderer, r.GetMinX(), r.GetMinY() + 2.0F, r.GetWidth(),
+				                r.GetHeight() - 4.0F);
+			}
+			const Vector4 color = !lockUsable ? EditorTheme::TextFaint()
+			                      : locked || hot ? EditorTheme::Text()
+			                                      : EditorTheme::TextDim();
+			// A padlock: its body, and over it the shackle, shut when locked
+			// and lifted open on one side when not.
+			const float cx = r.GetMinX() + r.GetWidth() * 0.5F;
+			const float bodyTop = r.GetMinY() + r.GetHeight() * 0.5F;
+			OverlayColorNP(renderer, color);
+			OverlayFillRect(renderer, cx - 5.0F, bodyTop, 10.0F, 7.5F);
+			const float lift = locked ? 0.0F : 2.5F;
+			const float legL = locked ? bodyTop : bodyTop - lift - 1.5F;
+			const Vector2 shackle[6] = {
+			  MakeVector2(cx - 3.2F, legL),
+			  MakeVector2(cx - 3.2F, bodyTop - 3.5F - lift),
+			  MakeVector2(cx - 1.8F, bodyTop - 5.5F - lift),
+			  MakeVector2(cx + 1.8F, bodyTop - 5.5F - lift),
+			  MakeVector2(cx + 3.2F, bodyTop - 3.5F - lift),
+			  MakeVector2(cx + 3.2F, bodyTop - lift)};
+			OverlayStrokePolyline(renderer, shackle, 6, 1.6F, color, false);
+		}
 
 		void TransformPanel::Press(ITransformTarget& target, const Vector2& at) {
 			// Whatever was being typed into is settled first, as a press anywhere
@@ -198,6 +263,10 @@ namespace spades {
 			// A press on the panel but on none of its fields settles it too — the
 			// panel answers for every press on it, and nothing else will.
 			Settle(target);
+			if (lockShown && lockUsable && LockRect().Contains(at)) {
+				SetScaleLocked(!IsScaleLocked());
+				return;
+			}
 			for (int i = 0; i < 9; i++) {
 				NumberField& field = *fields[std::size_t(i)];
 				if (!field.Contains(at) || !field.IsEnabled())
@@ -301,6 +370,7 @@ namespace spades {
 					top = bottom - Height(); // as tall as its rows, up from its foot
 				Place();
 			}
+			lockShown = shown && target.CanLockScale() && Slot(2) >= 0;
 			if (!shown) {
 				if (active >= 0)
 					Settle(target); // what it was setting is gone
@@ -340,6 +410,10 @@ namespace spades {
 				const bool settable = row == 0 || !onlyMoves;
 				text(kRows[row], x + kPad, y + (kRowH - labelH) * 0.5F, kTextScale,
 				     settable ? EditorTheme::TextDim() : EditorTheme::TextFaint());
+				if (row == 2 && target.CanLockScale()) {
+					lockUsable = settable;
+					DrawLock(cursor);
+				}
 				for (int axis = 0; axis < 3; axis++) {
 					const int i = row * 3 + axis;
 					NumberField& field = *fields[std::size_t(i)];
