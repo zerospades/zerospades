@@ -1010,6 +1010,50 @@ namespace spades {
 			return true;
 		}
 
+		bool KV6Scene::AddScene(const NodePath& parent, const std::string& path,
+		                        const std::string& name, std::string& why) {
+			why.clear();
+			if (!CanHold(parent)) {
+				why = "nothing to add there";
+				return false;
+			}
+			std::vector<VoxelObject> objects;
+			std::FILE* f = fs::OpenFile(path, "rb");
+			if (!f) {
+				why = "it cannot be opened";
+				return false;
+			}
+			try {
+				StdStream stream(f, true); // takes ownership of the FILE*
+				objects = VoxelModel2KV6::LoadScene(stream).objects;
+			} catch (const std::exception&) {
+				why = "it is not a scene this editor can read";
+				return false;
+			}
+			bool voxels = false;
+			std::function<void(VoxelObject&)> settle = [&](VoxelObject& o) {
+				o.locked = false;
+				voxels = voxels || o.model.GetPointerOrNull() != nullptr;
+				for (VoxelObject& child : o.children)
+					settle(child);
+			};
+			for (VoxelObject& o : objects)
+				settle(o);
+			if (!voxels) {
+				why = "it holds no voxels";
+				return false;
+			}
+			if (objects.size() > 1) {
+				VoxelObject group;
+				group.name = name;
+				group.children = std::move(objects);
+				objects.clear();
+				objects.push_back(std::move(group));
+			}
+			InsertUnder(parent, std::move(objects));
+			return true;
+		}
+
 		std::string KV6Scene::WhyNotDelete(const std::vector<NodePath>& nodes) const {
 			const std::vector<NodePath> top = TopMost(nodes);
 			if (top.empty())

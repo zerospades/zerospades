@@ -248,6 +248,16 @@ namespace spades {
 			 *  the parent's origin, named `name` made unique; selects it. */
 			bool AddChild(const NodePath& parent, Handle<VoxelModel> model, const std::string& name,
 			              std::string& why);
+			/**
+			 * The objects of the .2kv6 scene at `path` after `parent`'s children,
+			 * placed in its frame as they were in the scene's: a lone top object
+			 * as it is, several under a new node named `name`. Its notes and
+			 * clips stay behind, and its locks are lifted (its template is not
+			 * this scene's). Selects what it added, as one step. False, `why`
+			 * saying why, when the file cannot be read or holds no voxels.
+			 */
+			bool AddScene(const NodePath& parent, const std::string& path, const std::string& name,
+			              std::string& why);
 			/** Why the nodes cannot be deleted: one is, or holds, a locked node;
 			 *  empty when they can. */
 			std::string WhyNotDelete(const std::vector<NodePath>& nodes) const;
