@@ -60,7 +60,7 @@ namespace spades {
 
 		std::string ObjectClickSubTool::Hint(IVoxelEditContext&) {
 			return "click an object to select it  |  [Shift/Ctrl] add or take it away  |  [RMB] "
-			       "deselect it";
+			       "its menu";
 		}
 
 		void ObjectClickSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
