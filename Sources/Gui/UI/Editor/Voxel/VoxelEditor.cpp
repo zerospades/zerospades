@@ -383,10 +383,13 @@ namespace spades {
 			const GizmoView view = DocumentView();
 			if (!view.IsValid())
 				return;
-
 			Vector3 eye, dir;
 			view.Ray(host.AimPosition(), eye, dir);
+			pickHit = FirstSolidAlong(eye, dir, pickSolid, pickPlace);
+		}
 
+		bool VoxelEditor::FirstSolidAlong(const Vector3& eye, const Vector3& dir, IntVector3& solid,
+		                                  IntVector3& before) const {
 			// The renderer centres voxel (x,y,z) at world (x,y,z), so traverse in a
 			// +0.5-shifted space where each integer cell maps to a voxel index.
 			Vector3 o = eye + MakeVector3(0.5F, 0.5F, 0.5F);
@@ -403,7 +406,7 @@ namespace spades {
 			for (int a = 0; a < 3; a++) {
 				if (along[a] == 0.0F) {
 					if (from[a] < 0.0F || from[a] > size[a])
-						return; // parallel to this slab and outside it
+						return false; // parallel to this slab and outside it
 					continue;
 				}
 				float t0 = (0.0F - from[a]) / along[a];
@@ -414,7 +417,7 @@ namespace spades {
 				tExit = std::min(tExit, t1);
 			}
 			if (tEnter > tExit)
-				return; // the ray misses the volume
+				return false; // the ray misses the volume
 			// The cell before the first one inside is the one a voxel is placed
 			// in when the hit is on the volume's own face.
 			const float kInside = 1.0e-4F;
@@ -446,10 +449,9 @@ namespace spades {
 			const int limit = extent.x + extent.y + extent.z + 3;
 			for (int i = 0; i < limit; i++) {
 				if (document.IsSolid(cx, cy, cz)) {
-					pickHit = true;
-					pickSolid = MakeIntVector3(cx, cy, cz);
-					pickPlace = MakeIntVector3(px, py, pz);
-					return;
+					solid = MakeIntVector3(cx, cy, cz);
+					before = MakeIntVector3(px, py, pz);
+					return true;
 				}
 				px = cx;
 				py = cy;
@@ -465,6 +467,7 @@ namespace spades {
 					tMaxZ += tDeltaZ;
 				}
 			}
+			return false;
 		}
 
 		// --- Volume -----------------------------------------------------------
@@ -932,6 +935,106 @@ namespace spades {
 				}
 			}
 			return region;
+		}
+
+		std::vector<IntVector3> VoxelEditor::CoplanarFaces(const IntVector3& solid,
+		                                                   const IntVector3& normal) const {
+			std::vector<IntVector3> region;
+			auto showing = [&](const IntVector3& v) {
+				const IntVector3 out = v + normal;
+				return document.IsSolid(v.x, v.y, v.z) && !document.IsSolid(out.x, out.y, out.z);
+			};
+			if (!showing(solid))
+				return region;
+			// Across the plane only: the four face steps square to the normal.
+			std::vector<IntVector3> steps;
+			for (const IntVector3& step : kFaceNeighbours) {
+				if (step.x * normal.x + step.y * normal.y + step.z * normal.z == 0)
+					steps.push_back(step);
+			}
+			VoxelSelection queued;
+			std::vector<IntVector3> stack(1, solid);
+			queued.Add(solid);
+			while (!stack.empty()) {
+				const IntVector3 c = stack.back();
+				stack.pop_back();
+				region.push_back(c);
+				for (const IntVector3& step : steps) {
+					const IntVector3 n = c + step;
+					if (!queued.Contains(n) && showing(n)) {
+						queued.Add(n);
+						stack.push_back(n);
+					}
+				}
+			}
+			return region;
+		}
+
+		void VoxelEditor::IndexCells() const {
+			if (cellsVersion == document.Version())
+				return;
+			cellsVersion = document.Version();
+			solidCells.clear();
+			surfaceCells.clear();
+			const IntVector3 size = document.Size();
+			for (int x = 0; x < size.x; x++)
+				for (int y = 0; y < size.y; y++)
+					for (int z = 0; z < size.z; z++) {
+						if (!document.IsSolid(x, y, z))
+							continue;
+						const IntVector3 v = MakeIntVector3(x, y, z);
+						solidCells.push_back(v);
+						for (const IntVector3& step : kFaceNeighbours) {
+							const IntVector3 n = v + step;
+							if (!document.IsSolid(n.x, n.y, n.z)) {
+								surfaceCells.push_back(v);
+								break;
+							}
+						}
+					}
+		}
+
+		bool VoxelEditor::Seen(const IntVector3& v, const GizmoView& view) const {
+			// Through the middle of each face that shows and faces the eye, just
+			// inside it, so the ray meets this voxel unless another is in the way.
+			const Vector3 middle = MakeVector3(float(v.x), float(v.y), float(v.z));
+			for (const IntVector3& step : kFaceNeighbours) {
+				const IntVector3 n = v + step;
+				if (document.IsSolid(n.x, n.y, n.z))
+					continue; // covered
+				const Vector3 out = MakeVector3(float(step.x), float(step.y), float(step.z));
+				const Vector3 face = middle + out * 0.49F;
+				if (Vector3::Dot(out, view.eye - face) <= 0.0F)
+					continue; // turned away
+				Vector3 dir = face - view.eye;
+				const float length = dir.GetLength();
+				if (length < 1.0e-4F)
+					continue;
+				IntVector3 hit, before;
+				if (FirstSolidAlong(view.eye, dir / length, hit, before) && hit == v)
+					return true;
+			}
+			return false;
+		}
+
+		std::vector<IntVector3> VoxelEditor::CellsOnScreen(
+		  const std::function<bool(const Vector2&)>& inside, bool through) const {
+			std::vector<IntVector3> found;
+			const GizmoView view = DocumentView();
+			if (!view.IsValid())
+				return found;
+			IndexCells();
+			// Through the volume, every voxel; else only those with a face
+			// showing can be seen, and of them, those that are.
+			for (const IntVector3& v : through ? solidCells : surfaceCells) {
+				Vector2 screen;
+				if (!view.Project(MakeVector3(float(v.x), float(v.y), float(v.z)), screen) ||
+				    !inside(screen))
+					continue;
+				if (through || Seen(v, view))
+					found.push_back(v);
+			}
+			return found;
 		}
 
 		void VoxelEditor::SelectIfSolid(const IntVector3& v) {
@@ -1915,6 +2018,25 @@ namespace spades {
 			gizmo.Draw(canvas, GetGizmoView());
 		}
 
+		void VoxelEditor::DrawScreenRect(const AABB2& rect, const Vector4& color) {
+			// A faint fill to see what it takes in, and its edge.
+			Vector4 fill = color;
+			fill.w *= 0.12F;
+			OverlayColorNP(*renderer, fill);
+			OverlayFillRect(*renderer, rect.GetMinX(), rect.GetMinY(), rect.GetWidth(),
+			                rect.GetHeight());
+			OverlayStrokeRect(*renderer, rect.GetMinX(), rect.GetMinY(), rect.GetWidth(),
+			                  rect.GetHeight(), 1.0F, color);
+		}
+
+		void VoxelEditor::DrawScreenCircle(const Vector2& centre, float radius,
+		                                   const Vector4& color) {
+			Vector4 fill = color;
+			fill.w *= 0.08F;
+			OverlayFillCircle(*renderer, centre, radius, fill);
+			OverlayStrokeCircle(*renderer, centre, radius, 1.5F, color);
+		}
+
 		// --- Tools and modes --------------------------------------------------
 
 		std::string VoxelEditor::ToolLabel(int index) const {
@@ -2442,6 +2564,8 @@ namespace spades {
 			if (opts) {
 				for (int i = 0; i < opts->Count(); i++) {
 					const ToolOption& op = opts->At(i);
+					if (!op.visible)
+						continue;
 					OptionBar::Option opt;
 					opt.id = op.id;
 					opt.group = op.group;

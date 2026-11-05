@@ -48,6 +48,7 @@ namespace spades {
 			Type type = Type::Bool;
 			bool bvalue = false;     // Bool value
 			bool enabled = true;     // false greys a Bool or Action out (nothing to act on)
+			bool visible = true;     // false leaves it off the bar (it means nothing now)
 			float value = 0.0F;      // Number value; the tool refreshes it via SetNumber
 			float step = 1.0F;       // what one press of a Number's arrows adds
 			int decimals = 1;        // decimal places a Number is written with
@@ -111,6 +112,11 @@ namespace spades {
 			void SetEnabled(const std::string& id, bool enabled) {
 				if (ToolOption* o = Find(id))
 					o->enabled = enabled;
+			}
+			// An option of one sub-tool's is left off the bar under the others.
+			void SetVisible(const std::string& id, bool visible) {
+				if (ToolOption* o = Find(id))
+					o->visible = visible;
 			}
 
 			/** The option with `id`, or null if there is none. */
