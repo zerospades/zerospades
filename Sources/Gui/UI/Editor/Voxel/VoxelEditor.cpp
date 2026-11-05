@@ -572,8 +572,12 @@ namespace spades {
 			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
 			const bool wasEditing = currentMode == EditorMode::Edit;
-			if (wasEditing && mode != EditorMode::Edit)
+			if (wasEditing && mode != EditorMode::Edit) {
 				EndUserAction(); // nothing previewed is carried out of the document
+				// No colour is chosen outside Edit mode: its picker goes with it.
+				ui.GetColorPicker()->SetEyedropperMode(false);
+				ui.GetColorPicker()->Close();
+			}
 			if (mode == EditorMode::Edit && InObjectMode(toolIndex))
 				toolIndex = defaultTool;
 			activeTool = toolIndex;

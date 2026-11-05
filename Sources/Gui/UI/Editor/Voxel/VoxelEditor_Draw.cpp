@@ -374,7 +374,12 @@ namespace spades {
 			}
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
-			ui.GetToolbar()->SetColorSwatch(PickedColor(), ui.GetColorPicker()->IsOpen());
+			// The brush colour is what voxels are painted with: only Edit mode,
+			// which edits them, offers it.
+			if (currentMode == EditorMode::Edit)
+				ui.GetToolbar()->SetColorSwatch(PickedColor(), ui.GetColorPicker()->IsOpen());
+			else
+				ui.GetToolbar()->HideColorSwatch();
 			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
 			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
 			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
