@@ -36,7 +36,6 @@
 #include <Gui/UI/Components/EditorMenu.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
-#include <Gui/UI/Components/TransformPanel.h>
 #include <Gui/UI/Editor/Shell/EditorCamera.h>
 #include <Gui/UI/Editor/Shell/NavigationCube.h>
 #include <Gui/UI/Editor/Voxel/ObjectModeHost.h>
@@ -130,6 +129,7 @@ namespace spades {
 			void UndoObjects() override;
 			void RedoObjects() override;
 			void EditModeChanged(bool entering) override;
+			ITransformTarget& ObjectTransform() override;
 
 		protected:
 			~KV6EditorView();
@@ -292,14 +292,9 @@ namespace spades {
 			/** Asks where, then saves the node at `path` as a .kv6 (ModelOf). */
 			void SaveNodeAsModel(const NodePath& path);
 
-			// The active node's position, rotation and scale, set by number,
-			// down the right under the navigation cube in Object mode.
-			std::unique_ptr<TransformPanel> transformPanel;
+			// The active node's position, rotation and scale, as the editor's
+			// transform panel sets them in Object mode (ObjectTransform).
 			SceneTransformTarget transformTarget;
-			/** The panel's target, on the scene open now. */
-			ITransformTarget& TransformTarget();
-			/** Whether a press at the cursor goes to the panel. */
-			bool PanelTakesPress() const;
 			/** Ends whatever is being typed (a name, a number) as a click
 			 *  elsewhere would, before something else takes the input. */
 			void SettleTyping();
