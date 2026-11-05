@@ -158,8 +158,42 @@ namespace spades {
 			 * Null, `why` saying why, when that holds no voxel.
 			 */
 			Handle<VoxelModel> ModelOf(const NodePath& path, std::string& why) const;
-			/** Whether the node, or anything under it, holds voxels. */
+			/** Whether the node, or anything under it, holds voxels; for the
+			 *  scene (an empty path), whether any object does. */
 			bool HoldsVoxels(const NodePath& path) const;
+			/**
+			 * The node (the whole scene for an empty path) as one model in its
+			 * own frame, as ModelOf has it: `base` gets where the model's voxel
+			 * 0 0 0 lies in that frame. Null, `why` saying why, when it holds no
+			 * voxel in sight.
+			 */
+			Handle<VoxelModel> Composed(const NodePath& path, Vector3& base, std::string& why) const;
+
+			// --- Low-poly models ----------------------------------------------
+			/**
+			 * Where voxel `i` of a model made `factor` times coarser from the
+			 * node's Composed model (DownsampledVoxelModel) lands: block `i`'s
+			 * middle, in the world.
+			 */
+			Matrix4 LowPolyFrame(const NodePath& path, const Vector3& base, int factor) const;
+			/**
+			 * Shows `model` (voxel `i` at `frame` times `i`) in place of the node
+			 * and all under it (the whole scene for an empty path) until
+			 * ClearPreview. Nothing of the scene changes: no step, no flag.
+			 */
+			void SetPreview(const NodePath& hide, Handle<VoxelModel> model, const Matrix4& frame);
+			void ClearPreview();
+			/** Whether a preview stands in for the node now. */
+			bool PreviewHides(const NodePath& path) const;
+			/**
+			 * Adds `model`, made `factor` times coarser from the node's Composed
+			 * model (`base` as it gave), as a new object right after the node
+			 * among its siblings (after the scene's top objects for the scene),
+			 * set beside it, named after it with "_LowPoly"; selects it, as one
+			 * step. False, `why` saying why, when it cannot be placed there.
+			 */
+			bool AddLowPoly(const NodePath& path, Handle<VoxelModel> model, const Vector3& base,
+			                int factor, std::string& why);
 
 			/** An object as copied: with all under it, its voxels its own, and
 			 *  where it was in the world. */
@@ -207,6 +241,10 @@ namespace spades {
 			bool CanRedo() const { return undoTop < int(history.size()); }
 			void Undo();
 			void Redo();
+			/** What undoing or redoing would do, for the status line:
+			 *  "renaming \"Bolt\" to \"Slide\"". */
+			std::string UndoLabel() const;
+			std::string RedoLabel() const;
 			/** Changes since the scene was loaded or saved. */
 			bool Changed() const { return changeCount != savedChangeCount; }
 			void MarkChanged() { changeCount++; }
@@ -290,6 +328,13 @@ namespace spades {
 			std::vector<NodePath> folded;
 			long shapeVersion = 0;
 
+			// A model shown in place of a node, which is left undrawn meanwhile.
+			bool previewing = false;
+			NodePath previewHides;
+			Handle<VoxelModel> previewModel;
+			Handle<client::IModel> previewRender;
+			Matrix4 previewFrame = Matrix4::Identity();
+
 			bool dragging = false;
 			Placement dragStart;
 
@@ -317,6 +362,9 @@ namespace spades {
 			bool PlanMove(const std::vector<NodePath>& nodes, const NodePath& parent, int position,
 			              MoveStep& plan, std::string& why) const;
 			void ApplyHidden(const NodePath& path, bool hidden);
+			/** What `step` does, its nodes named as the tree has them now:
+			 *  `done` for after it, else before it. */
+			std::string StepLabel(const Step& step, bool done) const;
 			/** Puts `nodes` at `paths` (in the tree's order), or takes the
 			 *  nodes at `paths` out, keeping what the scene tracks by path. */
 			void InsertNodes(const std::vector<NodePath>& paths, const std::vector<VoxelObject>& nodes);
@@ -325,7 +373,8 @@ namespace spades {
 			std::vector<NodePath> TopMost(const std::vector<NodePath>& nodes) const;
 			/** Puts `nodes` after `parent`'s children, named apart from their
 			 *  siblings, and selects them, as one step. */
-			void InsertUnder(const NodePath& parent, std::vector<VoxelObject> nodes);
+			void InsertUnder(const NodePath& parent, std::vector<VoxelObject> nodes,
+			                 int position = -1);
 			/** Whether `parent` is somewhere nodes can go: the scene, or a node. */
 			bool CanHold(const NodePath& parent) const;
 			/** Records `step` as done: the tree as it is now is after it. */
