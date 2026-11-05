@@ -1440,7 +1440,66 @@ namespace spades {
 		// --- Drawing -----------------------------------------------------------
 
 		void KV6Scene::InvalidateModel(int index) {
-			entries[std::size_t(index)].renderModel = Handle<client::IModel>();
+			Entry& e = entries[std::size_t(index)];
+			e.renderModel = Handle<client::IModel>();
+			e.surfaceOf = nullptr; // its voxels changed
+		}
+
+		const std::vector<IntVector3>& KV6Scene::SurfaceOf(int index) const {
+			const Entry& e = entries[std::size_t(index)];
+			const VoxelModel& m = *e.object->model;
+			if (e.surfaceOf == &m)
+				return e.surface;
+			e.surface.clear();
+			e.surfaceOf = &m;
+			for (int x = 0; x < m.GetWidth(); x++)
+				for (int y = 0; y < m.GetHeight(); y++)
+					for (int z = 0; z < m.GetDepth(); z++) {
+						if (!m.IsSolid(x, y, z))
+							continue;
+						if (!m.IsSolid(x - 1, y, z) || !m.IsSolid(x + 1, y, z) ||
+						    !m.IsSolid(x, y - 1, z) || !m.IsSolid(x, y + 1, z) ||
+						    !m.IsSolid(x, y, z - 1) || !m.IsSolid(x, y, z + 1))
+							e.surface.push_back(MakeIntVector3(x, y, z));
+					}
+			return e.surface;
+		}
+
+		std::vector<int> KV6Scene::ObjectsOnScreen(const GizmoView& view,
+		                                           const std::function<bool(const Vector2&)>& inside,
+		                                           bool through) const {
+			// Enough voxels of an object asked whether the view sees them to tell
+			// one in sight from one hidden, without asking them all.
+			constexpr std::size_t kSamples = 24;
+			std::vector<int> found;
+			if (!view.IsValid())
+				return found;
+			for (int i = 0; i < Count(); i++) {
+				if (!Shown(i))
+					continue;
+				const Matrix4 world = WorldMatrix(i);
+				std::vector<Vector2> there;
+				for (const IntVector3& v : SurfaceOf(i)) {
+					Vector2 screen;
+					if (view.Project(Point(world, MakeVector3(float(v.x), float(v.y), float(v.z))), screen) &&
+					    inside(screen))
+						there.push_back(screen);
+				}
+				if (there.empty())
+					continue;
+				if (through) {
+					found.push_back(i);
+					continue;
+				}
+				const std::size_t step = std::max<std::size_t>(1, there.size() / kSamples);
+				for (std::size_t k = 0; k < there.size(); k += step) {
+					if (ObjectAt(view, there[k]) == i) {
+						found.push_back(i);
+						break;
+					}
+				}
+			}
+			return found;
 		}
 
 		void KV6Scene::Render(client::IRenderer& renderer) {

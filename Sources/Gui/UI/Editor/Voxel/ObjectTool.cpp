@@ -94,9 +94,12 @@ namespace spades {
 						objects->CancelObjectDrag();
 				}
 
+				// Off the gizmo, another object is picked; nothing gives the
+				// selection up, back to Select.
 				void OnClickAway(IVoxelEditContext& ed) override {
-					if (IObjectModeHost* objects = ed.ObjectMode())
-						objects->PickObjectAtCursor();
+					IObjectModeHost* objects = ed.ObjectMode();
+					if (objects && !objects->PickObjectAtCursor())
+						ed.ReturnToSelect();
 				}
 			};
 		} // namespace
@@ -117,10 +120,10 @@ namespace spades {
 		std::string ObjectTool::Hint(IVoxelEditContext& ed) {
 			IObjectModeHost* objects = ed.ObjectMode();
 			if (!objects || !objects->HasPickedObject())
-				return "click an object to pick it";
+				return "click an object to pick it  |  click nothing to select again";
 			return objects->PickedObjectName() +
 			       ":  drag the gizmo to move, turn or scale it  |  click another object to "
-			       "pick it  |  [Tab] edit its voxels";
+			       "pick it, nothing to select again  |  [Tab] edit its voxels";
 		}
 	} // namespace gui
 } // namespace spades

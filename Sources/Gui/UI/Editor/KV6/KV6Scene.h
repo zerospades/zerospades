@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -85,6 +86,14 @@ namespace spades {
 			void Pick(int index);
 			/** The object hit first along the view's ray through `cursor`, or -1. */
 			int ObjectAt(const GizmoView& view, const Vector2& cursor) const;
+			/**
+			 * The shown objects some voxel of which the view puts where `inside`
+			 * says on the screen: those in sight there (one of those voxels hit
+			 * first by the view's ray through it), or with `through` all of them.
+			 */
+			std::vector<int> ObjectsOnScreen(const GizmoView& view,
+			                                 const std::function<bool(const Vector2&)>& inside,
+			                                 bool through) const;
 			/** The box object `index` fills in the world, from voxel edge to edge. */
 			void Box(int index, Vector3& lo, Vector3& hi) const;
 			/** The box every object fills together. */
@@ -288,7 +297,12 @@ namespace spades {
 				std::vector<const VoxelObject*> parents;
 				Handle<client::IModel> renderModel;
 				const VoxelModel* renderedFrom = nullptr; // what renderModel shows
+				// Its voxels with a face showing, worked out when first needed.
+				mutable std::vector<IntVector3> surface;
+				mutable const VoxelModel* surfaceOf = nullptr;
 			};
+			/** Object `index`'s voxels with a face showing. */
+			const std::vector<IntVector3>& SurfaceOf(int index) const;
 			struct Placement {
 				Vector3 position;
 				Vector4 rotation;

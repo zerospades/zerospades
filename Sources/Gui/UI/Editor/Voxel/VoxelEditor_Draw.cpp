@@ -347,11 +347,15 @@ namespace spades {
 			std::vector<Toolbar::ToolbarButton> toolButtons;
 			const bool objectTools = currentMode == EditorMode::Object && ObjectMode();
 			if (objectTools) {
-				Toolbar::ToolbarButton btn;
-				btn.id = kObjectToolId;
-				btn.label = objectTool->Label();
-				btn.active = objectModeTool < 0;
-				toolButtons.push_back(btn);
+				for (int i = 0; i < int(this->objectTools.size()); i++) {
+					const VoxelToolSlot& slot = this->objectTools[std::size_t(i)];
+					Toolbar::ToolbarButton btn;
+					btn.id = slot.id;
+					btn.label = slot.tool->Label();
+					btn.hotKey = KeyIsTaken(slot.hotKey) ? std::string() : slot.hotKey;
+					btn.active = objectModeTool < 0 && objectOwnTool == i;
+					toolButtons.push_back(btn);
+				}
 			}
 			const int toolCount =
 			  (currentMode == EditorMode::Edit || objectTools) ? int(tools.size()) : 0;

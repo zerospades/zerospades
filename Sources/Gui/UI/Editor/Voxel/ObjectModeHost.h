@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 
 #include <Core/Math.h>
@@ -48,6 +49,26 @@ namespace spades {
 
 			/** Picks the object under the cursor, or nothing; false for nothing. */
 			virtual bool PickObjectAtCursor() = 0;
+
+			// --- Selecting objects, as Object mode's Select tool does --------
+			enum class SelectHow {
+				Only,   // it alone (nothing, on nothing)
+				Add,    // with what is selected
+				Remove, // out of what is selected
+				Toggle  // in if it is out, out if it is in
+			};
+			/** The object under the cursor, selected as `how` says; false when
+			 *  there is none. */
+			virtual bool SelectObjectAtCursor(SelectHow how) = 0;
+			/**
+			 * Selects (or with `removing` deselects) the objects the view shows
+			 * where `inside` says (screen pixels): those in sight there, or with
+			 * `through` all there. Returns how many.
+			 */
+			virtual int SelectObjectsOnScreen(const std::function<bool(const Vector2&)>& inside,
+			                                  bool through, bool removing) = 0;
+			virtual bool HasSelectedObjects() const = 0;
+			virtual void SelectNoObject() = 0;
 			/** Whether an object is picked: Edit mode then edits it. */
 			virtual bool HasPickedObject() const = 0;
 			/** The picked object's name, for the hint line. */

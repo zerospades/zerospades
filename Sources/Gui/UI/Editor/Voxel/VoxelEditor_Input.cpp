@@ -63,16 +63,69 @@ namespace spades {
 			// part of the same user action, so it undoes with it.
 			if (pendingTool.empty())
 				return;
-			const std::string id = pendingTool;
+			std::string id = pendingTool;
 			pendingTool.clear();
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
 			if (clearingSelection) {
 				clearingSelection = false;
-				if (!edit.selection.Empty()) {
+				// What is selected in the mode the editor is in: voxels, or objects.
+				if (objects) {
+					objects->SelectNoObject();
+				} else if (!edit.selection.Empty()) {
 					ClearSelection();
 					SetStatus("Selection cleared");
 				}
 			}
-			SetActiveTool(ToolIndex(id));
+			// Select, in Object mode, is its own.
+			if (objects && id == "select")
+				id = kObjectSelectToolId;
+			const int own = objects ? OwnObjectToolIndex(id) : -1;
+			if (own >= 0)
+				SetOwnObjectTool(own);
+			else
+				SetActiveTool(ToolIndex(id));
+		}
+
+		std::string VoxelEditor::ActiveToolName() {
+			VoxelTool* t = ActiveTool();
+			return t ? t->Label() : std::string();
+		}
+
+		int VoxelEditor::OwnObjectToolIndex(const std::string& id) const {
+			for (std::size_t i = 0; i < objectTools.size(); i++)
+				if (objectTools[i].id == id)
+					return int(i);
+			return -1;
+		}
+
+		void VoxelEditor::SetOwnObjectTool(int index) {
+			if (index < 0 || index >= int(objectTools.size()) ||
+			    (objectModeTool < 0 && objectOwnTool == index))
+				return;
+			ui.GetOptionBar()->EndEditing(true);
+			SettlePanel();
+			VoxelTool* previous = ActiveTool();
+			objectModeTool = -1;
+			objectOwnTool = index;
+			VoxelTool* current = ActiveTool();
+			if (previous == current)
+				return;
+			if (previous)
+				previous->OnDeactivate(*this);
+			if (current)
+				current->OnActivate(*this);
+		}
+
+		void VoxelEditor::ObjectSelectionChanged() {
+			IObjectModeHost* objects = ObjectMode();
+			if (currentMode != EditorMode::Object || !objects || objectModeTool >= 0)
+				return;
+			const int select = OwnObjectToolIndex(kObjectSelectToolId);
+			const int transform = OwnObjectToolIndex(kObjectTransformToolId);
+			if (objects->HasSelectedObjects() && objectOwnTool == select)
+				SetOwnObjectTool(transform);
+			else if (!objects->HasSelectedObjects() && objectOwnTool == transform)
+				SetOwnObjectTool(select);
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
