@@ -307,7 +307,6 @@ namespace spades {
 				Vector3 position;
 				Vector4 rotation;
 				Vector3 scale;
-				std::vector<TransformKeyframe> keyframes; // left out of a gizmo drag's
 			};
 			/**
 			 * Nodes taken out of the tree at `from` and put back at `to`: `from`
@@ -424,8 +423,8 @@ namespace spades {
 			/** Takes `r.from` out and puts them at `r.to` with `placements`,
 			 *  keeping what the scene tracks by path where it went. */
 			void Relocate(const Relocation& r, const std::vector<Placement>& placements);
-			static Placement PlacementOf(const VoxelObject& o, bool withKeyframes = false);
-			static void Place(VoxelObject& o, const Placement& p, bool withKeyframes = false);
+			static Placement PlacementOf(const VoxelObject& o);
+			static void Place(VoxelObject& o, const Placement& p);
 			// The rotation and the scale the picked object's parents give it.
 			void ParentFrame(int index, Quaternion& rotation, Vector3& scale) const;
 		};
