@@ -245,7 +245,11 @@ namespace spades {
 			                                      bool through) const override;
 			void SelectAll() override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
-			void ReturnToSelect() override { returningToSelect = true; }
+			void SwitchTool(const std::string& id) override { pendingTool = id; }
+			void ReturnToSelect() override {
+				clearingSelection = true;
+				pendingTool = "select";
+			}
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
 			void CopySelection() override;
 			bool CutSelection() override;
@@ -505,7 +509,10 @@ namespace spades {
 			 *  drawn over it, leaves it showing. */
 			bool OnPanel(const Vector2& at);
 			float clock = 0.0F; // seconds, for the caret and double clicks
-			bool returningToSelect = false; // ReturnToSelect, once the event is over
+			// A switch a tool asked for (SwitchTool), made once its event is over.
+			std::string pendingTool;
+			bool clearingSelection = false; // ReturnToSelect's, before the switch
+			void SwitchAsAsked();
 			/** What the active tool sets by number, or null. */
 			ITransformTarget* PanelTarget();
 			/** Ends a number being typed or scrubbed, as a click elsewhere does. */
