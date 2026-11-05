@@ -21,6 +21,7 @@
 #include "EditorUI.h"
 #include <Client/Fonts.h>
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/ContextMenu.h>
 #include <Gui/UI/Components/MenuBar.h>
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
@@ -43,6 +44,8 @@ namespace spades {
 				contextStrip = std::make_unique<OptionBar>(_audioDevice, 1, true);
 				colorPicker = std::make_unique<ColorPicker>();
 				menuBar = std::make_unique<MenuBar>(menuHost, _audioDevice);
+				contextMenu = std::make_unique<ContextMenu>(*_renderer, _fontManager->GetSmallGuiFont(),
+				                                            _audioDevice);
 			} catch (const std::exception& ex) {
 				SPLog("[!] Failed to initialize editor UI: %s", ex.what());
 				throw;

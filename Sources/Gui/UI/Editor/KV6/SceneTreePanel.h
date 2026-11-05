@@ -24,6 +24,8 @@
 #include <vector>
 
 #include <Core/Math.h>
+#include <Gui/UI/Components/InlineTextField.h>
+#include <Gui/UI/Framework/DoubleClick.h>
 #include <Gui/UI/Widgets/TextEntry.h>
 
 #include "KV6Scene.h"
@@ -97,7 +99,7 @@ namespace spades {
 			/** Starts on the node at `path`, all of its name selected. False for
 			 *  the scene's row, or a node that keeps its name (`why` says so). */
 			bool BeginRename(KV6Scene& scene, const NodePath& path, float time, std::string& why);
-			bool IsRenaming() const { return renaming; }
+			bool IsRenaming() const { return nameField.IsOpen(); }
 			/** Whether `at` is on the name being typed, where presses place the
 			 *  caret and drags select. */
 			bool IsOverRename(const KV6Scene& scene, const Vector2& at) const;
@@ -164,21 +166,13 @@ namespace spades {
 			std::vector<NodePath> dragged;
 			NodePath anchor; // where Shift ranges start
 			long anchorShape = -1;
-			// The last click on a name, which a second one soon after and close
-			// by makes a double click.
-			float lastClickTime = -1.0e9F;
-			Vector2 lastClickAt = MakeVector2(0.0F, 0.0F);
-			NodePath lastClickRow;
+			// Clicks on names, a second soon after on the same one renaming it.
+			ui::DoubleClick rowClicks;
 
-			bool renaming = false;
+			// The name being typed, over the node's label.
 			NodePath renamed;
 			long renameShape = 0;
-			TextEntry name;
-			std::string composing;     // an input method's text, not yet typed
-			int nameFrom = 0;          // the first byte of the name in sight
-			float caretSince = 0.0F;   // the caret shows steadily from this time
-			unsigned long caretRevision = ~0UL;
-			float clock = 0.0F;        // the last frame's time
+			InlineTextField nameField;
 
 			std::vector<Row> Rows(const KV6Scene& scene) const;
 			int VisibleRows() const;
@@ -195,13 +189,12 @@ namespace spades {
 			std::string Label(const Row& row) const;
 			/** The row showing `path`, or -1 (folded away, or gone). */
 			int RowOf(const std::vector<Row>& rows, const NodePath& path) const;
-			/** The box a name is typed into on `row`, and its text's left edge. */
-			void RenameBox(const Row& row, int index, float& x, float& y, float& w, float& h) const;
-			float TextWidth(const std::string& text) const;
-			/** Keeps the caret in sight as the name scrolls in its box. */
-			void ScrollName(float width);
-			void DrawRename(const KV6Scene& scene, const Row& row, int index, float time);
-			void DrawRenameReason(const KV6Scene& scene, const Row& row, int index);
+			/** The box a name is typed into on `row`, shown at `index`. */
+			AABB2 RenameBox(const Row& row, int index) const;
+			/** Puts the name's box where its row is now. */
+			void PlaceRename(const KV6Scene& scene);
+			/** Why the name as typed would be refused, under its box. */
+			void DrawRenameReason(const KV6Scene& scene);
 			std::string Elide(const std::string& text, float width) const;
 
 			void DrawBranches(const Row& row, float y);

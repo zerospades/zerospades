@@ -26,39 +26,40 @@
 #include <Client/IRenderer.h>
 #include <Gui/OverlayPaint.h>
 
+#include "EditorTheme.h"
+
 namespace spades {
 	namespace gui {
 		namespace {
 			constexpr float kItemH = 24.0F;
 			constexpr float kSeparatorH = 9.0F; // the gap a separator line sits in
 			constexpr float kPadX = 14.0F;
+			constexpr float kCheckW = 16.0F;    // the check mark's column, left of captions
+			constexpr float kShortcutGap = 28.0F;
 			constexpr float kPadY = 4.0F;
 			constexpr float kMinWidth = 150.0F;
 			constexpr float kTextScale = 0.9F;
 			constexpr float kScreenMargin = 4.0F;
-
-			const Vector4 kBackground = MakeVector4(0.11F, 0.115F, 0.13F, 0.97F);
-			const Vector4 kBorder = MakeVector4(0.30F, 0.32F, 0.37F, 1.0F);
-			const Vector4 kDropShadow = MakeVector4(0.0F, 0.0F, 0.0F, 0.35F);
-			const Vector4 kHighlight = MakeVector4(0.24F, 0.42F, 0.72F, 1.0F);
-			const Vector4 kText = MakeVector4(0.90F, 0.91F, 0.93F, 1.0F);
-			const Vector4 kDisabledText = MakeVector4(0.50F, 0.52F, 0.56F, 1.0F);
-			const Vector4 kSeparator = MakeVector4(0.26F, 0.28F, 0.32F, 1.0F);
 		} // namespace
 
 		ContextMenu::ContextMenu(client::IRenderer& renderer, client::IFont& font,
 		                         client::IAudioDevice* audioDevice)
 		    : renderer(renderer), font(font), sounds(audioDevice) {}
 
-		void ContextMenu::Open(const Vector2& at, std::vector<ContextMenuItem> newItems) {
+		void ContextMenu::Open(const Vector2& at, std::vector<ContextMenuItem> newItems,
+		                       const void* owner) {
 			items = std::move(newItems);
 			open = !items.empty();
+			openedBy = owner;
 			highlighted = -1;
 			pressed = -1;
 			width = kMinWidth;
 			height = kPadY * 2.0F;
 			for (const ContextMenuItem& item : items) {
-				width = std::max(width, font.Measure(item.caption).x * kTextScale + kPadX * 2.0F);
+				float w = kPadX * 2.0F + kCheckW + font.Measure(item.caption).x * kTextScale;
+				if (!item.shortcut.empty())
+					w += kShortcutGap + font.Measure(item.shortcut).x * kTextScale;
+				width = std::max(width, w);
 				height += kItemH + (item.separated ? kSeparatorH : 0.0F);
 			}
 			// Down and right of the cursor, as far as the screen allows.
@@ -66,6 +67,15 @@ namespace spades {
 			x = std::max(kScreenMargin, std::min(at.x, sw - width - kScreenMargin));
 			y = std::max(kScreenMargin, std::min(at.y, sh - height - kScreenMargin));
 			lastCursor = at;
+		}
+
+		void ContextMenu::OpenBelow(const AABB2& anchor, std::vector<ContextMenuItem> newItems,
+		                            const void* owner) {
+			Open(MakeVector2(anchor.GetMinX(), anchor.GetMaxY() + 2.0F), std::move(newItems), owner);
+			if (open && width < anchor.GetWidth()) {
+				width = anchor.GetWidth();
+				x = std::min(x, renderer.ScreenWidth() - width - kScreenMargin);
+			}
 		}
 
 		void ContextMenu::Close() {
@@ -163,27 +173,37 @@ namespace spades {
 				highlighted = now;
 			}
 
-			OverlayColorNP(renderer, kDropShadow);
-			OverlayFillRect(renderer, x + 3.0F, y + 4.0F, width, height);
-			OverlayColorNP(renderer, kBackground);
-			OverlayFillRect(renderer, x, y, width, height);
-			OverlayStrokeRect(renderer, x, y, width, height, 1.0F, kBorder);
+			EditorTheme::PaintPanel(renderer, x, y, width, height);
 
 			const float textH = font.Measure("Ag").y * kTextScale;
 			for (int i = 0; i < int(items.size()); i++) {
 				const ContextMenuItem& item = items[std::size_t(i)];
 				const float top = ItemTop(i);
 				if (item.separated) {
-					OverlayColorNP(renderer, kSeparator);
+					OverlayColorNP(renderer, EditorTheme::Separator());
 					OverlayFillRect(renderer, x + 6.0F, top - kSeparatorH * 0.5F - 0.5F,
 					                width - 12.0F, 1.0F);
 				}
 				if (i == highlighted) {
-					OverlayColorNP(renderer, kHighlight);
+					OverlayColorNP(renderer, EditorTheme::Highlight());
 					OverlayFillRect(renderer, x + 3.0F, top, width - 6.0F, kItemH);
 				}
-				font.Draw(item.caption, MakeVector2(x + kPadX, top + (kItemH - textH) * 0.5F),
-				          kTextScale, item.enabled ? kText : kDisabledText);
+				const Vector4 color = item.enabled ? EditorTheme::Text() : EditorTheme::TextFaint();
+				const float midY = top + kItemH * 0.5F;
+				if (item.checked) {
+					const Vector2 tick[3] = {MakeVector2(x + kPadX - 6.0F, midY),
+					                         MakeVector2(x + kPadX - 2.5F, midY + 3.5F),
+					                         MakeVector2(x + kPadX + 4.0F, midY - 4.0F)};
+					OverlayStrokePolyline(renderer, tick, 3, 1.6F, color, false);
+				}
+				const float textY = top + (kItemH - textH) * 0.5F;
+				font.Draw(item.caption, MakeVector2(x + kPadX + kCheckW - 6.0F, textY), kTextScale,
+				          color);
+				if (!item.shortcut.empty()) {
+					const float sw = font.Measure(item.shortcut).x * kTextScale;
+					font.Draw(item.shortcut, MakeVector2(x + width - kPadX - sw, textY), kTextScale,
+					          i == highlighted ? EditorTheme::Text() : EditorTheme::TextDim());
+				}
 			}
 		}
 	} // namespace gui

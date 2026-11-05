@@ -27,6 +27,7 @@
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Gui/OverlayPaint.h>
+#include <Gui/UI/Components/EditorTheme.h>
 
 namespace spades {
 	namespace gui {
@@ -41,30 +42,20 @@ namespace spades {
 			constexpr float kTextScale = 0.9F;
 			constexpr float kDragStart = 4.0F; // pixels a press moves before it drags
 			constexpr float kWheelRows = 2.0F; // rows a wheel step scrolls
-			// A second click this soon and this close (Manhattan) to the first
-			// makes a double click, as everywhere else in the game's UI.
-			constexpr float kDoubleClickTime = 0.35F;
-			constexpr float kDoubleClickReach = 10.0F;
 			constexpr std::size_t kMaxNameBytes = 255; // as the file holds them
 			constexpr float kNamePad = 3.0F;           // the name, in from its box
-			constexpr float kCaretBlink = 1.06F;       // seconds the caret blinks in
 
 			const Vector4 kText = MakeVector4(0.86F, 0.87F, 0.90F, 1.0F);
 			const Vector4 kGroupText = MakeVector4(0.66F, 0.69F, 0.75F, 1.0F);
 			const Vector4 kHoverText = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
-			// The viewport outlines the selection in these.
-			const Vector4 kActive = MakeVector4(1.0F, 0.65F, 0.2F, 1.0F);
-			const Vector4 kSelected = MakeVector4(0.95F, 0.52F, 0.18F, 1.0F);
-			const Vector4 kShadow = MakeVector4(0.0F, 0.0F, 0.0F, 0.9F);
+			// As the view outlines the selection.
+			const Vector4 kActive = EditorTheme::Active();
+			const Vector4 kSelected = EditorTheme::Selected();
+			const Vector4 kShadow = EditorTheme::TextShadow();
 			const Vector4 kIcon = MakeVector4(0.80F, 0.82F, 0.86F, 1.0F);
-			const Vector4 kDrop = MakeVector4(0.35F, 0.68F, 1.0F, 1.0F);
-			const Vector4 kRefused = MakeVector4(1.0F, 0.35F, 0.3F, 1.0F);
+			const Vector4 kDrop = EditorTheme::DropTarget();
+			const Vector4 kRefused = EditorTheme::Refused();
 			const Vector4 kBranch = MakeVector4(0.58F, 0.61F, 0.68F, 0.55F);
-			// A name being typed: the one place the panel draws a background,
-			// so the text being edited reads whatever lies behind it.
-			const Vector4 kFieldFill = MakeVector4(0.04F, 0.05F, 0.07F, 0.92F);
-			const Vector4 kTextSelection = MakeVector4(0.24F, 0.42F, 0.72F, 1.0F);
-			const Vector4 kCaret = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
 			const float kDimmed = 0.42F; // alpha of what is hidden
 
 			Vector4 Faded(Vector4 c, float alpha) {
@@ -74,6 +65,14 @@ namespace spades {
 
 			NodePath ParentOf(const NodePath& path) {
 				return NodePath(path.begin(), path.end() - 1);
+			}
+
+			// A node's path as text, telling rows apart to a double click.
+			std::string PathKey(const NodePath& path) {
+				std::string key;
+				for (int i : path)
+					key += std::to_string(i) + "/";
+				return key;
 			}
 
 			// Without the spaces at either end, which nobody means to type.
@@ -86,7 +85,8 @@ namespace spades {
 		} // namespace
 
 		SceneTreePanel::SceneTreePanel(client::IRenderer& renderer, client::IFont& font)
-		    : renderer(renderer), font(font), name(kMaxNameBytes) {}
+		    : renderer(renderer), font(font),
+		      nameField(renderer, font, kTextScale, kMaxNameBytes) {}
 
 		void SceneTreePanel::Layout(float l, float t, float b) {
 			left = l;
@@ -100,7 +100,7 @@ namespace spades {
 			dragged.clear();
 			anchor.clear();
 			anchorShape = -1;
-			lastClickTime = -1.0e9F;
+			rowClicks.Reset();
 			CancelRename();
 		}
 
@@ -205,28 +205,11 @@ namespace spades {
 		                                  bool extend, float time) {
 			const std::vector<Row> rows = Rows(scene);
 			held = Held::Swallowed;
-			const bool twice = time - lastClickTime < kDoubleClickTime &&
-			                   (at - lastClickAt).GetManhattanLength() < kDoubleClickReach;
-
-			// On the name being typed, the press places the caret, a double one
-			// takes the word, and a drag from it selects.
-			if (renaming && IsOverRename(scene, at)) {
-				const int index = RowOf(rows, renamed);
-				float x, y, w, h;
-				RenameBox(rows[std::size_t(index)], index, x, y, w, h);
-				const int i = name.IndexAt(at.x - (x + kNamePad), nameFrom,
-				                           [this](const std::string& t) { return TextWidth(t); });
-				composing.clear();
-				if (twice && lastClickRow == renamed) {
-					name.SelectWordAt(i);
-					lastClickTime = -1.0e9F;
-				} else {
-					name.SetCaret(i, extend);
-					held = Held::Text;
-					lastClickTime = time;
-					lastClickAt = at;
-					lastClickRow = renamed;
-				}
+			// On the name being typed, the press is the field's: a drag from it
+			// selects.
+			if (IsOverRename(scene, at)) {
+				nameField.Press(at, extend, time);
+				held = Held::Text;
 				return std::string();
 			}
 
@@ -250,11 +233,7 @@ namespace spades {
 
 			// A second plain click on the same name types a new one over it.
 			if (!toggle && !extend) {
-				const bool again = twice && lastClickRow == row.path;
-				lastClickTime = again ? -1.0e9F : time;
-				lastClickAt = at;
-				lastClickRow = row.path;
-				if (again) {
+				if (rowClicks.Click(at, time, PathKey(row.path))) {
 					scene.Select({row.path}, row.path);
 					std::string why;
 					if (!BeginRename(scene, row.path, time, why))
@@ -323,15 +302,7 @@ namespace spades {
 
 		void SceneTreePanel::Move(const KV6Scene& scene, const Vector2& at) {
 			if (held == Held::Text) {
-				const std::vector<Row> rows = Rows(scene);
-				const int index = RowOf(rows, renamed);
-				if (index < 0)
-					return;
-				float x, y, w, h;
-				RenameBox(rows[std::size_t(index)], index, x, y, w, h);
-				name.SetCaret(name.IndexAt(at.x - (x + kNamePad), nameFrom,
-				                           [this](const std::string& t) { return TextWidth(t); }),
-				              true);
+				nameField.Drag(at);
 				return;
 			}
 			if (held != Held::Row)
@@ -589,17 +560,16 @@ namespace spades {
 		}
 
 		void SceneTreePanel::Draw(const KV6Scene& scene, const Vector2& cursor, float time) {
-			clock = time;
 			// The name being typed goes with its node: should the node take
 			// another path, or fold out of sight, the typing ends.
-			if (renaming && (renameShape != scene.ShapeVersion() || !scene.Node(renamed)))
+			if (IsRenaming() && (renameShape != scene.ShapeVersion() || !scene.Node(renamed)))
 				CancelRename();
 			// An undo or a redo during a drag changes what it was dragging.
 			if (held != Held::None && pressShape != scene.ShapeVersion())
 				held = Held::Swallowed;
 
 			const std::vector<Row> rows = Rows(scene);
-			if (renaming && RowOf(rows, renamed) < 0)
+			if (IsRenaming() && RowOf(rows, renamed) < 0)
 				CancelRename();
 			scroll = ClampedScroll(int(rows.size()));
 			const int hover = held == Held::None ? RowAt(rows, cursor) : -1;
@@ -644,8 +614,10 @@ namespace spades {
 					DrawLock(MakeVector2(left + kWidth - kEyeW - kLockW * 0.5F, midY),
 					         Faded(kIcon, hidden ? kDimmed : 0.8F));
 				}
-				if (renaming && row.path == renamed)
-					DrawRename(scene, row, i, time);
+				if (IsRenaming() && row.path == renamed) {
+					nameField.SetRect(RenameBox(row, i));
+					nameField.Draw(time, !scene.WhyNotRename(renamed, Trimmed(nameField.Text())).empty());
+				}
 				else
 					DrawText(Elide(Label(row), labelEnd - labelX), labelX, y, color);
 
@@ -660,10 +632,10 @@ namespace spades {
 				}
 			}
 
-			if (renaming) {
+			if (IsRenaming()) {
 				const int index = RowOf(rows, renamed);
 				if (index >= scroll && index < last)
-					DrawRenameReason(scene, rows[std::size_t(index)], index);
+					DrawRenameReason(scene);
 			}
 
 			if (held != Held::Drag)
@@ -707,16 +679,9 @@ namespace spades {
 			return -1;
 		}
 
-		void SceneTreePanel::RenameBox(const Row& row, int index, float& x, float& y, float& w,
-		                               float& h) const {
-			x = LabelX(row.depth) - kNamePad;
-			y = RowTop(index) + 1.0F;
-			w = left + kWidth - kEyeW - 4.0F - x;
-			h = kRowH - 2.0F;
-		}
-
-		float SceneTreePanel::TextWidth(const std::string& text) const {
-			return text.empty() ? 0.0F : font.Measure(text).x * kTextScale;
+		AABB2 SceneTreePanel::RenameBox(const Row& row, int index) const {
+			const float x = LabelX(row.depth) - kNamePad;
+			return AABB2(x, RowTop(index) + 1.0F, left + kWidth - kEyeW - 4.0F - x, kRowH - 2.0F);
 		}
 
 		bool SceneTreePanel::BeginRename(KV6Scene& scene, const NodePath& path, float time,
@@ -733,35 +698,33 @@ namespace spades {
 			if (held == Held::Drag)
 				CancelDrag();
 			Reveal(scene, path);
-			renaming = true;
 			renamed = path;
 			renameShape = scene.ShapeVersion();
-			name.Begin(o->name, true);
-			composing.clear();
-			nameFrom = 0;
-			caretSince = time;
-			caretRevision = name.Revision();
+			nameField.Begin(o->name, true, time);
+			PlaceRename(scene);
 			return true;
 		}
 
-		bool SceneTreePanel::IsOverRename(const KV6Scene& scene, const Vector2& at) const {
-			if (!renaming)
-				return false;
+		void SceneTreePanel::PlaceRename(const KV6Scene& scene) {
 			const std::vector<Row> rows = Rows(scene);
 			const int index = RowOf(rows, renamed);
-			if (index < scroll || index >= scroll + VisibleRows())
+			if (index >= 0)
+				nameField.SetRect(RenameBox(rows[std::size_t(index)], index));
+		}
+
+		bool SceneTreePanel::IsOverRename(const KV6Scene& scene, const Vector2& at) const {
+			if (!IsRenaming())
 				return false;
-			float x, y, w, h;
-			RenameBox(rows[std::size_t(index)], index, x, y, w, h);
-			return OverlayInRect(at, x, y, w, h);
+			const int index = RowOf(Rows(scene), renamed);
+			return index >= scroll && index < scroll + VisibleRows() && nameField.Contains(at);
 		}
 
 		bool SceneTreePanel::CommitRename(KV6Scene& scene, std::string& said) {
 			said.clear();
-			if (!renaming)
+			if (!IsRenaming())
 				return true;
 			const VoxelObject* o = scene.Node(renamed);
-			const std::string typed = Trimmed(name.Text());
+			const std::string typed = Trimmed(nameField.Text());
 			if (!o || typed == o->name) {
 				CancelRename();
 				return true;
@@ -777,16 +740,14 @@ namespace spades {
 		}
 
 		void SceneTreePanel::CancelRename() {
-			renaming = false;
-			name.End();
-			composing.clear();
+			nameField.End();
 			if (held == Held::Text)
 				held = Held::Swallowed; // its release ends the press
 		}
 
 		std::string SceneTreePanel::RenameKey(KV6Scene& scene, const std::string& key,
 		                                      const TextEntry::Modifiers& modifiers) {
-			if (!renaming)
+			if (!IsRenaming())
 				return std::string();
 			if (key == "Enter" || key == "Keypad Enter" || key == "Tab") {
 				std::string said;
@@ -798,124 +759,37 @@ namespace spades {
 				CancelRename();
 				return std::string();
 			}
-			// Mid-composition the input method has the keys.
-			if (composing.empty())
-				name.Key(key, modifiers);
+			nameField.Key(key, modifiers);
 			return std::string();
 		}
 
 		void SceneTreePanel::RenameText(const std::string& text) {
-			if (!renaming)
-				return;
-			composing.clear();
-			name.Insert(text);
+			if (IsRenaming())
+				nameField.Insert(text);
 		}
 
 		void SceneTreePanel::RenameComposition(const std::string& text) {
-			if (renaming)
-				composing = text;
+			if (IsRenaming())
+				nameField.Compose(text);
 		}
 
 		AABB2 SceneTreePanel::RenameRect(const KV6Scene& scene) const {
-			if (!renaming)
-				return AABB2();
-			const std::vector<Row> rows = Rows(scene);
-			const int index = RowOf(rows, renamed);
-			if (index < 0)
-				return AABB2();
-			float x, y, w, h;
-			RenameBox(rows[std::size_t(index)], index, x, y, w, h);
-			return AABB2(x, y, w, h);
+			return IsRenaming() ? nameField.Rect() : AABB2();
 		}
 
-		void SceneTreePanel::ScrollName(float width) {
-			const std::string& text = name.Text();
-			const int caret = name.Caret();
-			nameFrom = std::min(nameFrom, caret);
-			// Right until the caret (with what is being composed) fits...
-			while (nameFrom < caret &&
-			       TextWidth(text.substr(std::size_t(nameFrom), std::size_t(caret - nameFrom)) +
-			                 composing) > width)
-				nameFrom = name.Next(nameFrom);
-			// ...and back left while what lies before still fits too, so the box
-			// never shows less of the name than it could.
-			while (nameFrom > 0 &&
-			       TextWidth(text.substr(std::size_t(name.Previous(nameFrom))) + composing) <= width)
-				nameFrom = name.Previous(nameFrom);
-		}
-
-		void SceneTreePanel::DrawRename(const KV6Scene& scene, const Row& row, int index,
-		                                float time) {
-			float x, y, w, h;
-			RenameBox(row, index, x, y, w, h);
-			const float textX = x + kNamePad;
-			const float width = w - kNamePad * 2.0F;
-			ScrollName(width);
-
-			const std::string why = scene.WhyNotRename(renamed, Trimmed(name.Text()));
-			OverlayColorNP(renderer, kFieldFill);
-			OverlayFillRect(renderer, x, y, w, h);
-			OverlayStrokeRect(renderer, x, y, w, h, 1.0F, why.empty() ? kDrop : kRefused);
-
-			const std::string& text = name.Text();
-			const int caret = name.Caret();
-			auto widthTo = [&](int end) {
-				return TextWidth(text.substr(std::size_t(nameFrom), std::size_t(end - nameFrom)));
-			};
-
-			if (composing.empty() && name.HasSelection()) {
-				const float x0 = textX + widthTo(std::max(name.SelectionStart(), nameFrom));
-				const float x1 = std::min(textX + widthTo(name.SelectionEnd()), textX + width);
-				if (x1 > x0) {
-					OverlayColorNP(renderer, kTextSelection);
-					OverlayFillRect(renderer, x0, y + 2.0F, x1 - x0, h - 4.0F);
-				}
-			}
-
-			// What is in sight: from the first byte shown, what is being composed
-			// put in at the caret, cut where the box ends.
-			std::string shown = text.substr(std::size_t(nameFrom));
-			shown.insert(std::size_t(caret - nameFrom), composing);
-			while (!shown.empty() && TextWidth(shown) > width) {
-				std::size_t end = shown.size() - 1;
-				while (end > 0 && (static_cast<unsigned char>(shown[end]) & 0xC0) == 0x80)
-					end--;
-				shown.erase(end);
-			}
-			DrawText(shown, textX, RowTop(index), kHoverText);
-
-			const float caretX = textX + widthTo(caret);
-			if (!composing.empty()) {
-				// Underlined until the input method settles it.
-				OverlayColorNP(renderer, kHoverText);
-				OverlayFillRect(renderer, caretX, y + h - 3.0F,
-				                std::min(TextWidth(composing), textX + width - caretX), 1.0F);
-			}
-			// Steady while it moves, then blinking.
-			if (name.Revision() != caretRevision) {
-				caretRevision = name.Revision();
-				caretSince = time;
-			}
-			if (std::fmod(time - caretSince, kCaretBlink) < kCaretBlink * 0.5F) {
-				OverlayColorNP(renderer, kCaret);
-				OverlayFillRect(renderer, caretX + TextWidth(composing), y + 3.0F, 1.5F, h - 6.0F);
-			}
-
-		}
-
-		void SceneTreePanel::DrawRenameReason(const KV6Scene& scene, const Row& row, int index) {
-			const std::string why = scene.WhyNotRename(renamed, Trimmed(name.Text()));
+		void SceneTreePanel::DrawRenameReason(const KV6Scene& scene) {
+			const std::string why = scene.WhyNotRename(renamed, Trimmed(nameField.Text()));
 			if (why.empty())
 				return;
 			// Under the box, over the rows below it: drawn after them.
-			float x, y, w, h;
-			RenameBox(row, index, x, y, w, h);
-			const float reasonW = TextWidth(why) + 10.0F;
-			OverlayColorNP(renderer, kFieldFill);
-			OverlayFillRect(renderer, x, y + h + 2.0F, reasonW, kRowH - 2.0F);
-			OverlayStrokeRect(renderer, x, y + h + 2.0F, reasonW, kRowH - 2.0F, 1.0F,
-			                  Faded(kRefused, 0.6F));
-			DrawText(why, x + 5.0F, y + h + 1.0F, kRefused);
+			const AABB2& box = nameField.Rect();
+			const float x = box.GetMinX(), y = box.GetMaxY() + 2.0F;
+			const float w = font.Measure(why).x * kTextScale + 10.0F;
+			OverlayColorNP(renderer, EditorTheme::FieldFill());
+			OverlayFillRect(renderer, x, y, w, kRowH - 2.0F);
+			OverlayStrokeRect(renderer, x, y, w, kRowH - 2.0F, 1.0F,
+			                  Faded(EditorTheme::Refused(), 0.6F));
+			DrawText(why, x + 5.0F, y - 1.0F, EditorTheme::Refused());
 		}
 	} // namespace gui
 } // namespace spades
