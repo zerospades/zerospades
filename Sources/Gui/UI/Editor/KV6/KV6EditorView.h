@@ -44,6 +44,7 @@
 
 #include "KV6Document.h"
 #include "KV6Scene.h"
+#include "LowPolyPanel.h"
 #include "SceneTreePanel.h"
 
 namespace spades {
@@ -271,6 +272,21 @@ namespace spades {
 			}
 			/** Asks where, then saves the node at `path` as a .kv6 (ModelOf). */
 			void SaveNodeAsModel(const NodePath& path);
+
+			// A low-poly model of a node, made with LowPolyPanel: shown in the
+			// node's place, which is hidden meanwhile, until created or not.
+			std::unique_ptr<LowPolyPanel> lowPoly;
+			NodePath lowPolyNode;
+			Handle<VoxelModel> lowPolySource; // the node composed, as Composed has it
+			Vector3 lowPolyBase = MakeVector3(0.0F, 0.0F, 0.0F);
+			long lowPolySourceVoxels = 0;
+			Handle<VoxelModel> lowPolyModel; // at the factor chosen
+			void OpenLowPoly(const NodePath& path);
+			/** Makes the model at the panel's factor and shows it. */
+			void UpdateLowPoly();
+			void EndLowPoly(bool create);
+			/** A key or button while the panel is up; true when taken. */
+			bool LowPolyInput(const std::string& key, bool down);
 			/** A plain message over the editor with a single way out. */
 			void ShowMessage(const std::string& text);
 			/**
