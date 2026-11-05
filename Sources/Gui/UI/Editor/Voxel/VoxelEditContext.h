@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include <Core/Math.h>
@@ -105,6 +106,23 @@ namespace spades {
 			// The solid voxels 6-connected to (x,y,z) through its colour, itself
 			// included; empty if (x,y,z) holds no voxel. Changes nothing.
 			virtual std::vector<IntVector3> LinkedColorRegion(int x, int y, int z) const = 0;
+			/**
+			 * The flat face `solid` is part of on its side `normal` (a step along
+			 * one axis): it and the voxels reached from it face to face in the
+			 * same plane whose face that way shows, as a modeller selects a flat
+			 * face. A face a voxel covers is no part of it; nothing when the
+			 * face of `solid` itself is covered.
+			 */
+			virtual std::vector<IntVector3> CoplanarFaces(const IntVector3& solid,
+			                                              const IntVector3& normal) const = 0;
+			/**
+			 * The voxels whose middle lies on the screen where `inside` says
+			 * (screen pixels), as the view shows them: those in sight only (one
+			 * of their faces seen, not hidden by other voxels), or with
+			 * `through` every one there, hidden or not (an X-ray of the volume).
+			 */
+			virtual std::vector<IntVector3> CellsOnScreen(
+			  const std::function<bool(const Vector2&)>& inside, bool through) const = 0;
 
 			// Add every solid voxel of the document to the selection.
 			virtual void SelectAll() = 0;
