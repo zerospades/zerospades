@@ -64,7 +64,7 @@ namespace spades {
 		};
 
 		const char* const kUsage =
-		  "usage: --kv6-tools COMMAND FILE [ARGS...]\n"
+		  "usage: --debug-tools --kv6-tools COMMAND FILE [ARGS...]\n"
 		  "\n"
 		  "Reads and edits KV6 voxel models without opening the game. Coordinates\n"
 		  "are voxel indices from 0 (Z points down, as in the game); colours are\n"

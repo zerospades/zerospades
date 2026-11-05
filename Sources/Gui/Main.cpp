@@ -231,6 +231,21 @@ namespace {
 	// time and written back before the config is flushed.
 	std::vector<std::pair<std::string, std::string>> g_cvarOverrideOriginals;
 
+	// Options for developers and tests, which a player never needs: each is
+	// refused unless --debug-tools is given too, so none is used by accident
+	// and --help lists only what a player may want.
+	const char* const kDebugOptions[] = {"--screenshot-quit", "--editor-reference",
+	                                     "--override-cvar",   "--replay-demo",
+	                                     "--demo",            "--player",
+	                                     "--kv6-tools"};
+
+	bool IsDebugOption(const char* arg) {
+		for (const char* option : kDebugOptions)
+			if (!strcasecmp(arg, option))
+				return true;
+		return false;
+	}
+
 	void printHelp(char* binaryName) {
 		printf("usage: %s [server_address] [v=protocol_version] [--replay demo.dem] [-h|--help] [-v|--version]\n",
 		       binaryName);
@@ -243,15 +258,6 @@ namespace {
 		printf("                       enabled-mod set, and hides the Mods tab, so\n");
 		printf("                       only this mod applies. A bare name resolves\n");
 		printf("                       under the user Mods/ folder.\n");
-		printf("  --override-cvar NAME=VALUE\n");
-		printf("                       set a config variable for this run only; the\n");
-		printf("                       on-disk config is left unchanged. May be given\n");
-		printf("                       multiple times.\n");
-		printf("  --replay-demo        play a demo and follow a player, skipping all\n");
-		printf("                       menus. Use --demo and --player to customise it.\n");
-		printf("  --demo FILE          demo to use (default: latest in Demos/); a bare\n");
-		printf("                       name resolves under Demos/\n");
-		printf("  --player ID|NAME     player to follow (default: first player)\n");
 		printf("  --register-file-types\n");
 		printf("                       offer this program for the files its editors\n");
 		printf("                       open, so a file manager can open one with it.\n");
@@ -263,6 +269,26 @@ namespace {
 		printf("                       A file given on its own does the same, which\n");
 		printf("                       is what a file manager passes when it opens\n");
 		printf("                       one with this program.\n");
+		printf("  -h, --help           show this help message\n");
+		printf("  -v, --version        show version information\n");
+		printf("  --debug-tools        allow the options for developers and tests;\n");
+		printf("                       --debug-tools --help lists them\n");
+		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
+		printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
+	}
+
+	void printDebugHelp(char* binaryName) {
+		printf("usage: %s --debug-tools [OPTIONS...]\n", binaryName);
+		printf("Options for developers and tests, refused without --debug-tools:\n");
+		printf("  --override-cvar NAME=VALUE\n");
+		printf("                       set a config variable for this run only; the\n");
+		printf("                       on-disk config is left unchanged. May be given\n");
+		printf("                       multiple times.\n");
+		printf("  --replay-demo        play a demo and follow a player, skipping all\n");
+		printf("                       menus. Use --demo and --player to customise it.\n");
+		printf("  --demo FILE          demo to use (default: latest in Demos/); a bare\n");
+		printf("                       name resolves under Demos/\n");
+		printf("  --player ID|NAME     player to follow (default: first player)\n");
 		printf("  --editor-reference X|Y|Z IMAGE\n");
 		printf("                       show IMAGE as a reference image across that\n");
 		printf("                       axis in the model editor --open opens\n");
@@ -272,12 +298,10 @@ namespace {
 		printf("                       with no one at the keyboard\n");
 		printf("  --kv6-tools COMMAND FILE [ARGS...]\n");
 		printf("                       read and edit a KV6 model without opening the\n");
-		printf("                       game (its size, pivot, bounds, voxels); must\n");
-		printf("                       come first. --kv6-tools help lists commands.\n");
-		printf("  -h, --help           show this help message\n");
-		printf("  -v, --version        show version information\n");
-		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
-		printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
+		printf("                       game (its size, pivot, bounds, voxels); comes\n");
+		printf("                       right after --debug-tools, and everything after\n");
+		printf("                       it is its own. --debug-tools --kv6-tools help\n");
+		printf("                       lists its commands.\n");
 	}
 
 	std::regex const hostNameRegex{"aos://.*"};
@@ -342,6 +366,8 @@ namespace {
 				g_printVersion = true;
 				return ++i;
 			}
+			if (!strcasecmp(a, "--debug-tools"))
+				return ++i; // seen before parsing began (main)
 			if (!strcasecmp(a, "--help") || !strcasecmp(a, "-h")) {
 				g_printHelp = true;
 				return ++i;
@@ -728,10 +754,38 @@ int main(int argc, char** argv) {
 	if (argc > 0 && argv[0])
 		spades::g_executablePath = argv[0];
 
+	// The options for developers and tests are allowed with --debug-tools
+	// only: one given without it is refused before anything is read, as
+	// reading its arguments as others could do anything.
+	bool debugTools = false;
+	for (int i = 1; i < argc; i++) {
+		if (!argv[i])
+			continue;
+		if (!strcasecmp(argv[i], "--debug-tools"))
+			debugTools = true;
+		if (IsDebugOption(argv[i]) && !debugTools) {
+			fprintf(stderr,
+			        "%s is an option for developers and tests: give --debug-tools before it\n"
+			        "(%s --debug-tools --help lists them all)\n",
+			        argv[i], argv[0] ? argv[0] : "ZeroSpades");
+			return 2;
+		}
+		// A command-line tool takes everything after it as its own, so it
+		// comes right after --debug-tools.
+		if (!strcasecmp(argv[i], "--kv6-tools")) {
+			if (i != 2) {
+				fprintf(stderr, "%s comes right after --debug-tools: %s --debug-tools %s ...\n",
+				        argv[i], argv[0] ? argv[0] : "ZeroSpades", argv[i]);
+				return 2;
+			}
+			break;
+		}
+	}
+
 	// A command-line tool of its own: everything after it is its, and it runs
 	// with no window and none of the game's start-up.
-	if (argc > 1 && argv[1] && !strcasecmp(argv[1], "--kv6-tools"))
-		return spades::RunKV6Tools(argc - 2, argv + 2);
+	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--kv6-tools"))
+		return spades::RunKV6Tools(argc - 3, argv + 3);
 
 	for (int i = 1; i < argc;) {
 		int ret = handleCommandLineArgument(argc, argv, i);
@@ -760,7 +814,10 @@ int main(int argc, char** argv) {
 	}
 
 	if (g_printHelp) {
-		printHelp(argv[0]);
+		if (debugTools)
+			printDebugHelp(argv[0]);
+		else
+			printHelp(argv[0]);
 		return 0;
 	}
 
