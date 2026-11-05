@@ -33,6 +33,7 @@
 #include <Core/Debug.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
+#include <Core/VoxelBlend.h>
 #include <Core/VoxelModel.h>
 #include <Gui/AutomationOptions.h>
 #include <Gui/OverlayPaint.h>
@@ -106,6 +107,7 @@ namespace spades {
 			constexpr float kTreeLeft = 14.0F;
 			constexpr float kTreeTopGap = 12.0F;
 			constexpr float kTreeBottomGap = 60.0F;
+			constexpr float kTreeWidth = 236.0F; // as the tree lays its rows out
 
 			// The view keys: back to the opening view, and frame the selection.
 			// Named as SDL names them (Home), compared ignoring case.
@@ -176,6 +178,8 @@ namespace spades {
 			tree = std::make_unique<SceneTreePanel>(*renderer, fontManager->GetSmallGuiFont());
 			contextMenu = std::make_unique<ContextMenu>(*renderer, fontManager->GetSmallGuiFont(),
 			                                            audioDevice.GetPointerOrNull());
+			lowPoly = std::make_unique<LowPolyPanel>(*renderer, fontManager->GetSmallGuiFont(),
+			                                         audioDevice.GetPointerOrNull());
 
 			// The editor always opens with a document. A file the player asked to
 			// create is started under its name; one that exists but cannot be read
@@ -226,14 +230,17 @@ namespace spades {
 			const bool selected = !onScene && !selection.empty();
 			const VoxelObject* node = scene->Node(row);
 			std::vector<ContextMenuItem> items;
-			items.push_back(ContextMenuItem{onScene ? "Add Object" : "Add Child",
+			items.push_back(ContextMenuItem{"Add Child",
 			                                [this, row] { AddObjectUnder(row); }, true, false});
 			if (!onScene) {
 				items.push_back(ContextMenuItem{"Rename", [this, row] { RenameInTree(row); },
 				                                node && !node->locked, false});
-				items.push_back(ContextMenuItem{"Save as KV6...", [this, row] { SaveNodeAsModel(row); },
-				                                scene->HoldsVoxels(row), false});
 			}
+			items.push_back(ContextMenuItem{"Save as KV6...", [this, row] { SaveNodeAsModel(row); },
+			                                scene->HoldsVoxels(row), false});
+			items.push_back(ContextMenuItem{"Generate Low-Poly KV6...",
+			                                [this, row] { OpenLowPoly(row); }, scene->HoldsVoxels(row),
+			                                false});
 			items.push_back(ContextMenuItem{"Copy",
 			                                [this, selection, objects] {
 				                                objectClipboard = scene->Copy(selection);
@@ -288,9 +295,14 @@ namespace spades {
 
 		void KV6EditorView::SaveNodeAsModel(const NodePath& path) {
 			const VoxelObject* node = scene->Node(path);
-			if (!node)
+			if (!node && !path.empty())
 				return;
-			const std::string stem = node->name.empty() ? std::string("Object") : node->name;
+			// Named after the node, or for the whole scene after its file.
+			std::string stem = node ? node->name : LocalFileSystem::GetFileName(filePath);
+			if (!node && stem.rfind('.') != std::string::npos)
+				stem.erase(stem.rfind('.'));
+			if (stem.empty())
+				stem = node ? "Object" : "Scene";
 			ShowModelFileDialog(
 			  "Save \"" + stem + "\" as KV6", FileBrowserPurpose::Save,
 			  stem + DefaultExtension(DocumentKind::Model),
@@ -308,6 +320,112 @@ namespace spades {
 					  editor->SetStatus("Could not write " + file);
 			  },
 			  DocumentKind::Model);
+		}
+
+		// --- Low-poly models -----------------------------------------------------
+
+		namespace {
+			long SolidVoxels(const VoxelModel& m) {
+				long n = 0;
+				for (int x = 0; x < m.GetWidth(); x++)
+					for (int y = 0; y < m.GetHeight(); y++)
+						for (int z = 0; z < m.GetDepth(); z++)
+							n += m.IsSolid(x, y, z) ? 1 : 0;
+				return n;
+			}
+			IntVector3 SizeOf(const VoxelModel& m) {
+				return MakeIntVector3(m.GetWidth(), m.GetHeight(), m.GetDepth());
+			}
+		} // namespace
+
+		void KV6EditorView::OpenLowPoly(const NodePath& path) {
+			SettleRename();
+			ui->GetOptionBar()->EndEditing(true);
+			editor->CancelToolInteraction();
+			std::string why;
+			Handle<VoxelModel> source = scene->Composed(path, lowPolyBase, why);
+			if (!source) {
+				editor->SetStatus("Cannot make a low-poly model: " + why);
+				return;
+			}
+			lowPolyNode = path;
+			lowPolySource = source;
+			lowPolySourceVoxels = SolidVoxels(*source);
+			const VoxelObject* node = scene->Node(path);
+			// Three times coarser, as the game's own far models are, unless that
+			// leaves too little of a small one.
+			const int longest = std::max(source->GetWidth(), std::max(source->GetHeight(), source->GetDepth()));
+			lowPoly->Open(node ? (node->name.empty() ? std::string("(unnamed)") : node->name)
+			                   : std::string("the whole scene"),
+			              longest >= 24 ? 3 : 2);
+			UpdateLowPoly();
+		}
+
+		void KV6EditorView::UpdateLowPoly() {
+			const int factor = lowPoly->Factor();
+			lowPolyModel = DownsampledVoxelModel(*lowPolySource, factor);
+			const long voxels = SolidVoxels(*lowPolyModel);
+			lowPoly->SetStats(SizeOf(*lowPolySource), lowPolySourceVoxels, SizeOf(*lowPolyModel), voxels);
+			// The node steps aside for what it would become.
+			scene->SetPreview(lowPolyNode, voxels > 0 ? lowPolyModel : Handle<VoxelModel>(),
+			                  scene->LowPolyFrame(lowPolyNode, lowPolyBase, factor));
+		}
+
+		void KV6EditorView::EndLowPoly(bool create) {
+			scene->ClearPreview();
+			lowPoly->Close();
+			if (create) {
+				std::string why;
+				const int factor = lowPoly->Factor();
+				if (scene->AddLowPoly(lowPolyNode, lowPolyModel, lowPolyBase, factor, why)) {
+					tree->Reveal(*scene, scene->Active());
+					editor->SetStatus("Added " + scene->Node(scene->Active())->name + ", 1/" +
+					                  std::to_string(factor) + " of the resolution");
+				} else {
+					editor->SetStatus("Cannot add the low-poly model: " + why);
+				}
+			}
+			lowPolySource = Handle<VoxelModel>();
+			lowPolyModel = Handle<VoxelModel>();
+		}
+
+		bool KV6EditorView::LowPolyInput(const std::string& key, bool down) {
+			if (!lowPoly->IsOpen())
+				return false;
+			const Vector2& at = softwareCursor->GetPosition();
+			LowPolyPanel::Action action = LowPolyPanel::Action::None;
+			if (key == "LeftMouseButton") {
+				action = down ? lowPoly->Press(at) : lowPoly->Release(at);
+			} else if (key == "RightMouseButton") {
+				// nothing to open meanwhile
+			} else if (key == "MiddleMouseButton") {
+				return false; // the camera looks the preview over
+			} else if (down) {
+				action = lowPoly->Key(key);
+				if (action == LowPolyPanel::Action::None) {
+					// The camera's keys and the view's still work; nothing that
+					// would change the scene under the preview does.
+					if (EditorKeyMatches(cg_keyScreenshot, key)) {
+						wantScreenShot = true;
+						return true;
+					}
+					if (cam.MovementKey(key, down, globalTime))
+						return true;
+					if (!editor->IsCtrlHeld())
+						ViewKey(key);
+					return true;
+				}
+			} else {
+				cam.MovementKey(key, down, globalTime); // let go of what was held
+				return true;
+			}
+			switch (action) {
+				case LowPolyPanel::Action::Changed: UpdateLowPoly(); break;
+				case LowPolyPanel::Action::Create: EndLowPoly(true); break;
+				case LowPolyPanel::Action::Cancel: EndLowPoly(false); break;
+				case LowPolyPanel::Action::None: break;
+			}
+			return true;
 		}
 
 		void KV6EditorView::AddObjectUnder(const NodePath& parent) {
@@ -560,13 +678,15 @@ namespace spades {
 		bool KV6EditorView::CanRedoObjects() const { return scene && scene->CanRedo(); }
 
 		void KV6EditorView::UndoObjects() {
+			const std::string what = scene->UndoLabel();
 			scene->Undo();
-			editor->SetStatus("Undid placing " + PickedObjectName());
+			editor->SetStatus("Undid " + what);
 		}
 
 		void KV6EditorView::RedoObjects() {
+			const std::string what = scene->RedoLabel();
 			scene->Redo();
-			editor->SetStatus("Redid placing " + PickedObjectName());
+			editor->SetStatus("Redid " + what);
 		}
 
 		void KV6EditorView::EditModeChanged(bool entering) {
@@ -1017,8 +1137,8 @@ namespace spades {
 			// so the drag never runs into the screen's edge.
 			if (!editor->HoldsPointer())
 				softwareCursor->Accumulate(dx, dy);
-			if (contextMenu->IsOpen())
-				return; // it follows the cursor as it is drawn
+			if (contextMenu->IsOpen() || lowPoly->IsOpen())
+				return; // they follow the cursor as they are drawn
 			// The tree's press follows the cursor; over its rows, nothing under
 			// them answers to it.
 			if (tree->IsHolding() && scene) {
@@ -1056,6 +1176,11 @@ namespace spades {
 
 			// A modal dialog (file browser) owns every key while it is up.
 			if (ui->GetOverlay()->KeyEvent(key, down))
+				return;
+
+			// The low-poly panel, while it is up: its keys and clicks, and the
+			// camera's, nothing else.
+			if (LowPolyInput(key, down))
 				return;
 
 			// So does the tree's menu, but for releases of keys held from before
@@ -1402,11 +1527,15 @@ namespace spades {
 				                                    : LocalFileSystem::GetFileName(filePath));
 				tree->Layout(kTreeLeft, VoxelEditor::BarsHeight() + kTreeTopGap, sh - kTreeBottomGap);
 				tree->Draw(*scene, softwareCursor->GetPosition(), globalTime);
+				lowPoly->Layout(kTreeLeft + kTreeWidth + 16.0F, VoxelEditor::BarsHeight() + kTreeTopGap);
+				lowPoly->Draw(softwareCursor->GetPosition());
 			} else {
 				if (tree->IsHolding())
 					tree->CancelDrag(); // left for Edit mode mid-drag
 				tree->CancelRename();
 				contextMenu->Close();
+				if (lowPoly->IsOpen())
+					EndLowPoly(false);
 			}
 
 			editor->DrawPanels();

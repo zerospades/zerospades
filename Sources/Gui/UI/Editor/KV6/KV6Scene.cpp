@@ -174,6 +174,7 @@ namespace spades {
 			metadata = std::move(loaded.metadata);
 			clips = std::move(loaded.clips);
 			Restart();
+			ClearPreview();
 			Pick(0);
 			changeCount = savedChangeCount = 0;
 			return true;
@@ -788,6 +789,8 @@ namespace spades {
 		}
 
 		bool KV6Scene::HoldsVoxels(const NodePath& path) const {
+			if (path.empty())
+				return !entries.empty();
 			std::function<bool(const VoxelObject&)> holds = [&](const VoxelObject& o) {
 				if (o.model)
 					return true;
@@ -800,35 +803,128 @@ namespace spades {
 			return o && holds(*o);
 		}
 
-		Handle<VoxelModel> KV6Scene::ModelOf(const NodePath& path, std::string& why) const {
+		Handle<VoxelModel> KV6Scene::Composed(const NodePath& path, Vector3& base,
+		                                      std::string& why) const {
 			why.clear();
-			const VoxelObject* node = Node(path);
-			if (!node) {
-				why = "there is nothing there";
-				return Handle<VoxelModel>();
+			base = MakeVector3(0.0F, 0.0F, 0.0F);
+			std::vector<VoxelObject> objects;
+			std::string what = "the scene";
+			if (path.empty()) {
+				objects = roots;
+			} else {
+				const VoxelObject* node = Node(path);
+				if (!node) {
+					why = "there is nothing there";
+					return Handle<VoxelModel>();
+				}
+				what = Quoted(*node);
+				if (node->children.empty()) {
+					// Its own voxels, as they are: voxel `i` at `i`.
+					if (!node->model)
+						why = what + " holds no voxels";
+					return node->model;
+				}
+				// In its own frame, shown whatever it is set to: what hangs under
+				// it lands where it does, the hidden left out as the game leaves
+				// them.
+				VoxelObject object = *node;
+				object.position = MakeVector3(0.0F, 0.0F, 0.0F);
+				object.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+				object.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+				object.hidden = false;
+				objects.push_back(std::move(object));
 			}
-			if (node->children.empty()) {
-				if (!node->model)
-					why = Quoted(*node) + " holds no voxels";
-				return node->model;
-			}
-			// In its own frame, shown whatever it is set to: what hangs under it
-			// lands where it does, the hidden left out as the game leaves them.
-			VoxelObject object = *node;
-			object.position = MakeVector3(0.0F, 0.0F, 0.0F);
-			object.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
-			object.scale = MakeVector3(1.0F, 1.0F, 1.0F);
-			object.hidden = false;
 			try {
 				IntVector3 low;
-				Handle<VoxelModel> model =
-				  VoxelModelLoader::MergeScene(std::vector<VoxelObject>(1, object), &low);
-				model->SetOrigin(MakeVector3(float(low.x), float(low.y), float(low.z)));
+				Handle<VoxelModel> model = VoxelModelLoader::MergeScene(objects, &low);
+				base = MakeVector3(float(low.x), float(low.y), float(low.z));
+				model->SetOrigin(base);
 				return model;
 			} catch (const std::exception&) {
-				why = Quoted(*node) + " shows no voxels: what holds them is hidden";
+				why = what + " shows no voxels: what holds them is hidden";
 				return Handle<VoxelModel>();
 			}
+		}
+
+		Handle<VoxelModel> KV6Scene::ModelOf(const NodePath& path, std::string& why) const {
+			Vector3 base;
+			return Composed(path, base, why);
+		}
+
+		Matrix4 KV6Scene::LowPolyFrame(const NodePath& path, const Vector3& base, int factor) const {
+			// Block `i` holds voxels `i * factor` to `i * factor + factor - 1`:
+			// its middle is half a block less a voxel's half in from its start.
+			const float f = float(factor);
+			const float half = (f - 1.0F) * 0.5F;
+			return NodeMatrix(path) * Matrix4::Translate(base + MakeVector3(half, half, half)) *
+			       Matrix4::Scale(f);
+		}
+
+		void KV6Scene::SetPreview(const NodePath& hide, Handle<VoxelModel> model,
+		                          const Matrix4& frame) {
+			previewing = true;
+			previewHides = hide;
+			if (previewModel.GetPointerOrNull() != model.GetPointerOrNull())
+				previewRender = Handle<client::IModel>();
+			previewModel = std::move(model);
+			previewFrame = frame;
+		}
+
+		void KV6Scene::ClearPreview() {
+			previewing = false;
+			previewHides.clear();
+			previewModel = Handle<VoxelModel>();
+			previewRender = Handle<client::IModel>();
+		}
+
+		bool KV6Scene::PreviewHides(const NodePath& path) const {
+			return previewing && StartsWith(path, previewHides);
+		}
+
+		bool KV6Scene::AddLowPoly(const NodePath& path, Handle<VoxelModel> model,
+		                          const Vector3& base, int factor, std::string& why) {
+			why.clear();
+			const VoxelObject* node = Node(path);
+			if (!model || (!path.empty() && !node)) {
+				why = "there is nothing to add";
+				return false;
+			}
+			// Where it lands in the node's parent's frame: as LowPolyFrame has it
+			// (the node's transform times its own block frame), then moved along
+			// the parent's x past the node's own extent, so the two stand side
+			// by side.
+			const Matrix4 local =
+			  (path.empty() ? Matrix4::Identity()
+			                : LocalTransform(node->position, node->rotation, node->scale));
+			const float f = float(factor);
+			const float half = (f - 1.0F) * 0.5F;
+			const Matrix4 placed =
+			  local * Matrix4::Translate(base + MakeVector3(half, half, half)) * Matrix4::Scale(f);
+			float lo = std::numeric_limits<float>::max(), hi = -lo;
+			for (int c = 0; c < 8; c++) {
+				const Vector3 corner =
+				  MakeVector3((c & 1) ? float(model->GetWidth()) - 0.5F : -0.5F,
+				              (c & 2) ? float(model->GetHeight()) - 0.5F : -0.5F,
+				              (c & 4) ? float(model->GetDepth()) - 0.5F : -0.5F);
+				const float x = Point(placed, corner).x;
+				lo = std::min(lo, x);
+				hi = std::max(hi, x);
+			}
+			const float width = hi - lo;
+			const float gap = std::max(2.0F, width * 0.1F);
+			VoxelObject o;
+			o.name = (path.empty() ? std::string("Scene") : node->name) + "_LowPoly";
+			if (!DecomposeTransform(Matrix4::Translate(width + gap, 0.0F, 0.0F) * placed, o.position,
+			                        o.rotation, o.scale)) {
+				why = (path.empty() ? std::string("the scene") : Quoted(*node)) +
+				      " is placed in a way a model beside it cannot be";
+				return false;
+			}
+			o.model = std::move(model);
+			const NodePath parent = path.empty() ? NodePath() : ParentOf(path);
+			InsertUnder(parent, std::vector<VoxelObject>(1, std::move(o)),
+			            path.empty() ? -1 : path.back() + 1);
+			return true;
 		}
 
 		std::vector<KV6Scene::CopiedObject> KV6Scene::Copy(const std::vector<NodePath>& nodes) const {
@@ -842,9 +938,11 @@ namespace spades {
 			return copied;
 		}
 
-		void KV6Scene::InsertUnder(const NodePath& parent, std::vector<VoxelObject> nodes) {
+		void KV6Scene::InsertUnder(const NodePath& parent, std::vector<VoxelObject> nodes,
+		                           int position) {
 			CancelDrag();
 			const std::vector<VoxelObject>& level = *ChildrenOf(parent);
+			const int at = position < 0 || position > int(level.size()) ? int(level.size()) : position;
 			std::vector<std::string> taken;
 			for (const VoxelObject& o : level)
 				taken.push_back(o.name);
@@ -853,7 +951,7 @@ namespace spades {
 				nodes[i].name = UniqueName(nodes[i].name, taken);
 				taken.push_back(nodes[i].name);
 				NodePath path = parent;
-				path.push_back(int(level.size() + i));
+				path.push_back(at + int(i));
 				step->paths.push_back(std::move(path));
 			}
 			step->nodes = std::move(nodes);
@@ -1158,6 +1256,45 @@ namespace spades {
 			o.position = o.position - Quaternion(o.rotation).Apply(o.scale * shift);
 		}
 
+		std::string KV6Scene::StepLabel(const Step& step, bool done) const {
+			auto named = [&](const NodePath& path) {
+				const VoxelObject* o = Node(path);
+				return o ? Quoted(*o) : std::string("an object");
+			};
+			auto objects = [&](const std::vector<NodePath>& paths) {
+				return paths.size() == 1 ? named(paths.front())
+				                         : std::to_string(paths.size()) + " objects";
+			};
+			switch (step.kind) {
+				case Step::Kind::Place: return "placing " + named(step.path);
+				case Step::Kind::Hide:
+					return (step.hidden ? "hiding " : "showing ") + named(step.path);
+				case Step::Kind::Move:
+					return "moving " + objects(done ? step.move->relocation.to
+					                                : step.move->relocation.from);
+				case Step::Kind::Insert:
+				case Step::Kind::Remove: {
+					const InsertStep& m = *step.insert;
+					// Named as they were kept: they are not in the tree either way.
+					const std::string what =
+					  m.nodes.size() == 1 ? Quoted(m.nodes.front())
+					                      : std::to_string(m.nodes.size()) + " objects";
+					return (step.kind == Step::Kind::Insert ? "adding " : "deleting ") + what;
+				}
+				case Step::Kind::Rename:
+					return "renaming \"" + step.rename->before + "\" to \"" + step.rename->after + "\"";
+			}
+			return std::string();
+		}
+
+		std::string KV6Scene::UndoLabel() const {
+			return CanUndo() ? StepLabel(history[std::size_t(undoTop - 1)], true) : std::string();
+		}
+
+		std::string KV6Scene::RedoLabel() const {
+			return CanRedo() ? StepLabel(history[std::size_t(undoTop)], false) : std::string();
+		}
+
 		void KV6Scene::Undo() {
 			if (!CanUndo())
 				return;
@@ -1241,10 +1378,28 @@ namespace spades {
 		}
 
 		void KV6Scene::Render(client::IRenderer& renderer) {
+			if (previewing && previewModel) {
+				if (!previewRender)
+					previewRender = renderer.CreateModel(*previewModel);
+				client::ModelRenderParam param;
+				// The renderer adds the model's origin; the frame leaves it out.
+				param.matrix = previewFrame * Matrix4::Translate(previewModel->GetOrigin() * -1.0F);
+				renderer.RenderModel(*previewRender, param);
+				// Its volume, outlined apart from a selection's.
+				const Vector3 a = MakeVector3(-0.5F, -0.5F, -0.5F);
+				const Vector3 b = MakeVector3(float(previewModel->GetWidth()) - 0.5F,
+				                              float(previewModel->GetHeight()) - 0.5F,
+				                              float(previewModel->GetDepth()) - 0.5F);
+				const Vector4 color = MakeVector4(0.35F, 0.85F, 1.0F, 1.0F);
+				ForEachBoxEdge(a, b, [&](const Vector3& p, const Vector3& q) {
+					renderer.AddDebugLine(Point(previewFrame, p), Point(previewFrame, q), color);
+				});
+			}
+
 			for (int i = 0; i < Count(); i++) {
 				Entry& e = entries[std::size_t(i)];
 				VoxelObject& o = *e.object;
-				if (!Shown(i))
+				if (!Shown(i) || PreviewHides(e.path))
 					continue;
 				if (!e.renderModel || e.renderedFrom != o.model.GetPointerOrNull()) {
 					e.renderModel = renderer.CreateModel(*o.model);
@@ -1260,7 +1415,7 @@ namespace spades {
 			// one brighter, as its row is in the tree.
 			for (const NodePath& path : selection) {
 				const int i = ObjectIndexAt(path);
-				if (i < 0 || !Shown(i))
+				if (i < 0 || !Shown(i) || PreviewHides(path))
 					continue;
 				const VoxelModel& model = *Object(i).model;
 				const Matrix4 world = WorldMatrix(i);
