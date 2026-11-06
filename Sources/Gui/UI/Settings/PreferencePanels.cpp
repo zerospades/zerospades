@@ -210,11 +210,15 @@ namespace spades {
 
 			l.AddHeading(_Tr("Preferences", "Heads-Up Display"));
 			{
+				// Quarter steps: the scale is applied in eighths, so finer steps would
+				// include ones that change nothing.
 				ConfigSlider* s = l.AddSliderField(_Tr("Preferences", "Interface Scale"),
-				                                   "ui_scale", 0.5F, 2.0F, 0.05F,
+				                                   "ui_scale", 0.5F, 2.0F, 0.25F,
 				                                   NumberFormatter(0, "%", "", 100));
-				// Applied on release, not on every step: each rescale rebuilds the UI.
-				s->released = [](UIElement& e) { PreferenceView::RescaleUIFrom(e); };
+				// Stored on release, not on every step: each rescale rebuilds the UI,
+				// which would tear the slider down mid-drag.
+				s->writeOnRelease = true;
+				s->committed = [](UIElement& e) { PreferenceView::KeepOpenAcrossRebuild(e); };
 			}
 			l.AddHelp(_Tr("Preferences",
 				"Size of the menus and HUD. At 100% they are sized for your screen "

@@ -53,11 +53,20 @@ namespace spades {
 		public:
 			ValueMapper mapper; // optional
 
+			/**
+			 * Store the value only when the user lets go, for settings too heavy to
+			 * apply on every step of a drag. The label follows the knob either way.
+			 */
+			bool writeOnRelease = false;
+			/** Raised when a release stored a different value (`writeOnRelease` only). */
+			ui::EventHandler committed;
+
 			ConfigSlider(ui::UIManager* manager, const std::string& configName, float minValue,
 			             float maxValue, float stepValue, Formatter formatter);
 
 			void OnResized() override;
 			void OnChanged() override;
+			void OnReleased() override;
 		};
 
 		/** A field that captures the next key/mouse press and binds it to a config item. */

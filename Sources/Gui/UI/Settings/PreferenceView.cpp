@@ -362,32 +362,35 @@ namespace spades {
 			SetParent(nullptr);
 			// Closed by the user: nothing to bring back, even if a rescale requested
 			// from it turned out not to change the scale (and rebuilt nothing).
-			reopenState = nullptr;
+			UIManager& manager = GetManager();
+			if (dynamic_cast<PreferenceViewPersistedState*>(
+			      manager.restoreAfterRebuild.GetPointerOrNull()))
+				manager.restoreAfterRebuild = nullptr;
 			OnClosed();
 		}
 
-		Handle<PreferenceViewPersistedState> PreferenceView::reopenState;
-
-		void PreferenceView::RescaleUIFrom(UIElement& descendant) {
+		void PreferenceView::KeepOpenAcrossRebuild(UIElement& descendant) {
 			PreferenceView* view = nullptr;
 			for (UIElement* e = &descendant; e && !view; e = e->GetParent())
 				view = dynamic_cast<PreferenceView*>(e);
 
-			if (view) {
-				// Its own state object (the in-game menu's) dies with the menu in the
-				// rebuild, and the main menu's window keeps none, so take a copy.
-				reopenState = Handle<PreferenceViewPersistedState>::New();
-				view->SaveStateTo(*reopenState);
-			}
+			// Detached already: a rebuild is under way (a slider losing its capture as
+			// it is torn down lands here), and there is no window to keep.
+			if (!view || !view->GetParent())
+				return;
 
-			// Takes effect between frames; the screens then rebuild on the new size.
-			descendant.GetManager().GetRenderer().ApplyUIScale();
+			// Its own state object (the in-game menu's) dies with the menu in the
+			// rebuild, and the main menu's window keeps none, so take a copy.
+			auto state = Handle<PreferenceViewPersistedState>::New();
+			view->SaveStateTo(*state);
+			view->GetManager().restoreAfterRebuild = std::move(state).Cast<RefCountedObject>();
 		}
 
-		Handle<PreferenceViewPersistedState> PreferenceView::TakeReopenState() {
-			Handle<PreferenceViewPersistedState> state = std::move(reopenState);
-			reopenState = nullptr;
-			return state;
+		Handle<PreferenceViewPersistedState> PreferenceView::TakeReopenState(UIManager& manager) {
+			Handle<RefCountedObject> held = std::move(manager.restoreAfterRebuild);
+			manager.restoreAfterRebuild = nullptr;
+			auto* state = dynamic_cast<PreferenceViewPersistedState*>(held.GetPointerOrNull());
+			return Handle<PreferenceViewPersistedState>(state);
 		}
 
 		void PreferenceView::Run() {
