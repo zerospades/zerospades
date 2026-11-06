@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cmath>
 #include <ft2build.h>
 
@@ -202,14 +203,29 @@ namespace spades {
 			SPAssert(renderer);
 			SPAssert(fontSet);
 
-			binSize = 256;
-			int targetSize = static_cast<int>(std::min(height * 4.0F, 4000.0F));
-			while (binSize < targetSize)
-				binSize <<= 1;
-
 			baselineY = std::floor(height * 1.0F);
 			rendererIsLowQuality = renderer->IsRendererSW();
 
+			rasterScale = 0.0F; // forces SyncRasterScale to set up the cache
+			SyncRasterScale();
+		}
+
+		void FTFont::SyncRasterScale() {
+			// Never rasterize below 1:1; a UI scaled down just samples smaller.
+			float s = std::min(std::max(renderer->GetUIScale(), 1.0F), 4.0F);
+			if (s == rasterScale)
+				return;
+			rasterScale = s;
+
+			// Glyph images point into the bins, so both go together.
+			glyphMap.clear();
+			glyphs.clear();
+			bins.clear();
+
+			binSize = 256;
+			int targetSize = static_cast<int>(std::min(height * rasterScale * 4.0F, 4000.0F));
+			while (binSize < targetSize)
+				binSize <<= 1;
 			bins.emplace_back(binSize, binSize, *renderer);
 		}
 
@@ -227,14 +243,17 @@ namespace spades {
 				if (cId != 0) {
 					auto it2 = glyphs.find(std::make_pair<FT_Face>(*face, cId));
 					if (it2 == glyphs.end()) {
-						FT_Set_Char_Size(*face, 0, static_cast<FT_F26Dot6>(height * 64.0F), 72, 72);
+						FT_Set_Char_Size(*face, 0,
+						                 static_cast<FT_F26Dot6>(height * rasterScale * 64.0F), 72,
+						                 72);
 
 						Glyph g;
 						g.face = *face;
 						g.charIndex = cId;
 						FT_Load_Glyph(*face, cId, FT_LOAD_NO_HINTING);
 						const auto& adv = g.face->glyph->advance;
-						g.advance = MakeVector2((float)adv.x, (float)adv.y) / (64.0F);
+						g.advance =
+						  MakeVector2((float)adv.x, (float)adv.y) / (64.0F * rasterScale);
 
 						auto it3 =
 						  glyphs.emplace(std::make_pair<FT_Face>(*face, cId), std::move(g));
@@ -277,6 +296,8 @@ namespace spades {
 		Vector2 FTFont::Measure(const std::string& str) {
 			SPADES_MARK_FUNCTION();
 
+			SyncRasterScale();
+
 			float maxWidth = 0.0F;
 			float x = 0.0F;
 			int lines = 1;
@@ -303,7 +324,8 @@ namespace spades {
 			if (g.image)
 				return;
 
-			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(height * 64.0F), 72, 72);
+			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(height * rasterScale * 64.0F), 72,
+			                 72);
 			FT_Load_Glyph(g.face, g.charIndex, FT_LOAD_NO_HINTING);
 			FT_Render_Glyph(g.face->glyph, FT_RENDER_MODE_NORMAL);
 
@@ -348,8 +370,8 @@ namespace spades {
 			);
 
 			Vector2 offs(
-				(float)g.face->glyph->bitmap_left,
-				baselineY - g.face->glyph->bitmap_top
+				(float)g.face->glyph->bitmap_left / rasterScale,
+				baselineY - (float)g.face->glyph->bitmap_top / rasterScale
 			);
 
 			g.image.reset((*result).image, bounds, offs);
@@ -441,7 +463,7 @@ namespace spades {
 				(float)newH - 1
 			);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (KernelSize * 0.5F);
+			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (KernelSize * 0.5F / rasterScale);
 
 			g.blurImage.reset((*result).image, bounds, offs);
 		}
@@ -451,7 +473,8 @@ namespace spades {
 			if (g.outlineImage)
 				return;
 
-			enum { Thickness = 1 };
+			// 1 virtual pixel, in the bitmap's real pixels.
+			int const Thickness = std::max(1, static_cast<int>(std::round(rasterScale)));
 
 			auto &orig = *g.bmp;
 			int const origW = orig.GetWidth();
@@ -501,13 +524,14 @@ namespace spades {
 				(float)newH - 1
 			);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (float)Thickness;
+			Vector2 offs = (*g.image).offset - Vector2(1, 1) * ((float)Thickness / rasterScale);
 
 			g.outlineImage.reset((*result).image, bounds, offs);
 		}
 
 		void FTFont::Draw(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -524,13 +548,15 @@ namespace spades {
 				  auto& img = *g.image;
 				  auto srcBounds = img.bounds;
 				  auto target = offset + (Vector2(x, y) + img.offset) * scale;
-				  target = (target + 0.5F).Floor(); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * scale,
-								   srcBounds.GetHeight() * scale);
+				  // on whole real pixels, for sharper rendering
+				  target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+				  float bmpScale = scale / rasterScale;
+				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * bmpScale,
+								   srcBounds.GetHeight() * bmpScale);
 
 				  if (!rendererIsLowQuality) {
 					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * scale);
+					  destBounds = destBounds.Inflate(0.5F * bmpScale);
 				  }
 
 				  renderer->DrawImage(&img.img, destBounds, srcBounds);
@@ -550,6 +576,7 @@ namespace spades {
 
 		void FTFont::DrawBlurred(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -565,13 +592,15 @@ namespace spades {
 				  auto& img = *g.blurImage;
 				  auto srcBounds = img.bounds;
 				  auto target = offset + (Vector2(x, y) + img.offset) * scale;
-				  target = (target + 0.5F).Floor(); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * scale,
-								   srcBounds.GetHeight() * scale);
+				  // on whole real pixels, for sharper rendering
+				  target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+				  float bmpScale = scale / rasterScale;
+				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * bmpScale,
+								   srcBounds.GetHeight() * bmpScale);
 
 				  if (!rendererIsLowQuality) {
 					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * scale);
+					  destBounds = destBounds.Inflate(0.5F * bmpScale);
 				  }
 
 				  renderer->DrawImage(&img.img, destBounds, srcBounds);
@@ -591,6 +620,7 @@ namespace spades {
 
 		void FTFont::DrawOutlined(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -606,14 +636,16 @@ namespace spades {
 					auto &img = *g.outlineImage;
 					auto srcBounds = img.bounds;
 					auto target = offset + (Vector2(x, y) + img.offset) * scale;
-					target = (target + 0.5F).Floor();
+					// on whole real pixels, for sharper rendering
+					target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+					float bmpScale = scale / rasterScale;
 					AABB2 destBounds(target.x, target.y,
-									 srcBounds.GetWidth() * scale,
-									 srcBounds.GetHeight() * scale);
+									 srcBounds.GetWidth() * bmpScale,
+									 srcBounds.GetHeight() * bmpScale);
 
 					if (!rendererIsLowQuality) {
 						srcBounds = srcBounds.Inflate(0.5F);
-						destBounds = destBounds.Inflate(0.5F * scale);
+						destBounds = destBounds.Inflate(0.5F * bmpScale);
 					}
 
 					renderer->DrawImage(&img.img, destBounds, srcBounds);

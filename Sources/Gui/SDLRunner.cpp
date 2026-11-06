@@ -30,6 +30,7 @@
 #include <Audio/ALDevice.h>
 #include <Audio/NullDevice.h>
 #include <Client/Client.h>
+#include <Client/ScaledRenderer.h>
 #include <Core/ConcurrentDispatch.h>
 #include <Core/Debug.h>
 #include <Core/Disposable.h>
@@ -56,7 +57,7 @@ static int lastMouseX = 0, lastMouseY = 0;
 namespace spades {
 	namespace gui {
 
-		SDLRunner::SDLRunner() : m_hasSystemMenu(false) {}
+		SDLRunner::SDLRunner() : m_hasSystemMenu(false), m_uiScale(1.0F) {}
 
 		SDLRunner::~SDLRunner() {}
 
@@ -134,7 +135,9 @@ namespace spades {
 				case SDL_MOUSEMOTION:
 					if (m_active) {
 						if (view.NeedsAbsoluteMouseCoordinate())
-							view.MouseEvent(static_cast<float>(event.motion.x), static_cast<float>(event.motion.y));
+							// window pixels -> the UI's virtual pixels
+							view.MouseEvent(static_cast<float>(event.motion.x) / m_uiScale,
+							                static_cast<float>(event.motion.y) / m_uiScale);
 						else
 							view.MouseEvent(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
 					}
@@ -213,6 +216,9 @@ namespace spades {
 
 				while (running) {
 					SDL_Event event;
+
+					// The scale changes between frames (see ScaledRenderer::Flip).
+					m_uiScale = renderer->GetUIScale();
 
 					DispatchQueue::GetThreadQueue()->ProcessQueue();
 
@@ -307,12 +313,13 @@ namespace spades {
 					editing = ed;
 
 					if (editing) {
+						// virtual pixels -> window pixels, for the IME candidate window
 						AABB2 rt = view->GetTextInputRect();
 						SDL_Rect srt;
-						srt.x = (int)rt.GetMinX();
-						srt.y = (int)rt.GetMinY();
-						srt.w = (int)rt.GetWidth();
-						srt.h = (int)rt.GetHeight();
+						srt.x = (int)(rt.GetMinX() * m_uiScale);
+						srt.y = (int)(rt.GetMinY() * m_uiScale);
+						srt.w = (int)(rt.GetWidth() * m_uiScale);
+						srt.h = (int)(rt.GetHeight() * m_uiScale);
 						SDL_SetTextInputRect(&srt);
 					}
 
@@ -616,6 +623,12 @@ namespace spades {
 					Handle<client::IRenderer> renderer;
 					Handle<Disposable> windowReference;
 					std::tie(renderer, windowReference) = CreateRenderer(window, rtype);
+
+					// Scale the game's UI and HUD with the screen. The setup window has a
+					// fixed 800x480 layout and stays 1:1.
+					if (!m_hasSystemMenu)
+						renderer = Handle<client::ScaledRenderer>::New(renderer)
+						             .Cast<client::IRenderer>();
 
 					Handle<client::IAudioDevice> audio(CreateAudioDevice(), false);
 

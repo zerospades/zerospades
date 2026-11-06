@@ -39,6 +39,8 @@ namespace spades {
 		class SDLRunner {
 			bool m_active;
 			bool m_hasSystemMenu;
+			/** Window pixels per UI pixel, refreshed every frame from the renderer. */
+			float m_uiScale;
 
 		protected:
 			enum class RendererType { GL, SW };
