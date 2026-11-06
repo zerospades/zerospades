@@ -1,16 +1,13 @@
 name: ZeroSpades Android
 
 on:
-  push:
-    branches: ['**']
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  native-build:
+  build-and-release:
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -40,7 +37,7 @@ jobs:
       - name: Check out pinned OpenAL source
         run: git submodule update --init --depth 1 openal-soft
 
-      - name: Build pinned Android dependencies
+      - name: Build Android dependencies
         run: |
           set -eu
 
@@ -62,7 +59,7 @@ jobs:
             --x-install-root="$RUNNER_TEMP/zs-deps" \
             --clean-after-build
 
-      - name: Obtain official r33 development assets
+      - name: Obtain official game assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -83,16 +80,7 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk \
             "$RUNNER_TEMP/ZeroSpades-Android.apk"
 
-      - name: Upload APK as workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ZeroSpades-Android
-          path: ${{ runner.temp }}/ZeroSpades-Android.apk
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Create GitHub Release
-        if: github.event_name != 'pull_request'
+      - name: Create GitHub Release with APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
