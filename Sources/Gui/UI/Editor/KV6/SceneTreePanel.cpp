@@ -44,6 +44,7 @@ namespace spades {
 			constexpr float kWheelRows = 2.0F; // rows a wheel step scrolls
 			constexpr std::size_t kMaxNameBytes = 255; // as the file holds them
 			constexpr float kNamePad = 3.0F;           // the name, in from its box
+			constexpr float kBackdropPad = 6.0F;       // the panel behind, out from the rows
 
 			const Vector4 kText = MakeVector4(0.86F, 0.87F, 0.90F, 1.0F);
 			const Vector4 kGroupText = MakeVector4(0.66F, 0.69F, 0.75F, 1.0F);
@@ -197,8 +198,18 @@ namespace spades {
 
 		// --- Input -------------------------------------------------------------
 
+		AABB2 SceneTreePanel::Backdrop(int rowCount) const {
+			const int shown = std::min(rowCount - scroll, VisibleRows());
+			const float x = left - kSlack - kBackdropPad;
+			const float y = top - kBackdropPad;
+			return AABB2(x, y, kWidth + kSlack + kBackdropPad * 2.0F,
+			             float(std::max(1, shown)) * kRowH + kBackdropPad * 2.0F);
+		}
+
 		bool SceneTreePanel::IsOver(const KV6Scene& scene, const Vector2& at) const {
-			return RowAt(Rows(scene), at) >= 0;
+			// Its rows, and the panel round them: a press there picks nothing
+			// behind it.
+			return Backdrop(int(Rows(scene).size())).Contains(at);
 		}
 
 		std::string SceneTreePanel::Press(KV6Scene& scene, const Vector2& at, bool toggle,
@@ -577,6 +588,12 @@ namespace spades {
 			  held == Held::Drag ? DropAt(scene, rows, cursor) : Drop();
 			const int last = std::min(int(rows.size()), scroll + VisibleRows());
 
+			// A panel behind the rows, as behind the editor's other panels, so
+			// they read over the grid and the model.
+			const AABB2 backdrop = Backdrop(int(rows.size()));
+			EditorTheme::PaintPanel(renderer, backdrop.GetMinX(), backdrop.GetMinY(),
+			                        backdrop.GetWidth(), backdrop.GetHeight());
+
 			for (int i = scroll; i < last; i++) {
 				const Row& row = rows[std::size_t(i)];
 				const float y = RowTop(i);
@@ -596,8 +613,15 @@ namespace spades {
 				if (hidden)
 					color = Faded(color, kDimmed);
 
+				// A band across the row under the pointer, and the selected
+				// ones, with a bar beside them.
+				if (selected || hovered) {
+					OverlayColorNP(renderer, selected ? Faded(color, active ? 0.22F : 0.14F)
+					                                  : EditorTheme::Highlight());
+					OverlayFillRect(renderer, left - kSlack + 1.0F, y + 1.0F, kWidth + kSlack - 1.0F,
+					                kRowH - 2.0F);
+				}
 				if (selected) {
-					// A bar beside the row: the panel draws no background.
 					OverlayColorNP(renderer, color);
 					OverlayFillRect(renderer, left - kSlack + 1.0F, y + 3.0F, 2.0F, kRowH - 6.0F);
 				}
