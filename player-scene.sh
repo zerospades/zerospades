@@ -96,7 +96,10 @@ scene new "$out" --force >/dev/null
 	echo "add-hinge Player/Standing RightHip --at -2.5 0 -1"
 	part Player/Standing/RightHip LegRight RightLeg
 
-	echo "add-hinge Player Crouching"
+	# Raised so the crouched torso meets the head, which shows where
+	# standing puts it: crouched, the game hangs the head half a voxel above
+	# the torso's top (ClientPlayer.cpp), which is 5 voxels lower.
+	echo "add-hinge Player Crouching --at 0 0 -4.5"
 	echo "add-hinge Player/Crouching UpperBody --at 0 0 -5"
 	part Player/Crouching/UpperBody TorsoCrouch Torso
 	echo "add-hinge Player/Crouching LeftHip --at 2.5 -2.5 -0.5"
