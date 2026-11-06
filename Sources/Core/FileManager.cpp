@@ -93,6 +93,25 @@ namespace spades {
 		return false;
 	}
 
+	int FileManager::Rank(const char* fn) {
+		SPADES_MARK_FUNCTION();
+		if (!fn || fn[0] == 0)
+			return -1;
+		int rank = 0;
+		for (auto* fs : g_fileSystems) {
+			if (fs->FileExists(fn))
+				return rank;
+			rank++;
+		}
+		auto weak_fn = std::string(fn) + ".weak";
+		for (auto* fs : g_fileSystems) {
+			if (fs->FileExists(weak_fn.c_str()))
+				return rank;
+			rank++;
+		}
+		return -1;
+	}
+
 	bool FileManager::RemoveFile(const char* fn) {
 		SPADES_MARK_FUNCTION();
 		if (!fn)
