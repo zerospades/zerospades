@@ -35,23 +35,23 @@ namespace spades {
 	namespace client {
 		namespace {
 			const char* const kSceneFile = "Player.2kv6";
-			const char* const kHatPath = "Player/UpperBody/Neck/SantaHat";
+			const char* const kHatPath = "Player/Standing/UpperBody/Neck/SantaHat";
 
 			// Where the template keeps each classic part (player-scene.sh).
 			const char* ScenePathOf(const std::string& name) {
 				static const std::map<std::string, const char*> paths = {
-				  {"Torso", "Player/UpperBody/Torso"},
-				  {"Head", "Player/UpperBody/Neck/Head"},
-				  {"Arms", "Player/UpperBody/Shoulders/ArmsHolding"},
-				  {"Leg", "Player/LeftHip/LeftLeg"},
-				  {"LegRight", "Player/RightHip/RightLeg"},
-				  {"TorsoCrouch", "Crouching/UpperBody/Torso"},
-				  {"LegCrouch", "Crouching/LeftHip/LeftLeg"},
-				  {"LegRightCrouch", "Crouching/RightHip/RightLeg"},
-				  {"UpperArm", "JointedArms/LeftShoulder/LeftUpperArm"},
-				  {"Arm", "JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm"},
-				  {"UpperArmRight", "JointedArms/RightShoulder/RightUpperArm"},
-				  {"ArmRight", "JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm"},
+				  {"Torso", "Player/Standing/UpperBody/Torso"},
+				  {"Head", "Player/Standing/UpperBody/Neck/Head"},
+				  {"Arms", "Player/Standing/UpperBody/Shoulders/ArmsHolding"},
+				  {"Leg", "Player/Standing/LeftHip/LeftLeg"},
+				  {"LegRight", "Player/Standing/RightHip/RightLeg"},
+				  {"TorsoCrouch", "Player/Crouching/UpperBody/Torso"},
+				  {"LegCrouch", "Player/Crouching/LeftHip/LeftLeg"},
+				  {"LegRightCrouch", "Player/Crouching/RightHip/RightLeg"},
+				  {"UpperArm", "Player/JointedArms/LeftShoulder/LeftUpperArm"},
+				  {"Arm", "Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm"},
+				  {"UpperArmRight", "Player/JointedArms/RightShoulder/RightUpperArm"},
+				  {"ArmRight", "Player/JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm"},
 				  {"Dead", "Fallen/Corpse"},
 				};
 				const auto it = paths.find(name);
