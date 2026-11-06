@@ -76,10 +76,14 @@ namespace spades {
 
 			void SetWindow(SDL_Window* w) { window = w; }
 
+			// Questions about the monitor the setup window is on, which only the helper
+			// (holding the window) can answer. Process-wide display settings and facts,
+			// such as the auto-resolution mode or the monitor count, are in
+			// Gui/Utils/DisplayUtils.h.
+
 			/** The monitor the setup window is shown on. */
 			int GetCurrentDisplay();
 			std::string GetCurrentDisplayName();
-			int GetNumDisplays();
 			/** The desktop resolution of the monitor the setup window is shown on. */
 			bool GetDetectedResolution(int& width, int& height);
 			/** Re-lists the video modes of the monitor the setup window is shown on. */

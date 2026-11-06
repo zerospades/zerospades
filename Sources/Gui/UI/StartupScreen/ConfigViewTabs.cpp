@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "ConfigViewTabs.h"
@@ -582,7 +583,7 @@ namespace spades {
 					nativeRow = i;
 					item += " " + _Tr("StartupScreen", "(native)");
 					// Only worth naming the monitor when there is a choice of them.
-					if (helper->GetNumDisplays() > 1)
+					if (display::GetNumDisplays() > 1)
 						item += " - " + helper->GetCurrentDisplayName();
 					if (autoMode)
 						selected = i;
@@ -609,9 +610,15 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::Render() {
-			// Follow the setup window when it is dragged onto another monitor.
-			if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
-				ApplyDetectedResolution();
+			// Follow the setup window when it is dragged onto another monitor. A few
+			// checks a second are plenty for a window drag, and spare an SDL call
+			// per frame.
+			float now = GetManager().time;
+			if (now >= nextDisplayCheck) {
+				nextDisplayCheck = now + 0.25F;
+				if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
+					ApplyDetectedResolution();
+			}
 
 			client::IFont* font = GetFont();
 			if (font)

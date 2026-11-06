@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
-#include <set>
 #include <utility>
 #ifdef WIN32
 #include <direct.h>
@@ -683,8 +682,6 @@ namespace spades {
 		std::string StartupScreenHelper::GetCurrentDisplayName() {
 			return display::GetDisplayName(GetCurrentDisplay());
 		}
-
-		int StartupScreenHelper::GetNumDisplays() { return display::GetNumDisplays(); }
 
 		bool StartupScreenHelper::GetDetectedResolution(int& width, int& height) {
 			int index = GetCurrentDisplay();

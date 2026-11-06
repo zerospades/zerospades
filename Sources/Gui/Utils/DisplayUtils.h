@@ -41,6 +41,10 @@ namespace spades {
 				int height;
 			};
 
+			struct Rect {
+				int x, y, width, height;
+			};
+
 			/** Number of connected monitors (at least 1 once SDL video is up). */
 			int GetNumDisplays();
 
@@ -68,6 +72,12 @@ namespace spades {
 
 			/** The monitor's current desktop resolution; false if SDL can't tell. */
 			bool GetDesktopResolution(int index, Resolution& out);
+
+			/**
+			 * The part of the monitor a window may cover: all of it minus taskbars,
+			 * docks and menu bars. Needs SDL 2.0.5; with older SDL, the whole monitor.
+			 */
+			bool GetUsableBounds(int index, Rect& out);
 
 			/**
 			 * The monitor's distinct video modes of at least 640x480, largest first.
