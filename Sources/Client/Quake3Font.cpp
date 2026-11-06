@@ -96,7 +96,6 @@ namespace spades {
 
 		Vector2 Quake3Font::Measure(const std::string& txt) {
 			SPADES_MARK_FUNCTION();
-			SyncTextureScale();
 
 			float x = 0.0F, w = 0.0F, h = static_cast<float>(glyphHeight);
 			for (size_t i = 0; i < txt.size();) {
@@ -130,13 +129,12 @@ namespace spades {
 
 				continue;
 			fallback:
-				// As Draw() lays it out: at the fitted size, in unfitted units.
-				x += MeasureFallback(ch, (yMax - yMin) * pixelFit) / pixelFit;
+				x += MeasureFallback(ch, yMax - yMin);
 				if (x > w)
 					w = x;
 			}
 
-			return MakeVector2(w, h) * pixelFit;
+			return MakeVector2(w, h);
 		}
 
 		void Quake3Font::Draw(const std::string& txt, spades::Vector2 offset, float scale,
@@ -147,7 +145,6 @@ namespace spades {
 				offset = SnapOrigin(offset);
 
 			SyncTextureScale();
-			scale *= pixelFit;
 			IImage* image = scaledTex ? scaledTex.GetPointerOrNull() : tex;
 			const float texelScale = scaledTex ? static_cast<float>(texScale) : 1.0F;
 
@@ -308,19 +305,8 @@ namespace spades {
 		} // namespace
 
 		void Quake3Font::SyncTextureScale() {
-			const float s = renderer->ScreenPixelRatio();
-			int k = std::max(1, static_cast<int>(std::ceil(s - 0.001F)));
-			float fit = 1.0F;
-			if (s < 1.0F) {
-				// A pixel font can't be sharp, nor readable, below its own size: draw
-				// it one screen pixel per font pixel, a little larger than nominal.
-				fit = 1.0F / s;
-			} else if (s / static_cast<float>(k) < 0.71F) {
-				k = std::max(1, static_cast<int>(std::floor(s + 0.001F)));
-				fit = static_cast<float>(k) / s;
-			}
-			k = std::min(k, 4);
-			pixelFit = fit;
+			// Screen pixels per font pixel, rounded up: the atlas is never magnified.
+			const int k = std::min(std::max(1, static_cast<int>(std::ceil(renderer->ScreenPixelRatio()))), 4);
 			if (k == texScale)
 				return;
 			texScale = k;
@@ -328,9 +314,10 @@ namespace spades {
 			scaledOutlineImage = nullptr;
 			if (k > 1) {
 				if (source)
-					scaledTex = renderer->CreateImage(*UpscaleNearest(*source, k));
+					scaledTex = renderer->CreateImageWithoutMipmaps(*UpscaleNearest(*source, k));
 				if (outlineAtlas)
-					scaledOutlineImage = renderer->CreateImage(*UpscaleNearest(*outlineAtlas, k));
+					scaledOutlineImage =
+					  renderer->CreateImageWithoutMipmaps(*UpscaleNearest(*outlineAtlas, k));
 			}
 		}
 
@@ -347,7 +334,6 @@ namespace spades {
 				offset = SnapOrigin(offset);
 
 			SyncTextureScale();
-			scale *= pixelFit;
 			IImage* image = scaledOutlineImage ? scaledOutlineImage.GetPointerOrNull()
 			                                   : outlineImage.GetPointerOrNull();
 			const float texelScale = scaledOutlineImage ? static_cast<float>(texScale) : 1.0F;

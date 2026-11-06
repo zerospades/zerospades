@@ -134,6 +134,9 @@ namespace spades {
 			}
 
 			Handle<IImage> CreateImage(Bitmap& bmp) { return base->CreateImage(bmp); }
+			Handle<IImage> CreateImageWithoutMipmaps(Bitmap& bmp) {
+				return base->CreateImageWithoutMipmaps(bmp);
+			}
 			Handle<IModel> CreateModel(VoxelModel& m) { return base->CreateModel(m); }
 
 			void SetGameMap(stmp::optional<GameMap&>) { OnProhibitedAction(); }
@@ -280,6 +283,7 @@ namespace spades {
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
 			float ScreenPixelRatio() { return base->ScreenPixelRatio(); }
+			float UIScale() { return base->UIScale(); }
 
 			// A query, safe to pass through; without it scripts drawing through this
 			// would see a GPU renderer whatever the real one is. (No `override`, like

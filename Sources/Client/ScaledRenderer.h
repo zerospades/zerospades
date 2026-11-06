@@ -27,29 +27,22 @@ namespace spades {
 		/**
 		 * Scales all 2D drawing (menus, HUD, text) by the UI scale.
 		 *
-		 * The UI and HUD are laid out in fixed pixel sizes, so on a high resolution
-		 * screen they shrink to a fraction of their intended physical size. This proxy
-		 * sits between them and the real renderer: it reports a smaller "virtual"
-		 * screen (`ScreenWidth()` / `ScreenHeight()` divided by the scale) and maps
-		 * every 2D coordinate, clip and scene viewport back to real pixels. Callers
-		 * need no changes. Fonts ask `ScreenPixelRatio()` to rasterize glyphs at the real
-		 * pixel density, so text stays sharp instead of being upscaled.
+		 * The UI and HUD are laid out in fixed sizes, made for a 1080p-class window;
+		 * on a larger one they shrink to a fraction of their intended physical size.
+		 * This proxy sits between them and the real renderer: it reports a smaller
+		 * screen (`ScreenWidth` / `ScreenHeight` divided by the scale) and maps every
+		 * 2D coordinate, clip and scene viewport back, so callers need no changes.
+		 * `ScreenPixelRatio` and `UIScale` include the scale, so text and other
+		 * pixel-exact drawing are done at the screen's real density.
 		 *
-		 * The scale is `ui_scale` (a user multiplier, 1 by default) times an automatic
-		 * factor of the window's size against a 1920x1080 reference in quarter steps,
-		 * rounded to eighths: a 4K screen gets 2x out of the box, 1440p 1.25x, 1080p and
-		 * smaller 1x. It never makes the virtual screen smaller than 800x600, which the
-		 * menus need. It is re-evaluated between frames (`Flip`).
+		 * The wrapped renderer works in window units (points on a high-DPI display),
+		 * so the scale is about the window's size as the OS presents it, never about
+		 * pixel density, which the wrapped renderer handles.
 		 */
 		class ScaledRenderer final : public IRenderer {
 			Handle<IRenderer> base;
-			float scale = 1.0F;
-			float lastWidth = 0.0F, lastHeight = 0.0F;
-			float lastUserScale = 0.0F;
-			float lastPerPoint = 0.0F; // as last logged
-			float windowWidth = 0.0F, windowHeight = 0.0F; // in points; 0 = unknown
-
-			void UpdateScale();
+			float scale = 1.0F;      // window units per UI unit
+			float fixedScale = 0.0F; // set by SetFixedScale; 0 = automatic
 
 			Vector2 P(const Vector2& v) const { return v * scale; }
 			AABB2 R(const AABB2& r) const;
@@ -60,23 +53,31 @@ namespace spades {
 		public:
 			explicit ScaledRenderer(Handle<IRenderer> base);
 
-			/** The range `ui_scale` is held to (the preferences slider's range). */
-			static const float kMinUserScale, kMaxUserScale;
+			/**
+			 * The scale for a window of `width`x`height` window units. Its automatic
+			 * part is the window's size against 1920x1080, in quarter steps (so the UI
+			 * doesn't rescale continuously as the window is resized) and never below 1;
+			 * it is multiplied by `ui_scale`, and held so the UI keeps at least 800x600.
+			 * A 4K screen gets 2, 1440p 1.25, 1080p and smaller 1.
+			 */
+			static float ComputeScale(float width, float height);
 
 			/**
-			 * The window's size in points (SDL window units), which the automatic
-			 * scale is judged by. Until given, the renderer's own size is used.
-			 * Call it between frames (it may change the scale).
+			 * For a view laid out at a fixed size (the setup window, whose window is
+			 * sized to match): use `s` instead of the automatic scale.
 			 */
-			void SetWindowSize(float width, float height);
+			void SetFixedScale(float s);
 
-			/** UI units per point for a window of `width`x`height` points. */
-			static float ComputeScale(float width, float height, float userScale);
+			/**
+			 * Re-evaluates the scale from the window size and `ui_scale`. The runner
+			 * calls it once per frame, before the view runs, so a whole frame is laid
+			 * out at one scale. Returns whether the scale changed (the UI then sees a
+			 * new screen size and rebuilds itself).
+			 */
+			bool Update();
 
-			IRenderer& GetBase() { return *base; }
-
-			/** The UI scale on top of whatever the wrapped renderer has. */
 			float ScreenPixelRatio() override { return base->ScreenPixelRatio() * scale; }
+			float UIScale() override { return base->UIScale() * scale; }
 
 			void Init() override;
 			void Shutdown() override { base->Shutdown(); }
@@ -89,6 +90,9 @@ namespace spades {
 			}
 			void ClearCache() override { base->ClearCache(); }
 			Handle<IImage> CreateImage(Bitmap& bmp) override { return base->CreateImage(bmp); }
+			Handle<IImage> CreateImageWithoutMipmaps(Bitmap& bmp) override {
+				return base->CreateImageWithoutMipmaps(bmp);
+			}
 			Handle<IModel> CreateModel(VoxelModel& m) override { return base->CreateModel(m); }
 
 			void SetGameMap(stmp::optional<GameMap&> map) override { base->SetGameMap(map); }
@@ -148,7 +152,7 @@ namespace spades {
 			RendererInfo GetRendererInfo() override { return base->GetRendererInfo(); }
 
 			void FrameDone() override { base->FrameDone(); }
-			void Flip() override;
+			void Flip() override { base->Flip(); }
 			Handle<Bitmap> ReadBitmap() override;
 
 			float ScreenWidth() override { return base->ScreenWidth() / scale; }

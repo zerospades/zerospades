@@ -95,13 +95,6 @@ namespace spades {
 				 */
 				ScreenSizeChangedEventHandler screenSizeChanged;
 
-				/**
-				 * Left by an element that causes a screen size change (the preferences
-				 * window's Interface Scale) for the rebuilt screen to restore it from;
-				 * see `PreferenceView::KeepOpenAcrossRebuild`. Kept here, not globally,
-				 * so it can never outlive this screen.
-				 */
-				Handle<RefCountedObject> restoreAfterRebuild;
 
 				UIManager(client::IRenderer* renderer, client::IAudioDevice* audioDevice);
 

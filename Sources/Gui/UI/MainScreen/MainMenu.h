@@ -199,8 +199,8 @@ namespace spades {
 			MainScreenMainMenuState GetState();
 			void SetState(const MainScreenMainMenuState& state);
 
-			/** Opens the preferences window, on `state`'s tab and rows if given. */
-			void OpenSetup(Handle<PreferenceViewPersistedState> state = {});
+			/** Opens the preferences window where it was last left. */
+			void OpenSetup();
 
 			void HotKey(const std::string& key) override;
 			void Render() override;

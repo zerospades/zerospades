@@ -32,6 +32,7 @@
 namespace spades {
 	namespace client {
 		class IRenderer;
+		class ScaledRenderer;
 		class IAudioDevice;
 	} // namespace client
 	namespace gui {
@@ -39,8 +40,10 @@ namespace spades {
 		class SDLRunner {
 			bool m_active;
 			bool m_hasSystemMenu;
-			/** Window pixels per UI pixel, refreshed every frame from the renderer. */
+			/** Window units per UI unit (IRenderer::UIScale), for mouse positions. */
 			float m_uiScale;
+			/** The renderer's UI scaling, while a window is open; weak. */
+			client::ScaledRenderer* m_scaledRenderer;
 
 		protected:
 			enum class RendererType { GL, SW };
@@ -57,13 +60,16 @@ namespace spades {
 			virtual client::IAudioDevice* CreateAudioDevice();
 			std::tuple<Handle<client::IRenderer>, Handle<Disposable>>
 			CreateRenderer(SDL_Window*, RendererType type);
-			/** The game window's position and size in auto-resolution mode. */
-			static void AutoSizeWindow(int displayIndex, bool fullscreen, int& x, int& y,
-			                           int& width, int& height);
-			/** Fits a windowed game window, decorations included, to its monitor. */
-			static void FitWindowToDisplay(SDL_Window*, int displayIndex);
+			/**
+			 * A view laid out at a fixed size (the size given to Run), like the setup
+			 * window, instead of one that follows the window's size: its window is
+			 * enlarged for the monitor, and not resizable.
+			 */
+			virtual bool HasFixedLayout() { return false; }
 			/** Called once the window exists, before the view is created. */
 			virtual void WindowCreated(SDL_Window*) {}
+			/** The window was moved (possibly onto another monitor). */
+			virtual void WindowMoved(SDL_Window*) {}
 			/** Called after the client loop ends, while the window still exists. */
 			virtual void WindowDestroying(SDL_Window*) {}
 

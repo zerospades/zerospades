@@ -31,7 +31,11 @@ namespace spades {
 		class SDLGLDevice : public draw::IGLDevice {
 			SDL_Window* window;
 			SDL_GLContext context;
-			int w, h;
+			int w, h;             // framebuffer, pixels
+			int windowW, windowH; // window, points
+			/** Re-reads both sizes: the window may have been resized or moved to a
+			 *  display of another pixel density. */
+			void UpdateScreenSize();
 
 		protected:
 			~SDLGLDevice();
@@ -196,6 +200,8 @@ namespace spades {
 
 			Integer ScreenWidth() override;
 			Integer ScreenHeight() override;
+			Integer WindowWidth() override;
+			Integer WindowHeight() override;
 
 			void Swap() override;
 

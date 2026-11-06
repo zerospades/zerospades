@@ -164,6 +164,8 @@ namespace spades {
 
 			protected:
 				auto GetRendererType() -> RendererType override { return RendererType::SW; }
+				// Laid out at 800x480; its window is enlarged for the monitor instead.
+				bool HasFixedLayout() override { return true; }
 				client::IAudioDevice* CreateAudioDevice() override {
 					return new audio::NullDevice();
 				}
@@ -175,6 +177,7 @@ namespace spades {
 
 				void WindowCreated(SDL_Window* window) override { helper->SetWindow(window); }
 				void WindowDestroying(SDL_Window*) override { helper->SetWindow(nullptr); }
+				void WindowMoved(SDL_Window*) override { helper->WindowMoved(); }
 
 			public:
 				ConcreteRunner(StartupScreenHelper* helper) : helper(helper) {}

@@ -33,100 +33,62 @@ DEFINE_SPADES_SETTING(ui_scale, "1");
 namespace spades {
 	namespace client {
 		namespace {
-			// The resolution the UI and HUD were laid out for: anything this size or
-			// smaller is drawn 1:1.
+			// The window size the UI and HUD were laid out for: up to this, 1:1.
 			constexpr float kReferenceWidth = 1920.0F;
 			constexpr float kReferenceHeight = 1080.0F;
-			// The smallest virtual screen the menus fit in.
+			// The smallest screen the menus fit in.
 			constexpr float kMinWidth = 800.0F;
 			constexpr float kMinHeight = 600.0F;
+			// The range of ui_scale (the Interface Scale slider's).
+			constexpr float kMinUserScale = 0.5F;
+			constexpr float kMaxUserScale = 2.0F;
 		} // namespace
-
-		const float ScaledRenderer::kMinUserScale = 0.5F;
-		const float ScaledRenderer::kMaxUserScale = 2.0F;
 
 		ScaledRenderer::ScaledRenderer(Handle<IRenderer> base) : base(std::move(base)) {
 			SPADES_MARK_FUNCTION();
 			if (!this->base)
 				SPInvalidArgument("base");
 			// Before Init(): views create their fonts first, and fonts read the scale.
-			UpdateScale();
+			Update();
 		}
 
 		ScaledRenderer::~ScaledRenderer() {}
 
-		float ScaledRenderer::ComputeScale(float width, float height, float userScale) {
+		float ScaledRenderer::ComputeScale(float width, float height) {
 			if (width <= 0.0F || height <= 0.0F)
 				return 1.0F;
 
-			// Automatic part: how much bigger than the reference the window is, by its
-			// tighter axis (so ultrawide screens scale by height), in quarter steps.
 			float fit = std::min(width / kReferenceWidth, height / kReferenceHeight);
-			float autoScale = std::max(1.0F, std::floor(fit * 4.0F) / 4.0F);
+			float automatic = std::max(1.0F, std::floor(fit * 4.0F) / 4.0F);
 
-			if (!(userScale > 0.0F)) // also catches NaN from a mangled config
-				userScale = 1.0F;
-			userScale = std::min(std::max(userScale, kMinUserScale), kMaxUserScale);
+			float user = ui_scale;
+			if (!(user > 0.0F)) // also catches NaN from a mangled config
+				user = 1.0F;
+			user = std::min(std::max(user, kMinUserScale), kMaxUserScale);
 
-			// The product, in eighths: coarse enough that most UI edges land on whole
-			// pixels, fine enough that every slider step (quarters) still differs.
-			float s = std::round(autoScale * userScale * 8.0F) / 8.0F;
-
-			// Never shrink the virtual screen below what the menus need.
-			float maxScale = std::min(width / kMinWidth, height / kMinHeight);
-			s = std::min(s, std::max(maxScale, 1.0F));
-			return std::max(s, 0.5F);
+			float largest = std::max(1.0F, std::min(width / kMinWidth, height / kMinHeight));
+			return std::min(automatic * user, largest);
 		}
 
-		void ScaledRenderer::UpdateScale() {
-			float w = base->ScreenWidth();
-			float h = base->ScreenHeight();
-			float userScale = ui_scale;
+		void ScaledRenderer::SetFixedScale(float s) {
+			fixedScale = s;
+			Update();
+		}
 
-			// Judged in window points, the units the OS sizes things in, so a
-			// high-DPI display (whose points are already enlarged) isn't enlarged a
-			// second time, then converted to the wrapped renderer's units: pixels
-			// when it renders a high-DPI window at full resolution, points when it
-			// works in points itself (kv6-editor).
-			float pw = windowWidth > 0.0F ? windowWidth : w;
-			float ph = windowHeight > 0.0F ? windowHeight : h;
-			float perPoint = ComputeScale(pw, ph, userScale);
-			float baseUnitsPerPoint = pw > 0.0F ? w / pw : 1.0F;
-			float s = perPoint * baseUnitsPerPoint;
-			// Logged once the window is known (the constructor's first estimate is
-			// provisional), and when anything changes.
-			if (windowWidth > 0.0F && (s != scale || perPoint != lastPerPoint))
-				SPLog("UI scale: %g per point, %g per renderer unit (window %gx%g points, "
-				      "renderer %gx%g, ui_scale %g)",
-				      perPoint, s, pw, ph, w, h, userScale);
-			lastPerPoint = windowWidth > 0.0F ? perPoint : 0.0F;
+		bool ScaledRenderer::Update() {
+			float s = fixedScale > 0.0F ? fixedScale
+			                            : ComputeScale(base->ScreenWidth(), base->ScreenHeight());
+			if (s == scale)
+				return false;
+			SPLog("UI scale: %g (screen %gx%g, ui_scale %s)", s, base->ScreenWidth(),
+			      base->ScreenHeight(), ui_scale.CString());
 			scale = s;
-			lastWidth = w;
-			lastHeight = h;
-			lastUserScale = userScale;
-		}
-
-		void ScaledRenderer::SetWindowSize(float width, float height) {
-			if (width == windowWidth && height == windowHeight)
-				return;
-			windowWidth = width;
-			windowHeight = height;
-			UpdateScale();
+			return true;
 		}
 
 		void ScaledRenderer::Init() {
 			base->Init();
-			UpdateScale();
-		}
-
-		void ScaledRenderer::Flip() {
-			base->Flip();
-			// Between frames, so a whole frame is laid out at a single scale. The UI
-			// notices the virtual screen size change and rebuilds itself. ui_scale is
-			// polled (a plain field read) so a change from the console applies too.
-			if (static_cast<float>(ui_scale) != lastUserScale ||
-			    base->ScreenWidth() != lastWidth || base->ScreenHeight() != lastHeight)
-				UpdateScale();
+			Update();
 		}
 
 		Handle<Bitmap> ScaledRenderer::ReadBitmap() { return base->ReadBitmap(); }

@@ -44,6 +44,7 @@ namespace spades {
 				SPInvalidArgument("audioDevice");
 
 			helper = Handle<ClientUIHelper>::New(this);
+			preferenceState = Handle<gui::PreferenceViewPersistedState>::New();
 
 			manager = Handle<gui::ui::UIManager>::New(renderer.GetPointerOrNull(),
 			                                          audioDevice.GetPointerOrNull());
@@ -173,9 +174,9 @@ namespace spades {
 
 			// Rebuilt by an interface scale change made from the preferences window:
 			// bring it back where it was, so the change looks applied in place.
-			if (auto prefs = gui::PreferenceView::TakeReopenState(*manager)) {
+			if (preferenceState->reopenAfterRebuild) {
 				EnterClientMenu();
-				clientMenu->OpenSetup(std::move(prefs));
+				clientMenu->OpenSetup();
 			}
 		}
 

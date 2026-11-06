@@ -110,30 +110,32 @@ namespace spades {
 					int index = SDL_GetWindowDisplayIndex(window);
 					if (index >= 0 && index < GetNumDisplays())
 						return index;
-					// Polled while the setup screen is up: say it once, not every time.
-					static bool logged = false;
-					if (!logged) {
-						logged = true;
-						SPLog("Couldn't tell which display the window is on: %s", SDL_GetError());
-					}
+					SPLog("Couldn't tell which display the window is on: %s", SDL_GetError());
 				}
 				return GetPreferredDisplay();
 			}
 
-			bool IsAutoResolution() {
-				// Configs from before auto-detection: keep a resolution someone chose.
-				// The stock 800x600 and the monitor's own native size are taken as
-				// "never chosen", so those switch to auto-detection.
-				if (!r_videoAutoResolutionChecked) {
-					r_videoAutoResolutionChecked = 1;
-					int w = r_videoWidth, h = r_videoHeight;
-					Resolution native;
-					bool isNative = GetDesktopResolution(GetPreferredDisplay(), native) &&
-					                native.width == w && native.height == h;
-					r_videoAutoResolution = (isNative || (w == 800 && h == 600)) ? 1 : 0;
-				}
-				return r_videoAutoResolution;
+			void DeclareDpiAwareness() {
+#ifdef SDL_HINT_WINDOWS_DPI_AWARENESS
+				// Windows (SDL 2.24+): see the declaration.
+				SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+#endif
 			}
+
+			void MigrateSettings() {
+				if (r_videoAutoResolutionChecked)
+					return;
+				r_videoAutoResolutionChecked = 1;
+				// Configs from before auto-resolution: keep a resolution someone chose.
+				// The stock 800x600 and the monitor's own size count as never chosen.
+				int w = r_videoWidth, h = r_videoHeight;
+				Resolution native;
+				bool isNative = GetDesktopResolution(GetPreferredDisplay(), native) &&
+				                native.width == w && native.height == h;
+				r_videoAutoResolution = (isNative || (w == 800 && h == 600)) ? 1 : 0;
+			}
+
+			bool IsAutoResolution() { return r_videoAutoResolution; }
 
 			void SetAutoResolution(bool on) {
 				r_videoAutoResolutionChecked = 1;
@@ -150,21 +152,6 @@ namespace spades {
 				out.width = mode.w;
 				out.height = mode.h;
 				return true;
-			}
-
-			bool GetUsableBounds(int index, Rect& out) {
-				SDL_Rect r;
-#if SDL_VERSION_ATLEAST(2, 0, 5)
-				if (SDL_GetDisplayUsableBounds(index, &r) == 0 && r.w > 0 && r.h > 0) {
-					out = {r.x, r.y, r.w, r.h};
-					return true;
-				}
-#endif
-				if (SDL_GetDisplayBounds(index, &r) == 0 && r.w > 0 && r.h > 0) {
-					out = {r.x, r.y, r.w, r.h};
-					return true;
-				}
-				return false;
 			}
 
 			std::vector<Resolution> GetVideoModes(int index) {
