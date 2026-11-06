@@ -42,6 +42,7 @@
 #include <Core/Settings.h>
 #include <Core/ShellApi.h>
 #include <Core/VersionInfo.h>
+#include <Gui/Utils/DisplayUtils.h>
 #include <Gui/Utils/Icon.h>
 #include <Gui/Main.h>
 #include <ZeroSpades.h>
@@ -82,6 +83,7 @@ namespace spades {
 
 		StartupScreenHelper::StartupScreenHelper()
 			: scr(nullptr),
+			  window(nullptr),
 			  shaderHighCapable(false),
 			  postFilterHighCapable(false),
 			  particleHighCapable(false) {
@@ -171,31 +173,9 @@ namespace spades {
 
 			SPLog("Performing ecapability query");
 
-			int idDisplay = 0;
-			int numDisplayMode = SDL_GetNumDisplayModes(idDisplay);
-			SDL_DisplayMode mode;
-			modes.clear();
-			if (numDisplayMode > 0) {
-				std::set<std::pair<int, int>> foundModes;
-				for (int i = 0; i < numDisplayMode; i++) {
-					SDL_GetDisplayMode(idDisplay, i, &mode);
-					if (mode.w < 640 || mode.h < 480)
-						continue;
-					if (foundModes.find(std::make_pair(mode.w, mode.h)) != foundModes.end())
-						continue;
-
-					foundModes.insert(std::make_pair(mode.w, mode.h));
-					modes.push_back(spades::MakeIntVector3(mode.w, mode.h, 0));
-					SPLog("Video Mode Found: %dx%d", mode.w, mode.h);
-				}
-			} else {
-				SPLog("Failed to get video mode list. Presetting default list");
-				modes.push_back(spades::MakeIntVector3(640, 480, 0));
-				modes.push_back(spades::MakeIntVector3(800, 600, 0));
-				modes.push_back(spades::MakeIntVector3(1024, 768, 0));
-				modes.push_back(spades::MakeIntVector3(1280, 720, 0));
-				modes.push_back(spades::MakeIntVector3(1920, 1080, 0));
-			}
+			// The setup window doesn't exist yet: list the modes of the monitor it will
+			// open on. RefreshVideoModes() re-lists them once it is shown.
+			RefreshVideoModes();
 
 			bool capable = true;
 			SDL_Window* window = SDL_CreateWindow("ZeroSpades: Please wait...", 1, 1, 1, 1,
@@ -717,7 +697,38 @@ namespace spades {
 		void StartupScreenHelper::Start() {
 			if (scr == nullptr)
 				return;
+			// The game opens on the monitor the setup window is shown on.
+			display::SetPreferredDisplay(GetCurrentDisplay());
 			scr->Start();
+		}
+
+		int StartupScreenHelper::GetCurrentDisplay() { return display::GetWindowDisplay(window); }
+
+		std::string StartupScreenHelper::GetCurrentDisplayName() {
+			return display::GetDisplayName(GetCurrentDisplay());
+		}
+
+		int StartupScreenHelper::GetNumDisplays() { return display::GetNumDisplays(); }
+
+		bool StartupScreenHelper::GetDetectedResolution(int& width, int& height) {
+			int index = GetCurrentDisplay();
+			display::Resolution res;
+			if (!display::GetDesktopResolution(index, res))
+				return false;
+			SPLog("Detected %dx%d on display %d (%s)", res.width, res.height, index,
+			      display::GetDisplayName(index).c_str());
+			width = res.width;
+			height = res.height;
+			return true;
+		}
+
+		void StartupScreenHelper::RefreshVideoModes() {
+			int index = GetCurrentDisplay();
+			modes.clear();
+			for (const auto& m : display::GetVideoModes(index))
+				modes.push_back(spades::MakeIntVector3(m.width, m.height, 0));
+			SPLog("%d video modes found on display %d (%s)", static_cast<int>(modes.size()),
+			      index, display::GetDisplayName(index).c_str());
 		}
 
 		int StartupScreenHelper::GetNumVideoModes() { return static_cast<int>(modes.size()); }

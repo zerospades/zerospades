@@ -22,10 +22,13 @@
 
 #include <functional>
 #include <map>
+#include <string>
 #include <vector>
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+
+struct SDL_Window;
 
 namespace spades {
 	class Serveritem;
@@ -35,6 +38,7 @@ namespace spades {
 		class StartupScreenHelper : public RefCountedObject {
 			friend class StartupScreen;
 			StartupScreen* scr;
+			SDL_Window* window; // the setup window while it is shown; weak
 			std::vector<IntVector3> modes;
 			struct ReportLine {
 				std::string text;
@@ -69,6 +73,17 @@ namespace spades {
 			void StartupScreenDestroyed();
 
 			void ExamineSystem();
+
+			void SetWindow(SDL_Window* w) { window = w; }
+
+			/** The monitor the setup window is shown on. */
+			int GetCurrentDisplay();
+			std::string GetCurrentDisplayName();
+			int GetNumDisplays();
+			/** The desktop resolution of the monitor the setup window is shown on. */
+			bool GetDetectedResolution(int& width, int& height);
+			/** Re-lists the video modes of the monitor the setup window is shown on. */
+			void RefreshVideoModes();
 
 			int GetNumVideoModes();
 			int GetVideoModeWidth(int index);

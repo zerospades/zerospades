@@ -68,6 +68,12 @@ namespace spades {
 				    Handle<StartupScreenGraphicsDisplayResolutionEditor>::New(ui);
 				e->SetBounds(AABB2(160.0F, 0.0F, 124.0F, 24.0F));
 				AddChild(e.GetPointerOrNull());
+				WatchHelpDeep(e.GetPointerOrNull(),
+				          [this](const std::string& s) { HandleHelpText(s); },
+				          _Tr("StartupScreen",
+				              "The size of the game window. \"Auto-detect\" in the "
+				              "drop-down picks the resolution of the monitor this window "
+				              "is on; the game opens on that monitor too."));
 				resEdit = e.GetPointerOrNull();
 			}
 
@@ -462,6 +468,7 @@ namespace spades {
 		    : UIElement(&ui->GetUIManager()),
 		      r_videoWidth("r_videoWidth", nullptr),
 		      r_videoHeight("r_videoHeight", nullptr),
+		      r_videoResolutionDetected("r_videoResolutionDetected", nullptr),
 		      helper(&ui->GetHelper()) {
 			UIManager* manager = &GetManager();
 			{
@@ -493,6 +500,21 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::LoadConfig() {
+			// First run: replace the stock 800x600 with the resolution of the monitor
+			// the setup window opened on. Done once, so a chosen 800x600 is kept.
+			if (!static_cast<bool>(r_videoResolutionDetected)) {
+				r_videoResolutionDetected = 1;
+				if (static_cast<int>(r_videoWidth) == 800 &&
+				    static_cast<int>(r_videoHeight) == 600) {
+					int w, h;
+					if (helper->GetDetectedResolution(w, h) && w >= 640 && h >= 480 &&
+					    w <= 8192 && h <= 8192) {
+						r_videoWidth = w;
+						r_videoHeight = h;
+					}
+				}
+			}
+
 			widthField->SetText(std::to_string(static_cast<int>(r_videoWidth)));
 			heightField->SetText(std::to_string(static_cast<int>(r_videoHeight)));
 		}
@@ -510,21 +532,55 @@ namespace spades {
 			SaveConfig();
 		}
 
+		void StartupScreenGraphicsDisplayResolutionEditor::SetResolution(int w, int h) {
+			widthField->SetText(std::to_string(w));
+			heightField->SetText(std::to_string(h));
+			SaveConfig();
+		}
+
 		void StartupScreenGraphicsDisplayResolutionEditor::DropdownHandler(int index) {
-			if (index >= 0) {
-				widthField->SetText(std::to_string(helper->GetVideoModeWidth(index)));
-				heightField->SetText(std::to_string(helper->GetVideoModeHeight(index)));
-				SaveConfig();
+			if (index < 0)
+				return;
+			if (index == 0) { // "Auto-detect"
+				int w, h;
+				if (helper->GetDetectedResolution(w, h))
+					SetResolution(w, h);
+				return;
 			}
+			index -= 1;
+			if (index < helper->GetNumVideoModes())
+				SetResolution(helper->GetVideoModeWidth(index),
+				              helper->GetVideoModeHeight(index));
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ShowDropdown(UIElement&) {
+			// The setup window may have been dragged onto another monitor since the
+			// last time, so list the modes of the one it is on now.
+			helper->RefreshVideoModes();
+
+			int detectedW = 0, detectedH = 0;
+			bool detected = helper->GetDetectedResolution(detectedW, detectedH);
+
 			std::vector<std::string> items;
+			{
+				std::string item = _Tr("StartupScreen", "Auto-detect");
+				if (detected)
+					item += " (" + std::to_string(detectedW) + "x" + std::to_string(detectedH) +
+					        ")";
+				// Only worth naming the monitor when there is a choice of them.
+				if (helper->GetNumDisplays() > 1)
+					item += " - " + helper->GetCurrentDisplayName();
+				items.push_back(std::move(item));
+			}
+
 			int cnt = helper->GetNumVideoModes();
 			for (int i = 0; i < cnt; i++) {
 				int w = helper->GetVideoModeWidth(i);
 				int h = helper->GetVideoModeHeight(i);
-				items.push_back(std::to_string(w) + "x" + std::to_string(h));
+				std::string item = std::to_string(w) + "x" + std::to_string(h);
+				if (detected && w == detectedW && h == detectedH)
+					item += " " + _Tr("StartupScreen", "(native)");
+				items.push_back(std::move(item));
 			}
 			ui::ShowDropDownList(*this, std::move(items),
 			                     [this](int index) { DropdownHandler(index); });

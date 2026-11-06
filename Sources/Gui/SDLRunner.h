@@ -55,6 +55,10 @@ namespace spades {
 			virtual client::IAudioDevice* CreateAudioDevice();
 			std::tuple<Handle<client::IRenderer>, Handle<Disposable>>
 			CreateRenderer(SDL_Window*, RendererType type);
+			/** Called once the window exists, before the view is created. */
+			virtual void WindowCreated(SDL_Window*) {}
+			/** Called after the client loop ends, while the window still exists. */
+			virtual void WindowDestroying(SDL_Window*) {}
 
 		public:
 			SDLRunner();
