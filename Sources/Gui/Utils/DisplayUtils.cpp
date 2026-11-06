@@ -33,7 +33,7 @@ DEFINE_SPADES_SETTING(r_videoDisplayName, "");
 // Use the desktop resolution of the monitor the game opens on.
 DEFINE_SPADES_SETTING(r_videoAutoResolution, "1");
 // Set once r_videoAutoResolution has been defaulted for this config.
-DEFINE_SPADES_SETTING(r_videoAutoResolutionMigrated, "0");
+DEFINE_SPADES_SETTING(r_videoAutoResolutionChecked, "0");
 SPADES_SETTING(r_videoWidth);
 SPADES_SETTING(r_videoHeight);
 
@@ -107,18 +107,21 @@ namespace spades {
 
 			bool IsAutoResolution() {
 				// Configs from before auto-detection: keep a resolution someone chose.
-				// Only the stock 800x600 is taken as "never chosen".
-				if (!r_videoAutoResolutionMigrated) {
-					r_videoAutoResolutionMigrated = 1;
-					if (static_cast<int>(r_videoWidth) != 800 ||
-					    static_cast<int>(r_videoHeight) != 600)
-						r_videoAutoResolution = 0;
+				// The stock 800x600 and the monitor's own native size are taken as
+				// "never chosen", so those switch to auto-detection.
+				if (!r_videoAutoResolutionChecked) {
+					r_videoAutoResolutionChecked = 1;
+					int w = r_videoWidth, h = r_videoHeight;
+					Resolution native;
+					bool isNative = GetDesktopResolution(GetPreferredDisplay(), native) &&
+					                native.width == w && native.height == h;
+					r_videoAutoResolution = (isNative || (w == 800 && h == 600)) ? 1 : 0;
 				}
 				return r_videoAutoResolution;
 			}
 
 			void SetAutoResolution(bool on) {
-				r_videoAutoResolutionMigrated = 1;
+				r_videoAutoResolutionChecked = 1;
 				r_videoAutoResolution = on ? 1 : 0;
 			}
 

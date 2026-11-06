@@ -72,10 +72,10 @@ namespace spades {
 				WatchHelpDeep(e.GetPointerOrNull(),
 				          [this](const std::string& s) { HandleHelpText(s); },
 				          _Tr("StartupScreen",
-				              "The size of the game window. \"Auto-detect\" (the default) "
-				              "uses the resolution of the monitor this window is on, and the "
-				              "game opens on that monitor. Typing a size or picking one from "
-				              "the drop-down turns it off."));
+				              "The size of the game window. The native size (the default) "
+				              "follows the monitor this window is on, and the game opens on "
+				              "that monitor. Typing a size or picking another one turns that "
+				              "off."));
 				resEdit = e.GetPointerOrNull();
 			}
 
@@ -546,19 +546,17 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::DropdownHandler(int index) {
-			if (index < 0)
+			if (index < 0 || index >= helper->GetNumVideoModes())
 				return;
-			if (index == 0) { // "Auto-detect"
+			if (index == nativeRow) {
+				// The native mode is auto-detection: it follows the monitor.
 				display::SetAutoResolution(true);
 				ApplyDetectedResolution();
 				return;
 			}
-			index -= 1;
-			if (index < helper->GetNumVideoModes()) {
-				display::SetAutoResolution(false);
-				ShowResolution(helper->GetVideoModeWidth(index), helper->GetVideoModeHeight(index));
-				SaveConfig();
-			}
+			display::SetAutoResolution(false);
+			ShowResolution(helper->GetVideoModeWidth(index), helper->GetVideoModeHeight(index));
+			SaveConfig();
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ShowDropdown(UIElement&) {
@@ -566,34 +564,31 @@ namespace spades {
 			// last time, so list the modes of the one it is on now.
 			helper->RefreshVideoModes();
 
-			int detectedW = 0, detectedH = 0;
-			bool detected = helper->GetDetectedResolution(detectedW, detectedH);
+			int nativeW = 0, nativeH = 0;
+			bool detected = helper->GetDetectedResolution(nativeW, nativeH);
 			bool autoMode = display::IsAutoResolution();
 			int curW = std::atoi(widthField->GetText().c_str());
 			int curH = std::atoi(heightField->GetText().c_str());
 
 			std::vector<std::string> items;
-			int selected = autoMode ? 0 : -1;
-			{
-				std::string item = _Tr("StartupScreen", "Auto-detect");
-				if (detected)
-					item += " (" + std::to_string(detectedW) + "x" + std::to_string(detectedH) +
-					        ")";
-				// Only worth naming the monitor when there is a choice of them.
-				if (helper->GetNumDisplays() > 1)
-					item += " - " + helper->GetCurrentDisplayName();
-				items.push_back(std::move(item));
-			}
-
+			int selected = -1;
+			nativeRow = -1;
 			int cnt = helper->GetNumVideoModes();
 			for (int i = 0; i < cnt; i++) {
 				int w = helper->GetVideoModeWidth(i);
 				int h = helper->GetVideoModeHeight(i);
 				std::string item = std::to_string(w) + "x" + std::to_string(h);
-				if (detected && w == detectedW && h == detectedH)
+				if (detected && nativeRow < 0 && w == nativeW && h == nativeH) {
+					nativeRow = i;
 					item += " " + _Tr("StartupScreen", "(native)");
+					// Only worth naming the monitor when there is a choice of them.
+					if (helper->GetNumDisplays() > 1)
+						item += " - " + helper->GetCurrentDisplayName();
+					if (autoMode)
+						selected = i;
+				}
 				if (!autoMode && selected < 0 && w == curW && h == curH)
-					selected = static_cast<int>(items.size());
+					selected = i;
 				items.push_back(std::move(item));
 			}
 
