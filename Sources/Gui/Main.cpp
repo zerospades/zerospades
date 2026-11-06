@@ -538,6 +538,8 @@ int main(int argc, char** argv) {
 	spades::g_openDocumentPath = commandLine.openDocument;
 	spades::gui::Automation().screenshotQuitAfter = commandLine.screenshotQuitAfter;
 	spades::gui::Automation().editorReferences = commandLine.editorReferences;
+	spades::gui::Automation().editorGenerate = commandLine.editorGenerateNode;
+	spades::gui::Automation().editorGenerateAt = commandLine.editorGenerateResolution;
 
 	std::unique_ptr<spades::SplashWindow> splashWindow;
 

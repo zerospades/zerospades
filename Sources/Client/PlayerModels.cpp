@@ -35,7 +35,10 @@ namespace spades {
 	namespace client {
 		namespace {
 			const char* const kSceneFile = "Player.2kv6";
+			// Where a scene's head wears the Christmas hat every set shares: a
+			// hinge the hat's pivot sits on.
 			const char* const kHatPath = "Player/Neck/SantaHat";
+			const char* const kHatFile = "Models/Player/SantaHat.kv6";
 
 			// Where the template keeps each classic part (player-scene.sh).
 			const char* ScenePathOf(const std::string& name) {
@@ -162,7 +165,13 @@ namespace spades {
 			const int headRank = FileManager::Rank((dir + "Head.kv6").c_str());
 			if (headRank >= 0 && headRank < set.sceneRank)
 				return PlayerPart();
-			return ScenePart(set, kHatPath);
+			const VoxelObject* mount = Find(set.scene, kHatPath);
+			if (!mount)
+				return PlayerPart();
+			PlayerPart hat;
+			hat.model = renderer.RegisterModel(kHatFile);
+			hat.local = LocalTransform(mount->position, mount->rotation, mount->scale);
+			return hat;
 		}
 
 		void PlayerModels::Preload(const std::string& dir, bool christmas) {

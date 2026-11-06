@@ -59,6 +59,11 @@ namespace spades {
 		/** Reference images for the model editor --open opens, each across
 		 *  an axis: 0 = x, 1 = y, 2 = z (--editor-reference). */
 		std::vector<std::pair<int, std::string>> editorReferences;
+		/** Open Generate KV6 on this node (a path of names, or "/" for the
+		 *  whole scene) at this resolution ("1/1"), in the scene editor
+		 *  --open opens (--editor-generate). Empty for not asked. */
+		std::string editorGenerateNode;
+		std::string editorGenerateResolution;
 
 		// --- Something else than the game, done and over with
 		bool printHelp = false;

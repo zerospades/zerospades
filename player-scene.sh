@@ -5,7 +5,7 @@
 #   Player                            the player: turns with where they face
 #   ├─ Neck                           the head nods about it, with the aim
 #   │  ├─ Head                        Head.kv6
-#   │  └─ SantaHat         [hidden]   worn over Head at Christmas
+#   │  └─ SantaHat                    where the shared SantaHat.kv6 sits at Christmas
 #   ├─ Shoulders                      tilt with the aim
 #   │  └─ ArmsHolding                 Arms.kv6: both arms holding a tool, third person
 #   ├─ Standing                       the torso and legs, standing
@@ -55,18 +55,13 @@ at() {
 	awk -v x="$x" -v y="$y" -v z="$z" 'BEGIN { printf "%g %g %g\n", -x, -y, -z }'
 }
 
-# The hat alone: XmasHat.kv6 is a head under a hat; its last three layers
-# are the head.
-hat="$tmp/SantaHat.kv6"
-cp "$here/Resources/Models/Player/XmasHat.kv6" "$hat"
-kv6 clear-box "$hat" 0 0 5 8 5 7 >/dev/null
-kv6 resize "$hat" 9 6 5 >/dev/null
-
-# Worn 5% larger about the middle of the head (voxels -2.5..2.5, -2.5..2.5,
-# -5.5..-0.5 on the neck), so the two never share a face.
-read -r hx hy hz < <(at "$hat")
-hatAt=$(awk -v x="$hx" -v y="$hy" -v z="$hz" \
-	'BEGIN { s = 1.05; cz = -3; printf "%g %g %g\n", s * x, s * y, cz + s * (z - cz) }')
+# The Christmas hat is one model every set shares, Models/Player/SantaHat.kv6
+# (XmasHat.kv6 without the head under it); a scene only says where its head
+# wears it: a hinge the hat's pivot sits on. Worn 5% larger about the middle
+# of the head (voxels -2.5..2.5, -2.5..2.5, -5.5..-0.5 on the neck), so the
+# two never share a face: its pivot (5.5 2.5 7.5) then lands 0.15 above the
+# neck.
+hatAt="0 0 0.15"
 
 # add-model PARENT PART NAME: the set's PART.kv6 as NAME, on its pivot.
 part() { echo "add-model $1 $dir/$2.kv6 --name $3 --at $(at "$dir/$2.kv6")"; }
@@ -83,9 +78,8 @@ scene new "$out" --force >/dev/null
 	echo "add-hinge / Player"
 	echo "add-hinge Player Neck --at 0 0 -10"
 	part Player/Neck Head Head
-	echo "add-model Player/Neck $hat --name SantaHat --at $hatAt"
+	echo "add-hinge Player/Neck SantaHat --at $hatAt"
 	echo "set-scale Player/Neck/SantaHat 1.05"
-	echo "hide Player/Neck/SantaHat"
 	echo "add-hinge Player Shoulders --at 0 0 -9"
 	part Player/Shoulders Arms ArmsHolding
 	echo "add-hinge Player Standing"
@@ -154,7 +148,8 @@ pivot); its name and turn are the template's.
 
 Part                                            Classic file        Used in
 Player/Neck/Head                                Head.kv6            third person, corpse; standing and crouched
-Player/Neck/SantaHat                            (XmasHat.kv6)       over Head, 20-27 December
+Player/Neck/SantaHat                            (SantaHat.kv6)      a hinge: where the shared hat
+                                                                    sits over Head, 20-27 December
 Player/Shoulders/ArmsHolding                    Arms.kv6            third person; standing and crouched
 Player/Standing/UpperBody/Torso                 Torso.kv6           third person, first person, corpse
 Player/Standing/LeftHip/LeftLeg                 Leg.kv6             third person, first person, corpse

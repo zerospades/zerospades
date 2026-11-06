@@ -59,6 +59,8 @@ namespace spades {
 			 *  false, `why` saying why, when it holds no voxel in sight. */
 			bool Open(KV6Scene& scene, const NodePath& path, std::string& why);
 			bool IsOpen() const { return panel.IsOpen(); }
+			/** Moves the open tool to `resolution`; false when it is not offered. */
+			bool Choose(KV6Scene& scene, const VoxelResolution& resolution);
 			/**
 			 * A key or button while open, the cursor at `cursor`: true when the
 			 * tool took it, `said` then holding what the user is told, if

@@ -180,6 +180,15 @@ namespace spades {
 				   c.editorReferences.emplace_back(axis, LocalPathFromArgument(v[1]));
 				   return std::string();
 			   }},
+			  {"--editor-generate", nullptr, "NODE RESOLUTION", 2, true,
+			   "open Generate KV6 on NODE (a path of names, or / for\n"
+			   "the whole scene) at RESOLUTION (1/4, 1/1, 2/1), in the\n"
+			   "scene editor --open opens",
+			   [](CommandLine& c, const std::vector<std::string>& v) {
+				   c.editorGenerateNode = v[0];
+				   c.editorGenerateResolution = v[1];
+				   return std::string();
+			   }},
 			  {"--screenshot-quit", nullptr, "SECONDS", 1, true,
 			   "take a screenshot that many seconds after starting,\n"
 			   "then quit: to check what is drawn with no one at the\n"
@@ -419,6 +428,11 @@ namespace spades {
 		}
 		if (!out.editorReferences.empty() && out.openDocument.empty()) {
 			Error("--editor-reference is for the model editor --open opens, and no file was "
+			      "given to open");
+			return CommandLineResult::Error;
+		}
+		if (!out.editorGenerateNode.empty() && out.openDocument.empty()) {
+			Error("--editor-generate is for the scene editor --open opens, and no file was "
 			      "given to open");
 			return CommandLineResult::Error;
 		}

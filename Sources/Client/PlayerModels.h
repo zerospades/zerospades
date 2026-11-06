@@ -69,10 +69,11 @@ namespace spades {
 			 */
 			PlayerPart Get(const std::string& dir, const std::string& name);
 			/**
-			 * The set's own Christmas hat, worn over its head (drawn with the
-			 * head's matrix); none (false) for a set without a scene, a scene
-			 * without one, or a head a stronger pack gives as a .kv6: those
-			 * show XmasHat.kv6 in place of the head instead, as ever.
+			 * The Christmas hat every set shares (SantaHat.kv6), where the set's
+			 * scene wears it over its head (drawn with the head's matrix); none
+			 * (false) for a set without a scene, a scene with nowhere for it, or
+			 * a head a stronger pack gives as a .kv6: those show XmasHat.kv6 in
+			 * place of the head instead, as ever.
 			 */
 			PlayerPart Hat(const std::string& dir);
 			/** Loads every part of the set in `dir` ahead of the game. */

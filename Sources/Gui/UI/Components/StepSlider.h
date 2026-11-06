@@ -57,6 +57,8 @@ namespace spades {
 			 *  that no longer can. */
 			void SetUsable(int index, bool usable);
 			int Index() const { return index; }
+			/** Chooses step `i`, when it is usable; true when the choice changed. */
+			bool Select(int i) { return i >= 0 && i < Count() && steps[std::size_t(i)].usable && Choose(i); }
 			int Count() const { return int(steps.size()); }
 
 			/** Its box: the track runs across it, the labels below. */
