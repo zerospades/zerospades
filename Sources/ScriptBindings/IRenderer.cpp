@@ -553,6 +553,10 @@ namespace spades {
 						                              asMETHOD(IRenderer, ScreenHeight),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer", "bool get_IsRendererSW() const property",
+						                              asMETHOD(IRenderer, IsRendererSW),
+						                              asCALL_THISCALL);
+						manager->CheckError(r);
 						break;
 					default: break;
 				}
