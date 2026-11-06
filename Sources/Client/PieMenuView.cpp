@@ -83,8 +83,26 @@ namespace spades {
 			// with its alpha scaled by it. `spansAt(y)` gives the shape's extent along
 			// the horizontal line at screen y, `bounds` must contain the shape, and
 			// `color` is premultiplied.
+			//
+			// Coverage is worked out on the screen's real pixels, not the UI's: with
+			// the UI scaled up (ScaledRenderer), a UI pixel spans several real ones,
+			// and anti-aliasing at UI resolution would come out as blocky steps.
+			// `bounds` and `spansAt` stay in UI coordinates.
 			template <class SpanFn>
-			void FillShape(IRenderer& r, Vector4 color, const AABB2& bounds, SpanFn&& spansAt) {
+			void FillShape(IRenderer& r, Vector4 color, const AABB2& uiBounds, SpanFn&& uiSpansAt) {
+				const float scale = r.ScreenPixelRatio();
+				const float invScale = 1.0F / scale;
+				const AABB2 bounds(uiBounds.min.x * scale, uiBounds.min.y * scale,
+				                   uiBounds.GetWidth() * scale, uiBounds.GetHeight() * scale);
+				auto spansAt = [&](float realY) {
+					RowSpans spans = uiSpansAt(realY * invScale);
+					for (int k = 0; k < spans.count; k++) {
+						spans.lo[static_cast<size_t>(k)] *= scale;
+						spans.hi[static_cast<size_t>(k)] *= scale;
+					}
+					return spans;
+				};
+
 				const int px0 = static_cast<int>(floorf(bounds.GetMinX()));
 				const int px1 = static_cast<int>(ceilf(bounds.GetMaxX()));
 				const int py0 = static_cast<int>(floorf(bounds.min.y));
@@ -154,9 +172,12 @@ namespace spades {
 						if (runLevel > 0) {
 							r.SetColorAlphaPremultiplied(
 							  color * (static_cast<float>(runLevel) / kCoverageLevels));
-							r.DrawImage(nullptr, AABB2(static_cast<float>(px0 + runStart),
-													   static_cast<float>(py),
-													   static_cast<float>(i - runStart), 1.0F));
+							// One real pixel row, given in UI coordinates.
+							r.DrawImage(nullptr,
+							            AABB2(static_cast<float>(px0 + runStart) * invScale,
+							                  static_cast<float>(py) * invScale,
+							                  static_cast<float>(i - runStart) * invScale,
+							                  invScale));
 						}
 						runStart = i;
 						runLevel = level;

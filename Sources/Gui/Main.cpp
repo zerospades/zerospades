@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <Imports/SDL.h>
+#include <Gui/Utils/DisplayUtils.h>
 #include <curl/curl.h>
 #include <zlib.h>
 
@@ -590,6 +591,7 @@ int main(int argc, char** argv) {
 #ifdef WIN32
 	SetUnhandledExceptionFilter(UnhandledExceptionProc);
 #endif
+	spades::gui::display::DeclareDpiAwareness();
 
 	if (argc > 0 && argv[0])
 		spades::g_executablePath = argv[0];

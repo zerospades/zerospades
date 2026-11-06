@@ -24,11 +24,13 @@
 
 #include "SDLRunner.h"
 
+#include <Gui/Utils/DisplayUtils.h>
 #include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
 #include <Audio/NullDevice.h>
 #include <Client/Client.h>
+#include <Client/ScaledRenderer.h>
 #include <Core/ConcurrentDispatch.h>
 #include <Core/Debug.h>
 #include <Core/Disposable.h>
@@ -55,7 +57,8 @@ static int lastMouseX = 0, lastMouseY = 0;
 namespace spades {
 	namespace gui {
 
-		SDLRunner::SDLRunner() : m_hasSystemMenu(false) {}
+		SDLRunner::SDLRunner()
+		    : m_hasSystemMenu(false), m_uiScale(1.0F), m_scaledRenderer(nullptr) {}
 
 		SDLRunner::~SDLRunner() {}
 
@@ -133,7 +136,9 @@ namespace spades {
 				case SDL_MOUSEMOTION:
 					if (m_active) {
 						if (view.NeedsAbsoluteMouseCoordinate())
-							view.MouseEvent(static_cast<float>(event.motion.x), static_cast<float>(event.motion.y));
+							// window pixels -> the UI's virtual pixels
+							view.MouseEvent(static_cast<float>(event.motion.x) / m_uiScale,
+							                static_cast<float>(event.motion.y) / m_uiScale);
 						else
 							view.MouseEvent(static_cast<float>(event.motion.xrel), static_cast<float>(event.motion.yrel));
 					}
@@ -169,14 +174,27 @@ namespace spades {
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
 				case SDL_WINDOWEVENT:
-					if (event.window.type == SDL_WINDOWEVENT_FOCUS_GAINED) {
-						SDL_SetRelativeMouseMode(SDL_TRUE);
+					if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+						// Only grab the mouse back if the view wants it grabbed: menus
+						// use an absolute cursor. This matches the state the client
+						// loop last set, so its cached mode stays in sync.
+						SDL_SetRelativeMouseMode(view.NeedsAbsoluteMouseCoordinate() ? SDL_FALSE
+						                                                               : SDL_TRUE);
 						SDL_ShowCursor(SDL_DISABLE);
 						m_active = true;
-					} else if (event.window.type == SDL_WINDOWEVENT_FOCUS_LOST) {
+					} else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 						SDL_SetRelativeMouseMode(SDL_FALSE);
 						SDL_ShowCursor(SDL_ENABLE);
 						m_active = false;
+					}
+					if (event.window.event == SDL_WINDOWEVENT_MOVED) {
+						// Remember the monitor the window was dragged onto, so the next
+						// window (the game's, or the setup's on the next launch) opens there.
+						SDL_Window* window = SDL_GetWindowFromID(event.window.windowID);
+						if (window) {
+							display::SetPreferredDisplay(display::GetWindowDisplay(window));
+							WindowMoved(window);
+						}
 					}
 					break;
 				default: break;
@@ -199,6 +217,8 @@ namespace spades {
 
 				SPLog("Starting Client Loop");
 
+				m_uiScale = renderer->UIScale();
+
 				while (running) {
 					SDL_Event event;
 
@@ -220,7 +240,24 @@ namespace spades {
 
 					ot += dt;
 					if ((int32_t)dt > 0) {
+						// The UI scale is settled here, once per frame, before the view
+						// runs: the whole frame is laid out at one scale (a new one makes
+						// the UI rebuild itself at the start of RunFrame).
+						const bool rescaled = m_scaledRenderer && m_scaledRenderer->Update();
+						if (rescaled)
+							m_uiScale = renderer->UIScale();
+
 						view->RunFrame((float)dt / 1000.0F);
+
+						// The rebuilt UI's cursor still holds a position in the old
+						// scale's units: re-send the real one, so hover and clicks line
+						// up without waiting for the mouse to move.
+						if (rescaled && absoluteMouseCoord && m_active) {
+							int mx, my;
+							SDL_GetMouseState(&mx, &my);
+							view->MouseEvent(static_cast<float>(mx) / m_uiScale,
+							                 static_cast<float>(my) / m_uiScale);
+						}
 
 						// Views draw; the runner is the only thing that presents. Present
 						// before `RunFrameLate`, which is where post-frame work happens
@@ -295,12 +332,13 @@ namespace spades {
 					editing = ed;
 
 					if (editing) {
+						// virtual pixels -> window pixels, for the IME candidate window
 						AABB2 rt = view->GetTextInputRect();
 						SDL_Rect srt;
-						srt.x = (int)rt.GetMinX();
-						srt.y = (int)rt.GetMinY();
-						srt.w = (int)rt.GetWidth();
-						srt.h = (int)rt.GetHeight();
+						srt.x = (int)(rt.GetMinX() * m_uiScale);
+						srt.y = (int)(rt.GetMinY() * m_uiScale);
+						srt.w = (int)(rt.GetWidth() * m_uiScale);
+						srt.h = (int)(rt.GetHeight() * m_uiScale);
 						SDL_SetTextInputRect(&srt);
 					}
 
@@ -373,9 +411,11 @@ namespace spades {
 					SDL_UnlockSurface(surface);
 			}
 
-		public:
-			SDLSWPort(SDL_Window* wnd) : wnd(wnd), surface(nullptr) {
+			/** (Re)acquires the window surface; SDL replaces it when the window is resized. */
+			void AcquireSurface() {
 				surface = SDL_GetWindowSurface(wnd);
+				if (!surface)
+					SPRaise("SDL_GetWindowSurface failed: %s", SDL_GetError());
 				// FIXME: check pixel format
 				if (SDL_MUSTLOCK(surface))
 					SDL_LockSurface(surface);
@@ -392,6 +432,9 @@ namespace spades {
 				}
 				SetFramebufferBitmap();
 			}
+
+		public:
+			SDLSWPort(SDL_Window* wnd) : wnd(wnd), surface(nullptr) { AcquireSurface(); }
 
 			void Dispose() override { surface = nullptr; }
 
@@ -421,6 +464,16 @@ namespace spades {
 				if (SDL_MUSTLOCK(surface))
 					SDL_UnlockSurface(surface);
 				SDL_UpdateWindowSurface(wnd);
+
+				// Resized: the old surface is gone; the next frame is drawn into a new
+				// one of the new size (the renderer picks the change up).
+				int ww = 0, wh = 0;
+				SDL_GetWindowSize(wnd, &ww, &wh);
+				if (ww > 0 && wh > 0 && (ww != surface->w || wh != surface->h)) {
+					AcquireSurface();
+					return;
+				}
+
 				if (SDL_MUSTLOCK(surface)) {
 					SDL_LockSurface(surface);
 					if (!adjusted)
@@ -453,6 +506,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			SDL_Init(SDL_INIT_VIDEO);
+			display::MigrateSettings();
 
 			try {
 				std::string caption;
@@ -473,7 +527,7 @@ namespace spades {
 				Uint32 sdlFlags = 0;
 				switch (rtype) {
 					case RendererType::GL:
-						sdlFlags = SDL_WINDOW_OPENGL;
+						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
@@ -492,9 +546,44 @@ namespace spades {
 #endif
 				}
 
-				SDL_Window* window = SDL_CreateWindow(caption.c_str(),
-					SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-					width, height, sdlFlags);
+				// Open on the monitor the setup window was last shown on. In fullscreen
+				// mode SDL switches that monitor, not the primary one.
+				int displayIndex = display::GetPreferredDisplay();
+				const bool fullscreen = (sdlFlags & SDL_WINDOW_FULLSCREEN) != 0;
+				float fixedScale = 0.0F;
+				if (HasFixedLayout()) {
+					// Laid out at width x height: enlarged for this monitor by the same
+					// rule as the game's UI, so it is as legible.
+					display::Resolution desktop;
+					fixedScale = display::GetDesktopResolution(displayIndex, desktop)
+					               ? client::ScaledRenderer::ComputeScale(
+					                   static_cast<float>(desktop.width),
+					                   static_cast<float>(desktop.height))
+					               : 1.0F;
+					width = static_cast<int>(std::lround(width * fixedScale));
+					height = static_cast<int>(std::lround(height * fixedScale));
+				} else {
+					// The UI follows the window's size, so the window can have any.
+					sdlFlags |= SDL_WINDOW_RESIZABLE;
+					if (display::IsAutoResolution()) {
+						display::Resolution desktop;
+						if (fullscreen) {
+							// The monitor's own mode, so going fullscreen switches none.
+							if (display::GetDesktopResolution(displayIndex, desktop)) {
+								width = desktop.width;
+								height = desktop.height;
+							}
+						} else {
+							// As large as the monitor allows: the window system fits a
+							// maximized window between its taskbars, docks and frame.
+							sdlFlags |= SDL_WINDOW_MAXIMIZED;
+						}
+					}
+				}
+
+				SDL_Window* window = SDL_CreateWindow(
+				  caption.c_str(), SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
+				  SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), width, height, sdlFlags);
 
 				if (!window) {
 					std::string msg = SDL_GetError();
@@ -528,6 +617,14 @@ namespace spades {
 					Handle<Disposable> windowReference;
 					std::tie(renderer, windowReference) = CreateRenderer(window, rtype);
 
+					// The UI and HUD are scaled with the window (or, for a fixed layout,
+					// by the scale its window was enlarged by).
+					auto scaled = Handle<client::ScaledRenderer>::New(renderer);
+					if (fixedScale > 0.0F)
+						scaled->SetFixedScale(fixedScale);
+					m_scaledRenderer = scaled.GetPointerOrNull();
+					renderer = std::move(scaled).Cast<client::IRenderer>();
+
 					Handle<client::IAudioDevice> audio(CreateAudioDevice(), false);
 
 					if (rtype == RendererType::GL) {
@@ -536,7 +633,10 @@ namespace spades {
 							SPRaise("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
 					}
 
+					WindowCreated(window);
 					RunClientLoop(window, renderer.GetPointerOrNull(), audio.GetPointerOrNull());
+					WindowDestroying(window);
+					m_scaledRenderer = nullptr;
 
 					// `SDL_Window` and its associated resources will be inaccessible
 					// past this point. Some referencing objects might be still alive due to

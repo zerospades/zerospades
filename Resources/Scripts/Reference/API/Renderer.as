@@ -191,6 +191,16 @@ namespace spades {
         float ScreenHeight {
             get {}
         }
+
+        /**
+         * Screen pixels per unit of ScreenWidth/ScreenHeight: above 1 when the
+         * interface is scaled up (Interface Scale, a 4K screen), below 1 when it is
+         * scaled down. Pixel-exact drawing, such as a crosshair, can use it to land
+         * on whole screen pixels.
+         */
+        float ScreenPixelRatio {
+            get {}
+        }
     }
 
     class SceneDefinition {

@@ -95,6 +95,7 @@ namespace spades {
 				 */
 				ScreenSizeChangedEventHandler screenSizeChanged;
 
+
 				UIManager(client::IRenderer* renderer, client::IAudioDevice* audioDevice);
 
 				client::IRenderer& GetRenderer() const { return *renderer; }

@@ -119,7 +119,6 @@ namespace spades {
 		SDLGLDevice::SDLGLDevice(SDL_Window* s) : window(s) {
 			SPLog("Starting SDLGLDevice");
 
-			SDL_GetWindowSize(window, &w, &h);
 			context = SDL_GL_CreateContext(s);
 			if (!context) {
 				const char* err = SDL_GetError();
@@ -128,6 +127,10 @@ namespace spades {
 			}
 
 			SDL_GL_MakeCurrent(window, context);
+
+			w = h = windowW = windowH = 1;
+			UpdateScreenSize();
+			SPLog("GL framebuffer %dx%d pixels for a %dx%d window", w, h, windowW, windowH);
 
 #ifndef __APPLE__
 			GLenum err = glewInit();
@@ -242,6 +245,7 @@ namespace spades {
 			// glFinish();
 			CheckErrorAlways();
 			SDL_GL_SwapWindow(window);
+			UpdateScreenSize();
 #if 0
 			Uint32 t = SDL_GetTicks();
 			if(lastFrame == 0) t = lastFrame - 30;
@@ -2150,6 +2154,29 @@ namespace spades {
 			glReadPixels(x, y, width, height, parseTextureFormat(format), parseType(type), data);
 			CheckErrorAlways();
 		}
+
+		void SDLGLDevice::UpdateScreenSize() {
+			// A minimised window can report an empty size: keep the last real one so
+			// nothing downstream divides by zero or allocates empty framebuffers.
+			int ww = 0, wh = 0;
+			SDL_GetWindowSize(window, &ww, &wh);
+			if (ww > 0 && wh > 0) {
+				windowW = ww;
+				windowH = wh;
+			}
+			// The framebuffer in pixels: larger than the window on a high-DPI display
+			// (Retina, a scaled Wayland output), where the window is in points.
+			int pw = 0, ph = 0;
+			SDL_GL_GetDrawableSize(window, &pw, &ph);
+			if (pw > 0 && ph > 0) {
+				w = pw;
+				h = ph;
+			}
+		}
+
+		IGLDevice::Integer SDLGLDevice::WindowWidth() { return windowW; }
+
+		IGLDevice::Integer SDLGLDevice::WindowHeight() { return windowH; }
 
 		IGLDevice::Integer SDLGLDevice::ScreenWidth() { return w; }
 

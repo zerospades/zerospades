@@ -42,7 +42,7 @@ namespace spades {
 		public:
 			GLImage(IGLDevice::UInteger textureObject, IGLDevice* device, float w, float h,
 			        bool autoDelete = true);
-			static Handle<GLImage> FromBitmap(Bitmap&, IGLDevice*);
+			static Handle<GLImage> FromBitmap(Bitmap&, IGLDevice*, bool mipmaps = true);
 			void Bind(IGLDevice::Enum target);
 
 			float GetWidth() override { return width; }

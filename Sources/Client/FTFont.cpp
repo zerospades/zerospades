@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cmath>
 #include <ft2build.h>
 
@@ -31,7 +32,6 @@
 #include <Core/Bitmap.h>
 #include <Core/FileManager.h>
 #include <Core/ThreadLocalStorage.h>
-#include <Draw/SW/SWRenderer.h>
 
 namespace spades {
 	namespace ngclient {
@@ -203,14 +203,30 @@ namespace spades {
 			SPAssert(renderer);
 			SPAssert(fontSet);
 
+			baselineY = std::floor(height * 1.0F);
+			rendererIsLowQuality = renderer->IsRendererSW();
+
+			rasterScale = 0.0F; // forces SyncRasterScale to set up the cache
+			SyncRasterScale();
+		}
+
+		void FTFont::SyncRasterScale() {
+			// At the screen's density, below 1 too: a glyph rasterized larger and
+			// then shrunk by the GPU comes out resampled, i.e. blurred.
+			float s = std::min(std::max(renderer->ScreenPixelRatio(), 0.25F), 4.0F);
+			if (s == rasterScale)
+				return;
+			rasterScale = s;
+
+			// Glyph images point into the bins, so both go together.
+			glyphMap.clear();
+			glyphs.clear();
+			bins.clear();
+
 			binSize = 256;
-			int targetSize = static_cast<int>(std::min(height * 4.0F, 4000.0F));
+			int targetSize = static_cast<int>(std::min(height * rasterScale * 4.0F, 4000.0F));
 			while (binSize < targetSize)
 				binSize <<= 1;
-
-			baselineY = std::floor(height * 1.0F);
-			rendererIsLowQuality = dynamic_cast<draw::SWRenderer*>(renderer);
-
 			bins.emplace_back(binSize, binSize, *renderer);
 		}
 
@@ -228,14 +244,17 @@ namespace spades {
 				if (cId != 0) {
 					auto it2 = glyphs.find(std::make_pair<FT_Face>(*face, cId));
 					if (it2 == glyphs.end()) {
-						FT_Set_Char_Size(*face, 0, static_cast<FT_F26Dot6>(height * 64.0F), 72, 72);
+						FT_Set_Char_Size(*face, 0,
+						                 static_cast<FT_F26Dot6>(height * rasterScale * 64.0F), 72,
+						                 72);
 
 						Glyph g;
 						g.face = *face;
 						g.charIndex = cId;
 						FT_Load_Glyph(*face, cId, FT_LOAD_NO_HINTING);
 						const auto& adv = g.face->glyph->advance;
-						g.advance = MakeVector2((float)adv.x, (float)adv.y) / (64.0F);
+						g.advance =
+						  MakeVector2((float)adv.x, (float)adv.y) / (64.0F * rasterScale);
 
 						auto it3 =
 						  glyphs.emplace(std::make_pair<FT_Face>(*face, cId), std::move(g));
@@ -278,6 +297,8 @@ namespace spades {
 		Vector2 FTFont::Measure(const std::string& str) {
 			SPADES_MARK_FUNCTION();
 
+			SyncRasterScale();
+
 			float maxWidth = 0.0F;
 			float x = 0.0F;
 			int lines = 1;
@@ -304,7 +325,8 @@ namespace spades {
 			if (g.image)
 				return;
 
-			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(height * 64.0F), 72, 72);
+			FT_Set_Char_Size(g.face, 0, static_cast<FT_F26Dot6>(height * rasterScale * 64.0F), 72,
+			                 72);
 			FT_Load_Glyph(g.face, g.charIndex, FT_LOAD_NO_HINTING);
 			FT_Render_Glyph(g.face->glyph, FT_RENDER_MODE_NORMAL);
 
@@ -349,20 +371,49 @@ namespace spades {
 			);
 
 			Vector2 offs(
-				(float)g.face->glyph->bitmap_left,
-				baselineY - g.face->glyph->bitmap_top
+				(float)g.face->glyph->bitmap_left / rasterScale,
+				baselineY - (float)g.face->glyph->bitmap_top / rasterScale
 			);
 
 			g.image.reset((*result).image, bounds, offs);
 			g.bmp = spbmp;
 		}
 
+		namespace {
+			/**
+			 * 2 * radius + 1 Gaussian taps summing to 65536. Radius 3 is the original
+			 * hand-tuned table (sigma about 1.75), kept exact so 1x text is unchanged;
+			 * larger radii stretch the same curve.
+			 */
+			std::vector<uint32_t> BlurWeights(int radius) {
+				if (radius == 3)
+					return {3590U, 8121U, 13254U, 15606U, 13254U, 8121U, 3590U};
+
+				float sigma = 1.75F * static_cast<float>(radius) / 3.0F;
+				std::vector<float> f(2 * radius + 1);
+				float total = 0.0F;
+				for (int i = -radius; i <= radius; ++i) {
+					float v = std::exp(-static_cast<float>(i * i) / (2.0F * sigma * sigma));
+					f[i + radius] = v;
+					total += v;
+				}
+				std::vector<uint32_t> w(f.size());
+				for (size_t i = 0; i < f.size(); ++i)
+					w[i] = static_cast<uint32_t>(f[i] / total * 65536.0F);
+				return w;
+			}
+		} // namespace
+
 		void FTFont::RenderBlurGlyph(Glyph& g) {
 			RenderGlyph(g);
 			if (g.blurImage)
 				return;
 
-			enum { KernelSize = 6 };
+			// The shadow is a Gaussian 3 virtual pixels wide on each side, so in the
+			// bitmap's real pixels its radius grows with the raster scale.
+			int const radius = 3 * std::max(1, static_cast<int>(std::round(rasterScale)));
+			int const KernelSize = radius * 2;
+			std::vector<uint32_t> const weights = BlurWeights(radius);
 
 			auto& orig = *g.bmp;
 			int const origW = orig.GetWidth();
@@ -372,10 +423,14 @@ namespace spades {
 			int const newW = newbmp->GetWidth();
 			int const newH = newbmp->GetHeight();
 
+			auto toPixel = [](uint32_t sum) -> uint32_t {
+				return (std::min<uint32_t>(sum >> 16, 255U) << 24) | 0xFFFFFF;
+			};
+
 			std::vector<uint8_t> buf;
 			buf.resize(newW + KernelSize);
 			for (int y = 0; y < newH; ++y) {
-				int iy = y - (KernelSize >> 1);
+				int iy = y - radius;
 				auto* pixels = newbmp->GetPixels() + y * newW;
 				if (iy >= 0 && iy < origH) {
 					{
@@ -385,15 +440,10 @@ namespace spades {
 							*(outp++) = *(inp++) >> 24;
 					}
 					for (int x = 0; x < newW; ++x) {
-						uint32_t sum;
-						sum = static_cast<uint32_t>(buf[x]) * 3590U;
-						sum += static_cast<uint32_t>(buf[x + 1]) * 8121U;
-						sum += static_cast<uint32_t>(buf[x + 2]) * 13254U;
-						sum += static_cast<uint32_t>(buf[x + 3]) * 15606U;
-						sum += static_cast<uint32_t>(buf[x + 4]) * 13254U;
-						sum += static_cast<uint32_t>(buf[x + 5]) * 8121U;
-						sum += static_cast<uint32_t>(buf[x + 6]) * 3590U;
-						*(pixels++) = (sum >> 16 << 24) | 0xFFFFFF;
+						uint32_t sum = 0;
+						for (int t = 0; t <= KernelSize; ++t)
+							sum += static_cast<uint32_t>(buf[x + t]) * weights[t];
+						*(pixels++) = toPixel(sum);
 					}
 				} else {
 					memset(pixels, 0, newW * 4);
@@ -407,22 +457,17 @@ namespace spades {
 				auto* pixels = newbmp->GetPixels() + x;
 				{
 					auto* inp = pixels;
-					auto* outp = buf.data() + (KernelSize >> 1);
+					auto* outp = buf.data() + radius;
 					for (int y = 0; y < newH; ++y) {
 						*(outp++) = *(inp) >> 24;
 						inp += newW;
 					}
 				}
 				for (int y = 0; y < newH; ++y) {
-					uint32_t sum;
-					sum = static_cast<uint32_t>(buf[y]) * 3590U;
-					sum += static_cast<uint32_t>(buf[y + 1]) * 8121U;
-					sum += static_cast<uint32_t>(buf[y + 2]) * 13254U;
-					sum += static_cast<uint32_t>(buf[y + 3]) * 15606U;
-					sum += static_cast<uint32_t>(buf[y + 4]) * 13254U;
-					sum += static_cast<uint32_t>(buf[y + 5]) * 8121U;
-					sum += static_cast<uint32_t>(buf[y + 6]) * 3590U;
-					*(pixels) = (sum >> 16 << 24) | 0xFFFFFF;
+					uint32_t sum = 0;
+					for (int t = 0; t <= KernelSize; ++t)
+						sum += static_cast<uint32_t>(buf[y + t]) * weights[t];
+					*(pixels) = toPixel(sum);
 					pixels += newW;
 				}
 			}
@@ -442,7 +487,7 @@ namespace spades {
 				(float)newH - 1
 			);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (KernelSize * 0.5F);
+			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (radius / rasterScale);
 
 			g.blurImage.reset((*result).image, bounds, offs);
 		}
@@ -452,7 +497,8 @@ namespace spades {
 			if (g.outlineImage)
 				return;
 
-			enum { Thickness = 1 };
+			// 1 virtual pixel, in the bitmap's real pixels.
+			int const Thickness = std::max(1, static_cast<int>(std::round(rasterScale)));
 
 			auto &orig = *g.bmp;
 			int const origW = orig.GetWidth();
@@ -502,13 +548,14 @@ namespace spades {
 				(float)newH - 1
 			);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (float)Thickness;
+			Vector2 offs = (*g.image).offset - Vector2(1, 1) * ((float)Thickness / rasterScale);
 
 			g.outlineImage.reset((*result).image, bounds, offs);
 		}
 
 		void FTFont::Draw(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -525,13 +572,15 @@ namespace spades {
 				  auto& img = *g.image;
 				  auto srcBounds = img.bounds;
 				  auto target = offset + (Vector2(x, y) + img.offset) * scale;
-				  target = (target + 0.5F).Floor(); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * scale,
-								   srcBounds.GetHeight() * scale);
+				  // on whole real pixels, for sharper rendering
+				  target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+				  float bmpScale = scale / rasterScale;
+				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * bmpScale,
+								   srcBounds.GetHeight() * bmpScale);
 
 				  if (!rendererIsLowQuality) {
 					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * scale);
+					  destBounds = destBounds.Inflate(0.5F * bmpScale);
 				  }
 
 				  renderer->DrawImage(&img.img, destBounds, srcBounds);
@@ -551,6 +600,7 @@ namespace spades {
 
 		void FTFont::DrawBlurred(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -566,13 +616,15 @@ namespace spades {
 				  auto& img = *g.blurImage;
 				  auto srcBounds = img.bounds;
 				  auto target = offset + (Vector2(x, y) + img.offset) * scale;
-				  target = (target + 0.5F).Floor(); // for sharper rendering
-				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * scale,
-								   srcBounds.GetHeight() * scale);
+				  // on whole real pixels, for sharper rendering
+				  target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+				  float bmpScale = scale / rasterScale;
+				  AABB2 destBounds(target.x, target.y, srcBounds.GetWidth() * bmpScale,
+								   srcBounds.GetHeight() * bmpScale);
 
 				  if (!rendererIsLowQuality) {
 					  srcBounds = srcBounds.Inflate(0.5F);
-					  destBounds = destBounds.Inflate(0.5F * scale);
+					  destBounds = destBounds.Inflate(0.5F * bmpScale);
 				  }
 
 				  renderer->DrawImage(&img.img, destBounds, srcBounds);
@@ -592,6 +644,7 @@ namespace spades {
 
 		void FTFont::DrawOutlined(const std::string& str, Vector2 offset, float scale, Vector4 color) {
 			SPADES_MARK_FUNCTION();
+			SyncRasterScale();
 
 			float x = 0.0F;
 			float y = 0.0F;
@@ -607,14 +660,16 @@ namespace spades {
 					auto &img = *g.outlineImage;
 					auto srcBounds = img.bounds;
 					auto target = offset + (Vector2(x, y) + img.offset) * scale;
-					target = (target + 0.5F).Floor();
+					// on whole real pixels, for sharper rendering
+					target = (target * rasterScale + 0.5F).Floor() / rasterScale;
+					float bmpScale = scale / rasterScale;
 					AABB2 destBounds(target.x, target.y,
-									 srcBounds.GetWidth() * scale,
-									 srcBounds.GetHeight() * scale);
+									 srcBounds.GetWidth() * bmpScale,
+									 srcBounds.GetHeight() * bmpScale);
 
 					if (!rendererIsLowQuality) {
 						srcBounds = srcBounds.Inflate(0.5F);
-						destBounds = destBounds.Inflate(0.5F * scale);
+						destBounds = destBounds.Inflate(0.5F * bmpScale);
 					}
 
 					renderer->DrawImage(&img.img, destBounds, srcBounds);

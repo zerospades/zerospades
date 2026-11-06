@@ -52,16 +52,33 @@ namespace spades {
 				void Render() override;
 			};
 
+			/** A track area of a `Slider`; tells it when a click on the track ends. */
+			class SliderFill : public ScrollBarFill {
+				Slider* slider; // weak; owned as our parent
+
+			public:
+				SliderFill(Slider* slider);
+				void MouseUp(MouseButton button, Vector2 clientPosition) override;
+			};
+
 			/** A horizontal value slider with a fixed-size knob. */
 			class Slider : public ScrollBarBase {
 				SliderKnob* knob;
-				ScrollBarFill* fill1;
-				ScrollBarFill* fill2;
+				SliderFill* fill1;
+				SliderFill* fill2;
 
 			public:
+				/**
+				 * Raised when the user lets go: at the end of a knob drag or of a click
+				 * on the track. `changed` fires on every step in between; this is for
+				 * work too heavy to redo on each of them.
+				 */
+				EventHandler released;
+
 				Slider(UIManager* manager);
 
 				void OnChanged() override;
+				virtual void OnReleased();
 				void Layout();
 				void OnResized() override;
 

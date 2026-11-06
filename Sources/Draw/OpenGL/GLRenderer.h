@@ -177,6 +177,7 @@ namespace spades {
 			void ClearCache() override;
 
 			Handle<client::IImage> CreateImage(Bitmap&) override;
+			Handle<client::IImage> CreateImageWithoutMipmaps(Bitmap&) override;
 			Handle<client::IModel> CreateModel(VoxelModel&) override;
 
 			GLProgram* RegisterProgram(const std::string& name);
@@ -237,6 +238,7 @@ namespace spades {
 
 			float ScreenWidth() override;
 			float ScreenHeight() override;
+			float ScreenPixelRatio() override;
 
 			client::RendererInfo GetRendererInfo() override;
 

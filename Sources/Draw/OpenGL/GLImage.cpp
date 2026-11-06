@@ -51,7 +51,8 @@ namespace spades {
 			device->BindTexture(target, tex);
 		}
 
-		Handle<GLImage> GLImage::FromBitmap(spades::Bitmap& bmp, spades::draw::IGLDevice* dev) {
+		Handle<GLImage> GLImage::FromBitmap(spades::Bitmap& bmp, spades::draw::IGLDevice* dev,
+		                                    bool mipmaps) {
 			SPADES_MARK_FUNCTION();
 
 			IGLDevice::UInteger tex = dev->GenTexture();
@@ -61,10 +62,11 @@ namespace spades {
 			                bmp.GetPixels());
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMagFilter, IGLDevice::Linear);
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureMinFilter,
-			                  IGLDevice::LinearMipmapNearest);
+			                  mipmaps ? IGLDevice::LinearMipmapNearest : IGLDevice::Linear);
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapS, IGLDevice::Repeat);
 			dev->TexParamater(IGLDevice::Texture2D, IGLDevice::TextureWrapT, IGLDevice::Repeat);
-			dev->GenerateMipmap(IGLDevice::Texture2D);
+			if (mipmaps)
+				dev->GenerateMipmap(IGLDevice::Texture2D);
 			return Handle<GLImage>::New(tex, dev, (float)bmp.GetWidth(), (float)bmp.GetHeight());
 		}
 

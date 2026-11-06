@@ -32,11 +32,18 @@ namespace spades {
 		class FontManager;
 	}
 	namespace gui {
-		/** Remembers the selected tab and per-tab scroll position across openings. */
+		/**
+		 * Remembers the selected tab and per-tab scroll position across openings.
+		 * Owned by a screen that outlives its UI being rebuilt (MainScreenUI,
+		 * ClientUI), which also reopens the window if a rebuild closed it.
+		 */
 		class PreferenceViewPersistedState : public RefCountedObject {
 		public:
 			int selectedTabIndex = 0;
 			std::vector<int> tabScrollRows;
+			/** The window was open when a setting it changed rebuilt the screen's UI
+			 *  (see PreferenceView::KeepOpenAcrossRebuild): reopen it. */
+			bool reopenAfterRebuild = false;
 		};
 
 		/** Options controlling a `PreferenceView` (in-game flag + persisted state). */
@@ -99,6 +106,7 @@ namespace spades {
 			ui::ListView* GetTabList(int idx);
 			void RestorePersistedState();
 			void SavePersistedState();
+			void SaveStateTo(PreferenceViewPersistedState& state);
 			void AddTab(ui::UIElement* view, const std::string& caption,
 			            HeadingNavIndex* nav = nullptr);
 			void OnTabButtonActivated(ui::UIElement& sender);
@@ -119,6 +127,14 @@ namespace spades {
 			void Render() override;
 			void Close();
 			void Run();
+
+			/**
+			 * Called by a setting (Interface Scale) whose change rebuilds the screen's
+			 * UI, from inside the preferences window holding `descendant`: saves the
+			 * window's tab and scroll position and marks it for reopening, for the
+			 * screen that owns its persisted state to reopen it after the rebuild.
+			 */
+			static void KeepOpenAcrossRebuild(ui::UIElement& descendant);
 		};
 
 		// -- Option panels --

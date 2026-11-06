@@ -98,6 +98,15 @@ namespace spades {
 
 			bool rendererIsLowQuality;
 
+			/**
+			 * Real pixels per virtual pixel that the cached glyphs were rasterized at
+			 * (the renderer's UI scale). Glyph bitmaps are in real pixels; advances
+			 * and offsets are in virtual pixels, so layout doesn't depend on it.
+			 */
+			float rasterScale = 1.0F;
+			/** Drops the glyph cache when the UI scale changed since it was filled. */
+			void SyncRasterScale();
+
 			std::shared_ptr<FTFontSet> fontSet;
 
 			struct Bin;

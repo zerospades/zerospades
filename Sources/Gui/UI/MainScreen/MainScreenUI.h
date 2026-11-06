@@ -36,6 +36,7 @@ namespace spades {
 	namespace gui {
 		class MainScreenHelper;
 		class MainScreenMainMenu;
+		class PreferenceViewPersistedState;
 		namespace ui {
 			class UIManager;
 		}
@@ -50,6 +51,8 @@ namespace spades {
 			Handle<ui::UIManager> manager;
 			Handle<MainScreenMainMenu> mainMenu;
 			Handle<client::GameMap> titleMap;
+			// The preferences window's tab and scroll position; survives Reload.
+			Handle<PreferenceViewPersistedState> preferenceState;
 
 			float time = -1.0F;
 
@@ -66,6 +69,8 @@ namespace spades {
 
 		public:
 			bool shouldExit = false;
+
+			PreferenceViewPersistedState& GetPreferenceState() { return *preferenceState; }
 
 			MainScreenUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			             client::FontManager* fontManager, MainScreenHelper* helper);

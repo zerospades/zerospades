@@ -44,6 +44,7 @@ namespace spades {
 				SPInvalidArgument("audioDevice");
 
 			helper = Handle<ClientUIHelper>::New(this);
+			preferenceState = Handle<gui::PreferenceViewPersistedState>::New();
 
 			manager = Handle<gui::ui::UIManager>::New(renderer.GetPointerOrNull(),
 			                                          audioDevice.GetPointerOrNull());
@@ -155,6 +156,12 @@ namespace spades {
 			// better than leaving a misplaced one, and the partial message is not worth
 			// carrying across a resize.
 			CloseUI();
+			// A window opened from the menu (preferences, a dialog) attaches beside
+			// it on the root, so closing the menu leaves it behind with nothing to
+			// return to. Drop everything still attached, as the main screen does.
+			gui::ui::UIElement& root = manager->GetRootElement();
+			while (!root.GetChildren().empty())
+				root.RemoveChild(root.GetChildren()[0].GetPointerOrNull());
 
 			// Rebuild through the constructors so the new layout is exactly what
 			// entering the game at this extent would have produced. The menu is pure
@@ -164,6 +171,13 @@ namespace spades {
 			chatLogWindow = Handle<ChatLogWindow>::New(this);
 			for (const auto& record : chatLogRecords)
 				chatLogWindow->Record(record.first, record.second);
+
+			// Rebuilt by an interface scale change made from the preferences window:
+			// bring it back where it was, so the change looks applied in place.
+			if (preferenceState->reopenAfterRebuild) {
+				EnterClientMenu();
+				clientMenu->OpenSetup();
+			}
 		}
 
 		bool ClientUI::IsChatEnabled() {

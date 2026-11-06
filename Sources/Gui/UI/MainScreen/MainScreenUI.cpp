@@ -24,6 +24,7 @@
 
 #include "CreateProfileScreen.h"
 #include "MainMenu.h"
+#include <Gui/UI/Settings/PreferenceView.h>
 #include "MainScreenUI.h"
 #include <Client/Fonts.h>
 #include <Client/GameMap.h>
@@ -53,6 +54,7 @@ namespace spades {
 		      helper(helper) {
 			SetupRenderer();
 
+			preferenceState = Handle<PreferenceViewPersistedState>::New();
 			manager = Handle<ui::UIManager>::New(renderer, audioDevice);
 			manager->GetRootElement().SetFont(&fontManager->GetGuiFont());
 
@@ -106,6 +108,11 @@ namespace spades {
 			MainScreenMainMenuState state = mainMenu->GetState();
 			Init();
 			mainMenu->SetState(state);
+
+			// Rebuilt by an interface scale change made from the preferences window:
+			// bring it back where it was, so the change looks applied in place.
+			if (preferenceState->reopenAfterRebuild)
+				mainMenu->OpenSetup();
 		}
 
 		void MainScreenUI::SetupRenderer() {

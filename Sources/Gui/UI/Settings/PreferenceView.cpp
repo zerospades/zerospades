@@ -236,14 +236,16 @@ namespace spades {
 		}
 
 		void PreferenceView::SavePersistedState() {
-			if (!persistedState)
-				return;
+			if (persistedState)
+				SaveStateTo(*persistedState);
+		}
 
-			persistedState->selectedTabIndex = selectedTabIndex;
-			persistedState->tabScrollRows.resize(tabs.size());
+		void PreferenceView::SaveStateTo(PreferenceViewPersistedState& state) {
+			state.selectedTabIndex = selectedTabIndex;
+			state.tabScrollRows.resize(tabs.size());
 			for (size_t i = 0; i < tabs.size(); i++) {
 				ListView* list = GetTabList(static_cast<int>(i));
-				persistedState->tabScrollRows[i] = (list != nullptr) ? list->GetTopRowIndex() : 0;
+				state.tabScrollRows[i] = (list != nullptr) ? list->GetTopRowIndex() : 0;
 			}
 		}
 
@@ -358,7 +360,25 @@ namespace spades {
 			SavePersistedState();
 			owner->enable = true;
 			SetParent(nullptr);
+			// Closed by the user: nothing to bring back, even if a rescale requested
+			// from it turned out not to change the scale (and rebuilt nothing).
+			if (persistedState)
+				persistedState->reopenAfterRebuild = false;
 			OnClosed();
+		}
+
+		void PreferenceView::KeepOpenAcrossRebuild(UIElement& descendant) {
+			PreferenceView* view = nullptr;
+			for (UIElement* e = &descendant; e && !view; e = e->GetParent())
+				view = dynamic_cast<PreferenceView*>(e);
+
+			// Detached already: a rebuild is under way (a slider losing its capture as
+			// it is torn down lands here), and there is no window to keep.
+			if (!view || !view->GetParent() || !view->persistedState)
+				return;
+
+			view->SavePersistedState();
+			view->persistedState->reopenAfterRebuild = true;
 		}
 
 		void PreferenceView::Run() {
