@@ -289,10 +289,13 @@ namespace spades {
 			virtual bool IsRendererSW() const { return false; }
 
 			/**
-			 * Real pixels per unit of 2D coordinates: above 1 when the UI is scaled up
-			 * (see `ScaledRenderer`). Fonts rasterize glyphs at this density.
+			 * Screen pixels per 2D drawing unit: above 1 when the UI is scaled up (see
+			 * `ScaledRenderer`), below 1 when it is scaled down. Anything sized in
+			 * screen pixels (glyph rasters, a pixel-exact crosshair, an anti-aliasing
+			 * fringe) uses it. Same name and meaning as in the kv6-editor branch, where
+			 * a high-DPI window contributes its own factor.
 			 */
-			virtual float GetUIScale() const { return 1.0F; }
+			virtual float ScreenPixelRatio() { return 1.0F; }
 
 			/**
 			 * Describes the backend, for the debug screen. The default implementation only

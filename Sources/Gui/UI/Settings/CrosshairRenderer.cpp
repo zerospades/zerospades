@@ -74,7 +74,7 @@ namespace spades {
 			// depending on where they fall. So scale each size once, round it to whole
 			// real pixels, and lay the crosshair out on the real grid. At 1x this is
 			// the plain UI layout.
-			const float scale = r.GetUIScale();
+			const float scale = r.ScreenPixelRatio();
 			const PixelCanvas c{r, 1.0F / scale};
 			auto px = [scale](float v) { return std::round(v * scale); };
 			// Something set at least 1 UI pixel thick stays at least 1 real pixel thick.

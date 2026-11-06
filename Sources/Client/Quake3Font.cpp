@@ -308,10 +308,14 @@ namespace spades {
 		} // namespace
 
 		void Quake3Font::SyncTextureScale() {
-			const float s = renderer->GetUIScale();
+			const float s = renderer->ScreenPixelRatio();
 			int k = std::max(1, static_cast<int>(std::ceil(s - 0.001F)));
 			float fit = 1.0F;
-			if (s > 1.0F && s / static_cast<float>(k) < 0.71F) {
+			if (s < 1.0F) {
+				// A pixel font can't be sharp, nor readable, below its own size: draw
+				// it one screen pixel per font pixel, a little larger than nominal.
+				fit = 1.0F / s;
+			} else if (s / static_cast<float>(k) < 0.71F) {
 				k = std::max(1, static_cast<int>(std::floor(s + 0.001F)));
 				fit = static_cast<float>(k) / s;
 			}
@@ -331,7 +335,7 @@ namespace spades {
 		}
 
 		Vector2 Quake3Font::SnapOrigin(Vector2 offset) const {
-			float s = renderer->GetUIScale();
+			float s = renderer->ScreenPixelRatio();
 			return (offset * s).Floor() * (1.0F / s);
 		}
 

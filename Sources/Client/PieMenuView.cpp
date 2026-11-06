@@ -90,7 +90,7 @@ namespace spades {
 			// `bounds` and `spansAt` stay in UI coordinates.
 			template <class SpanFn>
 			void FillShape(IRenderer& r, Vector4 color, const AABB2& uiBounds, SpanFn&& uiSpansAt) {
-				const float scale = r.GetUIScale();
+				const float scale = r.ScreenPixelRatio();
 				const float invScale = 1.0F / scale;
 				const AABB2 bounds(uiBounds.min.x * scale, uiBounds.min.y * scale,
 				                   uiBounds.GetWidth() * scale, uiBounds.GetHeight() * scale);

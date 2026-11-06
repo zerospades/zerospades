@@ -211,8 +211,9 @@ namespace spades {
 		}
 
 		void FTFont::SyncRasterScale() {
-			// Never rasterize below 1:1; a UI scaled down just samples smaller.
-			float s = std::min(std::max(renderer->GetUIScale(), 1.0F), 4.0F);
+			// At the screen's density, below 1 too: a glyph rasterized larger and
+			// then shrunk by the GPU comes out resampled, i.e. blurred.
+			float s = std::min(std::max(renderer->ScreenPixelRatio(), 0.25F), 4.0F);
 			if (s == rasterScale)
 				return;
 			rasterScale = s;

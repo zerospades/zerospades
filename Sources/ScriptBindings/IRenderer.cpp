@@ -557,8 +557,8 @@ namespace spades {
 						                              asMETHOD(IRenderer, IsRendererSW),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
-						r = eng->RegisterObjectMethod("Renderer", "float get_UIScale() property",
-						                              asMETHODPR(IRenderer, GetUIScale, () const, float),
+						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenPixelRatio() property",
+						                              asMETHOD(IRenderer, ScreenPixelRatio),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
 						break;
