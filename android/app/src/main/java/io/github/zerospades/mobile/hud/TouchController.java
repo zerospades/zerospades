@@ -5,7 +5,7 @@ import java.util.Map;
 
 /** Platform-independent multi-touch ownership. Coordinates are in HudLayout units. */
 public final class TouchController {
-    public enum Action { PAUSE, CHAT, FIRE, AIM, RELOAD, NEXT_TOOL, GRENADE, SPRINT, CROUCH, JUMP, LOADOUT, CAPTURE_COLOR }
+    public enum Action { PAUSE, CHAT, FIRE, AIM, RELOAD, NEXT_TOOL, GRENADE, SPRINT, CROUCH, JUMP, LOADOUT, CAPTURE_COLOR, PIE_MENU, FLASHLIGHT }
     public interface Sink {
         /** Forward is negative y, strafe right is positive x; both are in [-1, 1]. */
         void move(float x, float y);
@@ -15,6 +15,7 @@ public final class TouchController {
         void button(Action action, boolean pressed);
         /** Select a point in the real block palette, normalized to [0, 1). */
         default void palette(float x, float y) { }
+        default void cancelPie() { }
     }
     private enum Kind { STICK, LOOK, BUTTON, PALETTE, IGNORED }
     private static final class Pointer {
@@ -133,6 +134,10 @@ public final class TouchController {
             float dx = x - p.startX, dy = y - p.startY;
             if (dx * dx + dy * dy > 20f * 20f) p.tapCandidate = false;
             if (!p.longPressed && blockPaletteEnabled && inPalette(x, y)) selectPalette(x, y);
+        } else if (p.kind == Kind.BUTTON && p.action == Action.PIE_MENU) {
+            // The button is near the screen edge; amplify the short available
+            // drag so every pie slice can cross the engine's 66-pixel dead zone.
+            sink.look((x - p.x) * 4f, (y - p.y) * 4f);
         } else if (p.kind == Kind.LOOK) sink.look(x - p.x, y - p.y);
         p.x = x;
         p.y = y;
@@ -182,6 +187,7 @@ public final class TouchController {
         return true;
     }
     public void cancel() {
+        if (pressed(Action.PIE_MENU)) sink.cancelPie();
         // Removing one at a time ensures shared actions have exactly one release.
         // A cancelled tool tap must not switch tools.
         for (Pointer p : pointers.values()) if (p.action == Action.NEXT_TOOL) p.longPressed = true;

@@ -1,6 +1,10 @@
 package io.github.zerospades.mobile;
 
 import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -10,7 +14,9 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import org.libsdl.app.SDLActivity;
 import io.github.zerospades.mobile.hud.ChatOverlay;
+import io.github.zerospades.mobile.hud.ChatMessage;
 import io.github.zerospades.mobile.hud.HudState;
+import io.github.zerospades.mobile.hud.GyroAim;
 import io.github.zerospades.mobile.hud.TouchController;
 import io.github.zerospades.mobile.hud.NativeTouchSink;
 import io.github.zerospades.mobile.hud.TouchHudView;
@@ -32,6 +38,21 @@ public final class GameActivity extends SDLActivity {
     private List<String> killFeed = Collections.emptyList();
     private long joinedAt = -1;
     private boolean polling;
+    private SensorManager sensors;
+    private Sensor gyroscope;
+    private final GyroAim gyroAim = new GyroAim();
+    private final SensorEventListener gyroListener = new SensorEventListener() {
+        @Override public void onSensorChanged(SensorEvent event) {
+            if (!polling || hud == null || hud.getVisibility() != View.VISIBLE ||
+                    !hasWindowFocus() || hud.isPieHeld() || (chat != null && chat.isOpen())) {
+                gyroAim.reset(); return;
+            }
+            float[] delta = gyroAim.sample(event.timestamp, event.values[0], event.values[1], event.values[2],
+                    getWindowManager().getDefaultDisplay().getRotation());
+            if (delta != null && (delta[0] != 0 || delta[1] != 0)) touchSink.look(delta[0], delta[1]);
+        }
+        @Override public void onAccuracyChanged(Sensor sensor, int accuracy) { }
+    };
 
     private final Runnable pollHud = new Runnable() {
         @Override public void run() {
@@ -47,8 +68,9 @@ public final class GameActivity extends SDLActivity {
                 } else if (data[1] != 0 && joinedAt < 0) joinedAt = SystemClock.elapsedRealtime();
                 hadClient = data[0] != 0;
                 byte[] messages = nativeTakeChat();
-                if (chat != null && messages != null && messages.length > 0)
-                    chat.addMessage(new String(messages, StandardCharsets.UTF_8));
+                if (chat != null && messages != null)
+                    for (ChatMessage message : ChatMessage.decode(messages))
+                        chat.addMessage(message.prefix, message.name, message.suffix, message.color);
                 byte[] kills = nativeTakeKillfeed();
                 if (kills != null) killFeed = kills.length == 0 ? Collections.emptyList() :
                         Arrays.asList(new String(kills, StandardCharsets.UTF_8).split("\\n", -1));
@@ -81,10 +103,13 @@ public final class GameActivity extends SDLActivity {
         if (mBrokenLibraries || mLayout == null) return;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         touchSink = new NativeTouchSink();
+        sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
+        gyroscope = sensors != null ? sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) : null;
         hud = new TouchHudView(this, new TouchController.Sink() {
             @Override public void move(float x, float y) { touchSink.move(x, y); }
             @Override public void look(float x, float y) { touchSink.look(x, y); }
             @Override public void palette(float x, float y) { touchSink.palette(x, y); }
+            @Override public void cancelPie() { touchSink.cancelPie(); }
             @Override public void button(TouchController.Action action, boolean pressed) {
                 if (action == TouchController.Action.CHAT) {
                     if (pressed) {
@@ -96,6 +121,7 @@ public final class GameActivity extends SDLActivity {
             }
         });
         // The renderer draws the real circular map at the matching HUD position.
+        hud.setLayoutListener(GameActivity::nativeSetMapLayout);
         hud.setShowNativeMap(true);
         hud.setVisibility(View.GONE);
         mLayout.addView(hud, new ViewGroup.LayoutParams(
@@ -140,9 +166,14 @@ public final class GameActivity extends SDLActivity {
     @Override protected void onResume() {
         super.onResume();
         if (hud != null && !polling) { polling = true; ui.post(pollHud); }
+        gyroAim.reset();
+        if (sensors != null && gyroscope != null && getSharedPreferences("controls", MODE_PRIVATE).getBoolean("gyro", false))
+            sensors.registerListener(gyroListener, gyroscope, SensorManager.SENSOR_DELAY_GAME);
     }
 
     @Override protected void onPause() {
+        if (sensors != null) sensors.unregisterListener(gyroListener);
+        gyroAim.reset();
         polling = false;
         ui.removeCallbacks(pollHud);
         if (hud != null) hud.cancelTouches();
@@ -157,6 +188,7 @@ public final class GameActivity extends SDLActivity {
         super.onDestroy();
     }
 
+    private static native void nativeSetMapLayout(float x, float y, float size);
     private static native int[] nativeReadHud();
     private static native void nativeSendChat(byte[] utf8, boolean global);
     private static native byte[] nativeTakeChat();

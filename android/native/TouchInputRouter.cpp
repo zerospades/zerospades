@@ -69,6 +69,8 @@ void TouchInputRouter::Button(TouchAction action, bool down) {
         case TouchAction::Sprint: Set(9, "cg_keySprint", down); break;
         case TouchAction::Crouch: Set(10, "cg_keyCrouch", down); break;
         case TouchAction::Jump: Set(11, "cg_keyJump", down); break;
+        case TouchAction::PieMenu: Set(14, "cg_keyPieMenu", down); break;
+        case TouchAction::Flashlight: Set(15, "cg_keyFlashlight", down); break;
         case TouchAction::CaptureColor: Set(13, "cg_keyCaptureColor", down); break;
         case TouchAction::Loadout:
             // Like a menu key: release movement/fire before opening limbo.

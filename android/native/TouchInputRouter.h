@@ -10,7 +10,7 @@ namespace spades { namespace android {
 // IDs are part of the JNI contract. Do not use Java enum ordinals here.
 enum class TouchAction { Pause = 0, Chat = 1, Fire = 2, Aim = 3, Reload = 4,
                          NextTool = 5, Grenade = 6, Sprint = 7, Crouch = 8, Jump = 9,
-                         Loadout = 10, CaptureColor = 11 };
+                         Loadout = 10, CaptureColor = 11, PieMenu = 12, Flashlight = 13 };
 
 // Dispatches on the game thread only. The callbacks must outlive the router.
 class TouchInputRouter {
@@ -29,7 +29,7 @@ private:
     Key key;
     Lookup lookup;
     Look look;
-    std::array<std::string, 14> slots{};
+    std::array<std::string, 16> slots{};
     std::map<std::string, unsigned> heldKeys;
 };
 

@@ -13,13 +13,14 @@
 #include <Client/Weapon.h>
 #include <jni.h>
 #include <array>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <vector>
 
 namespace spades { namespace android {
 namespace {
-    enum class Type { Move, Look, Button, Reset, Chat, Palette };
+    enum class Type { Move, Look, Button, Reset, Chat, Palette, CancelPie };
     struct Event {
         Type type; float x = 0, y = 0; int action = 0; bool down = false;
         std::string text;
@@ -33,6 +34,7 @@ namespace {
     std::array<jint, 14> hud{};
     const void* hudOwner = nullptr;
     bool accepting = false;
+    HudMapLayout mapLayout{138.0f/1568.0f, 138.0f/980.0f, 1.0f};
     std::unique_ptr<TouchInputRouter> router;
     std::unique_ptr<QuickGrenade> quickGrenade;
     std::unique_ptr<FramePulse> jumpPulse;
@@ -76,9 +78,18 @@ void StartTouchInput() {
     std::lock_guard<std::mutex> lock(mutex);
     pending.clear(); messages.Reset(); hud.fill(0); hudOwner = nullptr; accepting = true;
 }
+HudMapLayout GetTouchMapLayout() {
+    std::lock_guard<std::mutex> lock(mutex);
+    return mapLayout;
+}
 void RecordTouchChat(const std::string& text) {
     std::lock_guard<std::mutex> lock(mutex);
     if (accepting) messages.AddChat(text);
+}
+void RecordTouchPlayerChat(const std::string& prefix, const std::string& name,
+                           const std::string& suffix, std::uint32_t color) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (accepting) messages.AddPlayerChat(prefix, name, suffix, color);
 }
 void RecordTouchKill(const std::string& text) {
     std::lock_guard<std::mutex> lock(mutex);
@@ -168,12 +179,15 @@ void DrainTouchInput(gui::View& view) {
     { std::lock_guard<std::mutex> lock(mutex); events.swap(pending); }
     if (quickGrenade->Active() && (!CurrentQuickClient(view) || view.NeedsAbsoluteMouseCoordinate()))
         quickGrenade->Cancel(CurrentQuickClient(view) != nullptr);
-    if (view.NeedsAbsoluteMouseCoordinate()) { jumpPulse->Cancel(); fireButton->Cancel(); router->Reset(); }
+    if (view.NeedsAbsoluteMouseCoordinate()) {
+        if (auto* client = dynamic_cast<client::Client*>(view.GetTouchGameView())) client->AndroidCancelPieMenu();
+        jumpPulse->Cancel(); fireButton->Cancel(); router->Reset();
+    }
     for (const auto& event : events) {
         // Do not turn the camera or press gameplay keys while a menu/text input
         // owns the cursor. Reset is still processed to release held inputs.
         bool gameplay = !view.NeedsAbsoluteMouseCoordinate();
-        if (!gameplay && event.type != Type::Reset && event.type != Type::Chat &&
+        if (!gameplay && event.type != Type::Reset && event.type != Type::CancelPie && event.type != Type::Chat &&
             !(event.type == Type::Button && event.action == static_cast<int>(TouchAction::Pause))) {
             jumpPulse->Cancel();
             fireButton->Cancel();
@@ -184,11 +198,14 @@ void DrainTouchInput(gui::View& view) {
             case Type::Move: router->Move(event.x, event.y); break;
             case Type::Look: router->LookDelta(event.x, event.y); break;
             case Type::Button:
-                if (event.action < 0 || event.action > 11) break;
+                if (event.action < 0 || event.action > 13) break;
                 if (event.action == static_cast<int>(TouchAction::Grenade)) {
                     if (event.down && !quickGrenade->Active()) {
                         auto* current = dynamic_cast<client::Client*>(view.GetTouchGameView());
                         if (current && current->AndroidHasLivePlayer()) {
+                            // Starting a quick throw resets held keys. Closing the pie
+                            // first avoids accidentally committing a selected slice.
+                            current->AndroidCancelPieMenu();
                             auto player = current->GetWorld()->GetLocalPlayer();
                             quickClient = current;
                             quickWorld = current->GetWorld();
@@ -215,12 +232,17 @@ void DrainTouchInput(gui::View& view) {
                 } else {
                     if (event.down && (event.action == static_cast<int>(TouchAction::Pause) ||
                                        event.action == static_cast<int>(TouchAction::Loadout))) {
+                        if (auto* client = dynamic_cast<client::Client*>(view.GetTouchGameView())) client->AndroidCancelPieMenu();
                         jumpPulse->Cancel(); fireButton->Cancel();
                     }
                     router->Button(static_cast<TouchAction>(event.action), event.down);
                 }
                 break;
+            case Type::CancelPie:
+                if (auto* client = dynamic_cast<client::Client*>(view.GetTouchGameView())) client->AndroidCancelPieMenu();
+                break;
             case Type::Reset:
+                if (auto* client = dynamic_cast<client::Client*>(view.GetTouchGameView())) client->AndroidCancelPieMenu();
                 if (quickGrenade->Active()) quickGrenade->Cancel(CurrentQuickClient(view) != nullptr);
                 jumpPulse->Cancel();
                 fireButton->Cancel();
@@ -247,6 +269,7 @@ void AdvanceTouchInputAfterFrame() {
     if (fireButton) fireButton->AfterFrame();
 }
 void StopTouchInput(gui::View& view) {
+    if (auto* client = dynamic_cast<client::Client*>(view.GetTouchGameView())) client->AndroidCancelPieMenu();
     { std::lock_guard<std::mutex> lock(mutex); accepting = false; pending.clear(); messages.Reset(); hud.fill(0); hudOwner = nullptr; }
     if (quickGrenade) {
         quickGrenade->Cancel(CurrentQuickClient(view) != nullptr);
@@ -333,4 +356,17 @@ Java_io_github_zerospades_mobile_hud_NativeTouchSink_nativeButton(JNIEnv*, jclas
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_zerospades_mobile_hud_NativeTouchSink_nativeReset(JNIEnv*, jclass) {
     spades::android::Enqueue({spades::android::Type::Reset});
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_github_zerospades_mobile_hud_NativeTouchSink_nativeCancelPie(JNIEnv*, jclass) {
+    spades::android::Enqueue({spades::android::Type::CancelPie});
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_github_zerospades_mobile_GameActivity_nativeSetMapLayout(JNIEnv*, jclass, jfloat x, jfloat y, jfloat size) {
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(size) ||
+        x < 0 || x > 1 || y < 0 || y > 1 || size < .5f || size > 2.f) return;
+    std::lock_guard<std::mutex> lock(spades::android::mutex);
+    spades::android::mapLayout = {x, y, size};
 }

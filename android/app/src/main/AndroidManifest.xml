@@ -4,6 +4,7 @@
         android:allowBackup="false"
         android:label="@string/app_name"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".HudEditorActivity" android:screenOrientation="landscape" android:exported="false" />
         <activity
             android:name=".HudPreviewActivity"
             android:screenOrientation="landscape"

@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Bundle;
+import android.hardware.Sensor;
+import android.hardware.SensorManager;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -84,6 +86,22 @@ public final class LauncherActivity extends Activity {
             content.addView(diagnostics, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
+        if (BuildConfig.NATIVE_GAME) {
+            CheckBox gyro = new CheckBox(this);
+            SensorManager sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
+            boolean available = sensors != null && sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null;
+            gyro.setText(available ? "Gyroscope aiming (uses in-game mouse sensitivity)" : "Gyroscope aiming unavailable on this device");
+            SharedPreferences controls = getSharedPreferences("controls", MODE_PRIVATE);
+            gyro.setChecked(available && controls.getBoolean("gyro", false));
+            gyro.setEnabled(available);
+            gyro.setOnCheckedChangeListener((button, checked) -> controls.edit().putBoolean("gyro", checked).apply());
+            content.addView(gyro);
+        }
+        Button editor = new Button(this);
+        editor.setText("Customize HUD");
+        editor.setOnClickListener(view -> startActivity(new Intent(this, HudEditorActivity.class)));
+        content.addView(editor, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         Button preview = new Button(this);
         preview.setText(R.string.preview_hud);
         preview.setOnClickListener(view -> startActivity(new Intent(this, HudPreviewActivity.class)));

@@ -14,7 +14,8 @@ int main() {
         {"cg_keyAttack", "LeftMouseButton"}, {"cg_keyAltAttack", "RightMouseButton"},
         {"cg_keyReloadWeapon", "r"}, {"cg_keySprint", "Shift"},
         {"cg_keyCrouch", "Control"}, {"cg_keyGlobalChat", "t"}, {"cg_keyJump", "Space"},
-        {"cg_keyLimbo", "l"}, {"cg_keyCaptureColor", "e"}
+        {"cg_keyLimbo", "l"}, {"cg_keyCaptureColor", "e"},
+        {"cg_keyPieMenu", "MiddleMouseButton"}, {"cg_keyFlashlight", "f"}
     };
     std::vector<std::string> events;
     float dx = 0, dy = 0;
@@ -49,6 +50,9 @@ int main() {
     expect({"w+", "W-", "l+", "l-"}); // movement and fire currently share W
     router.Button(TouchAction::CaptureColor, true); router.Button(TouchAction::CaptureColor, false);
     expect({"e+", "e-"});
+    router.Button(TouchAction::PieMenu, true); router.Button(TouchAction::PieMenu, false);
+    router.Button(TouchAction::Flashlight, true); router.Button(TouchAction::Flashlight, false);
+    expect({"MiddleMouseButton+", "MiddleMouseButton-", "f+", "f-"});
     router.Button(TouchAction::Grenade, true); expect({}); // quick-throw is handled by the bridge
     router.Button(TouchAction::NextTool, true); router.Button(TouchAction::NextTool, false);
     expect({"AndroidNextTool+", "AndroidNextTool-"});

@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.InputFilter;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -28,7 +31,7 @@ public final class ChatOverlay extends LinearLayout {
     private final ScrollView scroll;
     private final Switch teamChat;
     private Runnable onClosed;
-    private final StringBuilder history = new StringBuilder();
+    private final SpannableStringBuilder history = new SpannableStringBuilder();
 
     public ChatOverlay(Activity activity, Sender sender) {
         super(activity);
@@ -89,17 +92,25 @@ public final class ChatOverlay extends LinearLayout {
         if (onClosed != null) onClosed.run();
     }
     public boolean isOpen() { return getVisibility() == VISIBLE; }
-    public void clearMessages() { history.setLength(0); messages.setText(""); input.setText(""); }
+    public void clearMessages() { history.clear(); messages.setText(""); input.setText(""); }
     public void addMessage(String message) {
         if (message == null || message.isEmpty()) return;
+        addMessage("", "", message, Color.WHITE);
+    }
+    public void addMessage(String prefix, String name, String suffix, int color) {
         if (history.length() > 0) history.append('\n');
-        history.append(message);
+        history.append(prefix);
+        int start = history.length();
+        history.append(name);
+        if (history.length() > start) history.setSpan(new ForegroundColorSpan(color), start,
+                history.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        history.append(suffix);
         // Bound retained text when connected to a busy server.
         if (history.length() > 16000) {
-            int end = history.indexOf("\n", history.length() - 12000);
+            int end = history.toString().indexOf("\n", history.length() - 12000);
             history.delete(0, end >= 0 ? end + 1 : history.length() - 12000);
         }
-        messages.setText(history.toString());
+        messages.setText(history);
         scroll.post(new Runnable() { @Override public void run() { scroll.fullScroll(View.FOCUS_DOWN); } });
     }
     private void send() {

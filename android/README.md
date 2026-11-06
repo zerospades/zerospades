@@ -41,6 +41,23 @@ suitable for production or reliable upgrades between CI builds.
 The native launcher defaults to lower-cost water; its water reflections option
 adds a mirrored-scene pass. Both need device performance testing.
 
+## Touch controls and HUD editor
+
+**Customize HUD** opens a local preview. Drag a control, minimap, score bars,
+timer, killfeed, or the combined equipment/health panel; select an item and use
+the size slider. **Save** applies it, **Cancel** discards changes, and **Reset**
+restores defaults after saving. The compass and native block palette are not
+movable in this editor. Overlapping items can interfere with touch; reset if a
+layout becomes unusable. The two fire buttons are independently adjustable.
+
+Hold **PIE**, drag in the desired direction, then release to choose a slice;
+fire/aim cycle its pages. **LIGHT** uses the game's flashlight binding. Enable
+**Gyroscope aiming** in the launcher if the device has a gyroscope. Both gyro
+and touch aiming enter the engine's mouse-input path, so the in-game mouse
+sensitivity, sensitivity type and other engine aim options apply. Gyro is off
+by default and stops while paused or in menus. Sensor direction, feel, editor
+layout and native minimap alignment still need physical-device testing.
+
 If the experimental game exits during startup, reopen the app and select
 **View crash report**. You can inspect, copy, or share the report manually;
 no data is sent automatically. It may contain device details, file paths,
@@ -54,7 +71,7 @@ logging starts or the Android version does not expose a trace.
 the UI thread. The experimental native bridge supplies scores and the shared
 mode maximum, health, selected tool and weapon, ammunition, frame rate and up
 to five kill messages. The engine renders its real circular minimap underneath
-the overlay in the reference position. Action and equipment icons use Android Canvas vector artwork. The activity tracks `joinedAtMillis` using
+the overlay in the reference position. Action buttons and equipment use temporary text labels. The activity tracks `joinedAtMillis` using
 `SystemClock.elapsedRealtime()`, but its behavior across disconnects and server
 changes still requires validation.
 The displayed clock counts up in minutes and seconds. Both score bars use the

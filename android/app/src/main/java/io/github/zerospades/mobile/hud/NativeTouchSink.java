@@ -24,10 +24,13 @@ public final class NativeTouchSink implements TouchController.Sink {
             case JUMP: id = 9; break;
             case LOADOUT: id = 10; break;
             case CAPTURE_COLOR: id = 11; break;
+            case PIE_MENU: id = 12; break;
+            case FLASHLIGHT: id = 13; break;
             default: throw new IllegalArgumentException("Unknown touch action");
         }
         nativeButton(id, pressed);
     }
+    @Override public void cancelPie() { nativeCancelPie(); }
     /** Release held inputs on activity pause before the native engine is stopped. */
     public void reset() { nativeReset(); }
     private static native void nativeMove(float x, float y);
@@ -35,4 +38,5 @@ public final class NativeTouchSink implements TouchController.Sink {
     private static native void nativePalette(float x, float y);
     private static native void nativeButton(int action, boolean down);
     private static native void nativeReset();
+    private static native void nativeCancelPie();
 }

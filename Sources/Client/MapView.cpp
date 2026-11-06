@@ -28,6 +28,9 @@
 #include "IImage.h"
 #include "IRenderer.h"
 #include "MapView.h"
+#ifdef __ANDROID__
+#include "../../android/native/TouchInputBridge.h"
+#endif
 #include "Player.h"
 #include "TCGameMode.h"
 #include "Teamplay.h"
@@ -482,7 +485,8 @@ namespace spades {
 			// Align the real engine minimap with the Android HUD reference layout.
 			bool androidHud = !largeMap && localPlayer && localPlayer->IsAlive() &&
 			                  !localPlayerIsSpectating && !client->NeedsAbsoluteMouseCoordinate();
-			if (androidHud) cfgMapSize = sh * (198.0F / 980.0F);
+			auto androidMap = android::GetTouchMapLayout();
+			if (androidHud) cfgMapSize = sh * (198.0F / 980.0F) * androidMap.size;
 #endif
 			Vector2 mapWndSize = {cfgMapSize, cfgMapSize};
 
@@ -530,7 +534,10 @@ namespace spades {
 			float winX = (sw - 8.0F) - mapWndSize.x;
 			float winY = 8.0F;
 #ifdef __ANDROID__
-			if (androidHud) winX = winY = sh * (39.0F / 980.0F);
+			if (androidHud) {
+				winX = sw * androidMap.x - mapWndSize.x * 0.5F;
+				winY = sh * androidMap.y - mapWndSize.y * 0.5F;
+			}
 #endif
 
 			if (!largeMap) {

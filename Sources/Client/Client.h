@@ -815,6 +815,7 @@ namespace spades {
 			bool AndroidToolReady();
 			bool AndroidSelectTool(Player::ToolType tool);
 			void AndroidSelectPalettePoint(float x, float y);
+			void AndroidCancelPieMenu();
 #endif
 
 			// Snapshot of all view-related state, used to preserve camera across demo seeks

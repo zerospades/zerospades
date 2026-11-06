@@ -19,6 +19,7 @@
 
  */
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -1336,6 +1337,12 @@ namespace spades {
 			SetSelectedTool(tool);
 			return true;
 		}
+		void Client::AndroidCancelPieMenu() {
+			if (pieMenuView && pieMenuView->IsOpen()) {
+				pieMenuView->Close();
+				weapInput = WeaponInput();
+			}
+		}
 		void Client::AndroidSelectPalettePoint(float x, float y) {
 			if (paletteView) paletteView->SelectAndroidPalettePoint(x, y);
 		}
@@ -1395,8 +1402,11 @@ namespace spades {
 				return;
 
 #ifdef __ANDROID__
-			android::RecordTouchChat((global ? "[Global] " : "[Team] ") + playerNameStr +
-			                         (state.empty() ? "" : " " + state) + ": " + msg);
+			auto teamColor = world->GetTeamColor(p.GetTeamId());
+			auto channel = [](int v) -> std::uint32_t { return static_cast<std::uint32_t>(std::max(0, std::min(255, v))); };
+			std::uint32_t rgb = (channel(teamColor.x) << 16) | (channel(teamColor.y) << 8) | channel(teamColor.z);
+			android::RecordTouchPlayerChat(global ? "[Global] " : "[Team] ", playerNameStr,
+			    (state.empty() ? "" : " " + state) + ": " + msg, rgb);
 #endif
 			chatWindow->AddMessage(s);
 
