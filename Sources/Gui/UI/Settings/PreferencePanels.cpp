@@ -209,12 +209,16 @@ namespace spades {
 			l.AddToggleField(_Tr("Preferences", "Show Dead Player Names"), "cg_playerNamesDead");
 
 			l.AddHeading(_Tr("Preferences", "Heads-Up Display"));
-			l.AddSliderField(_Tr("Preferences", "Interface Scale"), "ui_scale", 0.5F, 2.0F, 0.05F,
-			                 NumberFormatter(0, "%", "", 100));
+			{
+				ConfigSlider* s = l.AddSliderField(_Tr("Preferences", "Interface Scale"),
+				                                   "ui_scale", 0.5F, 2.0F, 0.05F,
+				                                   NumberFormatter(0, "%", "", 100));
+				// Applied on release, not on every step: each rescale rebuilds the UI.
+				s->released = [](UIElement& e) { PreferenceView::RescaleUIFrom(e); };
+			}
 			l.AddHelp(_Tr("Preferences",
 				"Size of the menus and HUD. At 100% they are sized for your screen "
-				"automatically (twice as large on a 4K screen as on 1080p). "
-				"Applied when you close this window."));
+				"automatically (twice as large on a 4K screen as on 1080p)."));
 			l.AddToggleField(_Tr("Preferences", "Hide HUD"), "cg_hideHud");
 			l.AddSliderField(_Tr("Preferences", "HUD Color"), "cg_hudColor", 0, 10, 1,
 			                 HUDColorFormatter());

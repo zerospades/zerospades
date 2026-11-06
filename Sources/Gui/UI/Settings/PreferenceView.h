@@ -82,6 +82,9 @@ namespace spades {
 			ui::UIElement* owner; // weak
 			Handle<PreferenceViewPersistedState> persistedState;
 
+			/** Set by `RescaleUIFrom`, taken by the screen rebuilt after the rescale. */
+			static Handle<PreferenceViewPersistedState> reopenState;
+
 			std::vector<Handle<PreferenceTab>> tabs;
 
 			float contentsLeft, contentsWidth;
@@ -99,6 +102,7 @@ namespace spades {
 			ui::ListView* GetTabList(int idx);
 			void RestorePersistedState();
 			void SavePersistedState();
+			void SaveStateTo(PreferenceViewPersistedState& state);
 			void AddTab(ui::UIElement* view, const std::string& caption,
 			            HeadingNavIndex* nav = nullptr);
 			void OnTabButtonActivated(ui::UIElement& sender);
@@ -119,6 +123,20 @@ namespace spades {
 			void Render() override;
 			void Close();
 			void Run();
+
+			/**
+			 * Applies a new `ui_scale` from inside the preferences window holding
+			 * `descendant`. A rescale rebuilds every screen, so the window's tab and
+			 * scroll position are kept for the rebuilt screen to reopen it with
+			 * (see `TakeReopenState`).
+			 */
+			static void RescaleUIFrom(ui::UIElement& descendant);
+
+			/**
+			 * The state to reopen the preferences window with, if a rescale rebuilt
+			 * the screens while it was open; null otherwise. Cleared by the call.
+			 */
+			static Handle<PreferenceViewPersistedState> TakeReopenState();
 		};
 
 		// -- Option panels --

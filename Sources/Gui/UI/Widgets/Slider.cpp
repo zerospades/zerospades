@@ -61,7 +61,10 @@ namespace spades {
 				(void)clientPosition;
 				if (button != MouseButton::Left)
 					return;
+				bool wasDragging = dragging;
 				dragging = false;
+				if (wasDragging)
+					slider->OnReleased();
 			}
 
 			void SliderKnob::MouseEnter() {
@@ -76,7 +79,13 @@ namespace spades {
 				UIElement::MouseLeave();
 			}
 			
-			void SliderKnob::MouseCaptureLost() { dragging = false; }
+			void SliderKnob::MouseCaptureLost() {
+				// The drag is over even though no button-up reached us.
+				bool wasDragging = dragging;
+				dragging = false;
+				if (wasDragging)
+					slider->OnReleased();
+			}
 
 			void SliderKnob::Render() {
 				client::IRenderer& r = GetManager().GetRenderer();
@@ -102,14 +111,31 @@ namespace spades {
 				knob = k.GetPointerOrNull();
 				AddChild(knob);
 
-				Handle<ScrollBarFill> f1 = Handle<ScrollBarFill>::New(&GetManager());
+				Handle<SliderFill> f1 = Handle<SliderFill>::New(this);
 				fill1 = f1.GetPointerOrNull();
 				fill1->activated = [this](UIElement&) { ScrollBy(-largeChange); };
 				AddChild(fill1);
-				Handle<ScrollBarFill> f2 = Handle<ScrollBarFill>::New(&GetManager());
+				Handle<SliderFill> f2 = Handle<SliderFill>::New(this);
 				fill2 = f2.GetPointerOrNull();
 				fill2->activated = [this](UIElement&) { ScrollBy(largeChange); };
 				AddChild(fill2);
+			}
+
+			void Slider::OnReleased() {
+				if (released)
+					released(*this);
+			}
+
+			// -- SliderFill --
+
+			SliderFill::SliderFill(Slider* slider)
+			    : ScrollBarFill(&slider->GetManager()), slider(slider) {}
+
+			void SliderFill::MouseUp(MouseButton button, Vector2 clientPosition) {
+				bool wasPressed = pressed;
+				ScrollBarFill::MouseUp(button, clientPosition);
+				if (wasPressed && !pressed)
+					slider->OnReleased();
 			}
 
 			void Slider::OnChanged() {

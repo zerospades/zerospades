@@ -136,7 +136,15 @@ namespace spades {
 
 		void ClientMenu::OnBackToGame(UIElement&) { ui->SetActiveUI(nullptr); }
 
-		void ClientMenu::OnSetup(UIElement&) {
+		void ClientMenu::OnSetup(UIElement&) { OpenSetup(); }
+
+		void ClientMenu::OpenSetup(Handle<PreferenceViewPersistedState> state) {
+			// Carry it into this menu's own memory, which outlives the window.
+			if (state) {
+				preferenceState->selectedTabIndex = state->selectedTabIndex;
+				preferenceState->tabScrollRows = state->tabScrollRows;
+			}
+
 			PreferenceViewOptions opt;
 			opt.gameActive = true;
 			opt.persistedState = preferenceState;
