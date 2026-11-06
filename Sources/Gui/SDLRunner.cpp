@@ -24,6 +24,7 @@
 
 #include "SDLRunner.h"
 
+#include <Gui/Utils/DisplayUtils.h>
 #include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
@@ -177,6 +178,13 @@ namespace spades {
 						SDL_SetRelativeMouseMode(SDL_FALSE);
 						SDL_ShowCursor(SDL_ENABLE);
 						m_active = false;
+					}
+					if (event.window.event == SDL_WINDOWEVENT_MOVED) {
+						// Remember the monitor the window was dragged onto, so the next
+						// window (the game's, or the setup's on the next launch) opens there.
+						SDL_Window* window = SDL_GetWindowFromID(event.window.windowID);
+						if (window)
+							display::SetPreferredDisplay(display::GetWindowDisplay(window));
 					}
 					break;
 				default: break;
@@ -492,8 +500,12 @@ namespace spades {
 #endif
 				}
 
+				// Open on the monitor the setup window was last shown on. In fullscreen
+				// mode SDL switches that monitor, not the primary one.
+				int displayIndex = display::GetPreferredDisplay();
 				SDL_Window* window = SDL_CreateWindow(caption.c_str(),
-					SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
+					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
 					width, height, sdlFlags);
 
 				if (!window) {
@@ -536,7 +548,9 @@ namespace spades {
 							SPRaise("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
 					}
 
+					WindowCreated(window);
 					RunClientLoop(window, renderer.GetPointerOrNull(), audio.GetPointerOrNull());
+					WindowDestroying(window);
 
 					// `SDL_Window` and its associated resources will be inaccessible
 					// past this point. Some referencing objects might be still alive due to

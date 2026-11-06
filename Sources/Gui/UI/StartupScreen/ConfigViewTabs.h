@@ -74,9 +74,11 @@ namespace spades {
 			ui::Button* dropdownButton;
 			Settings::ItemHandle r_videoWidth;
 			Settings::ItemHandle r_videoHeight;
+			Settings::ItemHandle r_videoResolutionDetected;
 			StartupScreenHelper* helper; // weak
 
 			void SaveConfig();
+			void SetResolution(int w, int h);
 			void ValueEditHandler(ui::UIElement&);
 			void DropdownHandler(int index);
 			void ShowDropdown(ui::UIElement&);
