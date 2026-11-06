@@ -174,9 +174,21 @@ namespace al {
 	LPALCCAPTURESTOP qalcCaptureStop;
 	LPALCCAPTURESAMPLES qalcCaptureSamples;
 
+#ifndef OPENAL_SOFT
 	static spades::DynamicLibrary *alLibrary = NULL;
+#endif
 
 	static void *GPA(const char *str) {
+		// The built-in OpenAL Soft does not exist as a separate shared library.
+		// Resolve extensions from the active context before trying a dlopen.
+		if (qalGetProcAddress) {
+			void *v = qalGetProcAddress(str);
+			if (v)
+				return v;
+		}
+#ifdef OPENAL_SOFT
+		SPRaise("OpenAL function not available: %s", str);
+#else
 		if (!alLibrary) {
 			auto paths = spades::Split(s_alDriver, ";");
 			std::string errors;
@@ -213,13 +225,8 @@ namespace al {
 			}
 		}
 
-		if (qalGetProcAddress) {
-			void *v = qalGetProcAddress(str);
-			if (v)
-				return v;
-		}
-
 		return alLibrary->GetSymbol(str);
+#endif
 	}
 
 #define L(name) *(void **)(&(q##name)) = GPA(#name)

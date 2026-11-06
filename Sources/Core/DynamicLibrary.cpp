@@ -84,6 +84,7 @@ namespace spades {
 #include "Debug.h"
 #include "DynamicLibrary.h"
 #include "Exception.h"
+#include <cstring>
 #include <dlfcn.h>
 
 namespace spades {
@@ -98,15 +99,18 @@ namespace spades {
 #ifndef __OpenBSD__
 		if (handle == nullptr && strchr(fn, '/') == nullptr && strchr(fn, '\\') == nullptr) {
 			char* baseDir = SDL_GetBasePath();
-			std::string newPath = baseDir;
-			newPath += "/";
-			newPath += fn;
-			handle = dlopen(newPath.c_str(), RTLD_LAZY);
+			if (baseDir != nullptr) {
+				std::string newPath(baseDir);
+				SDL_free(baseDir);
+				newPath += "/";
+				newPath += fn;
+				handle = dlopen(newPath.c_str(), RTLD_LAZY);
+			}
 		}
 #endif
 		if (handle == nullptr) {
-			std::string err = dlerror();
-			SPRaise("Failed to dlload '%s': %s", fn, err.c_str());
+			const char* err = dlerror();
+			SPRaise("Failed to dlload '%s': %s", fn, err ? err : "unknown dynamic loader error");
 		}
 	}
 
@@ -128,8 +132,9 @@ namespace spades {
 
 		void* v = GetSymbolOrNull(sname);
 		if (v == NULL) {
-			std::string err = dlerror();
-			SPRaise("Failed to find symbol '%s' in %s: %s", sname, name.c_str(), err.c_str());
+			const char* err = dlerror();
+			SPRaise("Failed to find symbol '%s' in %s: %s", sname, name.c_str(),
+			        err ? err : "unknown dynamic loader error");
 		}
 		return v;
 	}

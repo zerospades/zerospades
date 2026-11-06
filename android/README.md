@@ -91,6 +91,23 @@ g++ -std=c++17 -Wall -Wextra -Werror android/native/TouchInputRouter.cpp \
 /tmp/touch-input-tests
 ```
 
+## Native audio startup regression checks
+
+On Linux, the isolated tests exercise OpenAL extension resolution and a missing
+library with an unavailable SDL base path. Supply an OpenAL Soft include
+folder; an optional shared library also enables integration tests using the
+null audio backend (no physical sound device):
+
+```sh
+cmake -S android/native/tests/audio -B /tmp/zs-audio-tests \
+  -DOPENAL_INCLUDE_DIR=/path/to/openal-soft/include \
+  -DOPENAL_LIBRARY=/path/to/libopenal.so
+cmake --build /tmp/zs-audio-tests --parallel
+ctest --test-dir /tmp/zs-audio-tests --output-on-failure
+```
+
+These host checks do not establish Android startup or audio playback.
+
 ## Native AngelScript ABI checks
 
 The Android ABI selection now chooses AngelScript's ARM64 call bridge for
