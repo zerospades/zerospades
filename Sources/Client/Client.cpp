@@ -1341,8 +1341,6 @@ namespace spades {
 			if (global) {
 				s += _Tr("Client", "[Global]");
 				s += " ";
-			} else {
-				s += "[" + mapView->ToGrid(p.GetPosition().GetXY()) + "] ";
 			}
 
 			// add player name (team-colored)
@@ -1351,7 +1349,14 @@ namespace spades {
 			// add player state
 			if (!state.empty()) {
 				s += " ";
-				s += state;
+				s += ChatWindow::ColoredMessage(state, MsgColorGray);
+			}
+
+			// add teamamate coord
+			if (!global && !p.IsSpectator() && p.IsAlive()) {
+				std::string coord = mapView->ToGrid(p.GetPosition().GetXY());		
+				s += " ";
+				s += ChatWindow::ColoredMessage("(" + coord + ")", MsgColorGreen);
 			}
 
 			s += ": ";
