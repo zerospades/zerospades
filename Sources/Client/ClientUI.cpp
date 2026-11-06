@@ -52,9 +52,6 @@ namespace spades {
 			// These screens bake the screen extent into their layout, so a resize has
 			// to rebuild them rather than just resize the root.
 			manager->screenSizeChanged = [this] { ReloadScreens(); };
-			// A reopen request left by a preferences window of an earlier screen
-			// isn't ours to honour.
-			gui::PreferenceView::TakeReopenState();
 
 			// clientMenu is built lazily in EnterClientMenu() so that
 			// helper->IsDemoMode() reflects the demo flag, which isn't set until
@@ -176,7 +173,7 @@ namespace spades {
 
 			// Rebuilt by an interface scale change made from the preferences window:
 			// bring it back where it was, so the change looks applied in place.
-			if (auto prefs = gui::PreferenceView::TakeReopenState()) {
+			if (auto prefs = gui::PreferenceView::TakeReopenState(*manager)) {
 				EnterClientMenu();
 				clientMenu->OpenSetup(std::move(prefs));
 			}

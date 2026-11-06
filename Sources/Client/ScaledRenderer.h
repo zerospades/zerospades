@@ -36,22 +36,21 @@ namespace spades {
 		 * pixel density, so text stays sharp instead of being upscaled.
 		 *
 		 * The scale is `ui_scale` (a user multiplier, 1 by default) times an automatic
-		 * factor of the window's size against a 1920x1080 reference, so a 4K screen gets
-		 * 2x out of the box and 1080p and smaller stay at 1x. It never makes the
-		 * virtual screen smaller than 800x600, which the menus need.
+		 * factor of the window's size against a 1920x1080 reference in quarter steps,
+		 * rounded to eighths: a 4K screen gets 2x out of the box, 1440p 1.25x, 1080p and
+		 * smaller 1x. It never makes the virtual screen smaller than 800x600, which the
+		 * menus need. It is re-evaluated between frames (`Flip`).
 		 */
 		class ScaledRenderer final : public IRenderer {
 			Handle<IRenderer> base;
 			float scale = 1.0F;
 			float lastWidth = 0.0F, lastHeight = 0.0F;
-			bool refreshRequested = true;
+			float lastUserScale = 0.0F;
 
 			void UpdateScale();
 
 			Vector2 P(const Vector2& v) const { return v * scale; }
 			AABB2 R(const AABB2& r) const;
-			/** `R`, with the edges on whole pixels so flat fills and 1px lines stay crisp. */
-			AABB2 Snap(const AABB2& r) const;
 
 		protected:
 			~ScaledRenderer() override;
@@ -59,13 +58,15 @@ namespace spades {
 		public:
 			explicit ScaledRenderer(Handle<IRenderer> base);
 
+			/** The range `ui_scale` is held to (the preferences slider's range). */
+			static const float kMinUserScale, kMaxUserScale;
+
 			/** The scale for a window of `width`x`height` real pixels. */
 			static float ComputeScale(float width, float height, float userScale);
 
 			IRenderer& GetBase() { return *base; }
 
 			float GetUIScale() const override { return scale; }
-			void ApplyUIScale() override { refreshRequested = true; }
 
 			void Init() override;
 			void Shutdown() override { base->Shutdown(); }
@@ -135,7 +136,7 @@ namespace spades {
 			}
 			void EndClippingCircle() override { base->EndClippingCircle(); }
 			void BeginClippingRect(const AABB2& outRect) override {
-				base->BeginClippingRect(Snap(outRect));
+				base->BeginClippingRect(R(outRect));
 			}
 			void EndClippingRect() override { base->EndClippingRect(); }
 

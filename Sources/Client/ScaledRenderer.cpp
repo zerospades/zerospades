@@ -42,6 +42,9 @@ namespace spades {
 			constexpr float kMinHeight = 600.0F;
 		} // namespace
 
+		const float ScaledRenderer::kMinUserScale = 0.5F;
+		const float ScaledRenderer::kMaxUserScale = 2.0F;
+
 		ScaledRenderer::ScaledRenderer(Handle<IRenderer> base) : base(std::move(base)) {
 			SPADES_MARK_FUNCTION();
 			if (!this->base)
@@ -58,14 +61,15 @@ namespace spades {
 
 			// Automatic part: how much bigger than the reference the window is, by its
 			// tighter axis (so ultrawide screens scale by height), in quarter steps.
-			// Quarter steps keep most UI edges on whole pixels.
 			float fit = std::min(width / kReferenceWidth, height / kReferenceHeight);
 			float autoScale = std::max(1.0F, std::floor(fit * 4.0F) / 4.0F);
 
 			if (!(userScale > 0.0F)) // also catches NaN from a mangled config
 				userScale = 1.0F;
-			userScale = std::min(std::max(userScale, 0.5F), 3.0F);
+			userScale = std::min(std::max(userScale, kMinUserScale), kMaxUserScale);
 
+			// The product, in eighths: coarse enough that most UI edges land on whole
+			// pixels, fine enough that every slider step (quarters) still differs.
 			float s = std::round(autoScale * userScale * 8.0F) / 8.0F;
 
 			// Never shrink the virtual screen below what the menus need.
@@ -84,7 +88,7 @@ namespace spades {
 			scale = s;
 			lastWidth = w;
 			lastHeight = h;
-			refreshRequested = false;
+			lastUserScale = userScale;
 		}
 
 		void ScaledRenderer::Init() {
@@ -95,9 +99,10 @@ namespace spades {
 		void ScaledRenderer::Flip() {
 			base->Flip();
 			// Between frames, so a whole frame is laid out at a single scale. The UI
-			// notices the virtual screen size change and rebuilds itself.
-			if (refreshRequested || base->ScreenWidth() != lastWidth ||
-			    base->ScreenHeight() != lastHeight)
+			// notices the virtual screen size change and rebuilds itself. ui_scale is
+			// polled (a plain field read) so a change from the console applies too.
+			if (static_cast<float>(ui_scale) != lastUserScale ||
+			    base->ScreenWidth() != lastWidth || base->ScreenHeight() != lastHeight)
 				UpdateScale();
 		}
 
@@ -106,19 +111,6 @@ namespace spades {
 		AABB2 ScaledRenderer::R(const AABB2& r) const {
 			return AABB2(r.min.x * scale, r.min.y * scale, r.GetWidth() * scale,
 			             r.GetHeight() * scale);
-		}
-
-		AABB2 ScaledRenderer::Snap(const AABB2& r) const {
-			float x0 = std::round(r.min.x * scale);
-			float y0 = std::round(r.min.y * scale);
-			float x1 = std::round(r.max.x * scale);
-			float y1 = std::round(r.max.y * scale);
-			// A hairline must not round away to nothing.
-			if (r.max.x != r.min.x && x1 == x0)
-				x1 = x0 + (r.max.x > r.min.x ? 1.0F : -1.0F);
-			if (r.max.y != r.min.y && y1 == y0)
-				y1 = y0 + (r.max.y > r.min.y ? 1.0F : -1.0F);
-			return AABB2(x0, y0, x1 - x0, y1 - y0);
 		}
 
 		void ScaledRenderer::StartScene(const SceneDefinition& def) {
@@ -141,9 +133,10 @@ namespace spades {
 		}
 
 		void ScaledRenderer::DrawImage(stmp::optional<IImage&> img, const AABB2& outRect) {
-			// Untextured rectangles are the panels, separators and 1px borders: keep
-			// their edges on whole pixels. Images keep their exact placement.
-			base->DrawImage(img, img ? R(outRect) : Snap(outRect));
+			// No snapping to whole pixels: both renderers rasterize flat fills by
+			// pixel centres already, and rounding would make sub-pixel rects (a bar
+			// shrinking to empty) show up as 1px slivers.
+			base->DrawImage(img, R(outRect));
 		}
 
 		void ScaledRenderer::DrawImage(stmp::optional<IImage&> img, const Vector2& outTopLeft,
@@ -154,7 +147,7 @@ namespace spades {
 
 		void ScaledRenderer::DrawImage(stmp::optional<IImage&> img, const AABB2& outRect,
 		                               const AABB2& inRect) {
-			base->DrawImage(img, img ? R(outRect) : Snap(outRect), inRect);
+			base->DrawImage(img, R(outRect), inRect);
 		}
 
 		void ScaledRenderer::DrawImage(stmp::optional<IImage&> img, const Vector2& outTopLeft,
@@ -166,8 +159,7 @@ namespace spades {
 		void ScaledRenderer::DrawFilledRectFade(float x0, float y0, float x1, float y1,
 		                                        Vector4 color0, Vector4 color1,
 		                                        bool horizontal) {
-			AABB2 r = Snap(AABB2(x0, y0, x1 - x0, y1 - y0));
-			base->DrawFilledRectFade(r.min.x, r.min.y, r.max.x, r.max.y, color0, color1,
+			base->DrawFilledRectFade(x0 * scale, y0 * scale, x1 * scale, y1 * scale, color0, color1,
 			                         horizontal);
 		}
 	} // namespace client

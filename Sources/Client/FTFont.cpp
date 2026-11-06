@@ -378,12 +378,41 @@ namespace spades {
 			g.bmp = spbmp;
 		}
 
+		namespace {
+			/**
+			 * 2 * radius + 1 Gaussian taps summing to 65536. Radius 3 is the original
+			 * hand-tuned table (sigma about 1.75), kept exact so 1x text is unchanged;
+			 * larger radii stretch the same curve.
+			 */
+			std::vector<uint32_t> BlurWeights(int radius) {
+				if (radius == 3)
+					return {3590U, 8121U, 13254U, 15606U, 13254U, 8121U, 3590U};
+
+				float sigma = 1.75F * static_cast<float>(radius) / 3.0F;
+				std::vector<float> f(2 * radius + 1);
+				float total = 0.0F;
+				for (int i = -radius; i <= radius; ++i) {
+					float v = std::exp(-static_cast<float>(i * i) / (2.0F * sigma * sigma));
+					f[i + radius] = v;
+					total += v;
+				}
+				std::vector<uint32_t> w(f.size());
+				for (size_t i = 0; i < f.size(); ++i)
+					w[i] = static_cast<uint32_t>(f[i] / total * 65536.0F);
+				return w;
+			}
+		} // namespace
+
 		void FTFont::RenderBlurGlyph(Glyph& g) {
 			RenderGlyph(g);
 			if (g.blurImage)
 				return;
 
-			enum { KernelSize = 6 };
+			// The shadow is a Gaussian 3 virtual pixels wide on each side, so in the
+			// bitmap's real pixels its radius grows with the raster scale.
+			int const radius = 3 * std::max(1, static_cast<int>(std::round(rasterScale)));
+			int const KernelSize = radius * 2;
+			std::vector<uint32_t> const weights = BlurWeights(radius);
 
 			auto& orig = *g.bmp;
 			int const origW = orig.GetWidth();
@@ -393,10 +422,14 @@ namespace spades {
 			int const newW = newbmp->GetWidth();
 			int const newH = newbmp->GetHeight();
 
+			auto toPixel = [](uint32_t sum) -> uint32_t {
+				return (std::min<uint32_t>(sum >> 16, 255U) << 24) | 0xFFFFFF;
+			};
+
 			std::vector<uint8_t> buf;
 			buf.resize(newW + KernelSize);
 			for (int y = 0; y < newH; ++y) {
-				int iy = y - (KernelSize >> 1);
+				int iy = y - radius;
 				auto* pixels = newbmp->GetPixels() + y * newW;
 				if (iy >= 0 && iy < origH) {
 					{
@@ -406,15 +439,10 @@ namespace spades {
 							*(outp++) = *(inp++) >> 24;
 					}
 					for (int x = 0; x < newW; ++x) {
-						uint32_t sum;
-						sum = static_cast<uint32_t>(buf[x]) * 3590U;
-						sum += static_cast<uint32_t>(buf[x + 1]) * 8121U;
-						sum += static_cast<uint32_t>(buf[x + 2]) * 13254U;
-						sum += static_cast<uint32_t>(buf[x + 3]) * 15606U;
-						sum += static_cast<uint32_t>(buf[x + 4]) * 13254U;
-						sum += static_cast<uint32_t>(buf[x + 5]) * 8121U;
-						sum += static_cast<uint32_t>(buf[x + 6]) * 3590U;
-						*(pixels++) = (sum >> 16 << 24) | 0xFFFFFF;
+						uint32_t sum = 0;
+						for (int t = 0; t <= KernelSize; ++t)
+							sum += static_cast<uint32_t>(buf[x + t]) * weights[t];
+						*(pixels++) = toPixel(sum);
 					}
 				} else {
 					memset(pixels, 0, newW * 4);
@@ -428,22 +456,17 @@ namespace spades {
 				auto* pixels = newbmp->GetPixels() + x;
 				{
 					auto* inp = pixels;
-					auto* outp = buf.data() + (KernelSize >> 1);
+					auto* outp = buf.data() + radius;
 					for (int y = 0; y < newH; ++y) {
 						*(outp++) = *(inp) >> 24;
 						inp += newW;
 					}
 				}
 				for (int y = 0; y < newH; ++y) {
-					uint32_t sum;
-					sum = static_cast<uint32_t>(buf[y]) * 3590U;
-					sum += static_cast<uint32_t>(buf[y + 1]) * 8121U;
-					sum += static_cast<uint32_t>(buf[y + 2]) * 13254U;
-					sum += static_cast<uint32_t>(buf[y + 3]) * 15606U;
-					sum += static_cast<uint32_t>(buf[y + 4]) * 13254U;
-					sum += static_cast<uint32_t>(buf[y + 5]) * 8121U;
-					sum += static_cast<uint32_t>(buf[y + 6]) * 3590U;
-					*(pixels) = (sum >> 16 << 24) | 0xFFFFFF;
+					uint32_t sum = 0;
+					for (int t = 0; t <= KernelSize; ++t)
+						sum += static_cast<uint32_t>(buf[y + t]) * weights[t];
+					*(pixels) = toPixel(sum);
 					pixels += newW;
 				}
 			}
@@ -463,7 +486,7 @@ namespace spades {
 				(float)newH - 1
 			);
 
-			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (KernelSize * 0.5F / rasterScale);
+			Vector2 offs = (*g.image).offset - Vector2(1, 1) * (radius / rasterScale);
 
 			g.blurImage.reset((*result).image, bounds, offs);
 		}
