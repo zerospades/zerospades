@@ -26,6 +26,7 @@
 
 #include <Core/Debug.h>
 #include <Core/Settings.h>
+#include <Core/Strings.h>
 #include <Imports/SDL.h>
 
 DEFINE_SPADES_SETTING(r_videoDisplay, "0");
@@ -64,7 +65,7 @@ namespace spades {
 				std::string name = RealDisplayName(index);
 				if (!name.empty())
 					return name;
-				return "Display " + std::to_string(index + 1);
+				return _Tr("StartupScreen", "Display {0}", index + 1);
 			}
 
 			int GetPreferredDisplay() {
@@ -72,17 +73,26 @@ namespace spades {
 				if (count <= 0)
 					return 0;
 
-				// The name survives monitors being plugged in or out; the index doesn't.
+				int index = r_videoDisplay;
+				bool indexValid = index >= 0 && index < count;
 				std::string name = r_videoDisplayName;
-				if (!name.empty()) {
-					for (int i = 0; i < count; i++) {
-						if (RealDisplayName(i) == name)
-							return i;
-					}
+				if (name.empty()) // the backend names no monitor: the index is all we have
+					return indexValid ? index : 0;
+
+				// Still where we left it. Checked first, so two identical monitors
+				// (same name) resolve to the one that was chosen, not the first.
+				if (indexValid && RealDisplayName(index) == name)
+					return index;
+
+				// Monitors were plugged in or out and the indices shifted: follow the name.
+				for (int i = 0; i < count; i++) {
+					if (RealDisplayName(i) == name)
+						return i;
 				}
 
-				int index = r_videoDisplay;
-				return (index >= 0 && index < count) ? index : 0;
+				// The monitor is gone. Its old index may now be a different monitor, so
+				// use the primary one.
+				return 0;
 			}
 
 			void SetPreferredDisplay(int index) {
@@ -100,7 +110,12 @@ namespace spades {
 					int index = SDL_GetWindowDisplayIndex(window);
 					if (index >= 0 && index < GetNumDisplays())
 						return index;
-					SPLog("Couldn't tell which display the window is on: %s", SDL_GetError());
+					// Polled while the setup screen is up: say it once, not every time.
+					static bool logged = false;
+					if (!logged) {
+						logged = true;
+						SPLog("Couldn't tell which display the window is on: %s", SDL_GetError());
+					}
 				}
 				return GetPreferredDisplay();
 			}
@@ -135,6 +150,21 @@ namespace spades {
 				out.width = mode.w;
 				out.height = mode.h;
 				return true;
+			}
+
+			bool GetUsableBounds(int index, Rect& out) {
+				SDL_Rect r;
+#if SDL_VERSION_ATLEAST(2, 0, 5)
+				if (SDL_GetDisplayUsableBounds(index, &r) == 0 && r.w > 0 && r.h > 0) {
+					out = {r.x, r.y, r.w, r.h};
+					return true;
+				}
+#endif
+				if (SDL_GetDisplayBounds(index, &r) == 0 && r.w > 0 && r.h > 0) {
+					out = {r.x, r.y, r.w, r.h};
+					return true;
+				}
+				return false;
 			}
 
 			std::vector<Resolution> GetVideoModes(int index) {

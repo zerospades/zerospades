@@ -461,6 +461,65 @@ namespace spades {
 			}
 		}
 
+		void SDLRunner::AutoSizeWindow(int displayIndex, bool fullscreen, int& x, int& y,
+		                               int& width, int& height) {
+			if (fullscreen) {
+				// The monitor's own mode, so going fullscreen switches no mode.
+				display::Resolution res;
+				if (display::GetDesktopResolution(displayIndex, res)) {
+					width = res.width;
+					height = res.height;
+				}
+			} else {
+				// As large as the monitor allows without going under the taskbar, dock
+				// or menu bar. Decorations are taken off once the window exists.
+				display::Rect area;
+				if (display::GetUsableBounds(displayIndex, area)) {
+					x = area.x;
+					y = area.y;
+					width = area.width;
+					height = area.height;
+				}
+			}
+			SPLog("Auto resolution: %dx%d on display %d (%s)", width, height, displayIndex,
+			      fullscreen ? "fullscreen" : "windowed");
+		}
+
+		void SDLRunner::FitWindowToDisplay(SDL_Window* window, int displayIndex) {
+			// Done before the renderer exists: the software renderer keeps the window
+			// surface it was created with, so the size has to be final by then.
+
+			// Some window systems (Wayland) choose the monitor themselves.
+			int actual = SDL_GetWindowDisplayIndex(window);
+			if (actual >= 0 && actual != displayIndex) {
+				SPLog("The window opened on display %d, not %d; fitting it there", actual,
+				      displayIndex);
+				displayIndex = actual;
+			}
+
+			display::Rect area;
+			if (!display::GetUsableBounds(displayIndex, area))
+				return;
+			int x = area.x, y = area.y, w = area.width, h = area.height;
+
+#if SDL_VERSION_ATLEAST(2, 0, 5)
+			// The title bar and frame come on top of the size we ask for. X11 window
+			// managers report them asynchronously, hence the pump.
+			SDL_PumpEvents();
+			int top = 0, left = 0, bottom = 0, right = 0;
+			if (SDL_GetWindowBordersSize(window, &top, &left, &bottom, &right) == 0) {
+				x += left;
+				y += top;
+				w -= left + right;
+				h -= top + bottom;
+			}
+#endif
+			if (w < 320 || h < 240)
+				return; // nonsense from the window system; keep what SDL made
+			SDL_SetWindowSize(window, w, h);
+			SDL_SetWindowPosition(window, x, y);
+		}
+
 		void SDLRunner::Run(int width, int height) {
 			SPADES_MARK_FUNCTION();
 
@@ -507,26 +566,28 @@ namespace spades {
 				// Open on the monitor the setup window was last shown on. In fullscreen
 				// mode SDL switches that monitor, not the primary one.
 				int displayIndex = display::GetPreferredDisplay();
+				int x = SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex);
+				int y = SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex);
 				// The setup window keeps its own size; the game follows its monitor.
-				if (!m_hasSystemMenu && display::IsAutoResolution()) {
-					display::Resolution res;
-					if (display::GetDesktopResolution(displayIndex, res)) {
-						SPLog("Auto resolution: %dx%d on display %d", res.width, res.height,
-						      displayIndex);
-						width = res.width;
-						height = res.height;
-						r_videoWidth = width;
-						r_videoHeight = height;
-					}
-				}
-				SDL_Window* window = SDL_CreateWindow(caption.c_str(),
-					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
-					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
-					width, height, sdlFlags);
+				bool autoSize = !m_hasSystemMenu && display::IsAutoResolution();
+				bool fullscreen = (sdlFlags & SDL_WINDOW_FULLSCREEN) != 0;
+				if (autoSize)
+					AutoSizeWindow(displayIndex, fullscreen, x, y, width, height);
+
+				SDL_Window* window =
+				  SDL_CreateWindow(caption.c_str(), x, y, width, height, sdlFlags);
 
 				if (!window) {
 					std::string msg = SDL_GetError();
 					SPRaise("Failed to create graphics window: %s", msg.c_str());
+				}
+
+				if (autoSize && !fullscreen)
+					FitWindowToDisplay(window, displayIndex);
+				if (autoSize) {
+					SDL_GetWindowSize(window, &width, &height);
+					r_videoWidth = width;
+					r_videoHeight = height;
 				}
 
 #ifdef __APPLE__

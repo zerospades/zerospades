@@ -78,6 +78,7 @@ namespace spades {
 			bool updatingFields = false;
 			int shownDisplay = -1; // the monitor the auto-detected size came from
 			int nativeRow = -1;    // the drop-down row of the native mode (auto-detection)
+			float nextDisplayCheck = 0.0F; // UIManager time of the next monitor check
 
 			void SaveConfig();
 			void ShowResolution(int w, int h);
