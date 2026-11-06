@@ -169,7 +169,7 @@ namespace spades {
 				case MsgColorTeam3:
 					return w ? ConvertColorRGBA(w->GetTeamColor(2)) : MakeVector4(1, 1, 0, 1);
 				case MsgColorRed: return MakeVector4(1, 0.25, 0.25, 1);
-				case MsgColorGreen: return MakeVector4(0, 1, 0, 1);
+				case MsgColorGreen: return MakeVector4(0.5, 1, 0.5, 1);
 				case MsgColorGray: return MakeVector4(0.8F, 0.8F, 0.8F, 1);
 				case MsgColorYellow: return MakeVector4(1, 1, 0.5, 1);
 				default: return MakeVector4(1, 1, 1, 1);
