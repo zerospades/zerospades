@@ -279,13 +279,13 @@ namespace spades {
 
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
+			float ScreenPixelRatio() { return base->ScreenPixelRatio(); }
 
-			// Queries, safe to pass through; without them scripts drawing through
-			// this would see an unscaled, GPU renderer whatever the real one is.
-			// (No `override`, like the rest of this class: marking only some members
-			// makes clang warn about all the others.)
+			// A query, safe to pass through; without it scripts drawing through this
+			// would see a GPU renderer whatever the real one is. (No `override`, like
+			// the rest of this class: marking only some members makes clang warn
+			// about all the others.)
 			bool IsRendererSW() const { return base->IsRendererSW(); }
-			float GetUIScale() const { return base->GetUIScale(); }
 		};
 
 		namespace {

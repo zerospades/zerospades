@@ -214,7 +214,16 @@ namespace spades {
 
 				SPLog("Starting Client Loop");
 
-				m_uiScale = renderer->GetUIScale();
+				// Window units (mouse positions) per UI unit: the UI scale. Taken from
+				// the sizes rather than ScreenPixelRatio, which also counts a high-DPI
+				// window's own pixel density.
+				auto windowUnitsPerUI = [&]() {
+					int ww = 0, wh = 0;
+					SDL_GetWindowSize(wnd, &ww, &wh);
+					float uiW = renderer->ScreenWidth();
+					return ww > 0 && uiW > 0.0F ? static_cast<float>(ww) / uiW : 1.0F;
+				};
+				m_uiScale = windowUnitsPerUI();
 				bool cursorNeedsResync = false;
 
 				while (running) {
@@ -263,7 +272,7 @@ namespace spades {
 
 						// The scale is re-evaluated in Flip (ScaledRenderer); the events
 						// polled below already belong to the next frame.
-						float scale = renderer->GetUIScale();
+						float scale = windowUnitsPerUI();
 						if (scale != m_uiScale) {
 							m_uiScale = scale;
 							cursorNeedsResync = true;

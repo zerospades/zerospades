@@ -66,7 +66,9 @@ namespace spades {
 			 * - otherwise (UI scales between 1 and about 1.41) it is the scale rounded
 			 *   down, drawn at exactly texScale screen pixels per font pixel, so the
 			 *   text is `pixelFit` (texScale / UI scale, at least 0.71) of its nominal
-			 *   size. Measure() reports that size, so layouts stay consistent.
+			 *   size;
+			 * - below 1, one screen pixel per font pixel (pixelFit above 1).
+			 * Measure() reports the size drawn, so layouts stay consistent.
 			 */
 			int texScale = 1;
 			float pixelFit = 1.0F;

@@ -99,7 +99,7 @@ namespace spades {
 	}
 
 	// Variants of the two above on a grid of whole screen pixels, `unit` UI units
-	// apart (1 / Renderer.UIScale); see DrawTarget.
+	// apart (1 / Renderer.ScreenPixelRatio); see DrawTarget.
 	void DrawTargetOutlineRect(Renderer@ r, float unit, int x, int y, int w, int h, TargetParam param) {
 		int thickness = int(param.outlineThickness);
 		r.ColorNP = param.outlineColor;
@@ -134,7 +134,7 @@ namespace spades {
 		// depending on where they fall. So each size is scaled once and rounded to
 		// whole screen pixels, and the crosshair laid out on the screen's grid. At
 		// 1x this is the plain UI layout. (Mirrors Gui/UI/Settings/CrosshairRenderer.)
-		float scale = r.UIScale;
+		float scale = r.ScreenPixelRatio;
 		float unit = 1.0F / scale;
 		TargetParam param = uiParam;
 		param.lineGap = TargetPixels(uiParam.lineGap, scale);

@@ -32,7 +32,7 @@ namespace spades {
 		 * sits between them and the real renderer: it reports a smaller "virtual"
 		 * screen (`ScreenWidth()` / `ScreenHeight()` divided by the scale) and maps
 		 * every 2D coordinate, clip and scene viewport back to real pixels. Callers
-		 * need no changes. Fonts ask `GetUIScale()` to rasterize glyphs at the real
+		 * need no changes. Fonts ask `ScreenPixelRatio()` to rasterize glyphs at the real
 		 * pixel density, so text stays sharp instead of being upscaled.
 		 *
 		 * The scale is `ui_scale` (a user multiplier, 1 by default) times an automatic
@@ -66,7 +66,8 @@ namespace spades {
 
 			IRenderer& GetBase() { return *base; }
 
-			float GetUIScale() const override { return scale; }
+			/** The UI scale on top of whatever the wrapped renderer has. */
+			float ScreenPixelRatio() override { return base->ScreenPixelRatio() * scale; }
 
 			void Init() override;
 			void Shutdown() override { base->Shutdown(); }
