@@ -44,7 +44,7 @@
 
 #include "KV6Document.h"
 #include "KV6Scene.h"
-#include "LowPolyTool.h"
+#include "ResampleTool.h"
 #include "SceneTransformTarget.h"
 #include "SceneTreePanel.h"
 
@@ -310,12 +310,12 @@ namespace spades {
 			/** The modifiers held, for what is typed. */
 			TextEntry::Modifiers HeldModifiers() const;
 
-			// Low-poly models of a node, previewed in its place.
-			std::unique_ptr<LowPolyTool> lowPoly;
-			void OpenLowPoly(const NodePath& path);
+			// Models of a node at another resolution, previewed in its place.
+			std::unique_ptr<ResampleTool> resample;
+			void OpenResample(const NodePath& path);
 			/** A key or button while it is open; true when taken: its own,
 			 *  the camera's, and nothing that would change the scene. */
-			bool LowPolyInput(const std::string& key, bool down);
+			bool ResampleInput(const std::string& key, bool down);
 			/** A plain message over the editor with a single way out. */
 			void ShowMessage(const std::string& text);
 			/**

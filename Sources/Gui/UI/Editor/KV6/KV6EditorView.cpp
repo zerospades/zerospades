@@ -151,7 +151,7 @@ namespace spades {
 			editor = std::make_unique<VoxelEditor>(document, *this, *renderer, *fontManager, *ui,
 			                                       *softwareCursor, VoxelEditor::Config());
 			tree = std::make_unique<SceneTreePanel>(*renderer, fontManager->GetSmallGuiFont());
-			lowPoly = std::make_unique<LowPolyTool>(*renderer, fontManager->GetSmallGuiFont(),
+			resample = std::make_unique<ResampleTool>(*renderer, fontManager->GetSmallGuiFont(),
 			                                        audioDevice.GetPointerOrNull());
 
 			// The editor always opens with a document. A file the player asked to
@@ -236,7 +236,7 @@ namespace spades {
 			items.push_back(
 			  ContextMenuItem("Save as KV6...", [this, row] { SaveNodeAsModel(row); }).Enabled(voxels));
 			items.push_back(
-			  ContextMenuItem("Generate Low-Poly KV6...", [this, row] { OpenLowPoly(row); })
+			  ContextMenuItem("Generate KV6...", [this, row] { OpenResample(row); })
 			    .Enabled(voxels));
 			items.push_back(ContextMenuItem("Copy", [this, selection] { CopyObjects(selection); })
 			                  .Enabled(selected)
@@ -365,25 +365,25 @@ namespace spades {
 			  DocumentKind::Model);
 		}
 
-		// --- Low-poly models -----------------------------------------------------
+		// --- Models at another resolution -----------------------------------------------------
 
-		void KV6EditorView::OpenLowPoly(const NodePath& path) {
+		void KV6EditorView::OpenResample(const NodePath& path) {
 			SettleTyping();
 			ui->GetOptionBar()->EndEditing(true);
 			editor->CancelToolInteraction();
 			std::string why;
-			if (!lowPoly->Open(*scene, path, why))
-				editor->SetStatus("Cannot make a low-poly model: " + why);
+			if (!resample->Open(*scene, path, why))
+				editor->SetStatus("Cannot generate a KV6: " + why);
 		}
 
-		bool KV6EditorView::LowPolyInput(const std::string& key, bool down) {
-			if (!lowPoly->IsOpen() || !scene)
+		bool KV6EditorView::ResampleInput(const std::string& key, bool down) {
+			if (!resample->IsOpen() || !scene)
 				return false;
 			std::string said;
-			if (lowPoly->Input(*scene, key, down, softwareCursor->GetPosition(), said)) {
+			if (resample->Input(*scene, key, down, softwareCursor->GetPosition(), said)) {
 				if (!said.empty())
 					editor->SetStatus(said);
-				if (!lowPoly->IsOpen())
+				if (!resample->IsOpen())
 					tree->Reveal(*scene, scene->Active()); // what it added, if anything
 				return true;
 			}
@@ -603,7 +603,7 @@ namespace spades {
 			// Edit mode first, while the scene is still there to take the voxels
 			// back; then nothing is left that offers Object mode.
 			editor->SetObjectMode(false);
-			lowPoly->Cancel(*scene);
+			resample->Cancel(*scene);
 			transformTarget.SetScene(nullptr);
 			tree->Reset();
 			scene.reset();
@@ -1183,8 +1183,12 @@ namespace spades {
 			// so the drag never runs into the screen's edge.
 			if (!editor->HoldsPointer())
 				softwareCursor->Accumulate(dx, dy);
-			if (ui->GetContextMenu()->IsOpen() || lowPoly->IsOpen())
-				return; // they follow the cursor as they are drawn
+			if (resample->IsOpen() && scene) {
+				resample->Move(*scene, softwareCursor->GetPosition()); // its slider, while held
+				return;
+			}
+			if (ui->GetContextMenu()->IsOpen())
+				return; // it follows the cursor as it is drawn
 			// The tree's press follows the cursor; over its rows, nothing under
 			// them answers to it.
 			if (tree->IsHolding() && scene) {
@@ -1224,9 +1228,9 @@ namespace spades {
 			if (ui->GetOverlay()->KeyEvent(key, down))
 				return;
 
-			// The low-poly panel, while it is up: its keys and clicks, and the
+			// The Generate KV6 panel, while it is up: its keys and clicks, and the
 			// camera's, nothing else.
-			if (LowPolyInput(key, down))
+			if (ResampleInput(key, down))
 				return;
 
 			// So does the tree's menu, but for releases of keys held from before
@@ -1513,7 +1517,7 @@ namespace spades {
 				                                    : LocalFileSystem::GetFileName(filePath));
 				tree->Layout(kTreeLeft, VoxelEditor::BarsHeight() + kTreeTopGap, sh - kTreeBottomGap);
 				tree->Draw(*scene, softwareCursor->GetPosition(), globalTime);
-				lowPoly->Draw(kTreeLeft + kTreeWidth + 16.0F, VoxelEditor::BarsHeight() + kTreeTopGap,
+				resample->Draw(kTreeLeft + kTreeWidth + 16.0F, VoxelEditor::BarsHeight() + kTreeTopGap,
 				              softwareCursor->GetPosition());
 			} else {
 				if (tree->IsHolding())
@@ -1521,7 +1525,7 @@ namespace spades {
 				tree->CancelRename();
 				ui->GetContextMenu()->Close();
 				if (scene)
-					lowPoly->Cancel(*scene);
+					resample->Cancel(*scene);
 			}
 
 			editor->DrawPanels();
