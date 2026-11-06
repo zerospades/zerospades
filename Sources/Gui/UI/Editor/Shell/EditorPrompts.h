@@ -30,6 +30,11 @@ namespace spades {
 		/** A plain message over the editor with a single way out. */
 		void ShowEditorMessage(UIOverlayHost& overlay, const std::string& text);
 
+		/** Asks before something that is not done lightly: OK (or Enter) runs
+		 *  `proceed`, Cancel (or Escape) nothing. */
+		void ConfirmEditorAction(UIOverlayHost& overlay, const std::string& question,
+		                         std::function<void()> proceed);
+
 		/**
 		 * Asks what becomes of a document's unsaved changes before it is lost:
 		 * Save, Discard or Cancel. `proceed` runs after Discard, or after Save

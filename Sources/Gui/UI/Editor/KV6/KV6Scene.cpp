@@ -1182,6 +1182,21 @@ namespace spades {
 			Record(std::move(step));
 		}
 
+		bool KV6Scene::SetLocked(const NodePath& path, bool locked) {
+			VoxelObject* o = MutableNode(path);
+			if (!o || o->locked == locked)
+				return false;
+			CancelDrag();
+			CancelPlacement();
+			o->locked = locked;
+			Step step;
+			step.kind = Step::Kind::Lock;
+			step.path = path;
+			step.locked = locked;
+			Record(std::move(step));
+			return true;
+		}
+
 		// --- Placing -----------------------------------------------------------
 
 		bool KV6Scene::PickedPose(GizmoPose& pose) const {
@@ -1361,6 +1376,8 @@ namespace spades {
 				case Step::Kind::Place: return "placing " + named(step.path);
 				case Step::Kind::Hide:
 					return (step.hidden ? "hiding " : "showing ") + named(step.path);
+				case Step::Kind::Lock:
+					return (step.locked ? "locking " : "unlocking ") + named(step.path);
 				case Step::Kind::Move:
 					return "moving " + objects(done ? step.move->relocation.to
 					                                : step.move->relocation.from);
@@ -1399,6 +1416,7 @@ namespace spades {
 					Select({step.path}, step.path);
 					break;
 				case Step::Kind::Hide: MutableNode(step.path)->hidden = !step.hidden; break;
+				case Step::Kind::Lock: MutableNode(step.path)->locked = !step.locked; break;
 				case Step::Kind::Move: {
 					const MoveStep& m = *step.move;
 					Relocate(m.relocation.Reversed(), m.before);
@@ -1438,6 +1456,7 @@ namespace spades {
 					Select({step.path}, step.path);
 					break;
 				case Step::Kind::Hide: ApplyHidden(step.path, step.hidden); break;
+				case Step::Kind::Lock: MutableNode(step.path)->locked = step.locked; break;
 				case Step::Kind::Move: {
 					const MoveStep& m = *step.move;
 					Relocate(m.relocation, m.after);

@@ -36,6 +36,18 @@ namespace spades {
 			overlay.Show(box.GetPointerOrNull());
 		}
 
+		void ConfirmEditorAction(UIOverlayHost& overlay, const std::string& question,
+		                         std::function<void()> proceed) {
+			Handle<ConfirmScreen> box = Handle<ConfirmScreen>::New(
+			  &overlay.GetUIManager().GetRootElement(), question, 160.0F);
+			box->closed = [proceed](ui::UIElement& sender) {
+				ConfirmScreen* answer = dynamic_cast<ConfirmScreen*>(&sender);
+				if (answer && answer->GetResult() && proceed)
+					proceed();
+			};
+			overlay.Show(box.GetPointerOrNull());
+		}
+
 		void ConfirmDiscardChanges(UIOverlayHost& overlay, const std::string& question,
 		                           std::function<void(std::function<void()>)> save,
 		                           std::function<void()> proceed) {

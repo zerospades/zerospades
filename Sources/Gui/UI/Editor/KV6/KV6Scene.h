@@ -148,6 +148,10 @@ namespace spades {
 			/** Hides the node (and so all under it) or shows it again; a hidden
 			 *  node and all under it leave the selection. */
 			void SetHidden(const NodePath& path, bool hidden);
+			/** Locks the node as a template holds it (its name, parent, turn and
+			 *  scale kept, see VoxelObject::locked), or unlocks it, as one step.
+			 *  False when there is no such node or it is that way already. */
+			bool SetLocked(const NodePath& path, bool locked);
 
 			/**
 			 * Why the node cannot be named `name`, empty when it can: a locked
@@ -353,10 +357,11 @@ namespace spades {
 				std::vector<AnimationClip> clipsBefore, clipsAfter;
 			};
 			struct Step {
-				enum class Kind { Place, Hide, Move, Insert, Remove, Rename } kind = Kind::Place;
+				enum class Kind { Place, Hide, Lock, Move, Insert, Remove, Rename } kind = Kind::Place;
 				NodePath path;          // Place, Hide
 				Placement before, after; // Place
 				bool hidden = false;     // Hide: what it became
+				bool locked = false;     // Lock: what it became
 				std::unique_ptr<MoveStep> move;
 				std::unique_ptr<InsertStep> insert; // Insert, Remove
 				std::unique_ptr<RenameStep> rename; // Rename, at `path`
