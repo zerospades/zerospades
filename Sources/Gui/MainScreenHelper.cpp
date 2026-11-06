@@ -37,6 +37,7 @@
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
 #include <Core/Settings.h>
+#include <Core/Strings.h>
 #include <Core/Thread.h>
 #include <Gui/Utils/LanDiscovery.h>
 #include <Gui/Utils/PingTester.h>
@@ -543,6 +544,16 @@ namespace spades {
 		bool MainScreenHelper::ShouldOpenModsTab() { return spades::g_openModsTab; }
 		bool MainScreenHelper::IsTryingMod() { return spades::g_tryMod; }
 		void MainScreenHelper::RelaunchForMods() { spades::RelaunchForMods(); }
+
+		ModApplyResult MainScreenHelper::ApplyMods(std::vector<ModFailure>& failures,
+		                                           std::string& error) {
+			if (mainScreen == NULL) {
+				error = _Tr("MainScreen", "The main screen is gone.");
+				return ModApplyResult::Refused;
+			}
+			return ModOverlay::Apply(*mainScreen->GetRenderer(), *mainScreen->GetAudioDevice(),
+			                         failures, error);
+		}
 
 		std::string MainScreenHelper::GetPendingErrorMessage() {
 			std::string s = errorMessage;

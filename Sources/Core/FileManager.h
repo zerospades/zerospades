@@ -39,8 +39,25 @@ namespace spades {
 		static void AddFileSystem(IFileSystem*);
 		static void AppendFileSystem(IFileSystem*);
 		static void PrependFileSystem(IFileSystem*);
+		/**
+		 * Unmounts `fs` and hands it back to the caller, or returns null if it isn't
+		 * mounted. Streams already opened from it stay valid.
+		 */
+		static std::unique_ptr<IFileSystem> RemoveFileSystem(IFileSystem*);
 		static std::vector<std::string> EnumFiles(const char*);
 		static std::string ReadAllBytes(const char*);
 		static void Close();
+
+		/**
+		 * While one is alive, reads on this thread see `fileSystems` on top of
+		 * everything, the first one topmost. The caller keeps them alive.
+		 */
+		class Overlay {
+		public:
+			explicit Overlay(std::vector<IFileSystem*> fileSystems);
+			~Overlay();
+			Overlay(const Overlay&) = delete;
+			void operator=(const Overlay&) = delete;
+		};
 	};
 }; // namespace spades

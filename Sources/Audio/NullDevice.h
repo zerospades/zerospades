@@ -36,7 +36,9 @@ namespace spades {
 		public:
 			NullDevice();
 
-			client::IAudioChunk* RegisterSound(const char* name) override;
+			Handle<client::IAudioChunk> RegisterSound(const char* name) override;
+			Handle<client::IAudioChunk> CreateSound(const char* name) override;
+			std::vector<std::string> GetRegisteredFiles() override { return {}; }
 
 			void SetGameMap(client::GameMap*) override;
 

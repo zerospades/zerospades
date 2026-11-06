@@ -21,18 +21,32 @@
 #pragma once
 
 #include "ScriptManager.h"
+#include <cstdint>
 #include <string>
 
 namespace spades {
 	class ScriptFunction {
 		std::string decl, type;
 		asIScriptEngine* lastEngine;
+		std::uint64_t loadedGeneration; // ScriptManager::GetGeneration() of `func`
 		asIScriptFunction* func;
 		void Load(asIScriptEngine*);
+		/** This function in `module`, or null with `error` saying why. */
+		asIScriptFunction* Find(asIScriptEngine*, asIScriptModule* module,
+		                        std::string& error) const;
 
 	public:
 		ScriptFunction(const std::string& decl);
 		ScriptFunction(const std::string& objectTypeName, const std::string& decl);
+		~ScriptFunction();
+		ScriptFunction(const ScriptFunction&) = delete;
+		void operator=(const ScriptFunction&) = delete;
+
 		ScriptContextHandle Prepare();
+		/** `Prepare`, with the function from the module `module` rather than "Client". */
+		ScriptContextHandle Prepare(const std::string& module);
+
+		/** Why `module` lacks a function some ScriptFunction looks up, or "". */
+		static std::string FindMissing(asIScriptEngine*, asIScriptModule* module);
 	};
 } // namespace spades

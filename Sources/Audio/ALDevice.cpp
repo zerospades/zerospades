@@ -100,8 +100,12 @@ namespace spades {
 			virtual ~ALAudioChunk() {
 				SPADES_MARK_FUNCTION();
 
+				// A destructor must not throw. Every source that played this chunk
+				// holds it (ALSrc::chunk), so no source has its buffer attached here.
 				al::qalDeleteBuffers(1, &handle);
-				ALCheckErrorPrecise();
+				ALenum error = al::qalGetError();
+				if (error != AL_NO_ERROR)
+					SPLog("Sound buffer %u not deleted: OpenAL error %d", handle, (int)error);
 			}
 
 		public:
@@ -185,6 +189,9 @@ namespace spades {
 				bool fading = false;
 				std::chrono::steady_clock::time_point fadeStart;
 				float fadeGain = 0.0F;
+				// The chunk whose buffer is attached: OpenAL keeps it attached after
+				// playing, and can't delete a buffer a source has.
+				Handle<ALAudioChunk> chunk;
 
 				ALSrc(Internal* i) : internal(i) {
 					SPADES_MARK_FUNCTION();
@@ -207,6 +214,7 @@ namespace spades {
 					ALCheckErrorPrecise();
 					al::qalSourcei(handle, AL_BUFFER, 0);
 					ALCheckError();
+					chunk = nullptr;
 				}
 
 				bool IsPlaying() {
@@ -364,13 +372,15 @@ namespace spades {
 					ALCheckError();
 				}
 
-				void PlayBufferOneShot(ALuint buffer) {
+				void PlayBufferOneShot(ALAudioChunk& played) {
 					SPADES_MARK_FUNCTION();
 
 					al::qalSourcei(handle, AL_LOOPING, AL_FALSE);
 					ALCheckErrorPrecise();
-					al::qalSourcei(handle, AL_BUFFER, buffer);
+					al::qalSourcei(handle, AL_BUFFER, played.GetHandle());
 					ALCheckErrorPrecise();
+					// The previous chunk's buffer is detached now: it may go.
+					chunk = Handle<ALAudioChunk>(played);
 					al::qalSourcei(handle, AL_SAMPLE_OFFSET, 0);
 					ALCheckErrorPrecise();
 
@@ -384,7 +394,7 @@ namespace spades {
 					if (err != AL_NO_ERROR) {
 						// Just log the error without making additional AL calls to avoid recursion
 						SPLog("Warning: alSourcePlay failed with error %d (0x%X) for buffer %u on source %u",
-							  (int)err, (unsigned int)err, buffer, handle);
+							  (int)err, (unsigned int)err, played.GetHandle(), handle);
 					}
 				}
 			};
@@ -660,7 +670,7 @@ namespace spades {
 				src->SetParam(param);
 				src->Set3D(origin);
 				src->UpdateObstruction();
-				src->PlayBufferOneShot(chunk->GetHandle());
+				src->PlayBufferOneShot(*chunk);
 			}
 			void PlayLocal(ALAudioChunk* chunk, const Vector3& origin,
 						   const client::AudioParam& param) {
@@ -674,7 +684,7 @@ namespace spades {
 				src->SetParam(param);
 				src->Set3D(origin, true);
 				src->UpdateObstruction();
-				src->PlayBufferOneShot(chunk->GetHandle());
+				src->PlayBufferOneShot(*chunk);
 			}
 			void PlayLocal(ALAudioChunk* chunk, const client::AudioParam& param) {
 				SPADES_MARK_FUNCTION();
@@ -687,7 +697,7 @@ namespace spades {
 				src->SetParam(param);
 				src->Set2D();
 				src->UpdateObstruction();
-				src->PlayBufferOneShot(chunk->GetHandle());
+				src->PlayBufferOneShot(*chunk);
 			}
 
 			void Respatialize(const Vector3& eye, const Vector3& front, const Vector3& up) {
@@ -864,18 +874,29 @@ namespace spades {
 			}
 		}
 
-		client::IAudioChunk* ALDevice::RegisterSound(const char* name) {
+		Handle<client::IAudioChunk> ALDevice::RegisterSound(const char* name) {
 			SPADES_MARK_FUNCTION();
 
 			std::map<std::string, ALAudioChunk*>::iterator it = chunks.find(name);
 			if (it == chunks.end()) {
+				// The cache keeps the reference the chunk is made with.
 				ALAudioChunk* c = CreateChunk(name);
 				chunks[name] = c;
-				// release audiochunk later (to eliminate memory leak)
-				return c;
+				return {c};
 			}
-			it->second->AddRef();
-			return it->second;
+			return {it->second};
+		}
+
+		std::vector<std::string> ALDevice::GetRegisteredFiles() {
+			std::vector<std::string> files;
+			for (const auto& entry : chunks)
+				files.push_back(entry.first);
+			return files;
+		}
+
+		Handle<client::IAudioChunk> ALDevice::CreateSound(const char* name) {
+			SPADES_MARK_FUNCTION();
+			return {CreateChunk(name), false};
 		}
 
 		void ALDevice::ClearCache() {

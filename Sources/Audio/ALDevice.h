@@ -42,7 +42,9 @@ namespace spades {
 
 			static bool TryLoad();
 
-			client::IAudioChunk* RegisterSound(const char* name) override;
+			Handle<client::IAudioChunk> RegisterSound(const char*) override;
+			Handle<client::IAudioChunk> CreateSound(const char*) override;
+			std::vector<std::string> GetRegisteredFiles() override;
 
 			static std::vector<std::string> DeviceList();
 

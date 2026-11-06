@@ -55,5 +55,8 @@ namespace spades {
 		 *     }
 		 */
 		static Handle<VoxelModel> Load(const char* path);
+
+		/** The metadata file `Load` reads for `path`. */
+		static std::string GetMetadataPath(const std::string& path);
 	};
 } // namespace spades

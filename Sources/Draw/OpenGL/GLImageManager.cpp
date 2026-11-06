@@ -54,7 +54,7 @@ namespace spades {
 
 			// The default white image is built in memory. The legacy file name is
 			// kept as an alias so existing callers and mods keep working.
-			if (name == "*white" || name == "Gfx/White.tga") {
+			if (IsBuiltIn(name)) {
 				GLImage* white = GetWhiteImage();
 				white->AddRef();
 				return white;
@@ -88,6 +88,17 @@ namespace spades {
 			return GLImage::FromBitmap(*bmp, &device).Unmanage();
 		}
 
+		bool GLImageManager::IsBuiltIn(const std::string& name) {
+			return name == "*white" || name == "Gfx/White.tga";
+		}
+
 		void GLImageManager::ClearCache() { images.clear(); }
+
+		std::vector<std::string> GLImageManager::GetFiles() const {
+			std::vector<std::string> files;
+			for (const auto& entry : images)
+				files.push_back(entry.first);
+			return files;
+		}
 	} // namespace draw
 } // namespace spades
