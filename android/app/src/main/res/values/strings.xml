@@ -15,6 +15,11 @@
     <string name="quick_start">Quick start (skip original settings)</string>
     <string name="quick_start_graphics">Quick-start graphics</string>
     <string name="quick_start_note">These switches apply only to quick start. The original settings screen has its own settings.</string>
+    <string name="gyro_enable">Gyroscope aiming</string>
+    <string name="gyro_unavailable">Gyroscope aiming unavailable on this device</string>
+    <string name="gyro_sensitivity">Gyro sensitivity: %1$.1fx</string>
+    <string name="gyro_sensitivity_description">Gyro sensitivity multiplier</string>
+    <string name="gyro_sensitivity_note">Adjusts gyro only. In-game mouse sensitivity still applies to both gyro and touch aim.</string>
     <string name="start">Start</string>
     <string name="not_ready_title">Game not available yet</string>
     <string name="not_ready">This preview contains the Android launcher only. The native game, graphics support, assets and touch controls still need to be integrated.</string>

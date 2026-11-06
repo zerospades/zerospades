@@ -52,9 +52,11 @@ layout becomes unusable. The two fire buttons are independently adjustable.
 
 Hold **PIE**, drag in the desired direction, then release to choose a slice;
 fire/aim cycle its pages. **LIGHT** uses the game's flashlight binding. Enable
-**Gyroscope aiming** in the launcher if the device has a gyroscope. Both gyro
-and touch aiming enter the engine's mouse-input path, so the in-game mouse
-sensitivity, sensitivity type and other engine aim options apply. Gyro is off
+**Gyroscope aiming** in the launcher if the device has a gyroscope. The
+launcher's **Gyro sensitivity** slider sets a separate 0.1x–5.0x multiplier
+(default 1.0x) for gyro only; it does not change touch aim. Both gyro and
+touch aiming enter the engine's mouse-input path, so the in-game mouse
+sensitivity, sensitivity type and other engine aim options also apply. Gyro is off
 by default and stops while paused or in menus. Sensor direction, feel, editor
 layout and native minimap alignment still need physical-device testing.
 

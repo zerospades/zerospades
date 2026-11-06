@@ -5,8 +5,16 @@ package io.github.zerospades.mobile.hud;
 public final class GyroAim {
     private static final float COUNTS_PER_RADIAN = 333.33334f;
     private static final float DEAD_ZONE = .015f;
+    public static final float MIN_SENSITIVITY = .1f;
+    public static final float MAX_SENSITIVITY = 5f;
     private long lastNanos;
+    private float sensitivity = 1f;
     private final float[] delta = new float[2];
+    public static float clampSensitivity(float value) {
+        return Float.isFinite(value) ? Math.max(MIN_SENSITIVITY, Math.min(MAX_SENSITIVITY, value)) : 1f;
+    }
+    /** Multiplier specific to gyro input; the engine applies its mouse setting afterward. */
+    public void setSensitivity(float value) { sensitivity = clampSensitivity(value); }
     public void reset() { lastNanos=0; }
     /** rotation is the Android Surface rotation value (0, 1, 2, 3). */
     public float[] sample(long timestamp, float x, float y, float z, int rotation) {
@@ -26,7 +34,8 @@ public final class GyroAim {
         }
         float yaw=Math.abs(sy)<DEAD_ZONE ? 0 : -sy;
         float pitch=Math.abs(sx)<DEAD_ZONE ? 0 : -sx;
-        delta[0]=yaw*dt*COUNTS_PER_RADIAN; delta[1]=pitch*dt*COUNTS_PER_RADIAN;
+        delta[0]=yaw*dt*COUNTS_PER_RADIAN*sensitivity;
+        delta[1]=pitch*dt*COUNTS_PER_RADIAN*sensitivity;
         return delta;
     }
 }

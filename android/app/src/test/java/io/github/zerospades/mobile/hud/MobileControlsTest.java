@@ -58,6 +58,21 @@ public class MobileControlsTest {
         assertEquals(3.3333,delta[0],.001); assertEquals(-6.6667,delta[1],.001);
         assertEquals(null,gyro.sample(0,Float.NaN,0,0,1));
     }
+    @Test public void gyroSensitivityScalesOnlyGyroDeltasAndClampsInvalidValues() {
+        GyroAim gyro = new GyroAim();
+        gyro.sample(1_000_000_000L, 1, 2, 0, 1);
+        float[] delta = gyro.sample(1_010_000_000L, 1, 2, 0, 1);
+        float x = delta[0], y = delta[1];
+        gyro.setSensitivity(2f);
+        delta = gyro.sample(1_020_000_000L, 1, 2, 0, 1);
+        assertEquals(x * 2, delta[0], .001); assertEquals(y * 2, delta[1], .001);
+        gyro.setSensitivity(.5f);
+        delta = gyro.sample(1_030_000_000L, 1, 2, 0, 1);
+        assertEquals(x * .5, delta[0], .001); assertEquals(y * .5, delta[1], .001);
+        assertEquals(.1, GyroAim.clampSensitivity(-2), .0001);
+        assertEquals(5, GyroAim.clampSensitivity(100), .0001);
+        assertEquals(1, GyroAim.clampSensitivity(Float.NaN), .0001);
+    }
     @Test public void chatRecordsKeepUnicodeAndColorWithoutMarkupParsing() {
         byte[] prefix="[Team] ".getBytes(StandardCharsets.UTF_8);
         byte[] name="नाम😀".getBytes(StandardCharsets.UTF_8);

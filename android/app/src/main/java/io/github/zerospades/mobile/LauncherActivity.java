@@ -15,7 +15,10 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
+
+import io.github.zerospades.mobile.hud.GyroAim;
 
 /** Android startup settings; the experimental native build installs assets before SDL. */
 public final class LauncherActivity extends Activity {
@@ -60,6 +63,8 @@ public final class LauncherActivity extends Activity {
         content.addView(start, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        if (BuildConfig.NATIVE_GAME) addGyroSettings(content);
+
         if (BuildConfig.NATIVE_GAME) {
             TextView quickTitle = new TextView(this);
             quickTitle.setText(R.string.quick_start_graphics);
@@ -86,17 +91,6 @@ public final class LauncherActivity extends Activity {
             content.addView(diagnostics, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
-        if (BuildConfig.NATIVE_GAME) {
-            CheckBox gyro = new CheckBox(this);
-            SensorManager sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
-            boolean available = sensors != null && sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null;
-            gyro.setText(available ? "Gyroscope aiming (uses in-game mouse sensitivity)" : "Gyroscope aiming unavailable on this device");
-            SharedPreferences controls = getSharedPreferences("controls", MODE_PRIVATE);
-            gyro.setChecked(available && controls.getBoolean("gyro", false));
-            gyro.setEnabled(available);
-            gyro.setOnCheckedChangeListener((button, checked) -> controls.edit().putBoolean("gyro", checked).apply());
-            content.addView(gyro);
-        }
         Button editor = new Button(this);
         editor.setText("Customize HUD");
         editor.setOnClickListener(view -> startActivity(new Intent(this, HudEditorActivity.class)));
@@ -108,6 +102,46 @@ public final class LauncherActivity extends Activity {
         content.addView(preview, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(scroll);
+    }
+
+    private void addGyroSettings(LinearLayout content) {
+        SharedPreferences controls = getSharedPreferences("controls", MODE_PRIVATE);
+        SensorManager sensors = (SensorManager)getSystemService(SENSOR_SERVICE);
+        boolean available = sensors != null && sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null;
+        CheckBox gyro = new CheckBox(this);
+        gyro.setText(available ? R.string.gyro_enable : R.string.gyro_unavailable);
+        gyro.setChecked(available && controls.getBoolean("gyro", false));
+        gyro.setEnabled(available);
+        content.addView(gyro);
+
+        TextView label = new TextView(this);
+        label.setTextSize(16);
+        content.addView(label);
+        SeekBar slider = new SeekBar(this);
+        slider.setMax(49); // 0.1x to 5.0x in 0.1x steps
+        float saved = GyroAim.clampSensitivity(controls.getFloat("gyro_sensitivity", 1f));
+        slider.setProgress(Math.max(0, Math.min(49, Math.round(saved * 10) - 1)));
+        slider.setEnabled(gyro.isChecked());
+        label.setText(getString(R.string.gyro_sensitivity, (slider.getProgress()+1)/10f));
+        slider.setContentDescription(getString(R.string.gyro_sensitivity_description));
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                float value = (progress + 1) / 10f;
+                label.setText(getString(R.string.gyro_sensitivity, value));
+                if (fromUser) controls.edit().putFloat("gyro_sensitivity", value).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        content.addView(slider);
+        TextView note = new TextView(this);
+        note.setText(R.string.gyro_sensitivity_note);
+        note.setTextSize(14);
+        content.addView(note);
+        gyro.setOnCheckedChangeListener((button, checked) -> {
+            controls.edit().putBoolean("gyro", checked).apply();
+            slider.setEnabled(checked);
+        });
     }
 
     private void startGame(boolean showOriginal, Button start, Button quick) {

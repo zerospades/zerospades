@@ -167,7 +167,9 @@ public final class GameActivity extends SDLActivity {
         super.onResume();
         if (hud != null && !polling) { polling = true; ui.post(pollHud); }
         gyroAim.reset();
-        if (sensors != null && gyroscope != null && getSharedPreferences("controls", MODE_PRIVATE).getBoolean("gyro", false))
+        SharedPreferences controls = getSharedPreferences("controls", MODE_PRIVATE);
+        gyroAim.setSensitivity(controls.getFloat("gyro_sensitivity", 1f));
+        if (sensors != null && gyroscope != null && controls.getBoolean("gyro", false))
             sensors.registerListener(gyroListener, gyroscope, SensorManager.SENSOR_DELAY_GAME);
     }
 
