@@ -82,13 +82,36 @@ namespace spades {
 			float w = base->ScreenWidth();
 			float h = base->ScreenHeight();
 			float userScale = ui_scale;
-			float s = ComputeScale(w, h, userScale);
-			if (s != scale)
-				SPLog("UI scale: %g (%gx%g pixels, ui_scale %g)", s, w, h, userScale);
+
+			// Judged in window points, the units the OS sizes things in, so a
+			// high-DPI display (whose points are already enlarged) isn't enlarged a
+			// second time, then converted to the wrapped renderer's units: pixels
+			// when it renders a high-DPI window at full resolution, points when it
+			// works in points itself (kv6-editor).
+			float pw = windowWidth > 0.0F ? windowWidth : w;
+			float ph = windowHeight > 0.0F ? windowHeight : h;
+			float perPoint = ComputeScale(pw, ph, userScale);
+			float baseUnitsPerPoint = pw > 0.0F ? w / pw : 1.0F;
+			float s = perPoint * baseUnitsPerPoint;
+			// Logged once the window is known (the constructor's first estimate is
+			// provisional), and when anything changes.
+			if (windowWidth > 0.0F && (s != scale || perPoint != lastPerPoint))
+				SPLog("UI scale: %g per point, %g per renderer unit (window %gx%g points, "
+				      "renderer %gx%g, ui_scale %g)",
+				      perPoint, s, pw, ph, w, h, userScale);
+			lastPerPoint = windowWidth > 0.0F ? perPoint : 0.0F;
 			scale = s;
 			lastWidth = w;
 			lastHeight = h;
 			lastUserScale = userScale;
+		}
+
+		void ScaledRenderer::SetWindowSize(float width, float height) {
+			if (width == windowWidth && height == windowHeight)
+				return;
+			windowWidth = width;
+			windowHeight = height;
+			UpdateScale();
 		}
 
 		void ScaledRenderer::Init() {

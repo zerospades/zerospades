@@ -223,6 +223,17 @@ namespace spades {
 					float uiW = renderer->ScreenWidth();
 					return ww > 0 && uiW > 0.0F ? static_cast<float>(ww) / uiW : 1.0F;
 				};
+				// The scaled UI judges its automatic scale by the window's size in
+				// points; keep it informed, between frames.
+				auto* scaled = dynamic_cast<client::ScaledRenderer*>(renderer);
+				auto syncWindowSize = [&]() {
+					if (!scaled)
+						return;
+					int ww = 0, wh = 0;
+					SDL_GetWindowSize(wnd, &ww, &wh);
+					scaled->SetWindowSize(static_cast<float>(ww), static_cast<float>(wh));
+				};
+
 				m_uiScale = windowUnitsPerUI();
 				bool cursorNeedsResync = false;
 
@@ -269,6 +280,7 @@ namespace spades {
 						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
 						renderer->Flip();
+						syncWindowSize();
 
 						// The scale is re-evaluated in Flip (ScaledRenderer); the events
 						// polled below already belong to the next frame.
@@ -657,9 +669,14 @@ namespace spades {
 
 					// Scale the game's UI and HUD with the screen. The setup window has a
 					// fixed 800x480 layout and stays 1:1.
-					if (!m_hasSystemMenu)
-						renderer = Handle<client::ScaledRenderer>::New(renderer)
-						             .Cast<client::IRenderer>();
+					if (!m_hasSystemMenu) {
+						auto scaled = Handle<client::ScaledRenderer>::New(renderer);
+						// Before any view exists, so the first layout is already right.
+						int ww = 0, wh = 0;
+						SDL_GetWindowSize(window, &ww, &wh);
+						scaled->SetWindowSize(static_cast<float>(ww), static_cast<float>(wh));
+						renderer = std::move(scaled).Cast<client::IRenderer>();
+					}
 
 					Handle<client::IAudioDevice> audio(CreateAudioDevice(), false);
 
