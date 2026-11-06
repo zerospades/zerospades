@@ -545,11 +545,11 @@ namespace spades {
 						r = eng->RegisterObjectMethod("Renderer", "Bitmap@ ReadBitmap()",
 						                              asFUNCTION(ReadBitmap), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
-						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenWidth() property property",
+						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenWidth() property",
 						                              asMETHOD(IRenderer, ScreenWidth),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
-						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenHeight() property property",
+						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenHeight() property",
 						                              asMETHOD(IRenderer, ScreenHeight),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
