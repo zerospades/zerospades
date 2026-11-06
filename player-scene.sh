@@ -3,14 +3,13 @@
 # the player template has them:
 #
 #   Player                            the player: turns with where they face
-#   ├─ Standing
-#   │  ├─ UpperBody                   top of the torso: torso, head and arms hang from it
-#   │  │  ├─ Torso                    Torso.kv6
-#   │  │  ├─ Neck                     the head nods about it, with the aim
-#   │  │  │  ├─ Head                  Head.kv6
-#   │  │  │  └─ SantaHat   [hidden]   worn over Head at Christmas
-#   │  │  └─ Shoulders                tilt with the aim
-#   │  │     └─ ArmsHolding           Arms.kv6: both arms holding a tool, third person
+#   ├─ Neck                           the head nods about it, with the aim
+#   │  ├─ Head                        Head.kv6
+#   │  └─ SantaHat         [hidden]   worn over Head at Christmas
+#   ├─ Shoulders                      tilt with the aim
+#   │  └─ ArmsHolding                 Arms.kv6: both arms holding a tool, third person
+#   ├─ Standing                       the torso and legs, standing
+#   │  ├─ UpperBody ─ Torso           Torso.kv6
 #   │  ├─ LeftHip ─ LeftLeg           Leg.kv6
 #   │  └─ RightHip ─ RightLeg         LegRight.kv6
 #   ├─ Crouching          [hidden]    the same joints, crouched
@@ -22,6 +21,10 @@
 #      └─ RightShoulder ─ RightUpperArm ─ RightElbow ─ RightForearm  UpperArmRight, ArmRight
 #   Fallen                [hidden]    shown when ragdolls are off: no joints
 #   └─ Corpse                         Dead.kv6
+#
+# The head and the arms holding a tool are the player's whatever the pose:
+# the game hangs them from the torso's top, standing or crouched. They show
+# here where standing puts them.
 #
 # The game places every joint itself and draws each part on its own hinge
 # (Client/PlayerModels.cpp), so the hinges' places here only show the parts
@@ -78,16 +81,16 @@ elbow() {
 scene new "$out" --force >/dev/null
 {
 	echo "add-hinge / Player"
+	echo "add-hinge Player Neck --at 0 0 -10"
+	part Player/Neck Head Head
+	echo "add-model Player/Neck $hat --name SantaHat --at $hatAt"
+	echo "set-scale Player/Neck/SantaHat 1.05"
+	echo "hide Player/Neck/SantaHat"
+	echo "add-hinge Player Shoulders --at 0 0 -9"
+	part Player/Shoulders Arms ArmsHolding
 	echo "add-hinge Player Standing"
 	echo "add-hinge Player/Standing UpperBody --at 0 0 -10"
 	part Player/Standing/UpperBody Torso Torso
-	echo "add-hinge Player/Standing/UpperBody Neck"
-	part Player/Standing/UpperBody/Neck Head Head
-	echo "add-model Player/Standing/UpperBody/Neck $hat --name SantaHat --at $hatAt"
-	echo "set-scale Player/Standing/UpperBody/Neck/SantaHat 1.05"
-	echo "hide Player/Standing/UpperBody/Neck/SantaHat"
-	echo "add-hinge Player/Standing/UpperBody Shoulders --at 0 0 1"
-	part Player/Standing/UpperBody/Shoulders Arms ArmsHolding
 	echo "add-hinge Player/Standing LeftHip --at 2.5 0 -1"
 	part Player/Standing/LeftHip Leg LeftLeg
 	echo "add-hinge Player/Standing RightHip --at -2.5 0 -1"
@@ -122,9 +125,9 @@ scene new "$out" --force >/dev/null
 	part Fallen Dead Corpse
 	echo "hide Fallen"
 
-	for n in Player Player/Standing Player/Standing/UpperBody Player/Standing/UpperBody/Torso Player/Standing/UpperBody/Neck \
-		Player/Standing/UpperBody/Neck/Head Player/Standing/UpperBody/Neck/SantaHat Player/Standing/UpperBody/Shoulders \
-		Player/Standing/UpperBody/Shoulders/ArmsHolding Player/Standing/LeftHip Player/Standing/LeftHip/LeftLeg \
+	for n in Player Player/Standing Player/Standing/UpperBody Player/Standing/UpperBody/Torso \
+		Player/Neck Player/Neck/Head Player/Neck/SantaHat Player/Shoulders Player/Shoulders/ArmsHolding \
+		Player/Standing/LeftHip Player/Standing/LeftHip/LeftLeg \
 		Player/Standing/RightHip Player/Standing/RightHip/RightLeg \
 		Player/Crouching Player/Crouching/UpperBody Player/Crouching/UpperBody/Torso Player/Crouching/LeftHip \
 		Player/Crouching/LeftHip/LeftLeg Player/Crouching/RightHip Player/Crouching/RightHip/RightLeg \
@@ -147,10 +150,10 @@ was on its pivot. Give a part new voxels or move it on its hinge (its
 pivot); its name and turn are the template's.
 
 Part                                            Classic file        Used in
+Player/Neck/Head                                Head.kv6            third person, corpse; standing and crouched
+Player/Neck/SantaHat                            (XmasHat.kv6)       over Head, 20-27 December
+Player/Shoulders/ArmsHolding                    Arms.kv6            third person; standing and crouched
 Player/Standing/UpperBody/Torso                 Torso.kv6           third person, first person, corpse
-Player/Standing/UpperBody/Neck/Head             Head.kv6            third person, corpse
-Player/Standing/UpperBody/Neck/SantaHat         (XmasHat.kv6)       over Head, 20-27 December
-Player/Standing/UpperBody/Shoulders/ArmsHolding Arms.kv6            third person
 Player/Standing/LeftHip/LeftLeg                 Leg.kv6             third person, first person, corpse
 Player/Standing/RightHip/RightLeg               LegRight.kv6        third person, first person, corpse
 Player/Crouching/UpperBody/Torso                TorsoCrouch.kv6     crouching, third and first person

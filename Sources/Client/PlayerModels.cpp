@@ -35,14 +35,14 @@ namespace spades {
 	namespace client {
 		namespace {
 			const char* const kSceneFile = "Player.2kv6";
-			const char* const kHatPath = "Player/Standing/UpperBody/Neck/SantaHat";
+			const char* const kHatPath = "Player/Neck/SantaHat";
 
 			// Where the template keeps each classic part (player-scene.sh).
 			const char* ScenePathOf(const std::string& name) {
 				static const std::map<std::string, const char*> paths = {
 				  {"Torso", "Player/Standing/UpperBody/Torso"},
-				  {"Head", "Player/Standing/UpperBody/Neck/Head"},
-				  {"Arms", "Player/Standing/UpperBody/Shoulders/ArmsHolding"},
+				  {"Head", "Player/Neck/Head"},
+				  {"Arms", "Player/Shoulders/ArmsHolding"},
 				  {"Leg", "Player/Standing/LeftHip/LeftLeg"},
 				  {"LegRight", "Player/Standing/RightHip/RightLeg"},
 				  {"TorsoCrouch", "Player/Crouching/UpperBody/Torso"},
