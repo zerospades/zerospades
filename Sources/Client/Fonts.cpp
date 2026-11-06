@@ -130,6 +130,10 @@ namespace spades {
 			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 12.0F).Cast<IFont>();
 
 			// bitmap fonts
+			// FIXME: licensing. The 6x8 glyphs (fontdata::kFont6x8) come from VOXLAP5.C by
+			// Ken Silverman, the engine of Ben Aksoy's Ace of Spades, under the Voxlap
+			// license, not the GPL. Replace them with a font under a GPL-compatible license
+			// (or one drawn for the project) that keeps the look.
 			smallFont = CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8Cell);
 		}
 
