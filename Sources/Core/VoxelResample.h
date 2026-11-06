@@ -32,28 +32,34 @@ namespace spades {
 
 	/**
 	 * How many voxels of a model to make for each voxel of a scene, each way:
-	 * `finer` of them (4/1, four times finer), or one for every `coarser`
-	 * (1/4, four times coarser); 1/1 is the scene as the game composes it.
-	 * One of the two is always 1.
+	 * `finer` of them for every `coarser`, in lowest terms. 4/1 is four times
+	 * finer, 1/4 four times coarser, 3/2 one and a half times finer; 1/1 is
+	 * the scene as the game composes it.
 	 */
 	struct VoxelResolution {
-		/** The furthest either way: 10/1 and 1/10. */
-		static constexpr int kMaxStep = 10;
+		/** The furthest the editor's steps go either way: 5/1 and 1/5. */
+		static constexpr int kMaxStep = 5;
 
 		int finer = 1;
 		int coarser = 1;
 
-		static VoxelResolution Finer(int n) { return VoxelResolution{n < 1 ? 1 : n, 1}; }
-		static VoxelResolution Coarser(int n) { return VoxelResolution{1, n < 1 ? 1 : n}; }
-		/** From 1/kMaxStep to kMaxStep/1, coarsest first: 19 of them. */
+		/** `finer` for every `coarser`, in lowest terms; 1/1 for anything
+		 *  not above zero. */
+		static VoxelResolution Of(int finer, int coarser);
+		static VoxelResolution Finer(int n) { return Of(n, 1); }
+		static VoxelResolution Coarser(int n) { return Of(1, n); }
+		/** From 1/kMaxStep to kMaxStep/1 in halves, coarsest first: 1/5,
+		 *  1/4.5, ..., 1/1.5, 1/1, 1.5/1, ..., 5/1. */
 		static const std::vector<VoxelResolution>& Steps();
-		/** "4/1", "1/4", "1/1", or N alone for N/1; false for anything else,
-		 *  or a resolution past kMaxStep. */
+		/** "4/1", "1/2.5", "1.5/1", or a count alone for that many to 1;
+		 *  false for anything else. Counts take one decimal at most. */
 		static bool Parse(const std::string& text, VoxelResolution& out);
 
 		/** One voxel of the result, in voxels of the scene: 1/4 for 4/1. */
 		float VoxelSize() const { return float(coarser) / float(finer); }
-		/** "4/1", "1/1", "1/4". */
+		/** Whether it is a whole number of times either way (4/1, 1/3). */
+		bool Whole() const { return finer == 1 || coarser == 1; }
+		/** "4/1", "1/1", "1/2.5", "1.5/1": one side 1, as the editor shows it. */
 		std::string Label() const;
 		/** The size a model of `size` voxels comes to, each side rounded up. */
 		IntVector3 SizeOf(const IntVector3& size) const;
@@ -70,9 +76,10 @@ namespace spades {
 	 * scene's frame:
 	 *
 	 *  - 1/1 is the scene as the game composes it (MergeScene).
-	 *  - Coarser is that made coarser (DownsampledVoxelModel): plates and
-	 *    rods a few voxels thick survive.
-	 *  - Finer samples each object through its own transform: each voxel of
+	 *  - Coarser by a whole number (1/3) is that made coarser
+	 *    (DownsampledVoxelModel): plates and rods a few voxels thick survive.
+	 *  - Finer, or coarser by a step between (1/2.5), samples each object
+	 *    through its own transform: each voxel of
 	 *    the result takes the colour of the object's voxel its middle falls
 	 *    in, the later object over the earlier where they meet. A part the
 	 *    scene scales down (finer than the rest) keeps its detail.

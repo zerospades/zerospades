@@ -232,7 +232,7 @@ namespace spades {
 			 * Adds `model`, which Resampled made of the node at `resolution`
 			 * with `frame`, as a new object right after the node among its
 			 * siblings (after the scene's top objects for the scene), set beside
-			 * it, named after it with the resolution ("Gun_4to1"); selects it,
+			 * it, named after it with the resolution ("Gun_2.5to1"); selects it,
 			 * as one step. False, `why` saying why, when it cannot go there.
 			 */
 			bool AddResampled(const NodePath& path, Handle<VoxelModel> model, const Matrix4& frame,

@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <functional>
@@ -33,18 +34,37 @@
 
 namespace spades {
 	namespace {
+		// The colour a loaded model gives voxels sealed inside a shell (see
+		// VoxelModel::HollowFill): solid, but never seen.
+		constexpr std::uint32_t kInterior = 0xDDBEEF;
+
 		// What a KV6 holds: a column is a 64-bit mask.
 		constexpr int kMaxAcross = 4096;
 		constexpr int kMaxDeep = 64;
 
-		bool ParseCount(const std::string& text, int& out) {
-			if (text.empty() || text.size() > 3)
+		int Gcd(int a, int b) { return b == 0 ? a : Gcd(b, a % b); }
+
+		// A count with at most one decimal ("2", "2.5"), in tenths; false for
+		// anything else, or nothing.
+		bool ParseTenths(const std::string& text, int& tenths) {
+			const std::size_t dot = text.find('.');
+			const std::string whole = text.substr(0, dot);
+			const std::string tenth = dot == std::string::npos ? std::string() : text.substr(dot + 1);
+			if (whole.empty() || whole.size() > 3 || tenth.size() > 1)
 				return false;
-			for (char c : text)
+			for (char c : whole + tenth)
 				if (c < '0' || c > '9')
 					return false;
-			out = std::atoi(text.c_str());
-			return out >= 1 && out <= VoxelResolution::kMaxStep;
+			if (dot != std::string::npos && tenth.empty())
+				return false;
+			tenths = std::atoi(whole.c_str()) * 10 + (tenth.empty() ? 0 : tenth[0] - '0');
+			return tenths > 0;
+		}
+
+		// `n / 10` as written: "2", "2.5".
+		std::string Tenths(int n) {
+			return n % 10 == 0 ? std::to_string(n / 10)
+			                   : std::to_string(n / 10) + "." + std::to_string(n % 10);
 		}
 
 		// An object holding voxels, where they land in the scene.
@@ -116,10 +136,11 @@ namespace spades {
 			return any;
 		}
 
-		// `n` times finer: each voxel of the result samples the object its
-		// middle falls in, through that object's own transform.
-		Handle<VoxelModel> Finer(const std::vector<VoxelObject>& objects, int n, Matrix4& frame,
-		                         std::string& why) {
+		// `f` voxels for each of the scene's (any above zero): each voxel of
+		// the result samples the object its middle falls in, through that
+		// object's own transform.
+		Handle<VoxelModel> Sampled(const std::vector<VoxelObject>& objects, float f,
+		                           Matrix4& frame, std::string& why) {
 			std::vector<Placed> placed;
 			for (const VoxelObject& o : objects)
 				Collect(o, Matrix4::Identity(), placed);
@@ -127,9 +148,8 @@ namespace spades {
 				why = "it shows no voxels";
 				return Handle<VoxelModel>();
 			}
-			// The result's voxel `t` spans the scene's [t/n - 0.5, (t+1)/n - 0.5)
+			// The result's voxel `t` spans the scene's [t/f - 0.5, (t+1)/f - 0.5)
 			// on each axis, so at 1/1 it would be the scene's voxel `t`.
-			const float f = float(n);
 			auto first = [&](float lo) { return int(std::floor((lo + 0.5F) * f)); };
 			auto last = [&](float hi) { return int(std::ceil((hi + 0.5F) * f)) - 1; };
 			IntVector3 tlo = MakeIntVector3(std::numeric_limits<int>::max(),
@@ -158,6 +178,13 @@ namespace spades {
 				return (std::size_t(z) * std::size_t(span.y) + std::size_t(y)) * std::size_t(span.x) +
 				       std::size_t(x);
 			};
+			// A voxel larger than the scene's (coarser) is tried at n points
+			// each way across it, and kept when a quarter of a plane of them
+			// is solid, in their mean colour, as DownsampledVoxelModel keeps a
+			// block: plates and rods a few voxels thick survive. A smaller one
+			// is tried at its middle alone.
+			const int n = f < 1.0F ? int(std::ceil(1.0F / f - 1.0e-4F)) : 1;
+			const int keep = std::max(1, n * n / 4);
 			for (const Placed& p : placed) {
 				const VoxelModel& m = *p.model;
 				const Matrix4 back = p.world.Inversed();
@@ -166,19 +193,40 @@ namespace spades {
 				for (int tz = first(lo.z); tz <= last(hi.z); tz++)
 					for (int ty = first(lo.y); ty <= last(hi.y); ty++)
 						for (int tx = first(lo.x); tx <= last(hi.x); tx++) {
-							const Vector4 middle =
-							  MakeVector4((float(tx) + 0.5F) / f - 0.5F, (float(ty) + 0.5F) / f - 0.5F,
-							              (float(tz) + 0.5F) / f - 0.5F, 1.0F);
-							const Vector3 s = (back * middle).GetXYZ();
-							const int sx = int(std::floor(s.x + 0.5F));
-							const int sy = int(std::floor(s.y + 0.5F));
-							const int sz = int(std::floor(s.z + 0.5F));
-							if (sx < 0 || sy < 0 || sz < 0 || sx >= m.GetWidth() ||
-							    sy >= m.GetHeight() || sz >= m.GetDepth() || !m.IsSolid(sx, sy, sz))
+							int hits = 0, seen = 0;
+							unsigned r = 0, g = 0, b = 0;
+							for (int jz = 0; jz < n; jz++)
+								for (int jy = 0; jy < n; jy++)
+									for (int jx = 0; jx < n; jx++) {
+										auto along = [&](int t, int j) {
+											return (float(t) + (float(j) + 0.5F) / float(n)) / f - 0.5F;
+										};
+										const Vector3 s =
+										  (back * MakeVector4(along(tx, jx), along(ty, jy), along(tz, jz), 1.0F))
+										    .GetXYZ();
+										const int sx = int(std::floor(s.x + 0.5F));
+										const int sy = int(std::floor(s.y + 0.5F));
+										const int sz = int(std::floor(s.z + 0.5F));
+										if (sx < 0 || sy < 0 || sz < 0 || sx >= m.GetWidth() ||
+										    sy >= m.GetHeight() || sz >= m.GetDepth() ||
+										    !m.IsSolid(sx, sy, sz))
+											continue;
+										hits++;
+										const std::uint32_t c = m.GetColor(sx, sy, sz) & 0xFFFFFF;
+										if (c == kInterior)
+											continue;
+										seen++;
+										r += c & 0xFF;
+										g += (c >> 8) & 0xFF;
+										b += (c >> 16) & 0xFF;
+									}
+							if (hits < keep)
 								continue;
 							const std::size_t i = at(tx - tlo.x, ty - tlo.y, tz - tlo.z);
 							solid[i] = true;
-							colors[i] = m.GetColor(sx, sy, sz) & 0xFFFFFF;
+							colors[i] = seen == 0 ? kInterior
+							                      : (r / unsigned(seen)) | ((g / unsigned(seen)) << 8) |
+							                          ((b / unsigned(seen)) << 16);
 						}
 			}
 			// Trimmed to what is solid.
@@ -213,13 +261,21 @@ namespace spades {
 		}
 	} // namespace
 
+	VoxelResolution VoxelResolution::Of(int finer, int coarser) {
+		if (finer < 1 || coarser < 1)
+			return VoxelResolution();
+		const int g = Gcd(finer, coarser);
+		return VoxelResolution{finer / g, coarser / g};
+	}
+
 	const std::vector<VoxelResolution>& VoxelResolution::Steps() {
 		static const std::vector<VoxelResolution> steps = [] {
+			// In halves either way: 1/5, 1/4.5, ..., 1/1.5, 1/1, 1.5/1, ..., 5/1.
 			std::vector<VoxelResolution> list;
-			for (int n = kMaxStep; n >= 2; n--)
-				list.push_back(Coarser(n));
-			for (int n = 1; n <= kMaxStep; n++)
-				list.push_back(Finer(n));
+			for (int half = kMaxStep * 2; half > 2; half--)
+				list.push_back(Of(2, half));
+			for (int half = 2; half <= kMaxStep * 2; half++)
+				list.push_back(Of(half, 2));
 			return list;
 		}();
 		return steps;
@@ -227,23 +283,20 @@ namespace spades {
 
 	bool VoxelResolution::Parse(const std::string& text, VoxelResolution& out) {
 		const std::size_t slash = text.find('/');
-		int a, b;
-		if (slash == std::string::npos) {
-			if (!ParseCount(text, a))
-				return false;
-			out = Finer(a);
-			return true;
-		}
-		if (!ParseCount(text.substr(0, slash), a) || !ParseCount(text.substr(slash + 1), b))
+		int a, b = 10;
+		if (!ParseTenths(text.substr(0, slash), a))
 			return false;
-		if (a != 1 && b != 1)
+		if (slash != std::string::npos && !ParseTenths(text.substr(slash + 1), b))
 			return false;
-		out = VoxelResolution{a, b};
+		out = Of(a, b);
 		return true;
 	}
 
 	std::string VoxelResolution::Label() const {
-		return std::to_string(finer) + "/" + std::to_string(coarser);
+		// One side is 1: the other as a count, a half written as such.
+		if (finer >= coarser)
+			return Tenths(finer * 10 / coarser) + "/1";
+		return "1/" + Tenths(coarser * 10 / finer);
 	}
 
 	IntVector3 VoxelResolution::SizeOf(const IntVector3& size) const {
@@ -257,7 +310,9 @@ namespace spades {
 		why.clear();
 		Handle<VoxelModel> model;
 		if (resolution.finer > 1) {
-			model = Finer(objects, resolution.finer, frame, why);
+			// Finer, or coarser by a step between whole ones (2/3): sampled.
+			model = Sampled(objects, float(resolution.finer) / float(resolution.coarser), frame,
+			                why);
 		} else {
 			// The scene as the game composes it, then as much coarser.
 			IntVector3 low;

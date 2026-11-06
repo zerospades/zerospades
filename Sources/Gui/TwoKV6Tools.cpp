@@ -88,10 +88,11 @@ namespace spades {
 		  "                           its pivot on the scene's origin; --scale 1/N\n"
 		  "                           makes it N times coarser, a lighter model to\n"
 		  "                           show far away (each N^3 block kept when a\n"
-		  "                           quarter of a plane full); --scale N/1 (to 10/1)\n"
-		  "                           N times finer, each part sampled through its\n"
-		  "                           own transform: one the scene scales down keeps\n"
-		  "                           the detail it was modelled at\n"
+		  "                           quarter of a plane full); --scale N/1 N times\n"
+		  "                           finer, each part sampled through its own\n"
+		  "                           transform: one the scene scales down keeps the\n"
+		  "                           detail it was modelled at. N may have a half\n"
+		  "                           (2.5/1, 1/1.5), as Generate KV6 offers\n"
 		  "\n"
 		  "  combine FILE TARGET SOURCE [--over|--under|--carve|--paint|--intersect]\n"
 		  "          [--grow]         combine SOURCE's voxels with TARGET's where they\n"
@@ -945,25 +946,22 @@ namespace spades {
 					Need(o.rest, 1, "flatten FILE OUT.kv6 [--scale 1/N|N/1]");
 					model = Composed(scene);
 					VoxelResolution resolution;
-					if (o.Has("--scale") && o.Values("--scale")[0].find('/') != std::string::npos &&
-					    o.Values("--scale")[0].compare(0, 2, "1/") != 0) {
-						// N/1: finer, each part sampled through its own transform.
+					if (o.Has("--scale") && o.Values("--scale")[0].find('/') != std::string::npos) {
+						// A ratio, as the editor's Generate KV6 makes it.
 						if (!VoxelResolution::Parse(o.Values("--scale")[0], resolution))
-							throw UsageError("--scale takes 1/N or N/1, N from 1 to " +
-							                 std::to_string(VoxelResolution::kMaxStep));
+							throw UsageError("--scale takes 1/N or N/1, N a count with at most "
+							                 "one decimal (1/3, 2.5/1)");
 						Matrix4 frame;
 						std::string why;
 						model = ResampledScene(scene, resolution, frame, why);
 						if (!model)
 							throw std::runtime_error(why);
 					} else if (o.Has("--scale")) {
-						// 1/N, or N itself, the factor the model gets coarser by.
-						std::string factor = o.Values("--scale")[0];
-						if (factor.compare(0, 2, "1/") == 0)
-							factor = factor.substr(2);
+						// N alone, the factor the model gets coarser by, as ever.
+						const std::string factor = o.Values("--scale")[0];
 						const int n = ParseInt(factor, "the scale's N (in 1/N)");
 						if (n < 1)
-							throw UsageError("--scale takes 1/N, N a whole number from 1");
+							throw UsageError("--scale takes N, a whole number from 1, or a ratio (1/3, 2.5/1)");
 						model = DownsampledVoxelModel(*model, n);
 					}
 					if (!gui::KV6ModelIO::Save(*model, o.rest[0]))

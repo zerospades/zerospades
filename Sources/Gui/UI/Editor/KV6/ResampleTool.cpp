@@ -63,8 +63,9 @@ namespace spades {
 			sourceSize = SizeOf(*composed);
 			sourceVoxels = SolidVoxels(*composed);
 
-			// Every step from 1/10 to 10/1, the ends, the fives and 1/1 named;
-			// a finer one too big for a KV6 cannot be chosen.
+			// Every step from 1/5 to 5/1, in halves: the whole ones named, the
+			// halves between ticks; a finer one too big for a KV6 cannot be
+			// chosen.
 			const std::vector<VoxelResolution>& steps = VoxelResolution::Steps();
 			std::vector<StepSlider::Step> slider;
 			int start = 0;
@@ -72,8 +73,7 @@ namespace spades {
 				const VoxelResolution& r = steps[i];
 				StepSlider::Step s;
 				s.label = r.Label();
-				const int n = std::max(r.finer, r.coarser);
-				s.major = n == 1 || n == 5 || n == VoxelResolution::kMaxStep;
+				s.major = r.Whole();
 				s.usable = Fits(r.SizeOf(sourceSize));
 				if (r == VoxelResolution())
 					start = int(i); // 1/1: the node as it is
