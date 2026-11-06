@@ -46,6 +46,8 @@ namespace spades {
 			float scale = 1.0F;
 			float lastWidth = 0.0F, lastHeight = 0.0F;
 			float lastUserScale = 0.0F;
+			float lastPerPoint = 0.0F; // as last logged
+			float windowWidth = 0.0F, windowHeight = 0.0F; // in points; 0 = unknown
 
 			void UpdateScale();
 
@@ -61,7 +63,14 @@ namespace spades {
 			/** The range `ui_scale` is held to (the preferences slider's range). */
 			static const float kMinUserScale, kMaxUserScale;
 
-			/** The scale for a window of `width`x`height` real pixels. */
+			/**
+			 * The window's size in points (SDL window units), which the automatic
+			 * scale is judged by. Until given, the renderer's own size is used.
+			 * Call it between frames (it may change the scale).
+			 */
+			void SetWindowSize(float width, float height);
+
+			/** UI units per point for a window of `width`x`height` points. */
 			static float ComputeScale(float width, float height, float userScale);
 
 			IRenderer& GetBase() { return *base; }
