@@ -178,6 +178,9 @@ public final class GameActivity extends SDLActivity {
             // Quick start preserves the previously tested mobile defaults.
             // Do not override any graphics values when the original screen is
             // shown: its controls must apply to the game and be saved normally.
+            // The desktop software backend cannot render to the SDL Android surface.
+            args.add("--override-cvar");
+            args.add("r_renderer=gl");
             override(args, "r_vsync", preferences.getBoolean("r_vsync", true));
             override(args, "r_hdr", preferences.getBoolean("r_hdr", false));
             override(args, "r_radiosity", preferences.getBoolean("r_radiosity", false));
