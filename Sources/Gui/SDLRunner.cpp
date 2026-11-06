@@ -507,6 +507,18 @@ namespace spades {
 				// Open on the monitor the setup window was last shown on. In fullscreen
 				// mode SDL switches that monitor, not the primary one.
 				int displayIndex = display::GetPreferredDisplay();
+				// The setup window keeps its own size; the game follows its monitor.
+				if (!m_hasSystemMenu && display::IsAutoResolution()) {
+					display::Resolution res;
+					if (display::GetDesktopResolution(displayIndex, res)) {
+						SPLog("Auto resolution: %dx%d on display %d", res.width, res.height,
+						      displayIndex);
+						width = res.width;
+						height = res.height;
+						r_videoWidth = width;
+						r_videoHeight = height;
+					}
+				}
 				SDL_Window* window = SDL_CreateWindow(caption.c_str(),
 					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),
 					SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex),

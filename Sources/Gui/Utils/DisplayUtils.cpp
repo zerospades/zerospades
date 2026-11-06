@@ -30,17 +30,39 @@
 
 DEFINE_SPADES_SETTING(r_videoDisplay, "0");
 DEFINE_SPADES_SETTING(r_videoDisplayName, "");
-// Set once the setup screen has filled in the detected resolution on first run.
-DEFINE_SPADES_SETTING(r_videoResolutionDetected, "0");
+// Use the desktop resolution of the monitor the game opens on.
+DEFINE_SPADES_SETTING(r_videoAutoResolution, "1");
+// Set once r_videoAutoResolution has been defaulted for this config.
+DEFINE_SPADES_SETTING(r_videoAutoResolutionMigrated, "0");
+SPADES_SETTING(r_videoWidth);
+SPADES_SETTING(r_videoHeight);
 
 namespace spades {
 	namespace gui {
 		namespace display {
+			namespace {
+				/**
+				 * The monitor's own name, or "" if it has none. When a backend can't
+				 * name a monitor SDL substitutes its index ("0", "1", ...), which
+				 * neither identifies it across replugs nor means anything to a person.
+				 */
+				std::string RealDisplayName(int index) {
+					const char* name = SDL_GetDisplayName(index);
+					if (!name || !*name)
+						return std::string();
+					std::string str = name;
+					if (std::all_of(str.begin(), str.end(),
+					                [](char c) { return c >= '0' && c <= '9'; }))
+						return std::string();
+					return str;
+				}
+			} // namespace
+
 			int GetNumDisplays() { return std::max(SDL_GetNumVideoDisplays(), 0); }
 
 			std::string GetDisplayName(int index) {
-				const char* name = SDL_GetDisplayName(index);
-				if (name && *name)
+				std::string name = RealDisplayName(index);
+				if (!name.empty())
 					return name;
 				return "Display " + std::to_string(index + 1);
 			}
@@ -54,8 +76,7 @@ namespace spades {
 				std::string name = r_videoDisplayName;
 				if (!name.empty()) {
 					for (int i = 0; i < count; i++) {
-						const char* n = SDL_GetDisplayName(i);
-						if (n && name == n)
+						if (RealDisplayName(i) == name)
 							return i;
 					}
 				}
@@ -68,8 +89,7 @@ namespace spades {
 				if (index < 0 || index >= GetNumDisplays())
 					return;
 				r_videoDisplay = index;
-				const char* name = SDL_GetDisplayName(index);
-				r_videoDisplayName = std::string(name ? name : "");
+				r_videoDisplayName = RealDisplayName(index);
 			}
 
 			int GetWindowDisplay(SDL_Window* window) {
@@ -83,6 +103,23 @@ namespace spades {
 					SPLog("Couldn't tell which display the window is on: %s", SDL_GetError());
 				}
 				return GetPreferredDisplay();
+			}
+
+			bool IsAutoResolution() {
+				// Configs from before auto-detection: keep a resolution someone chose.
+				// Only the stock 800x600 is taken as "never chosen".
+				if (!r_videoAutoResolutionMigrated) {
+					r_videoAutoResolutionMigrated = 1;
+					if (static_cast<int>(r_videoWidth) != 800 ||
+					    static_cast<int>(r_videoHeight) != 600)
+						r_videoAutoResolution = 0;
+				}
+				return r_videoAutoResolution;
+			}
+
+			void SetAutoResolution(bool on) {
+				r_videoAutoResolutionMigrated = 1;
+				r_videoAutoResolution = on ? 1 : 0;
 			}
 
 			bool GetDesktopResolution(int index, Resolution& out) {

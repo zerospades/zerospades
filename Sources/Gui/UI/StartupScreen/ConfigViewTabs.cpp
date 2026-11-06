@@ -27,6 +27,7 @@
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
 #include <Core/Strings.h>
+#include <Gui/Utils/DisplayUtils.h>
 #include <Gui/StartupScreenHelper.h>
 #include <Gui/UI/Framework/UIManager.h>
 
@@ -71,9 +72,10 @@ namespace spades {
 				WatchHelpDeep(e.GetPointerOrNull(),
 				          [this](const std::string& s) { HandleHelpText(s); },
 				          _Tr("StartupScreen",
-				              "The size of the game window. \"Auto-detect\" in the "
-				              "drop-down picks the resolution of the monitor this window "
-				              "is on; the game opens on that monitor too."));
+				              "The size of the game window. \"Auto-detect\" (the default) "
+				              "uses the resolution of the monitor this window is on, and the "
+				              "game opens on that monitor. Typing a size or picking one from "
+				              "the drop-down turns it off."));
 				resEdit = e.GetPointerOrNull();
 			}
 
@@ -468,7 +470,6 @@ namespace spades {
 		    : UIElement(&ui->GetUIManager()),
 		      r_videoWidth("r_videoWidth", nullptr),
 		      r_videoHeight("r_videoHeight", nullptr),
-		      r_videoResolutionDetected("r_videoResolutionDetected", nullptr),
 		      helper(&ui->GetHelper()) {
 			UIManager* manager = &GetManager();
 			{
@@ -500,23 +501,31 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::LoadConfig() {
-			// First run: replace the stock 800x600 with the resolution of the monitor
-			// the setup window opened on. Done once, so a chosen 800x600 is kept.
-			if (!static_cast<bool>(r_videoResolutionDetected)) {
-				r_videoResolutionDetected = 1;
-				if (static_cast<int>(r_videoWidth) == 800 &&
-				    static_cast<int>(r_videoHeight) == 600) {
-					int w, h;
-					if (helper->GetDetectedResolution(w, h) && w >= 640 && h >= 480 &&
-					    w <= 8192 && h <= 8192) {
-						r_videoWidth = w;
-						r_videoHeight = h;
-					}
-				}
+			if (display::IsAutoResolution()) {
+				ApplyDetectedResolution();
+				return;
 			}
+			ShowResolution(r_videoWidth, r_videoHeight);
+		}
 
-			widthField->SetText(std::to_string(static_cast<int>(r_videoWidth)));
-			heightField->SetText(std::to_string(static_cast<int>(r_videoHeight)));
+		void StartupScreenGraphicsDisplayResolutionEditor::ShowResolution(int w, int h) {
+			// SetText raises `changed`, which would read as the user typing a value
+			// and switch auto-detection off.
+			updatingFields = true;
+			widthField->SetText(std::to_string(w));
+			heightField->SetText(std::to_string(h));
+			updatingFields = false;
+		}
+
+		void StartupScreenGraphicsDisplayResolutionEditor::ApplyDetectedResolution() {
+			shownDisplay = helper->GetCurrentDisplay();
+			int w, h;
+			if (helper->GetDetectedResolution(w, h)) {
+				ShowResolution(w, h);
+				SaveConfig();
+			} else {
+				ShowResolution(r_videoWidth, r_videoHeight);
+			}
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::SaveConfig() {
@@ -529,12 +538,10 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ValueEditHandler(UIElement&) {
-			SaveConfig();
-		}
-
-		void StartupScreenGraphicsDisplayResolutionEditor::SetResolution(int w, int h) {
-			widthField->SetText(std::to_string(w));
-			heightField->SetText(std::to_string(h));
+			if (updatingFields)
+				return;
+			// A typed resolution is a manual choice.
+			display::SetAutoResolution(false);
 			SaveConfig();
 		}
 
@@ -542,15 +549,16 @@ namespace spades {
 			if (index < 0)
 				return;
 			if (index == 0) { // "Auto-detect"
-				int w, h;
-				if (helper->GetDetectedResolution(w, h))
-					SetResolution(w, h);
+				display::SetAutoResolution(true);
+				ApplyDetectedResolution();
 				return;
 			}
 			index -= 1;
-			if (index < helper->GetNumVideoModes())
-				SetResolution(helper->GetVideoModeWidth(index),
-				              helper->GetVideoModeHeight(index));
+			if (index < helper->GetNumVideoModes()) {
+				display::SetAutoResolution(false);
+				ShowResolution(helper->GetVideoModeWidth(index), helper->GetVideoModeHeight(index));
+				SaveConfig();
+			}
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ShowDropdown(UIElement&) {
@@ -560,8 +568,12 @@ namespace spades {
 
 			int detectedW = 0, detectedH = 0;
 			bool detected = helper->GetDetectedResolution(detectedW, detectedH);
+			bool autoMode = display::IsAutoResolution();
+			int curW = std::atoi(widthField->GetText().c_str());
+			int curH = std::atoi(heightField->GetText().c_str());
 
 			std::vector<std::string> items;
+			int selected = autoMode ? 0 : -1;
 			{
 				std::string item = _Tr("StartupScreen", "Auto-detect");
 				if (detected)
@@ -580,13 +592,32 @@ namespace spades {
 				std::string item = std::to_string(w) + "x" + std::to_string(h);
 				if (detected && w == detectedW && h == detectedH)
 					item += " " + _Tr("StartupScreen", "(native)");
+				if (!autoMode && selected < 0 && w == curW && h == curH)
+					selected = static_cast<int>(items.size());
 				items.push_back(std::move(item));
 			}
-			ui::ShowDropDownList(*this, std::move(items),
-			                     [this](int index) { DropdownHandler(index); });
+
+			// The editor is only 124px wide; size the list to its longest entry (a
+			// monitor name can be long) and keep it on screen.
+			AABB2 bnd = GetScreenBounds();
+			float width = bnd.GetWidth();
+			if (client::IFont* font = GetFont()) {
+				for (const auto& item : items)
+					width = std::max(width, font->Measure(item).x + 32.0F); // padding + scrollbar
+			}
+			float screenW = GetManager().GetRootElement().size.x;
+			width = std::min(width, screenW - 16.0F);
+			float x = std::min(bnd.min.x, screenW - 8.0F - width);
+
+			ui::ShowDropDownList(&GetManager(), x, bnd.max.y, width, std::move(items),
+			                     [this](int index) { DropdownHandler(index); }, selected);
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::Render() {
+			// Follow the setup window when it is dragged onto another monitor.
+			if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
+				ApplyDetectedResolution();
+
 			client::IFont* font = GetFont();
 			if (font)
 				font->Draw("x", MakeVector2(45.0F, 0.0F) + GetScreenPosition(), 1.0F,

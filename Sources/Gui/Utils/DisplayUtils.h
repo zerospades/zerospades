@@ -59,6 +59,13 @@ namespace spades {
 			/** Remembers `index` as the monitor the game window opens on. */
 			void SetPreferredDisplay(int index);
 
+			/**
+			 * Whether the game uses the desktop resolution of its monitor
+			 * (`r_videoAutoResolution`, on by default) instead of r_videoWidth/Height.
+			 */
+			bool IsAutoResolution();
+			void SetAutoResolution(bool on);
+
 			/** The monitor's current desktop resolution; false if SDL can't tell. */
 			bool GetDesktopResolution(int index, Resolution& out);
 
