@@ -931,8 +931,11 @@ namespace spades {
 			const float width = hi - lo;
 			const float gap = std::max(2.0F, width * 0.1F);
 			VoxelObject o;
-			o.name = (path.empty() ? std::string("Scene") : node->name) + "_" +
-			         std::to_string(resolution.finer) + "to" + std::to_string(resolution.coarser);
+			// "Gun_2.5to1": the resolution as shown, "to" for its '/', which no
+			// name may hold.
+			std::string label = resolution.Label();
+			label.replace(label.find('/'), 1, "to");
+			o.name = (path.empty() ? std::string("Scene") : node->name) + "_" + label;
 			if (!DecomposeTransform(Matrix4::Translate(width + gap, 0.0F, 0.0F) * placed, o.position,
 			                        o.rotation, o.scale)) {
 				why = (path.empty() ? std::string("the scene") : Quoted(*node)) +
