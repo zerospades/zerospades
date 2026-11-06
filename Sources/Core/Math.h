@@ -936,6 +936,13 @@ namespace spades {
 
 #pragma mark - Utilities
 
+	// easing functions, they expect a normalized time in [0, 1] (no clamping is done)
+	float EaseInQuad(float t);
+	float EaseOutQuad(float t);
+	float EaseInCubic(float t);
+	float EaseOutCubic(float t);
+
+	float Ramp(float x, float a, float b);
 	float SmoothStep(float);
 	float Mix(float a, float b, float frac);
 	Vector2 Mix(const Vector2& a, const Vector2& b, float frac);

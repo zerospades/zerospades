@@ -969,6 +969,30 @@ namespace spades {
 													asFUNCTION(SmoothStep), asCALL_CDECL);
 					manager->CheckError(r);
 
+					r = eng->RegisterGlobalFunction("float Ramp(float,float,float)",
+													asFUNCTIONPR(Ramp, (float, float, float), float),
+													asCALL_CDECL);
+					manager->CheckError(r);
+
+					{
+						// easing functions
+						struct EasingEntry {
+							const char* declaration;
+							float (*function)(float);
+						};
+						static const EasingEntry easingFunctions[] = {
+						  {"float EaseInQuad(float)", EaseInQuad},
+						  {"float EaseOutQuad(float)", EaseOutQuad},
+						  {"float EaseInCubic(float)", EaseInCubic},
+						  {"float EaseOutCubic(float)", EaseOutCubic},
+						};
+						for (const EasingEntry& entry : easingFunctions) {
+							r = eng->RegisterGlobalFunction(
+							  entry.declaration, asFUNCTION(entry.function), asCALL_CDECL);
+							manager->CheckError(r);
+						}
+					}
+
 					r = eng->RegisterGlobalFunction(
 					  "string ToString(int)", asFUNCTIONPR(UtilFuncs::ToString, (int), std::string),
 					  asCALL_CDECL);

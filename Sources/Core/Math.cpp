@@ -806,9 +806,14 @@ namespace spades {
 			*outNumBytes = 1;
 		return (uint32_t)str[start];
 	}
-
+	
+	float EaseInQuad(float t) { return t * t; }
+	float EaseOutQuad(float t) { return 1.0F - (1.0F - t) * (1.0F - t); }
+	float EaseInCubic(float t) { return t * t * t; }
+	float EaseOutCubic(float t) { return 1.0F - powf(1.0F - t, 3.0F); }
+	
+	float Ramp(float x, float a, float b) { return (x - a) / (b - a); }
 	float SmoothStep(float x) { return x * x * (3 - 2 * x); }
-
 	float Mix(float a, float b, float frac) { return a + (b - a) * frac; }
 	Vector2 Mix(const Vector2& a, const Vector2& b, float frac) { return a + (b - a) * frac; }
 	Vector3 Mix(const Vector3& a, const Vector3& b, float frac) { return a + (b - a) * frac; }
