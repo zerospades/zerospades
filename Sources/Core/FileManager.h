@@ -34,6 +34,13 @@ namespace spades {
 		static std::unique_ptr<IStream> OpenForReading(const char*);
 		static std::unique_ptr<IStream> OpenForWriting(const char*);
 		static bool FileExists(const char*);
+		/**
+		 * Where OpenForReading would take the file from: the place of the first
+		 * file system holding it, a weak file (".weak") ranked after every file
+		 * that is not. Lower wins, as a mod's pack over the game's own; -1 when
+		 * none holds it.
+		 */
+		static int Rank(const char*);
 		static bool RemoveFile(const char*);
 		static bool RenameFile(const char* oldName, const char* newName);
 		static void AddFileSystem(IFileSystem*);
