@@ -44,6 +44,9 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" AND NOT APPLE)
 endif()
 
 add_library(Angelscript_addons STATIC ${ANGELSCRIPT_SOURCE} ${ANGELSCRIPT_HEADERS})
+if(ANDROID)
+        set_target_properties(Angelscript_addons PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
 find_package(Threads)

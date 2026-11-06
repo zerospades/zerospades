@@ -802,7 +802,11 @@ namespace spades {
 			if (modsApplyButton != nullptr) {
 				// Toggles already persist; Apply only restarts to make pending
 				// changes live, so it's actionable only when something changed.
+#ifdef __ANDROID__
+				modsApplyButton->enable = false; // restart the Activity manually
+#else
 				modsApplyButton->enable = modsDirty && !modsDownloading;
+#endif
 			}
 			if (modsDownloading) {
 				// A negative fraction means the step has no measurable progress yet.
@@ -818,8 +822,12 @@ namespace spades {
 				return;
 			}
 			if (modsDirty) {
+#ifdef __ANDROID__
+				modsStatusLabel->text = _Tr("MainScreen", "Close and reopen the app to apply mod changes.");
+#else
 				modsStatusLabel->text =
 				    _Tr("MainScreen", "Press 'Apply changes' to restart and apply your mods.");
+#endif
 				return;
 			}
 			std::string installed = modsHelper->GetInstalledOfficialVersion();

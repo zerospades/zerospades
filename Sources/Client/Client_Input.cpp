@@ -731,6 +731,24 @@ namespace spades {
 
 				bool localPlayerIsAlive = p.IsAlive();
 				bool localPlayerIsSpectator = p.IsSpectator();
+#ifdef __ANDROID__
+				// Touch tool panel cycles selectable tools independently of mouse wheel settings.
+				if (name == "AndroidNextTool") {
+					if (down && localPlayerIsAlive && !localPlayerIsSpectator && !staffSpectating) {
+						Player::ToolType tool = p.GetTool();
+						do {
+							switch (tool) {
+								case Player::ToolSpade: tool = Player::ToolBlock; break;
+								case Player::ToolBlock: tool = Player::ToolWeapon; break;
+								case Player::ToolWeapon: tool = Player::ToolGrenade; break;
+								case Player::ToolGrenade: tool = Player::ToolSpade; break;
+							}
+						} while (!p.IsToolSelectable(tool));
+						SetSelectedTool(tool);
+					}
+					return;
+				}
+#endif
 				bool localPlayerIsSpectating = localPlayerIsSpectator || staffSpectating;
 				bool isStaff = activeNet->GetGameProperties()->isStaff;
 

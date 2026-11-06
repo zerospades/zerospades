@@ -989,8 +989,7 @@ namespace spades {
 			Close();
 		}
 
-		bool ClientChatWindow::CheckAndSetConfigVariable() {
-			std::string text = field->GetText();
+		bool ClientChatWindow::CheckAndSetConfigVariable(const std::string& text) {
 			if (text.substr(0, 1) != "/")
 				return false;
 			size_t idxPos = text.find(' ');
@@ -1018,7 +1017,7 @@ namespace spades {
 
 		void ClientChatWindow::OnSay(UIElement&) {
 			field->CommandSent();
-			if (!CheckAndSetConfigVariable()) {
+			if (!CheckAndSetConfigVariable(field->GetText())) {
 				if (isTeamChat)
 					helper->SayTeam(field->GetText());
 				else

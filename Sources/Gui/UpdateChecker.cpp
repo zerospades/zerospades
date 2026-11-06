@@ -24,6 +24,9 @@
 #include <memory>
 
 #include <curl/curl.h>
+#ifdef __ANDROID__
+#include "../../android/native/AndroidCurlTrust.h"
+#endif
 #include <json/json.h>
 
 #include <Core/Debug.h>
@@ -141,6 +144,13 @@ namespace spades {
 					SPLog("[!] Update check: failed to create a cURL handle.");
 					return r;
 				}
+#ifdef __ANDROID__
+				CURLcode trust = android::ConfigureCurlTrust(handle.get());
+				if (trust != CURLE_OK) {
+					SPLog("[!] Update check: cannot configure Android trust: %s", curl_easy_strerror(trust));
+					return r;
+				}
+#endif
 
 				// GitHub rejects API requests that carry no User-Agent.
 				std::unique_ptr<curl_slist, CURLSlistDeleter> headers{

@@ -26,6 +26,10 @@
 #include <fstream>
 
 #include "Client.h"
+#ifdef __ANDROID__
+#include <Gui/UI/InGame/ChatWindow.h>
+#include "../../android/native/TouchInputBridge.h"
+#endif
 #include "Fonts.h"
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
@@ -1318,6 +1322,34 @@ namespace spades {
 
 #pragma mark - Chat Messages
 
+#ifdef __ANDROID__
+		bool Client::AndroidHasLivePlayer() {
+			return world && !IsDemoMode() && !staffSpectating && world->GetLocalPlayer() &&
+			       world->GetLocalPlayer()->IsAlive() && !world->GetLocalPlayer()->IsSpectator();
+		}
+		bool Client::AndroidToolReady() {
+			return AndroidHasLivePlayer() && CanLocalPlayerUseTool() &&
+			       world->GetLocalPlayer()->IsReadyToUseTool();
+		}
+		bool Client::AndroidSelectTool(Player::ToolType tool) {
+			if (!AndroidHasLivePlayer() || !world->GetLocalPlayer()->IsToolSelectable(tool)) return false;
+			SetSelectedTool(tool);
+			return true;
+		}
+		void Client::AndroidSelectPalettePoint(float x, float y) {
+			if (paletteView) paletteView->SelectAndroidPalettePoint(x, y);
+		}
+		bool Client::SendAndroidChat(const std::string& text, bool global) {
+			if (!activeNet || IsDemoMode() || activeNet->GetStatus() != NetClientStatusConnected ||
+			    !world || !world->GetLocalPlayer() || text.empty() || text.size() > 800 ||
+			    text.find('\0') != std::string::npos)
+				return false;
+			if (!ClientChatWindow::CheckAndSetConfigVariable(text))
+				activeNet->SendChat(text, global);
+			return true;
+		}
+#endif
+
 		void Client::PlayerSentChatMessage(Player& p, bool global, const std::string& msg) {
 			std::string msgType = global
 				? _Tr("Client", "Global") : _Tr("Client", "Team");
@@ -1362,6 +1394,10 @@ namespace spades {
 			if (cg_ignoreChatMessages && !p.IsLocalPlayer())
 				return;
 
+#ifdef __ANDROID__
+			android::RecordTouchChat((global ? "[Global] " : "[Team] ") + playerNameStr +
+			                         (state.empty() ? "" : " " + state) + ": " + msg);
+#endif
 			chatWindow->AddMessage(s);
 
 			if (!IsMuted()) {
@@ -1556,6 +1592,9 @@ namespace spades {
 
 			// Display system messages in yellow
 			if (system) {
+#ifdef __ANDROID__
+				android::RecordTouchChat(msg);
+#endif
 				chatWindow->AddMessage(ChatWindow::ColoredMessage(msg, MsgColorSysInfo));
 				return;
 			}
@@ -1564,6 +1603,9 @@ namespace spades {
 			if (msg.substr(0, 8) == "PM from ") {
 				if (cg_ignorePrivateMessages)
 					return;
+#ifdef __ANDROID__
+				android::RecordTouchChat("[PM] " + msg.substr(8));
+#endif
 
 				// play chat sound
 				if (!IsMuted()) {
@@ -1579,6 +1621,9 @@ namespace spades {
 				return;
 			}
 
+#ifdef __ANDROID__
+			android::RecordTouchChat(msg);
+#endif
 			chatWindow->AddMessage(msg);
 		}
 

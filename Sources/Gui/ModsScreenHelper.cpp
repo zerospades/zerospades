@@ -38,6 +38,9 @@
 #endif
 
 #include <curl/curl.h>
+#ifdef __ANDROID__
+#include "../../android/native/AndroidCurlTrust.h"
+#endif
 #include <json/json.h>
 
 #include <unzip/unzip.h>
@@ -344,6 +347,14 @@ namespace spades {
 						std::remove(destAbs.c_str());
 						return "curl_easy_init failed";
 					}
+#ifdef __ANDROID__
+					CURLcode trust = android::ConfigureCurlTrust(h.get());
+					if (trust != CURLE_OK) {
+						std::fclose(f);
+						std::remove(destAbs.c_str());
+						return curl_easy_strerror(trust);
+					}
+#endif
 					curl_easy_setopt(h.get(), CURLOPT_URL, url.c_str());
 					curl_easy_setopt(h.get(), CURLOPT_USERAGENT, PACKAGE_STRING);
 					curl_easy_setopt(h.get(), CURLOPT_FOLLOWLOCATION, 1L);

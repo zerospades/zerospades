@@ -24,6 +24,10 @@
 
 #include "SDLRunner.h"
 
+#ifdef __ANDROID__
+#include "../../android/native/TouchInputBridge.h"
+#endif
+
 #include <Gui/Utils/Icon.h>
 #include "SDLGLDevice.h"
 #include <Audio/ALDevice.h>
@@ -169,11 +173,13 @@ namespace spades {
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
 				case SDL_WINDOWEVENT:
-					if (event.window.type == SDL_WINDOWEVENT_FOCUS_GAINED) {
-						SDL_SetRelativeMouseMode(SDL_TRUE);
+					if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+						// Restore the mode the current view needs. A menu may still own
+						// the cursor when the app regains focus.
+						SDL_SetRelativeMouseMode(view.NeedsAbsoluteMouseCoordinate() ? SDL_FALSE : SDL_TRUE);
 						SDL_ShowCursor(SDL_DISABLE);
 						m_active = true;
-					} else if (event.window.type == SDL_WINDOWEVENT_FOCUS_LOST) {
+					} else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 						SDL_SetRelativeMouseMode(SDL_FALSE);
 						SDL_ShowCursor(SDL_ENABLE);
 						m_active = false;
@@ -187,6 +193,14 @@ namespace spades {
 									  spades::client::IAudioDevice* audio) {
 			{
 				Handle<View> view(CreateView(renderer, audio), false);
+#ifdef __ANDROID__
+				// Stop and release inputs before this view is destroyed, even on exceptions.
+				struct TouchInputScope {
+					View& view;
+					explicit TouchInputScope(View& v) : view(v) { android::StartTouchInput(); }
+					~TouchInputScope() { android::StopTouchInput(view); }
+				} touchInputScope(*view);
+#endif
 				Uint32 ot = SDL_GetTicks();
 
 				bool running = true;
@@ -221,6 +235,9 @@ namespace spades {
 					ot += dt;
 					if ((int32_t)dt > 0) {
 						view->RunFrame((float)dt / 1000.0F);
+#ifdef __ANDROID__
+						android::AdvanceTouchInputAfterFrame();
+#endif
 
 						// Views draw; the runner is the only thing that presents. Present
 						// before `RunFrameLate`, which is where post-frame work happens
@@ -329,6 +346,10 @@ namespace spades {
 					// Process events
 					while (SDL_PollEvent(&event))
 						ProcessEvent(event, *view);
+#ifdef __ANDROID__
+					android::DrainTouchInput(*view);
+					android::PublishTouchHud(*view);
+#endif
 				}
 
 				SPLog("Leaving Client Loop");
@@ -452,7 +473,8 @@ namespace spades {
 		void SDLRunner::Run(int width, int height) {
 			SPADES_MARK_FUNCTION();
 
-			SDL_Init(SDL_INIT_VIDEO);
+			if (SDL_Init(SDL_INIT_VIDEO) != 0)
+				SPRaise("Failed to initialize SDL video: %s", SDL_GetError());
 
 			try {
 				std::string caption;
@@ -474,6 +496,11 @@ namespace spades {
 				switch (rtype) {
 					case RendererType::GL:
 						sdlFlags = SDL_WINDOW_OPENGL;
+#ifdef __ANDROID__
+						SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+						SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+						SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
@@ -532,8 +559,15 @@ namespace spades {
 
 					if (rtype == RendererType::GL) {
 						int vsync = r_vsync;
-						if (SDL_GL_SetSwapInterval(vsync) != 0)
+						if (SDL_GL_SetSwapInterval(vsync) != 0) {
+#ifdef __ANDROID__
+							// Some Android EGL drivers do not allow the requested interval.
+							// Keep their default instead of preventing the game from starting.
+							SPLog("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
+#else
 							SPRaise("SDL_GL_SetSwapInterval failed: %s", SDL_GetError());
+#endif
+						}
 					}
 
 					RunClientLoop(window, renderer.GetPointerOrNull(), audio.GetPointerOrNull());

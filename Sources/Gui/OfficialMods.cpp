@@ -31,6 +31,9 @@
 #endif
 
 #include <curl/curl.h>
+#ifdef __ANDROID__
+#include "../../android/native/AndroidCurlTrust.h"
+#endif
 #include <json/json.h>
 #include <unzip/unzip.h> // its zlib, for crc32
 
@@ -139,6 +142,10 @@ namespace spades {
 			std::unique_ptr<CURL, CURLEasyDeleter> handle{curl_easy_init()};
 			if (!handle)
 				return "curl_easy_init failed";
+#ifdef __ANDROID__
+			CURLcode trust = android::ConfigureCurlTrust(handle.get());
+			if (trust != CURLE_OK) return curl_easy_strerror(trust);
+#endif
 
 			// GitHub rejects API requests that carry no User-Agent.
 			std::unique_ptr<curl_slist, CURLSlistDeleter> headers{

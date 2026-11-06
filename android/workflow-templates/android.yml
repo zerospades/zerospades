@@ -1,0 +1,95 @@
+name: Android launcher preview
+
+on:
+  push:
+    branches: ['**']
+    tags: ['android-preview-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install offline GLSL validator
+        run: sudo apt-get update && sudo apt-get install -y glslang-tools
+      - name: Test game resource packaging and GLES shader assembly
+        env:
+          GLES_SHADER_VALIDATOR_REQUIRED: '1'
+        run: python3 -m unittest discover -s android/tests -v
+      - name: Test native touch input and HUD message buffer
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/TouchInputRouter.cpp android/native/tests/TouchInputRouterTest.cpp -o /tmp/touch-input-tests
+          /tmp/touch-input-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/HudMessageBufferTest.cpp -o /tmp/hud-message-tests
+          /tmp/hud-message-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/QuickGrenadeTest.cpp -o /tmp/quick-grenade-tests
+          /tmp/quick-grenade-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/GLESPixelConversionTest.cpp -o /tmp/gles-pixel-tests
+          /tmp/gles-pixel-tests
+          g++ -std=c++17 -Wall -Wextra -Werror -Wno-unknown-pragmas -ISources android/native/tests/GLESAllocationFormatTest.cpp -o /tmp/gles-allocation-tests
+          /tmp/gles-allocation-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/FramePulseTest.cpp -o /tmp/frame-pulse-tests
+          /tmp/frame-pulse-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/FrameHeldButtonTest.cpp -o /tmp/frame-button-tests
+          /tmp/frame-button-tests
+          g++ -std=c++17 -Wall -Wextra -Werror android/native/tests/TouchPaletteTest.cpp -o /tmp/touch-palette-tests
+          /tmp/touch-palette-tests
+      - name: Test AngelScript ABI selection and native calls on the host
+        run: |
+          cmake -P android/native/tests/angelscript/TestAbiSelection.cmake
+          cmake -S android/native/tests/angelscript -B /tmp/angelscript-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/angelscript-host --parallel 2
+          ctest --test-dir /tmp/angelscript-host --output-on-failure
+      - name: Install NDK for native ABI link checks
+        run: sdkmanager --install 'ndk;28.2.13676358'
+      - name: Cross-compile AngelScript native-call checks
+        run: |
+          for abi in arm64-v8a x86_64; do
+            cmake -S android/native/tests/angelscript -B "/tmp/angelscript-$abi" \
+              -DCMAKE_TOOLCHAIN_FILE="$ANDROID_SDK_ROOT/ndk/28.2.13676358/build/cmake/android.toolchain.cmake" \
+              -DANDROID_ABI="$abi" -DANDROID_PLATFORM=android-24 -DCMAKE_BUILD_TYPE=Release
+            cmake --build "/tmp/angelscript-$abi" --parallel 2
+          done
+      - name: Build installable launcher preview
+        working-directory: android
+        run: gradle --no-daemon testDebugUnitTest assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zerospades-android-launcher-preview
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  publish-preview:
+    if: startsWith(github.ref, 'refs/tags/android-preview-')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: zerospades-android-launcher-preview
+          path: preview
+      - name: Publish preview prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          mv preview/app-debug.apk preview/zerospades-android-launcher-preview.apk
+          gh release create "$TAG" preview/zerospades-android-launcher-preview.apk \
+            --title "Android launcher preview ($TAG)" --prerelease \
+            --notes "Launcher and HUD preview only. The native game is not included and touch controls are not connected. This APK is signed with the Android debug key and is not a production release."

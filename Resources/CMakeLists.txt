@@ -99,34 +99,3 @@ if(ZEROSPADES_RESOURCES)
 					${CMAKE_BINARY_DIR}/bin/$<CONFIGURATION>/Resources)
 	endif (WIN32 AND MSVC)
 endif()
-
-if(UNIX AND NOT APPLE)
-	add_custom_target(ZeroSpades_Unix ALL COMMENT "Process unix stuff")
-
-	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Icons)
-	add_custom_command(
-		TARGET ZeroSpades_Unix
-		POST_BUILD
-		COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Icons/converticons.sh ${CMAKE_CURRENT_SOURCE_DIR}/Icons
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Icons)
-
-	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Unix)
-	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Unix/Debian)
-	file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Unix/Man)
-
-	configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Unix/Debian/copyright.in" "${CMAKE_CURRENT_BINARY_DIR}/Unix/Debian/copyright")
-	configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Unix/Man/zerospades.6.in" "${CMAKE_CURRENT_BINARY_DIR}/Unix/Man/zerospades.6")
-
-	add_custom_command(
-		TARGET ZeroSpades_Unix
-		POST_BUILD
-		COMMAND sh -c \"gzip -9 -c ${CMAKE_CURRENT_SOURCE_DIR}/Unix/Debian/changelog > changelog.gz\"
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Unix/Debian
-	)
-	add_custom_command(
-		TARGET ZeroSpades_Unix
-		POST_BUILD
-		COMMAND sh -c \"gzip -9 -c ${CMAKE_CURRENT_BINARY_DIR}/Unix/Man/zerospades.6 > zerospades.6.gz\"
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Unix/Man
-	)
-endif(UNIX AND NOT APPLE)

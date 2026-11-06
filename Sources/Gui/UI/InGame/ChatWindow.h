@@ -174,7 +174,6 @@ namespace spades {
 			void OnSetTeam(gui::ui::UIElement& sender);
 			void OnFieldChanged(gui::ui::UIElement& sender);
 			void OnCancel(gui::ui::UIElement& sender);
-			bool CheckAndSetConfigVariable();
 			void OnSay(gui::ui::UIElement& sender);
 			void OnConfigListChanged(const std::vector<CommandFieldEntry>& entries,
 			                         size_t prefixLength, bool active);
@@ -194,6 +193,8 @@ namespace spades {
 			ClientChatWindow(ClientUI* ui, bool isTeamChat,
 			                 ChatWindowMode mode = ChatWindowMode::Centered);
 
+			/** Apply a local /setting value command; return false for server commands. */
+			static bool CheckAndSetConfigVariable(const std::string& text);
 			void UpdateState();
 
 			/** Appends a line to the history of the docked and peek views. */

@@ -41,7 +41,9 @@ namespace spades {
 	    : metrePerBlock(0.63F), mumbleLinkedMemory(nullptr), priv(new MumbleLinkPrivate()) {}
 
 	MumbleLink::~MumbleLink() {
-#ifdef WIN32
+#if defined(__ANDROID__)
+		// POSIX shm_open-based Mumble Link is not available on Android.
+#elif defined(WIN32)
 		UnmapViewOfFile(mumbleLinkedMemory);
 		if (priv->obj != nullptr)
 			CloseHandle(priv->obj);
@@ -60,7 +62,10 @@ namespace spades {
 
 	bool MumbleLink::Init() {
 		assert(mumbleLinkedMemory == nullptr);
-#ifdef WIN32
+#if defined(__ANDROID__)
+		// Android has no shm_open and cannot use the desktop Mumble Link protocol.
+		return false;
+#elif defined(WIN32)
 		priv->obj = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, L"MumbleLink");
 		if (priv->obj == nullptr)
 			return false;

@@ -32,6 +32,9 @@ namespace spades {
 			SDL_Window* window;
 			SDL_GLContext context;
 			int w, h;
+#ifdef __ANDROID__
+			float androidMaxAnisotropy = 1.0F;
+#endif
 
 		protected:
 			~SDLGLDevice();

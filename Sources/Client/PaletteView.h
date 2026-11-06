@@ -58,6 +58,9 @@ namespace spades {
 
 			void Update(float dt);
 			void Draw();
+#ifdef __ANDROID__
+			void SelectAndroidPalettePoint(float x, float y);
+#endif
 		};
 	} // namespace client
 } // namespace spades

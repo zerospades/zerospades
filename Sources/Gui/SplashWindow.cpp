@@ -49,6 +49,7 @@ namespace spades
 		if (surface == nullptr) {
 			SPLog("Creation of splash window surface failed.");
 			SDL_DestroyWindow(window);
+			window = nullptr;
 			return;
 		}
 

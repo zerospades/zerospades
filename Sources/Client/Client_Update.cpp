@@ -20,6 +20,9 @@
  */
 
 #include "Client.h"
+#ifdef __ANDROID__
+#include "../../android/native/TouchInputBridge.h"
+#endif
 
 #include <Core/ConcurrentDispatch.h>
 #include <Core/Settings.h>
@@ -1383,6 +1386,10 @@ namespace spades {
 			if (isLocalInvolved)
 				killFadeTime += 5.0F;
 
+#ifdef __ANDROID__
+			android::RecordTouchKill(killer.GetName() + " [" + cause + "]" +
+			                         (killerId != victimId ? " " + victim.GetName() : ""));
+#endif
 			killfeedWindow->AddMessage(s, killFadeTime);
 
 			// log to netlog

@@ -29,6 +29,9 @@
 
 #include <curl/curl.h>
 #include <json/json.h>
+#ifdef __ANDROID__
+#include "../../android/native/AndroidCurlTrust.h"
+#endif
 
 #include "Main.h"
 #include "MainScreen.h"
@@ -155,6 +158,10 @@ namespace spades {
 				std::unique_ptr<CURL, CURLEasyDeleter> cHandle{curl_easy_init()};
 				if (!cHandle)
 					SPRaise("Failed to create cURL object.");
+#ifdef __ANDROID__
+				CURLcode trust = android::ConfigureCurlTrust(cHandle.get());
+				if (trust != CURLE_OK) return trust;
+#endif
 
 				size_t (*curlWriteCallback)(void*, size_t, size_t, ServerListQuery*) =
 				  [](void* ptr, size_t size, size_t nmemb, ServerListQuery* self) -> size_t {

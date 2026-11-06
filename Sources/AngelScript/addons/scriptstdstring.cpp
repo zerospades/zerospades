@@ -921,11 +921,11 @@ double parseFloat(const string &val, asUINT *byteCount)
 	setlocale(LC_NUMERIC, "C");
 #endif
 #else
-#if !defined(ANDROID) && !defined(__psp2__)
+#if !defined(__psp2__) && ((!defined(ANDROID) && !defined(__ANDROID__)) || (defined(__ANDROID__) && __ANDROID_API__ >= 21))
 	// On Linux and other similar systems the threadsafe option is uselocale
 	// ref: https://stackoverflow.com/questions/4057319/is-setlocale-thread-safe-function
 	locale_t locale = newlocale(LC_NUMERIC_MASK, "C", NULL);
-	locale_t orig_locale = uselocale(locale);
+	locale_t orig_locale = locale ? uselocale(locale) : nullptr;
 #endif
 #endif
 
@@ -938,10 +938,12 @@ double parseFloat(const string &val, asUINT *byteCount)
 	_configthreadlocale(oldConfig);
 #endif
 #else
-#if !defined(ANDROID) && !defined(__psp2__)
+#if !defined(__psp2__) && ((!defined(ANDROID) && !defined(__ANDROID__)) || (defined(__ANDROID__) && __ANDROID_API__ >= 21))
+	if (locale) {
+		uselocale(orig_locale);
+		freelocale(locale);
+	}
 #endif
-	uselocale(orig_locale);
-	freelocale(locale);
 #endif
 
 	if( byteCount )

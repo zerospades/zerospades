@@ -53,6 +53,9 @@ namespace spades {
 			AABB2 GetTextInputRect() override;
 			void WheelEvent(float x, float y) override;
 			bool NeedsAbsoluteMouseCoordinate() override;
+#ifdef __ANDROID__
+			View* GetTouchGameView() override { return subview ? subview->GetTouchGameView() : nullptr; }
+#endif
 			void RunFrame(float dt) override;
 			void RunFrameLate(float dt) override;
 			void Closing() override;

@@ -478,6 +478,12 @@ namespace spades {
 			Vector2 mapSize = MakeVector2((float)map->Width(), (float)map->Height());
 
 			float cfgMapSize = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
+#ifdef __ANDROID__
+			// Align the real engine minimap with the Android HUD reference layout.
+			bool androidHud = !largeMap && localPlayer && localPlayer->IsAlive() &&
+			                  !localPlayerIsSpectating && !client->NeedsAbsoluteMouseCoordinate();
+			if (androidHud) cfgMapSize = sh * (198.0F / 980.0F);
+#endif
 			Vector2 mapWndSize = {cfgMapSize, cfgMapSize};
 
 			Vector2 zoomedSize = {512.0F, 512.0F};
@@ -501,6 +507,9 @@ namespace spades {
 			bool isSofwareRenderer = renderer.IsRendererSW(); // SWRenderer doesn't support minimap clipping (yet)
 			this->circularMap = cg_minimapCircular && !isSofwareRenderer && !largeMap;
 			this->rotatingMap = cg_minimapRotating && !isSofwareRenderer && !largeMap;
+#ifdef __ANDROID__
+			if (androidHud && !isSofwareRenderer) { circularMap = true; rotatingMap = false; }
+#endif
 
 			Vector2 inRange = mapWndSize * 0.5F * actualScale;
 			AABB2 inRect(center - inRange, center + inRange);
@@ -520,10 +529,17 @@ namespace spades {
 
 			float winX = (sw - 8.0F) - mapWndSize.x;
 			float winY = 8.0F;
+#ifdef __ANDROID__
+			if (androidHud) winX = winY = sh * (39.0F / 980.0F);
+#endif
 
 			if (!largeMap) {
 				const int statsMode = cg_stats;
-				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !isDemoMode)
+				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !isDemoMode
+#ifdef __ANDROID__
+				    && !androidHud
+#endif
+				   )
 					winY += cg_statsSmallFont ? 10.0F : 20.0F;
 			}
 
@@ -659,6 +675,9 @@ namespace spades {
 
 			// draw map sector
 			int minimapCoords = cg_minimapCoords;
+#ifdef __ANDROID__
+			if (androidHud) minimapCoords = 0;
+#endif
 			if (!largeMap && (minimapCoords || rotatingMap)) {
 				IFont& font = client->fontManager->GetGuiFont();
 				auto gridStr = ToGrid(focusPlayerPos);

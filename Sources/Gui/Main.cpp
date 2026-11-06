@@ -31,6 +31,9 @@
 #include <vector>
 
 #include <Imports/SDL.h>
+#ifdef __ANDROID__
+#include <SDL_system.h>
+#endif
 #include <curl/curl.h>
 #include <zlib.h>
 
@@ -488,6 +491,12 @@ extern char** environ;
 
 namespace spades {
 	void RelaunchForMods() {
+#ifdef __ANDROID__
+		// There is no executable to spawn: SDL runs inside an Activity. Keep
+		// resources open and let the player restart the app to apply mods.
+		Settings::GetInstance()->Flush();
+		SPLog("Restart the Android app to apply mod changes");
+#else
 		// Spawn a new instance of the same binary with --open-mods, then exit.
 		Settings::GetInstance()->Flush();
 
@@ -559,6 +568,7 @@ namespace spades {
 		// Skip atexit handlers — SDL/GL teardown can stall here, and the
 		// fresh process is already on its way.
 		_exit(0);
+#endif
 	}
 } // namespace spades
 
@@ -619,11 +629,24 @@ int main(int argc, char** argv) {
 		spades::reflection::Backtrace::StartBacktrace();
 		SPADES_MARK_FUNCTION();
 
-		// show splash window
+#ifdef __ANDROID__
+		// The Android launcher already handles startup. Avoid opening a temporary
+		// software SDL window on the Activity's only surface before creating the
+		// real GLES game window.
+		if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
+			SPRaise("Failed to initialize SDL: %s", SDL_GetError());
+		auto pumpEvents = [] {
+			SDL_PumpEvents();
+			SDL_Event event;
+			while (SDL_PollEvent(&event))
+				if (event.type == SDL_QUIT) throw spades::ExitRequestException();
+		};
+#else
 		// NOTE: splash window uses image loader, which assumes backtrace is already initialized.
 		splashWindow.reset(new spades::SplashWindow());
 		auto showSplashWindowTime = SDL_GetTicks();
 		auto pumpEvents = [&splashWindow] { splashWindow->PumpEvents(); };
+#endif
 
 		// initialize threads
 		spades::Thread::InitThreadSystem();
@@ -684,6 +707,22 @@ int main(int argc, char** argv) {
 		HWND hCon = GetConsoleWindow();
 		if (NULL != hCon)
 			setIcon(hCon);
+
+#elif defined(__ANDROID__)
+		// Paks are installed by the Android activity before SDL starts. Keep
+		// user configuration and mods separate from replaceable bundled paks.
+		const char* internalPath = SDL_AndroidGetInternalStoragePath();
+		if (!internalPath || !*internalPath)
+			SPRaise("Android internal storage is unavailable");
+		std::string androidRoot(internalPath);
+		std::string androidPaks = androidRoot + "/game-paks";
+		struct stat androidPakInfo;
+		if (stat(androidPaks.c_str(), &androidPakInfo) != 0 || !S_ISDIR(androidPakInfo.st_mode))
+			SPRaise("Android game assets have not been installed");
+		spades::g_userResourceDirectory = androidRoot + "/user-resources";
+		spades::FileManager::AddFileSystem(
+		  new spades::DirectoryFileSystem(spades::g_userResourceDirectory, true));
+		spades::FileManager::AddFileSystem(new spades::DirectoryFileSystem(androidPaks, false));
 
 #elif defined(__APPLE__)
 		std::string home = getenv("HOME");
@@ -995,12 +1034,14 @@ int main(int argc, char** argv) {
 
 		SDL_InitSubSystem(SDL_INIT_VIDEO);
 
-		// we want to show splash window at least for some time...
 		pumpEvents();
+#ifndef __ANDROID__
+		// Show the desktop splash window for at least some time.
 		auto ticks = SDL_GetTicks();
 		if (ticks < showSplashWindowTime + 1500)
 			SDL_Delay(showSplashWindowTime + 1500 - ticks);
 		pumpEvents();
+#endif
 
 		// everything is now ready!
 		if (g_replayDemoMenuless) {
@@ -1020,7 +1061,8 @@ int main(int argc, char** argv) {
 			spades::StartDemoReplay(g_replayDemoPath);
 		} else if (!g_autoconnect) {
 			if (spades::g_openModsTab || spades::g_tryMod ||
-			    !((int)cl_showStartupWindow != 0 || splashWindow->IsStartupScreenRequested())) {
+			    !((int)cl_showStartupWindow != 0 ||
+			      (splashWindow && splashWindow->IsStartupScreenRequested()))) {
 				splashWindow.reset();
 
 				SPLog("Starting main screen");

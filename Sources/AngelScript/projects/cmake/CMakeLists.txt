@@ -48,12 +48,18 @@ if(MSVC AND CMAKE_CL_64)
 endif()
 
 if(ANDROID)
-        enable_language(ASM)
-        if(CMAKE_ASM_COMPILER_WORKS)
-                set(ANGELSCRIPT_SOURCE ${ANGELSCRIPT_SOURCE} ../../source/as_callfunc_arm.cpp ../../source/as_callfunc_arm_gcc.S)
-        else()
-                message(FATAL ERROR "Android target requires a working assembler")
-        endif(CMAKE_ASM_COMPILER_WORKS)
+        # Android ABIs do not all use ARM calling conventions. In particular,
+        # the AArch64 native-call bridge needs its own C++ and assembly files;
+        # x86 and x86_64 use the guarded sources already in ANGELSCRIPT_SOURCE.
+        include(${CMAKE_CURRENT_LIST_DIR}/AndroidCallSources.cmake)
+        angelscript_android_call_sources("${ANDROID_ABI}" ANDROID_CALL_SOURCES)
+        if(ANDROID_CALL_SOURCES)
+                enable_language(ASM)
+                if(NOT CMAKE_ASM_COMPILER_WORKS)
+                        message(FATAL_ERROR "Android ${ANDROID_ABI} target requires a working assembler")
+                endif()
+                list(APPEND ANGELSCRIPT_SOURCE ${ANDROID_CALL_SOURCES})
+        endif()
 endif()
 
 # Add ARM64 support for macOS (Apple Silicon M1/M2/M3)
@@ -135,6 +141,10 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" AND NOT APPLE)
 endif()
 
 add_library(Angelscript STATIC ${ANGELSCRIPT_SOURCE} ${ANGELSCRIPT_HEADERS})
+# AngelScript is linked into the Android SDL shared library.
+if(ANDROID)
+        set_target_properties(Angelscript PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 
 find_package(Threads)

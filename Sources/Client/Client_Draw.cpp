@@ -1963,6 +1963,10 @@ namespace spades {
 				}
 			}
 
+			// The Android touch overlay supplies ammo and health while it owns gameplay.
+#ifdef __ANDROID__
+			if (p.IsSpectator() || staffSpectating || NeedsAbsoluteMouseCoordinate())
+#endif
 			// draw remaining ammo counter
 			{
 				bool drawIcon = (int)cg_hudAmmoStyle < 1;
@@ -2010,6 +2014,9 @@ namespace spades {
 				font.Draw(stockStr, pos, 1.0F, drawIcon ? stockCol : ammoCol);
 			}
 
+#ifdef __ANDROID__
+			if (p.IsSpectator() || staffSpectating || NeedsAbsoluteMouseCoordinate())
+#endif
 			// draw player health
 			{
 				int hp = lastHealth; // player health
@@ -2632,10 +2639,17 @@ namespace spades {
 						DrawSpectateHUD();
 					}
 					
-					// the chat panel shows the history by itself while it is open
-					if (!isChatPanelVisible)
-						chatWindow->Draw();
-					killfeedWindow->Draw();
+					// The Android overlay shows the real chat and killfeed during live play.
+					bool drawNativeMessages = true;
+#ifdef __ANDROID__
+					drawNativeMessages = !player.IsAlive() || localPlayerIsSpectator ||
+					                     NeedsAbsoluteMouseCoordinate();
+#endif
+					if (drawNativeMessages) {
+						// the chat panel shows the history by itself while it is open
+						if (!isChatPanelVisible) chatWindow->Draw();
+						killfeedWindow->Draw();
+					}
 					
 					if (netgraphVisible && !isDemoMode)
 						DrawNetGraph();

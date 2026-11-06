@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <Imports/OpenGL.h>
 #include <Imports/SDL.h>
 
@@ -25,10 +26,14 @@
 #include <Core/Debug.h>
 #include <Core/Exception.h>
 #include <Core/Settings.h>
+#ifdef __ANDROID__
+#include "../../android/native/GLESPixelConversion.h"
+#include "../../android/native/GLESAllocationFormat.h"
+#endif
 
 using namespace spades::draw;
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(ANDROID)
 #define GLEW 1
 #endif
 
@@ -128,8 +133,14 @@ namespace spades {
 			}
 
 			SDL_GL_MakeCurrent(window, context);
+#ifdef __ANDROID__
+			if (SDL_GL_ExtensionSupported("GL_EXT_texture_filter_anisotropic")) {
+				glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &androidMaxAnisotropy);
+				if (androidMaxAnisotropy < 1.0F) androidMaxAnisotropy = 1.0F;
+			}
+#endif
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(ANDROID)
 			GLenum err = glewInit();
 			if (GLEW_OK != err)
 				SPRaise("GLEW error: %s", glewGetErrorString(err));
@@ -242,6 +253,13 @@ namespace spades {
 			// glFinish();
 			CheckErrorAlways();
 			SDL_GL_SwapWindow(window);
+#ifdef __ANDROID__
+			// IME, orientation and multi-window changes resize the SDL surface.
+			// Refresh once per frame so GLRenderer can rebuild its framebuffers.
+			int newWidth = 0, newHeight = 0;
+			SDL_GetWindowSize(window, &newWidth, &newHeight);
+			if (newWidth > 0 && newHeight > 0) { w = newWidth; h = newHeight; }
+#endif
 #if 0
 			Uint32 t = SDL_GetTicks();
 			if(lastFrame == 0) t = lastFrame - 30;
@@ -283,6 +301,7 @@ namespace spades {
 		}
 
 		void SDLGLDevice::PolygonMode(Enum face, Enum val) {
+#if !defined(__ANDROID__) && !defined(ANDROID)
 			CheckExistence(glPolygonMode);
 
 			GLenum glFace;
@@ -302,6 +321,7 @@ namespace spades {
 
 			glPolygonMode(glFace, glMode);
 			CheckError();
+#endif
 		}
 		void SDLGLDevice::PolygonOffset(Float factor, Float units) {
 			CheckExistence(glPolygonOffset);
@@ -330,15 +350,25 @@ namespace spades {
 
 		void SDLGLDevice::Enable(Enum s, bool b) {
 			SPADES_MARK_FUNCTION();
+#if defined(__ANDROID__) || defined(ANDROID)
+			if (s == Multisample || s == FramebufferSRGB || s == Texture2D)
+				return;
+#endif
 			GLenum type;
 			switch (s) {
 				case DepthTest: type = GL_DEPTH_TEST; break;
 				case CullFace: type = GL_CULL_FACE; break;
 				case Blend: type = GL_BLEND; break;
+#if defined(GL_POLYGON_OFFSET_LINE) && !defined(__ANDROID__) && !defined(ANDROID)
 				case PolygonOffsetLine: type = GL_POLYGON_OFFSET_LINE; break;
+#else
+				case PolygonOffsetLine: type = GL_POLYGON_OFFSET_FILL; break;
+#endif
 				case Texture2D: type = GL_TEXTURE_2D; break;
+#if !defined(__ANDROID__) && !defined(ANDROID)
 				case Multisample: type = GL_MULTISAMPLE; break;
 				case FramebufferSRGB: type = GL_FRAMEBUFFER_SRGB; break;
+#endif
 				case StencilTest: type = GL_STENCIL_TEST; break;
 				case ScissorTest: type = GL_SCISSOR_TEST; break;
 				default: SPInvalidEnum("state", s);
@@ -533,6 +563,21 @@ namespace spades {
 
 		void* SDLGLDevice::MapBuffer(Enum target, Enum access) {
 			SPADES_MARK_FUNCTION_DEBUG();
+			void* ret = nullptr;
+#if defined(__ANDROID__) || defined(ANDROID)
+			GLbitfield flags = 0;
+			switch (access) {
+				case draw::IGLDevice::ReadOnly: flags = GL_MAP_READ_BIT; break;
+				case draw::IGLDevice::WriteOnly: flags = GL_MAP_WRITE_BIT; break;
+				case draw::IGLDevice::ReadWrite: flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT; break;
+				default: SPInvalidEnum("access", access);
+			}
+			GLint size = 0;
+			glGetBufferParameteriv(parseBufferTarget(target), GL_BUFFER_SIZE, &size);
+			if (size > 0) {
+				ret = glMapBufferRange(parseBufferTarget(target), 0, (GLsizeiptr)size, flags);
+			}
+#else
 			GLenum acc;
 			switch (access) {
 				case draw::IGLDevice::ReadOnly: acc = GL_READ_ONLY; break;
@@ -540,7 +585,6 @@ namespace spades {
 				case draw::IGLDevice::ReadWrite: acc = GL_READ_WRITE; break;
 				default: SPInvalidEnum("access", access);
 			}
-			void* ret = nullptr;
 #if GLEW
 			if (glMapBuffer)
 				ret = glMapBuffer(parseBufferTarget(target), acc);
@@ -551,6 +595,7 @@ namespace spades {
 #else
 			CheckExistence(glMapBuffer);
 			ret = glMapBuffer(parseBufferTarget(target), acc);
+#endif
 #endif
 			CheckError();
 			return ret;
@@ -671,15 +716,29 @@ namespace spades {
 		static GLenum parseQueryTarget(IGLDevice::Enum target) {
 			SPADES_MARK_FUNCTION_DEBUG();
 			switch (target) {
+#if defined(GL_SAMPLES_PASSED)
 				case IGLDevice::SamplesPassed: return GL_SAMPLES_PASSED;
+#else
+				case IGLDevice::SamplesPassed: return GL_ANY_SAMPLES_PASSED;
+#endif
 				case IGLDevice::AnySamplesPassed: return GL_ANY_SAMPLES_PASSED;
+#if defined(GL_TIME_ELAPSED)
 				case IGLDevice::TimeElapsed: return GL_TIME_ELAPSED;
+#elif defined(GL_TIME_ELAPSED_EXT)
+				case IGLDevice::TimeElapsed: return GL_TIME_ELAPSED_EXT;
+#else
+				case IGLDevice::TimeElapsed: return GL_ANY_SAMPLES_PASSED;
+#endif
 				default: SPInvalidEnum("target", target);
 			}
 		}
 
 		void SDLGLDevice::BeginQuery(Enum target, UInteger query) {
 			SPADES_MARK_FUNCTION_DEBUG();
+#if defined(__ANDROID__) || defined(ANDROID)
+			if (target == IGLDevice::TimeElapsed)
+				return;
+#endif
 #if GLEW
 			if (glBeginQuery)
 				glBeginQuery(parseQueryTarget(target), query);
@@ -696,6 +755,10 @@ namespace spades {
 
 		void SDLGLDevice::EndQuery(Enum target) {
 			SPADES_MARK_FUNCTION_DEBUG();
+#if defined(__ANDROID__) || defined(ANDROID)
+			if (target == IGLDevice::TimeElapsed)
+				return;
+#endif
 #if GLEW
 			if (glEndQuery)
 				glEndQuery(parseQueryTarget(target));
@@ -776,6 +839,18 @@ namespace spades {
 			} else {
 				ReportMissingFunc("glGetQueryObjectui64v");
 			}
+#elif defined(__ANDROID__) || defined(ANDROID)
+			GLuint val32 = 0;
+			switch (pname) {
+				case draw::IGLDevice::QueryResult:
+					glGetQueryObjectuiv(query, GL_QUERY_RESULT, &val32);
+					break;
+				case draw::IGLDevice::QueryResultAvailable:
+					glGetQueryObjectuiv(query, GL_QUERY_RESULT_AVAILABLE, &val32);
+					break;
+				default: SPInvalidEnum("pname", pname);
+			}
+			val = val32;
 #else
 			CheckExistence(glGetQueryObjectui64v);
 			switch (pname) {
@@ -791,6 +866,9 @@ namespace spades {
 
 		void SDLGLDevice::BeginConditionalRender(UInteger query, Enum mode) {
 			SPADES_MARK_FUNCTION_DEBUG();
+#if defined(__ANDROID__) || defined(ANDROID)
+			(void)query; (void)mode;
+#else
 			GLenum md;
 			switch (mode) {
 				case draw::IGLDevice::QueryWait: md = GL_QUERY_WAIT; break;
@@ -812,10 +890,14 @@ namespace spades {
 			glBeginConditionalRender(query, md);
 #endif
 			CheckError();
+#endif
 		}
 
 		void SDLGLDevice::EndConditionalRender() {
 			SPADES_MARK_FUNCTION_DEBUG();
+#if defined(__ANDROID__) || defined(ANDROID)
+			// Conditional render is not supported in standard GLES 3.0
+#else
 #if GLEW
 			if (glEndConditionalRender)
 				glEndConditionalRender();
@@ -828,6 +910,7 @@ namespace spades {
 			glEndConditionalRender();
 #endif
 			CheckError();
+#endif
 		}
 
 		IGLDevice::UInteger SDLGLDevice::GenTexture() {
@@ -894,7 +977,13 @@ namespace spades {
 				case RGB16F: return GL_RGB16F;
 				case RGBA16F: return GL_RGBA16F;
 				case R16F: return GL_R16F;
+#ifdef GL_RGB5
 				case RGB5: return GL_RGB5;
+#elif defined(GL_RGB565)
+				case RGB5: return GL_RGB565;
+#else
+				case RGB5: return GL_RGB;
+#endif
 				case RGB5A1: return GL_RGB5_A1;
 				case RGB8: return GL_RGB8;
 				case RGBA8: return GL_RGBA8;
@@ -929,16 +1018,65 @@ namespace spades {
 				case UnsignedByte: return GL_UNSIGNED_BYTE;
 				case FloatType: return GL_FLOAT;
 				case UnsignedShort5551: return GL_UNSIGNED_SHORT_5_5_5_1;
+#ifdef GL_UNSIGNED_SHORT_1_5_5_5_REV
 				case UnsignedShort1555Rev: return GL_UNSIGNED_SHORT_1_5_5_5_REV;
+#else
+				case UnsignedShort1555Rev: SPRaise("Reverse 1555 pixel type is unsupported on GLES");
+#endif
 				case UnsignedInt2101010Rev: return GL_UNSIGNED_INT_2_10_10_10_REV;
 				case UnsignedInt248: return GL_UNSIGNED_INT_24_8;
 				default: SPInvalidEnum("v", v);
 			}
 		}
 
+#ifdef __ANDROID__
+		static void PrepareAndroidAllocation(IGLDevice::Enum internalFormat, const void* data,
+		                                     IGLDevice::Enum& format, IGLDevice::Enum& type) {
+			if (data) return;
+			auto allocationFormat = format, allocationType = type;
+			if (!android::GLESStorageOnlyFormat(internalFormat, allocationFormat, allocationType))
+				return;
+			// Null is an offset when a PBO is bound, not a storage-only allocation.
+			GLint pbo = 0;
+			glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &pbo);
+			if (!pbo) { format = allocationFormat; type = allocationType; }
+		}
+
+		static void PrepareAndroidPixels(IGLDevice::Enum& format, IGLDevice::Enum type,
+		                                 int width, int height, int depth, const void*& data,
+		                                 std::vector<std::uint8_t>& storage) {
+			if (format != IGLDevice::BGRA) return;
+			GLint pbo = 0, rowLength = 0, imageHeight = 0, skipPixels = 0, skipRows = 0,
+			      skipImages = 0, alignment = 0;
+			glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &pbo);
+			glGetIntegerv(GL_UNPACK_ROW_LENGTH, &rowLength);
+			glGetIntegerv(GL_UNPACK_IMAGE_HEIGHT, &imageHeight);
+			glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &skipPixels);
+			glGetIntegerv(GL_UNPACK_SKIP_ROWS, &skipRows);
+			glGetIntegerv(GL_UNPACK_SKIP_IMAGES, &skipImages);
+			glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+			if (pbo || rowLength || imageHeight || skipPixels || skipRows || skipImages ||
+			    (alignment == 8 && width % 2 != 0 && (height > 1 || depth > 1)))
+				SPRaise("Unsupported pixel unpack state for Android BGRA conversion");
+			android::BgraPixelType pixelType;
+			if (type == IGLDevice::UnsignedByte) pixelType = android::BgraPixelType::Bytes;
+			else if (type == IGLDevice::UnsignedInt2101010Rev)
+				pixelType = android::BgraPixelType::Packed2101010Rev;
+			else SPRaise("Unsupported Android BGRA pixel type");
+			storage = android::ConvertBgraToRgba(data, width, height, depth, pixelType);
+			if (!storage.empty()) data = storage.data();
+			format = IGLDevice::RGBA;
+		}
+#endif
+
 		void SDLGLDevice::TexImage2D(Enum target, Integer level, Enum intFmt, Sizei width,
 									 Sizei height, Integer border, Enum format, Enum type,
 									 const void* data) {
+#ifdef __ANDROID__
+			std::vector<std::uint8_t> converted;
+			PrepareAndroidAllocation(intFmt, data, format, type);
+			PrepareAndroidPixels(format, type, width, height, 1, data, converted);
+#endif
 			CheckExistence(glTexImage2D);
 			glTexImage2D(parseTextureTarget(target), level, parseTextureInternalFormat(intFmt),
 						 width, height, border, parseTextureFormat(format), parseType(type), data);
@@ -948,6 +1086,11 @@ namespace spades {
 		void SDLGLDevice::TexImage3D(Enum target, Integer level, Enum intFmt, Sizei width,
 									 Sizei height, Sizei depth, Integer border, Enum format,
 									 Enum type, const void* data) {
+#ifdef __ANDROID__
+			std::vector<std::uint8_t> converted;
+			PrepareAndroidAllocation(intFmt, data, format, type);
+			PrepareAndroidPixels(format, type, width, height, depth, data, converted);
+#endif
 #if GLEW
 			if (glTexImage3D)
 				glTexImage3D(parseTextureTarget(target), level, parseTextureInternalFormat(intFmt),
@@ -971,6 +1114,10 @@ namespace spades {
 		void SDLGLDevice::TexSubImage2D(Enum target, Integer level, Integer x, Integer y,
 										Sizei width, Sizei height, Enum format, Enum type,
 										const void* data) {
+#ifdef __ANDROID__
+			std::vector<std::uint8_t> converted;
+			PrepareAndroidPixels(format, type, width, height, 1, data, converted);
+#endif
 			CheckExistence(glTexSubImage2D);
 			glTexSubImage2D(parseTextureTarget(target), level, x, y, width, height,
 							parseTextureFormat(format), parseType(type), data);
@@ -980,6 +1127,10 @@ namespace spades {
 		void SDLGLDevice::TexSubImage3D(Enum target, Integer level, Integer x, Integer y, Integer z,
 										Sizei width, Sizei height, Sizei depth, Enum format,
 										Enum type, const void* data) {
+#ifdef __ANDROID__
+			std::vector<std::uint8_t> converted;
+			PrepareAndroidPixels(format, type, width, height, depth, data, converted);
+#endif
 #if GLEW
 			if (glTexSubImage3D)
 				glTexSubImage3D(parseTextureTarget(target), level, x, y, z, width, height, depth,
@@ -1121,7 +1272,15 @@ namespace spades {
 			CheckExistence(glTexParameterf);
 			switch (param) {
 				case TextureMaxAnisotropy:
+#ifdef __ANDROID__
+					// Anisotropy is optional in GLES; never issue its enum on a
+					// driver that does not advertise the extension.
+					if (androidMaxAnisotropy > 1.0F)
+						glTexParameterf(targ, GL_TEXTURE_MAX_ANISOTROPY_EXT,
+						                std::max(1.0F, std::min(val, androidMaxAnisotropy)));
+#else
 					glTexParameterf(targ, GL_TEXTURE_MAX_ANISOTROPY_EXT, val);
+#endif
 					break;
 
 				default: SPInvalidEnum("param", param);
@@ -1263,8 +1422,12 @@ namespace spades {
 		}
 
 		void SDLGLDevice::VertexAttribDivisor(UInteger index, UInteger divisor) {
+#if defined(__ANDROID__) || defined(ANDROID)
+			glVertexAttribDivisor(index, divisor);
+#else
 			CheckExistence(glVertexAttribDivisorARB);
 			glVertexAttribDivisorARB(index, divisor);
+#endif
 			CheckError();
 		}
 
@@ -1940,11 +2103,20 @@ namespace spades {
 				case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: return FramebufferIncompleteAttachment;
 				case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
 					return FramebufferIncompleteMissingAttachment;
+#ifdef GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER
 				case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER: return FramebufferIncompleteDrawBuffer;
+#endif
+#ifdef GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER
 				case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER: return FramebufferIncompleteReadBuffer;
+#endif
 				case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE: return FramebufferIncompleteMultisample;
+#ifdef GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS
 				case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
 					return FramebufferIncompleteLayerTargets;
+#elif defined(GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT)
+				case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT:
+					return FramebufferIncompleteLayerTargets;
+#endif
 				default: return FramebufferUnsupported;
 			}
 		}

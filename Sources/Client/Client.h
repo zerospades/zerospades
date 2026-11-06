@@ -798,12 +798,24 @@ namespace spades {
 			bool AcceptsTextInput() override;
 			AABB2 GetTextInputRect() override;
 			bool NeedsAbsoluteMouseCoordinate() override;
+#ifdef __ANDROID__
+			gui::View* GetTouchGameView() override { return this; }
+#endif
 			bool ExecCommand(const Handle<gui::ConsoleCommand>&) override;
 			Handle<gui::ConsoleCommandCandidateIterator>
 			AutocompleteCommandName(const std::string& name) override;
 
 			void SetWorld(World*);
 			World* GetWorld() const { return world.get(); }
+#ifdef __ANDROID__
+			// Called on the game thread; uses the same command/encoding path as native chat.
+			bool SendAndroidChat(const std::string& text, bool global);
+			bool AndroidHasLivePlayer();
+			int AndroidFramesPerSecond() { return static_cast<int>(fpsCounter.GetFps() + 0.5); }
+			bool AndroidToolReady();
+			bool AndroidSelectTool(Player::ToolType tool);
+			void AndroidSelectPalettePoint(float x, float y);
+#endif
 
 			// Snapshot of all view-related state, used to preserve camera across demo seeks
 			struct ViewState {

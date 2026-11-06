@@ -1,0 +1,7 @@
+freetype
+opusfile
+opus
+libogg
+sdl2
+sdl2-image[libjpeg-turbo]
+curl[openssl]

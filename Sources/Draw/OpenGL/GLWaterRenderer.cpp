@@ -622,8 +622,12 @@ namespace spades {
 
 			GLProfiler::Context profiler(renderer.GetGLProfiler(), "Render");
 
+#if !defined(__ANDROID__) && !defined(ANDROID)
 			if (occlusionQuery == 0 && settings.r_occlusionQuery)
 				occlusionQuery = device.GenQuery();
+#endif
+			// GLES 3 has no core conditional rendering. The mirrored scene is
+			// rendered unconditionally there, so a water query cannot save work.
 
 			GLColorBuffer colorBuffer;
 

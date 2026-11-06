@@ -1,0 +1,26 @@
+<resources>
+    <string name="app_name">ZeroSpades Preview</string>
+    <string name="title">ZeroSpades</string>
+    <string name="subtitle">Android launcher preview</string>
+    <string name="status">The Android game engine is not connected yet. These graphics preferences are saved on this device, but do not affect the game yet.</string>
+    <string name="graphics">Graphics settings</string>
+    <string name="vsync">Vertical sync</string>
+    <string name="hdr">HDR rendering</string>
+    <string name="radiosity">Global illumination</string>
+    <string name="bloom">Lens scattering</string>
+    <string name="water_reflections">Water reflections (slower)</string>
+    <string name="jump_hint">Double-tap the movement joystick to jump; drag on the second tap to move. Hold the tool panel to change team or weapon. With blocks selected, tap the palette to choose a colour or hold it to grab the aimed block colour.</string>
+    <string name="start">Start</string>
+    <string name="not_ready_title">Game not available yet</string>
+    <string name="not_ready">This preview contains the Android launcher only. The native game, graphics support, assets and touch controls still need to be integrated.</string>
+    <string name="ok">OK</string>
+    <string name="preview_hud">Preview touch HUD</string>
+    <string name="preview_watermark">HUD PREVIEW — example data, no game connected</string>
+    <string name="preview_chat">Preview chat only — messages are not sent to a server.</string>
+    <string name="preview_message">Preview (not sent): %1$s</string>
+    <string name="chat_title">Chat</string>
+    <string name="chat_team">Team only</string>
+    <string name="chat_hint">Type a message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_close">Close</string>
+</resources>

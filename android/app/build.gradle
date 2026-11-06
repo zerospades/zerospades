@@ -1,0 +1,67 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The default artifact remains an explicitly non-playable preview. The opt-in
+// variant is under active development and must not be published as a release.
+def nativeGame = providers.gradleProperty('nativeGame').map { it.toBoolean() }.getOrElse(false)
+def dependencyRoot = providers.environmentVariable('ZEROSPADES_ANDROID_DEPS').orNull
+def devpak = providers.environmentVariable('ZEROSPADES_DEVPAK').orNull
+
+def generatedGameAssets = layout.buildDirectory.dir('generated/game-assets')
+
+android {
+    namespace 'io.github.zerospades.mobile'
+    compileSdk 35
+    buildFeatures { buildConfig true }
+
+    defaultConfig {
+        applicationId 'io.github.zerospades.mobile'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName nativeGame ? '0.0.9-android-native-wip' : '0.0.9-android-preview'
+        buildConfigField 'boolean', 'NATIVE_GAME', nativeGame.toString()
+        if (nativeGame) {
+            if (!dependencyRoot || !devpak) {
+                throw new GradleException('Native build requires ZEROSPADES_ANDROID_DEPS and ZEROSPADES_DEVPAK')
+            }
+            ndk { abiFilters 'arm64-v8a' }
+            externalNativeBuild {
+                cmake {
+                    arguments "-DANDROID_DEPENDENCY_ROOT=${dependencyRoot}",
+                              '-DANDROID_STL=c++_shared',
+                              '-DZEROSPADES_RESOURCES=OFF',
+                              '-DZEROSPADES_NONFREE_RESOURCES=OFF',
+                              '-DUSE_INTERNAL_OPENAL=ON'
+                }
+            }
+        }
+    }
+    if (nativeGame) {
+        ndkVersion '28.2.13676358'
+        externalNativeBuild { cmake { path file('../../CMakeLists.txt'); version '3.31.5' } }
+        sourceSets.main {
+            java.srcDir 'src/game/java'
+            assets.srcDir generatedGameAssets
+            manifest.srcFile 'src/game/AndroidManifest.xml'
+        }
+    }
+}
+
+if (nativeGame) {
+    // Do not fall back to an incomplete APK when external assets are missing.
+    def prepareGameAssets = tasks.register('prepareGameAssets', Exec) {
+        inputs.dir file('../../Resources')
+        inputs.file file('../tools/package_resources.py')
+        inputs.file file(devpak)
+        outputs.dir generatedGameAssets
+        commandLine 'python3', file('../tools/package_resources.py'), '--output',
+                generatedGameAssets.get().dir('game-paks').asFile, '--devpak', file(devpak), '--verify-r33'
+    }
+    tasks.named('preBuild').configure { dependsOn prepareGameAssets }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

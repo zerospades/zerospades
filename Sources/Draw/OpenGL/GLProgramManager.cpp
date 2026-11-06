@@ -33,6 +33,10 @@
 #include <Core/Stopwatch.h>
 #include <Core/TMPUtils.h>
 
+#ifdef __ANDROID__
+#include "../../../android/native/GLESShaderSource.h"
+#endif
+
 namespace spades {
 	namespace draw {
 		GLProgramManager::GLProgramManager(IGLDevice& d, GLSettings& settings)
@@ -75,10 +79,48 @@ namespace spades {
 
 			SPLog("Loading GLSL program '%s'", name.c_str());
 			std::string text = FileManager::ReadAllBytes(name.c_str());
+#ifndef __ANDROID__
 			std::vector<std::string> lines = SplitIntoLines(text);
+#endif
 
 			auto p = stmp::make_unique<GLProgram>(&device, name);
 
+#ifdef __ANDROID__
+			// ES permits only one attached shader per stage. Resolve exactly the
+			// same components as the desktop program, then compile one combined
+			// vertex and fragment shader with a GLSL ES preamble.
+			android::GLESShaderSettings es;
+			es.hdr = !!settings.r_hdr;
+			es.fogShadow = !!settings.r_fogShadow;
+			es.ssao = !!settings.r_ssao;
+			es.radiosity = settings.r_radiosity.operator int();
+			es.modelShadows = !!settings.r_modelShadows;
+			es.sparseShadowMaps = !!settings.r_sparseShadowMaps;
+			std::vector<android::ShaderComponent> vertexComponents, fragmentComponents;
+			for (const auto& file : android::ResolveGLESProgram(text, es)) {
+				const auto size = file.size();
+				if (size >= 3 && file.compare(size - 3, 3, ".vs") == 0)
+					vertexComponents.push_back({file, FileManager::ReadAllBytes(file.c_str())});
+				else if (size >= 3 && file.compare(size - 3, 3, ".fs") == 0)
+					fragmentComponents.push_back({file, FileManager::ReadAllBytes(file.c_str())});
+				else
+					SPRaise("Unsupported GLES shader component: %s", file.c_str());
+			}
+			std::vector<std::unique_ptr<GLShader>> combined;
+			for (bool fragment : {false, true}) {
+				const auto& components = fragment ? fragmentComponents : vertexComponents;
+				if (components.empty()) continue;
+				auto shader = stmp::make_unique<GLShader>(device, fragment ? GLShader::FragmentShader : GLShader::VertexShader);
+				shader->AddSource(android::AssembleGLESShader(components, fragment, es));
+				try {
+					shader->Compile();
+				} catch (const std::exception& e) {
+					SPRaise("GLES %s shader for program '%s' failed: %s", fragment ? "fragment" : "vertex", name.c_str(), e.what());
+				}
+				p->Attach(*shader);
+				combined.push_back(std::move(shader));
+			}
+#else
 			for (const auto& line : lines) {
 				std::string text = TrimSpaces(line);
 				if (text.empty())
@@ -116,6 +158,7 @@ namespace spades {
 					p->Attach(*shader);
 				}
 			}
+#endif
 
 			Stopwatch sw;
 			p->Link();

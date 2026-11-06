@@ -62,6 +62,7 @@ namespace spades {
 			std::size_t m_currentTimerQueryObjectIndex;
 
 			Phase& GetCurrentPhase() { return m_stack.back(); }
+			bool GpuTimingEnabled() const;
 
 			void BeginPhase(const std::string& name, const std::string& description);
 			void EndPhase();

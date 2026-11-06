@@ -43,6 +43,10 @@ namespace spades {
 			virtual bool AcceptsTextInput() { return false; }
 			virtual AABB2 GetTextInputRect() { return AABB2(); }
 			virtual bool NeedsAbsoluteMouseCoordinate() { return false; }
+#ifdef __ANDROID__
+			// Wrapper views forward this to their active gameplay subview.
+			virtual View* GetTouchGameView() { return nullptr; }
+#endif
 			virtual void WheelEvent(float x, float y) {}
 
 			/** Called for every frame. */

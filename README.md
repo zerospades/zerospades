@@ -1,4 +1,6 @@
-# ZeroSpades ![Build status](https://github.com/siecvi/zerospades/actions/workflows/ci.yml/badge.svg) [![All releases downloads](https://img.shields.io/github/downloads/siecvi/zerospades/total.svg)](https://github.com/siecvi/zerospades/releases) [![Latest release](https://img.shields.io/github/release/siecvi/zerospades.svg)](https://github.com/siecvi/zerospades/releases)
+# ZeroSpades Mobile
+
+Android port in progress: the current APK is a **launcher and HUD preview only**, not a playable game. See [android/README.md](android/README.md) for build instructions and remaining work.
 
 
 ![unknown](https://user-images.githubusercontent.com/25997662/166125363-3cdf237d-2154-4371-a44b-baea8a7abe5f.png)
@@ -79,23 +81,9 @@ openspades --replay /path/to/demo.dem
 
 Demos can also be played back using the external [aos_replay](https://github.com/BR-/aos_replay) tool.
 
-## How to Build/Install?
-See the [OpenSpades Building&Installing Guide](https://github.com/yvt/openspades#how-to-buildinstall)
+## Android build
 
-Just a quick note when building on [Windows](https://github.com/yvt/openspades#on-windows-with-visual-studio) (with vcpkg):
-
-On CMake, before you configure the project, you will need to add a new string entry:
-
-* With the Name field: `VCPKG_TARGET_TRIPLET`
-* And the Value field: `x86-windows-static`
-
-Then you're ready to configure & generate.
-
-## Tested Platforms
-* x86-64, EndeavourOS, Ryzen 7 7700X, RX9070XT, 32G RAM
-* ARM64, macOS 26.4.1, Apple Silicon M4, Integrated GPU, 24 GB RAM
-* riscv64, Ubuntu 24.04 LTS, SIFIVE P550, RX6700XT, 8G RAM
-* riscv64, Ubuntu 25.10 LTS, QEMU RVA23, No GPU, 12G RAM
+See [Android build instructions](android/README.md). The desktop game code is retained for the port.
 
 ## Troubleshooting
 For troubleshooting and common problems see [TROUBLESHOOTING](TROUBLESHOOTING.md).

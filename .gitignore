@@ -33,6 +33,7 @@ Makefile
 CMakeCache.txt
 *CMakeFiles/
 *.cmake
+!/android/**/*.cmake
 
 # mac related
 *.DS_Store
@@ -134,8 +135,18 @@ OpenSpades.rc
 
 # vcpkg build artifacts
 vcpkg/
+!/android/vcpkg/
 
 # Demo recordings
 *.dem
 .claude/worktrees/
 .claude/settings.json
+
+# Android / Gradle local state
+android/.gradle/
+android/local.properties
+android/**/.cxx/
+
+# Python cache files
+__pycache__/
+*.py[cod]

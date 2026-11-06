@@ -121,6 +121,16 @@ namespace spades {
 			m_white = m_renderer.RegisterWhiteImage();
 		}
 
+		bool GLProfiler::GpuTimingEnabled() const {
+#ifdef __ANDROID__
+			// GLES 3.0 does not guarantee timer queries. Do not read results of
+			// queries which the Android device layer cannot start.
+			return false;
+#else
+			return !!m_settings.r_debugTimingGPUTime;
+#endif
+		}
+
 		GLProfiler::~GLProfiler() {
 			SPADES_MARK_FUNCTION();
 			for (IGLDevice::UInteger timerQueryObject : m_timerQueryObjects)
@@ -157,7 +167,7 @@ namespace spades {
 
 			ResetTimes();
 
-			if (m_settings.r_debugTimingGPUTime) {
+			if (GpuTimingEnabled()) {
 				m_currentTimerQueryObjectIndex = 0;
 				if (m_timerQueryObjects.empty())
 					m_timerQueryObjects.push_back(m_device.GenQuery());
@@ -245,7 +255,7 @@ namespace spades {
 			}
 
 			// Collect GPU time information
-			if (m_settings.r_debugTimingGPUTime) {
+			if (GpuTimingEnabled()) {
 				if (!m_waitingTimerQueryResult)
 					m_device.EndQuery(IGLDevice::TimeElapsed);
 
@@ -362,7 +372,7 @@ namespace spades {
 
 			phase.startWallClockTime = GetWallClockTime();
 
-			if (m_settings.r_debugTimingGPUTime) {
+			if (GpuTimingEnabled()) {
 				NewTimerQuery();
 				phase.queryObjectIndices = std::pair<std::size_t, std::size_t>{};
 				(*phase.queryObjectIndices).first = m_currentTimerQueryObjectIndex;
@@ -397,7 +407,7 @@ namespace spades {
 			  wallClockTime - current.startWallClockTime;
 			current.measurementLatest.totalNumFrames++;
 
-			if (m_settings.r_debugTimingGPUTime) {
+			if (GpuTimingEnabled()) {
 				SPAssert(current.queryObjectIndices);
 				NewTimerQuery();
 				(*current.queryObjectIndices).second = m_currentTimerQueryObjectIndex;
@@ -415,7 +425,7 @@ namespace spades {
 			SPLog("(%d sampled frame(s). Showing the per-frame timing)",
 			      (*root.measurementSaved).totalNumFrames);
 
-			if (m_settings.r_debugTimingGPUTime)
+			if (GpuTimingEnabled())
 				SPLog("(GPU time / wall clock time)");
 			else
 				SPLog("(wall clock time)");
@@ -435,7 +445,7 @@ namespace spades {
 					for (int i = 0; i < indent; i++)
 						buf[i] = ' ';
 					buf[511] = 0;
-					if (self.m_settings.r_debugTimingGPUTime) {
+					if (self.GpuTimingEnabled()) {
 						std::snprintf(buf + indent, 511 - indent, "%s - %.3fms / %.3fms",
 						              phase.description.c_str(),
 						              result.totalGPUTime * 1000.0 * factor,
@@ -479,7 +489,7 @@ namespace spades {
 				ResultRenderer(GLProfiler& self, double factor)
 				    : self{self},
 				      renderer{self.m_renderer},
-				      gpu{self.m_settings.r_debugTimingGPUTime},
+				      gpu{self.GpuTimingEnabled()},
 				      factor{factor} {}
 
 				void DrawText(const char* str) {

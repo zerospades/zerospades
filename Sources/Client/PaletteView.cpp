@@ -26,6 +26,9 @@
 #include "Player.h"
 #include "World.h"
 #include <Core/Settings.h>
+#ifdef __ANDROID__
+#include "../../android/native/TouchPalette.h"
+#endif
 
 DEFINE_SPADES_SETTING(cg_keyPaletteLeft, "Left");
 DEFINE_SPADES_SETTING(cg_keyPaletteRight, "Right");
@@ -199,6 +202,18 @@ namespace spades {
 			}
 		}
 
+#ifdef __ANDROID__
+		void PaletteView::SelectAndroidPalettePoint(float x, float y) {
+			if (!client->AndroidHasLivePlayer() || client->NeedsAbsoluteMouseCoordinate()) return;
+			auto player = client->GetWorld()->GetLocalPlayer();
+			if (!player || !player->IsToolBlock()) return;
+			int index = android::PaletteIndex(x, y, paletteSize);
+			if (index < 0 || static_cast<size_t>(index) >= colors.size()) return;
+			// A drag may report several events for a single cell; avoid network spam.
+			if (!(player->GetBlockColor() == colors[index])) client->SetBlockColor(colors[index]);
+		}
+#endif
+
 		void PaletteView::Draw() {
 			float sw = renderer.ScreenWidth();
 			float sh = renderer.ScreenHeight();
@@ -218,6 +233,20 @@ namespace spades {
 			const int statsMode = cg_stats;
 			if (statsMode == 1)
 				winY -= cg_statsSmallFont ? 2.0F : 12.0F;
+
+#ifdef __ANDROID__
+			// Keep this geometry aligned with the touch hit region in HudLayout.
+			bool androidHud = client->AndroidHasLivePlayer() && !client->NeedsAbsoluteMouseCoordinate();
+			if (androidHud) {
+				float scale = sh / 980.0F;
+				cellGap = android::PaletteGap * scale;
+				bgPadding = 2.0F * scale;
+				totalSize = android::PaletteSize * scale;
+				cellSize = (totalSize - (paletteSize - 1) * cellGap) / paletteSize;
+				winX = android::PaletteX * scale;
+				winY = android::PaletteY * scale;
+			}
+#endif
 
 			float bgX = winX - bgPadding;
 			float bgY = winY - bgPadding;
@@ -258,7 +287,11 @@ namespace spades {
 				}
 			}
 
-			if (cg_hudPalette)
+			if (cg_hudPalette
+#ifdef __ANDROID__
+			    && !androidHud
+#endif
+			   )
 				client->DrawBlockPaletteHUD(winY);
 		}
 	} // namespace client
