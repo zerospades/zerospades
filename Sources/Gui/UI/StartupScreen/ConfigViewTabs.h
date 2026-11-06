@@ -74,11 +74,13 @@ namespace spades {
 			ui::Button* dropdownButton;
 			Settings::ItemHandle r_videoWidth;
 			Settings::ItemHandle r_videoHeight;
-			Settings::ItemHandle r_videoResolutionDetected;
 			StartupScreenHelper* helper; // weak
+			bool updatingFields = false;
+			int shownDisplay = -1; // the monitor the auto-detected size came from
 
 			void SaveConfig();
-			void SetResolution(int w, int h);
+			void ShowResolution(int w, int h);
+			void ApplyDetectedResolution();
 			void ValueEditHandler(ui::UIElement&);
 			void DropdownHandler(int index);
 			void ShowDropdown(ui::UIElement&);
