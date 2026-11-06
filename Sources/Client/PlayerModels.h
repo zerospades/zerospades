@@ -47,12 +47,15 @@ namespace spades {
 
 		/**
 		 * The player model sets ("Models/Player/Zombie/"), each either the 13
-		 * classic .kv6 parts (Torso.kv6, LegCrouch.kv6...) or one Player.2kv6
-		 * holding them as the player template does (player-scene.sh). Each part
-		 * comes from whichever the stronger pack gives, as any file does: the
-		 * scene's, unless a pack above it (a mod's over the game's own) gives
-		 * that part's .kv6, or the scene lacks it. So a skin of either kind,
-		 * or a mod replacing a single .kv6 of a scene's set, loads as it is.
+		 * classic .kv6 parts (Torso.kv6, LegCrouch.kv6...) or one .2kv6 scene
+		 * holding them as the player template does (player-scene.sh). The
+		 * set's script (Scripts/Skin/Player/Zombie.as) says which, as a skin's
+		 * scripts say what its weapon is made of: a skin replaces it with its
+		 * own. Every set's script is the same function (PlayerModels), built
+		 * on its own, its paths in the set's folder: any skin goes in any
+		 * set's place. A classic part from a pack above that script's still wins over
+		 * the scene, so skins made before there were scenes load as they are;
+		 * a part the scene lacks is its .kv6 too.
 		 *
 		 * The game still places every joint itself (walking, aiming,
 		 * crouching, the ragdoll): a scene gives the parts, not the poses.
@@ -86,13 +89,21 @@ namespace spades {
 			struct Set {
 				bool loaded = false;
 				std::vector<VoxelObject> scene; // empty for a classic set
-				int sceneRank = -1;             // FileManager::Rank of the scene
+				int declaredRank = -1; // FileManager::Rank of the script choosing the scene
 				std::map<std::string, PlayerPart> parts;
 			};
 			IRenderer& renderer;
 			std::map<std::string, Set> sets;
 
 			Set& SetIn(const std::string& dir);
+			/** "Rifle" for "Models/Player/Rifle/", "Classic" for the sets' own. */
+			static std::string SetName(const std::string& dir);
+			/** What the set's `script` says it is made of: its PlayerModels(),
+			 *  built as a module of its own. Throws when it cannot say. */
+			static std::string Declared(const std::string& script);
+			/** Whether the classic part `file` takes the place of the set's
+			 *  scene's: it comes from a pack above the script's. */
+			bool ClassicWins(const Set& set, const std::string& file) const;
 			/** The part at `path` in the set's scene; none if it holds none. */
 			PlayerPart ScenePart(Set& set, const std::string& path);
 		};
