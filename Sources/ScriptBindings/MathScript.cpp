@@ -725,6 +725,9 @@ namespace spades {
 						static Matrix4 Rotate(const Vector3& axis, float rad) {
 							return Matrix4::Rotate(axis, rad);
 						}
+						static Matrix4 EulerAngles(const Vector3& angles) {
+							return Matrix4::FromEulerAngles(angles);
+						}
 						static Matrix4 Scale(const Vector3& vec) { return Matrix4::Scale(vec); }
 						static Matrix4 FromAxes(const Vector3& v1, const Vector3& v2,
 												const Vector3& v3, const Vector3& v4) {
@@ -803,6 +806,11 @@ namespace spades {
 					r = eng->RegisterGlobalFunction(
 					  "Matrix4 CreateRotateMatrix(const Vector3& in, float)",
 					  asFUNCTION(Matrix4Funcs::Rotate), asCALL_CDECL);
+					manager->CheckError(r);
+
+					r = eng->RegisterGlobalFunction(
+					  "Matrix4 CreateEulerAnglesMatrix(const Vector3& in)",
+					  asFUNCTION(Matrix4Funcs::EulerAngles), asCALL_CDECL);
 					manager->CheckError(r);
 
 					r = eng->RegisterGlobalFunction("Matrix4 CreateScaleMatrix(float)",

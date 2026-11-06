@@ -219,6 +219,12 @@ namespace spades {
 					   x * y * ic - z * s, y * y * ic + c, y * z * ic + x * s, 0,
 					   x * z * ic + y * s, y * z * ic - x * s, z * z * ic + c, 0, 0, 0, 0, 1);
 	}
+	// creates a rotation matrix from euler angles (x-y-z order: X is applied first, then Y, then Z)
+	Matrix4 Matrix4::FromEulerAngles(spades::Vector3 angles) {
+		return Rotate(MakeVector3(0, 0, 1), angles.z)
+			* Rotate(MakeVector3(0, 1, 0), angles.y)
+			* Rotate(MakeVector3(1, 0, 0), angles.x);
+	}
 	Matrix4 Matrix4::Scale(float f) { return Scale(f, f, f); }
 	Matrix4 Matrix4::Scale(spades::Vector3 v) { return Scale(v.x, v.y, v.z); }
 	Matrix4 Matrix4::Scale(float x, float y, float z) {

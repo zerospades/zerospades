@@ -307,15 +307,6 @@ namespace spades {
 			return Mix(hip, ads, AimDownSightStateSmooth);
 		}
 
-		// creates a rotation matrix from euler angles (in the form of a Vector3) x-y-z
-		Matrix4 CreateEulerAnglesMatrix(Vector3 angles) {
-			Matrix4 mat;
-			mat = CreateRotateMatrix(Vector3(1, 0, 0), angles.x);
-			mat = CreateRotateMatrix(Vector3(0, 1, 0), angles.y) * mat;
-			mat = CreateRotateMatrix(Vector3(0, 0, 1), angles.z) * mat;
-			return mat;
-		}
-
 		// rotates gun matrix to ensure the sight is in the center of screen (0, ?, 0)
 		Matrix4 AdjustToAlignSight(Matrix4 mat, Vector3 sightPos, float fade) {
 			Vector3 p = mat * sightPos;

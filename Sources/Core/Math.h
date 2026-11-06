@@ -646,6 +646,7 @@ namespace spades {
 		static Matrix4 Scale(float);
 		static Matrix4 Scale(Vector3);
 		static Matrix4 Scale(float, float, float);
+		static Matrix4 FromEulerAngles(Vector3 angles);
 
 		Matrix4 Transposed() const;
 		Matrix4 Inversed() const;
