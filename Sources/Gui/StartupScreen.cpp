@@ -29,16 +29,19 @@
 #include <Gui/Main.h>
 #include <Gui/SDLRunner.h>
 #include <Gui/UI/StartupScreen/StartupScreenUI.h>
+#ifdef __ANDROID__
+#include "StartupScaledRenderer.h"
+#endif
 
 namespace spades {
 	namespace gui {
 		StartupScreen::StartupScreen(Handle<client::IRenderer> r, Handle<client::IAudioDevice> a,
 		                             StartupScreenHelper* helper,
-		                             Handle<client::FontManager> _fontManager)
+		                             Handle<client::FontManager> _fontManager, bool* startResult)
 		    : renderer(std::move(r)),
 		      audioDevice(std::move(a)),
 		      fontManager(std::move(_fontManager)),
-		      startRequested(false),
+		      startRequested(startResult),
 		      helper(helper) {
 			SPADES_MARK_FUNCTION();
 			if (!renderer)
@@ -74,6 +77,13 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			if (!ui)
 				return;
+#ifdef __ANDROID__
+			if (auto* scaled = dynamic_cast<StartupScaledRenderer*>(renderer.GetPointerOrNull())) {
+				const float scale = scaled->GetScale();
+				x /= scale;
+				y /= scale;
+			}
+#endif
 			ui->MouseEvent(x, y);
 		}
 
@@ -116,7 +126,14 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 			if (!ui)
 				return AABB2();
-			return ui->GetTextInputRect();
+			auto rect = ui->GetTextInputRect();
+#ifdef __ANDROID__
+			if (auto* scaled = dynamic_cast<StartupScaledRenderer*>(renderer.GetPointerOrNull())) {
+				const float scale = scaled->GetScale();
+				return AABB2(rect.min * scale, rect.max * scale);
+			}
+#endif
+			return rect;
 		}
 
 		bool StartupScreen::WantsToBeClosed() {
@@ -135,7 +152,12 @@ namespace spades {
 
 		void StartupScreen::DoInit() {
 			SPADES_MARK_FUNCTION();
+#ifndef __ANDROID__
 			renderer->Init();
+#else
+			// This screen only draws 2D UI. Do not preload the game world,
+			// shaders and water twice before the user can choose settings.
+#endif
 
 			ui = Handle<StartupScreenUI>::New(renderer.GetPointerOrNull(),
 			                                  audioDevice.GetPointerOrNull(),
@@ -150,40 +172,54 @@ namespace spades {
 			ui->Closing();
 		}
 
-		void StartupScreen::Start() { startRequested = true; }
+		void StartupScreen::Start() { *startRequested = true; }
 
 		void StartupScreen::Run() {
 			SDL_InitSubSystem(SDL_INIT_VIDEO);
 
-			auto* helper = new StartupScreenHelper();
+			auto helper = Handle<StartupScreenHelper>::New();
 			helper->ExamineSystem();
 
 			class ConcreteRunner : public SDLRunner {
-				Handle<StartupScreen> view;
+				bool startRequested = false;
 				StartupScreenHelper* helper;
 
 			protected:
-				auto GetRendererType() -> RendererType override { return RendererType::SW; }
+				auto GetRendererType() -> RendererType override {
+#ifdef __ANDROID__
+					// SDL on Android owns one native surface; use the same GLES
+					// renderer as the game instead of assuming a desktop SW surface.
+					return RendererType::GL;
+#else
+					return RendererType::SW;
+#endif
+				}
 				client::IAudioDevice* CreateAudioDevice() override {
 					return new audio::NullDevice();
 				}
 				View* CreateView(client::IRenderer* renderer, client::IAudioDevice* dev) override {
-					auto fontManager = Handle<client::FontManager>::New(renderer);
-					view = Handle<StartupScreen>::New(renderer, dev, helper, fontManager);
-					return Handle<StartupScreen>{view}.Unmanage();
+					Handle<client::IRenderer> uiRenderer(renderer);
+#ifdef __ANDROID__
+					uiRenderer = Handle<StartupScaledRenderer>::New(renderer).Cast<client::IRenderer>();
+#endif
+					auto fontManager = Handle<client::FontManager>::New(uiRenderer.GetPointerOrNull());
+					// Release the view while the renderer/context is still alive;
+					// the old runner-held Handle outlived SDL_Quit().
+					return Handle<StartupScreen>::New(uiRenderer, dev, helper, fontManager,
+					                                  &startRequested).Unmanage();
 				}
 
 			public:
 				ConcreteRunner(StartupScreenHelper* helper) : helper(helper) {}
 				bool RunAndGetStartFlag() {
 					this->Run(800, 480);
-					return view->startRequested;
+					return startRequested;
 				}
 			};
 
 			bool startFlag;
 			{
-				ConcreteRunner runner(helper);
+				ConcreteRunner runner(helper.GetPointerOrNull());
 				runner.SetHasSystemMenu(true);
 				startFlag = runner.RunAndGetStartFlag();
 			}

@@ -63,7 +63,24 @@ public class TouchControllerTest {
         assertEquals("RELOAD:true", r.buttons.get(0));
         c.up(8); assertEquals("RELOAD:false", r.buttons.get(1));
     }
-    @Test public void doubleTapStickJumpsWithoutAddingAButton() {
+    @Test public void jumpButtonWorksAlongsideMovementAndFire() {
+        Recorder r = new Recorder(); HudLayout l = new HudLayout(1568);
+        TouchController c = new TouchController(l, r);
+        c.down(1, l.stickX, l.stickY); c.move(1, l.stickX, l.stickY - l.stickRadius);
+        c.down(2, l.width - 294, 725); c.down(3, l.width - 465, 690);
+        assertEquals(-1, r.y, .001);
+        assertTrue(c.pressed(TouchController.Action.FIRE));
+        assertTrue(c.pressed(TouchController.Action.JUMP));
+        assertEquals("FIRE:true", r.buttons.get(0));
+        assertEquals("JUMP:true", r.buttons.get(1));
+        c.up(3);
+        assertEquals("JUMP:false", r.buttons.get(2));
+        assertTrue(c.pressed(TouchController.Action.FIRE));
+        c.cancel();
+        assertEquals("FIRE:false", r.buttons.get(3));
+        assertEquals(0, r.y, .001);
+    }
+    @Test public void doubleTapStickStillJumps() {
         Recorder r = new Recorder(); TouchController c = new TouchController(new HudLayout(1568), r);
         c.down(1, 284, 832, 1000); c.up(1, 1080);
         c.down(2, 284, 832, 1200);
@@ -108,6 +125,16 @@ public class TouchControllerTest {
         assertEquals(-1, r.y, .001); assertEquals(2, r.paletteSelections);
         c.up(2); assertEquals(-1, r.y, .001);
         c.up(1); assertEquals(0, r.y, .001);
+    }
+    @Test public void onlyToolAndPaletteScheduleLongPressHandling() {
+        Recorder r = new Recorder(); TouchController c = new TouchController(new HudLayout(1568), r);
+        c.down(1, 137, 608); assertFalse(c.isLongPressCandidate(1));
+        c.down(2, 284, 832); assertFalse(c.isLongPressCandidate(2));
+        c.down(3, 1450, 70); assertTrue(c.isLongPressCandidate(3));
+        c.setBlockPaletteEnabled(true); c.down(4, 300, 430);
+        assertTrue(c.isLongPressCandidate(4));
+        c.up(4); assertFalse(c.isLongPressCandidate(4));
+        c.cancel();
     }
     @Test public void holdingPaletteGrabsAimedColorWithoutSelectingAgainOnRelease() {
         Recorder r = new Recorder(); TouchController c = new TouchController(new HudLayout(1568), r);

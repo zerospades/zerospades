@@ -67,6 +67,10 @@ namespace spades {
 				Handle<StartupScreenGraphicsDisplayResolutionEditor> e =
 				    Handle<StartupScreenGraphicsDisplayResolutionEditor>::New(ui);
 				e->SetBounds(AABB2(160.0F, 0.0F, 124.0F, 24.0F));
+#ifdef __ANDROID__
+				// Android's SDL surface always uses the device's actual size.
+				e->enable = false;
+#endif
 				AddChild(e.GetPointerOrNull());
 				resEdit = e.GetPointerOrNull();
 			}
@@ -83,6 +87,9 @@ namespace spades {
 				              "screen, making it easier for you to concentrate on playing the "
 				              "game."));
 				e->activated = [this](UIElement& s) { OnFullscreenCheck(s); };
+#ifdef __ANDROID__
+				e->enable = false; // Android owns fullscreen and system bars.
+#endif
 				AddChild(e.GetPointerOrNull());
 				fullscreenCheck = e.GetPointerOrNull();
 			}

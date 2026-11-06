@@ -9,7 +9,12 @@
     <string name="radiosity">Global illumination</string>
     <string name="bloom">Lens scattering</string>
     <string name="water_reflections">Water reflections (slower)</string>
-    <string name="jump_hint">Double-tap the movement joystick to jump; drag on the second tap to move. Hold the tool panel to change team or weapon. With blocks selected, tap the palette to choose a colour or hold it to grab the aimed block colour.</string>
+    <string name="jump_hint">Use the jump button beside fire, or double-tap the movement joystick; drag on the second tap to move. Hold the tool panel to change team or weapon. With blocks selected, tap the palette to choose a colour or hold it to grab the aimed block colour.</string>
+    <string name="native_subtitle">Open the original ZeroSpades setup screen to change settings before playing.</string>
+    <string name="original_settings_play">ZeroSpades settings &amp; play</string>
+    <string name="quick_start">Quick start (skip original settings)</string>
+    <string name="quick_start_graphics">Quick-start graphics</string>
+    <string name="quick_start_note">These switches apply only to quick start. The original settings screen has its own settings.</string>
     <string name="start">Start</string>
     <string name="not_ready_title">Game not available yet</string>
     <string name="not_ready">This preview contains the Android launcher only. The native game, graphics support, assets and touch controls still need to be integrated.</string>

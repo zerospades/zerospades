@@ -110,6 +110,7 @@ namespace spades {
 			// (this function can be called multiple times via StartupScreenHelper::FixConfig)
 			reportLines.clear();
 			report.clear();
+			incapableConfigs.clear();
 
 			// check installed locales
 			SPLog("Checking installed locales");
@@ -167,6 +168,27 @@ namespace spades {
 				}
 			}
 
+#ifdef __ANDROID__
+			// The desktop probe creates a second window and checks desktop-only
+			// ARB extensions. Neither is valid for SDL's Android GLES backend;
+			// its false negatives would switch the working renderer to software.
+			modes.clear();
+			SDL_DisplayMode displayMode;
+			if (SDL_GetCurrentDisplayMode(0, &displayMode) == 0 &&
+			    displayMode.w > 0 && displayMode.h > 0)
+				modes.push_back(spades::MakeIntVector3(displayMode.w, displayMode.h, 0));
+			else
+				modes.push_back(spades::MakeIntVector3(800, 480, 0));
+			shaderHighCapable = postFilterHighCapable = particleHighCapable = true;
+			openGLCapable = true; // GLES 3 is required by the Android manifest.
+			incapableConfigs.emplace("r_renderer", [](std::string value) -> std::string {
+				return spades::EqualsIgnoringCase(value, "sw")
+				    ? "The software game renderer is not supported on Android." : std::string();
+			});
+			if (spades::EqualsIgnoringCase(r_renderer, "sw")) r_renderer = "gl";
+			AddReport("Android uses OpenGL ES 3. Graphics options are device-dependent.", col);
+			return;
+#endif
 			// check GL capabilities
 
 			SPLog("Performing ecapability query");

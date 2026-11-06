@@ -39,6 +39,7 @@ public final class HudLayout {
             new Button(TouchController.Action.FIRE, 137, 608, 52),
             new Button(TouchController.Action.AIM, width - 118, 627, 64),
             new Button(TouchController.Action.FIRE, width - 294, 725, 77),
+            new Button(TouchController.Action.JUMP, width - 465, 690, 50),
             new Button(TouchController.Action.RELOAD, width - 68, 783, 50),
             new Button(TouchController.Action.NEXT_TOOL, width - 153, 70, 132, 53),
             new Button(TouchController.Action.GRENADE, width - 588, 922, 42),

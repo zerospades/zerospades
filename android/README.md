@@ -1,9 +1,19 @@
-# Android work in progress
+# ZeroSpades Android
 
-The Android project is a **launcher and touch HUD preview**, not a playable port
-of the game. Start currently explains that the engine is unavailable. The
-launcher preferences are stored locally using existing setting names, but do
-not yet affect the engine.
+There are two Android build variants: the default is a **non-playable HUD
+preview**, while `-PnativeGame=true` builds the experimental game. A previous
+native debug build has been playtested successfully on a Samsung Galaxy Tab
+A8; that does not establish correctness on other devices or for later changes.
+
+In the native build, **ZeroSpades settings & play** opens the original startup
+screen with its Graphics, Audio, Generic, System Info and Advanced tabs. Its
+settings (including Post-process) are saved by the engine. This new Android
+startup path and the transition to the game still need device testing. Android
+uses the device surface size/fullscreen state, not the desktop resolution and
+fullscreen fields. Graphics options depend on GPU support and may be expensive.
+If the original screen or a setting causes trouble, reopen the app and use
+**Quick start**, which skips that screen and uses the launcher's graphics
+switches temporarily without overwriting the original screen's saved settings.
 
 The separate **Preview touch HUD** button shows an illustrative landscape
 layout inspired by the supplied reference. The background and HUD data are
@@ -44,8 +54,7 @@ logging starts or the Android version does not expose a trace.
 the UI thread. The experimental native bridge supplies scores and the shared
 mode maximum, health, selected tool and weapon, ammunition, frame rate and up
 to five kill messages. The engine renders its real circular minimap underneath
-the overlay in the reference position. The tool icons come from
-`Resources/Gfx/Hotbar`. The activity tracks `joinedAtMillis` using
+the overlay in the reference position. Action and equipment icons use Android Canvas vector artwork. The activity tracks `joinedAtMillis` using
 `SystemClock.elapsedRealtime()`, but its behavior across disconnects and server
 changes still requires validation.
 The displayed clock counts up in minutes and seconds. Both score bars use the
@@ -64,16 +73,16 @@ cycles selectable tools, independent of mouse-wheel settings. The router emits
 releases on cancellation, queue overflow, menu entry or engine shutdown; release
 handling across menu transitions still needs device testing. The grenade button
 uses a frame-spanning select/fire/release/restore sequence, which also requires
-integration testing. Double-tap the movement joystick to jump (drag on the
-second tap to move); this adds no extra HUD button. The jump pulse is held
-through one game update. Tap the tool panel to cycle selectable tools; hold it
+integration testing. Use the separate jump button beside fire or double-tap
+the movement joystick (drag on the second tap to move). The double-tap jump
+pulse is held through one game update. Tap the tool panel to cycle selectable tools; hold it
 to open the game's loadout/team menu, where weapon changes use the existing
 server rules. With blocks selected, tap or drag across the game's palette to
 select a block color; hold it to grab the color of the aimed-at block. These
 controls must be tested on a device.
 
-This bridge is **not active in the default preview APK**. The opt-in,
-unverified native build attaches the overlay and polls actual gameplay state.
+This bridge is **not active in the default preview APK**. The opt-in
+native build attaches the overlay and polls actual gameplay state.
 It forwards chat and killfeed messages, renders the native minimap beneath the
 overlay, and suppresses corresponding duplicate desktop HUD elements during
 active play. Gameplay input is suppressed when the game needs an absolute
@@ -89,6 +98,17 @@ To run the platform-independent native router tests on a host with g++:
 g++ -std=c++17 -Wall -Wextra -Werror android/native/TouchInputRouter.cpp \
   android/native/tests/TouchInputRouterTest.cpp -o /tmp/touch-input-tests
 /tmp/touch-input-tests
+```
+
+## Startup UI scaling regression check
+
+On a host with g++, the isolated fake-renderer test checks the startup UI's
+logical size, destination rectangles and clipping. It does not execute SDL or
+prove Android graphics, touch, or startup-to-game lifecycle behavior:
+
+```sh
+g++ -std=c++17 -DNDEBUG -ISources android/native/tests/startup/StartupScaledRendererTest.cpp -o /tmp/startup-scale-test
+/tmp/startup-scale-test
 ```
 
 ## Native audio startup regression checks
@@ -157,13 +177,13 @@ asset path `game-paks/`, verifies each external file against pinned upstream r33
 content, and invokes `GameAssetsInstaller.install()` before starting SDL. It
 copies paks to private `files/game-paks` without overwriting the separate
 `files/user-resources` config/mod directory. The preview does not invoke it.
-Packaging and installation have not been tested on Android. The nonfree pak's
+A prior debug build has been installed and run on a tablet. The nonfree pak's
 license has conditions that must be reviewed before distributing a game build.
 
 ## Experimental native integration build
 
-This path is incomplete and **not playtest-ready**. It has not been built or
-run on Android. For an arm64 integration build, install JDK 17, Gradle 8.9,
+This path remains experimental; a previous debug build ran on a Galaxy Tab A8,
+but newer changes and other devices still need testing. For an arm64 build, install JDK 17, Gradle 8.9,
 Android SDK platform 35, NDK 28.2.13676358 and Android SDK CMake 3.31.5. Initialize the `openal-soft`
 submodule, then build the ports in `vcpkg/dependencies.txt` from vcpkg commit
 `4334d8b4c8916018600212ab4dd4bbdc343065d1` with the triplet in
@@ -176,11 +196,9 @@ cd android
 gradle --no-daemon -PnativeGame=true assembleDebug
 ```
 
-The `workflow-templates/android-native-experimental.yml` template attempts
-this build if a maintainer adds it under `.github/workflows/`. It is currently
-inactive and untested. Its debug artifact, if produced, is not a release and
-is not yet suitable for gameplay testing. CI builds cannot establish rendering,
-networking, touch, asset licensing or device runtime correctness.
+The active `.github/workflows/Android Native Integration.yml` builds a debug APK
+as a temporary workflow artifact, not a release. CI builds cannot establish
+rendering, networking, touch, asset licensing or device runtime correctness.
 
 ## KyroSpades reference and remaining work
 

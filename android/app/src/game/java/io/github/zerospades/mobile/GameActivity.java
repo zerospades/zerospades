@@ -171,16 +171,20 @@ public final class GameActivity extends SDLActivity {
     @Override protected String[] getArguments() {
         SharedPreferences preferences = getSharedPreferences("graphics", MODE_PRIVATE);
         List<String> args = new ArrayList<>();
-        // Android already displayed its own settings screen.
-        override(args, "cl_showStartupWindow", false);
-        override(args, "r_vsync", preferences.getBoolean("r_vsync", true));
-        override(args, "r_hdr", preferences.getBoolean("r_hdr", false));
-        override(args, "r_radiosity", preferences.getBoolean("r_radiosity", false));
-        override(args, "r_bloom", preferences.getBoolean("r_bloom", false));
-        // Water 2 draws an additional mirrored scene; keep the cheaper water 1
-        // on mobile unless the player explicitly opts into reflections.
-        args.add("--override-cvar");
-        args.add("r_water=" + (preferences.getBoolean("water_reflections", false) ? "2" : "1"));
+        boolean showOriginal = getIntent() != null &&
+                getIntent().getBooleanExtra(LauncherActivity.EXTRA_ORIGINAL_STARTUP, false);
+        override(args, "cl_showStartupWindow", showOriginal);
+        if (!showOriginal) {
+            // Quick start preserves the previously tested mobile defaults.
+            // Do not override any graphics values when the original screen is
+            // shown: its controls must apply to the game and be saved normally.
+            override(args, "r_vsync", preferences.getBoolean("r_vsync", true));
+            override(args, "r_hdr", preferences.getBoolean("r_hdr", false));
+            override(args, "r_radiosity", preferences.getBoolean("r_radiosity", false));
+            override(args, "r_bloom", preferences.getBoolean("r_bloom", false));
+            args.add("--override-cvar");
+            args.add("r_water=" + (preferences.getBoolean("water_reflections", false) ? "2" : "1"));
+        }
         return args.toArray(new String[0]);
     }
 

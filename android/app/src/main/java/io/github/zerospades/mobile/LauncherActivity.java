@@ -17,6 +17,7 @@ import android.widget.TextView;
 
 /** Android startup settings; the experimental native build installs assets before SDL. */
 public final class LauncherActivity extends Activity {
+    static final String EXTRA_ORIGINAL_STARTUP = "original_startup";
     private SharedPreferences preferences;
 
     @Override
@@ -36,63 +37,45 @@ public final class LauncherActivity extends Activity {
         title.setText(R.string.title);
         title.setTextSize(30);
         content.addView(title);
-        addText(content, R.string.subtitle, 16);
         if (BuildConfig.NATIVE_GAME) {
-            TextView status = new TextView(this);
-            status.setText("Experimental native build: rendering and touch controls are still being integrated.");
-            status.setTextSize(16);
-            status.setPadding(0, dp(12), 0, dp(8));
-            content.addView(status);
+            TextView subtitle = new TextView(this);
+            subtitle.setText(R.string.native_subtitle);
+            subtitle.setTextSize(16);
+            subtitle.setPadding(0, dp(12), 0, dp(8));
+            content.addView(subtitle);
         } else {
+            addText(content, R.string.subtitle, 16);
             addText(content, R.string.status, 16);
         }
-        addText(content, R.string.graphics, 20);
 
-        // The experimental SDL activity passes these existing ZeroSpades
-        // settings as per-run overrides; the preview has no native engine.
+        Button start = new Button(this);
+        start.setText(BuildConfig.NATIVE_GAME ? R.string.original_settings_play : R.string.start);
+        start.setGravity(Gravity.CENTER);
+        Button quick = new Button(this);
+        quick.setText(R.string.quick_start);
+        start.setOnClickListener(view -> startGame(true, start, quick));
+        quick.setOnClickListener(view -> startGame(false, start, quick));
+        content.addView(start, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (BuildConfig.NATIVE_GAME) {
+            TextView quickTitle = new TextView(this);
+            quickTitle.setText(R.string.quick_start_graphics);
+            quickTitle.setTextSize(20);
+            quickTitle.setPadding(0, dp(18), 0, dp(4));
+            content.addView(quickTitle);
+            TextView quickNote = new TextView(this);
+            quickNote.setText(R.string.quick_start_note);
+            quickNote.setTextSize(14);
+            content.addView(quickNote);
+        } else addText(content, R.string.graphics, 20);
         addSetting(content, R.string.vsync, "r_vsync", true);
         addSetting(content, R.string.hdr, "r_hdr", false);
         addSetting(content, R.string.radiosity, "r_radiosity", false);
         addSetting(content, R.string.bloom, "r_bloom", false);
         addSetting(content, R.string.water_reflections, "water_reflections", false);
         addText(content, R.string.jump_hint, 14);
-
-        Button start = new Button(this);
-        start.setText(R.string.start);
-        start.setGravity(Gravity.CENTER);
-        start.setOnClickListener(view -> {
-            if (!BuildConfig.NATIVE_GAME) {
-                new AlertDialog.Builder(this).setTitle(R.string.not_ready_title)
-                        .setMessage(R.string.not_ready).setPositiveButton(R.string.ok, null).show();
-                return;
-            }
-            // Asset installation may copy tens of MB; keep the UI responsive
-            // and never start the native client with missing required paks.
-            start.setEnabled(false);
-            new Thread(() -> {
-                Exception failure = null;
-                try {
-                    GameAssetsInstaller.install(getApplicationContext());
-                    SystemCaBundle.install(getApplicationContext());
-                }
-                catch (Exception error) { failure = error; }
-                final Exception installFailure = failure;
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    start.setEnabled(true);
-                    if (installFailure != null) {
-                        new AlertDialog.Builder(this).setTitle("Game startup preparation failed")
-                                .setMessage(installFailure.getMessage())
-                                .setPositiveButton(R.string.ok, null).show();
-                        return;
-                    }
-                    Intent game = new Intent();
-                    game.setClassName(this, "io.github.zerospades.mobile.GameActivity");
-                    startActivity(game);
-                });
-            }, "game-assets-installer").start();
-        });
-        content.addView(start, new LinearLayout.LayoutParams(
+        if (BuildConfig.NATIVE_GAME) content.addView(quick, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         if (BuildConfig.NATIVE_GAME) {
             Button diagnostics = new Button(this);
@@ -107,6 +90,41 @@ public final class LauncherActivity extends Activity {
         content.addView(preview, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(scroll);
+    }
+
+    private void startGame(boolean showOriginal, Button start, Button quick) {
+        if (!BuildConfig.NATIVE_GAME) {
+            new AlertDialog.Builder(this).setTitle(R.string.not_ready_title)
+                    .setMessage(R.string.not_ready).setPositiveButton(R.string.ok, null).show();
+            return;
+        }
+        // Asset installation may copy tens of MB. Disable both entry points
+        // until it finishes so two native activities cannot start at once.
+        start.setEnabled(false);
+        quick.setEnabled(false);
+        new Thread(() -> {
+            Exception failure = null;
+            try {
+                GameAssetsInstaller.install(getApplicationContext());
+                SystemCaBundle.install(getApplicationContext());
+            } catch (Exception error) { failure = error; }
+            final Exception installFailure = failure;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                start.setEnabled(true);
+                quick.setEnabled(true);
+                if (installFailure != null) {
+                    new AlertDialog.Builder(this).setTitle("Game startup preparation failed")
+                            .setMessage(installFailure.getMessage())
+                            .setPositiveButton(R.string.ok, null).show();
+                    return;
+                }
+                Intent game = new Intent();
+                game.setClassName(this, "io.github.zerospades.mobile.GameActivity");
+                game.putExtra(EXTRA_ORIGINAL_STARTUP, showOriginal);
+                startActivity(game);
+            });
+        }, "game-assets-installer").start();
     }
 
     private void showDiagnostics(Button button) {

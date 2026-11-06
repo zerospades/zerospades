@@ -70,7 +70,13 @@ namespace spades {
 			}
 			{
 				Handle<CheckBox> button = Handle<CheckBox>::New(manager);
+#ifdef __ANDROID__
+				// Android's launcher offers an explicit quick-start fallback.
+				button->caption = "Use Quick start to skip this screen";
+				button->enable = false;
+#else
 				button->caption = _Tr("StartupScreen", "Skip this screen next time");
+#endif
 				float capSize = GetFont()->Measure(button->caption).x;
 				button->SetBounds(AABB2(8.0F, 45.0F, capSize + 18.0F, 20.0F));
 				AddChild(button.GetPointerOrNull());

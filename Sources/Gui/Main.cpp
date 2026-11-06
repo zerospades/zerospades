@@ -805,7 +805,7 @@ int main(int argc, char** argv) {
 			  "ZeroSpades will continue to run, but any critical events are not logged.",
 			  ex.what());
 			if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "ZeroSpades Log System Failure",
-			                             msg.c_str(), splashWindow->GetWindow())) {
+			                             msg.c_str(), splashWindow ? splashWindow->GetWindow() : nullptr)) {
 				// showing dialog failed.
 			}
 		}

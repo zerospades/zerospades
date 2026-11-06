@@ -153,6 +153,12 @@ public final class TouchController {
             } else sink.button(p.action, false);
         }
     }
+    /** Only tool-panel and palette touches need a delayed hold callback. */
+    public boolean isLongPressCandidate(int id) {
+        Pointer p = pointers.get(id);
+        return p != null && (p.kind == Kind.PALETTE ||
+                (p.kind == Kind.BUTTON && p.action == Action.NEXT_TOOL));
+    }
     /** True only for the same still-held tool-panel pointer that scheduled the callback. */
     public boolean longPressTool(int id, long startedAt) {
         Pointer p = pointers.get(id);

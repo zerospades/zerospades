@@ -38,7 +38,7 @@ namespace spades {
 			Handle<client::IAudioDevice> audioDevice;
 			Handle<client::FontManager> fontManager;
 			float timeToStartInitialization;
-			bool startRequested = false;
+			bool* startRequested; // runner-owned; outlives this view
 
 			Handle<StartupScreenHelper> helper;
 			Handle<StartupScreenUI> ui;
@@ -54,7 +54,8 @@ namespace spades {
 
 		public:
 			StartupScreen(Handle<client::IRenderer>, Handle<client::IAudioDevice>,
-			              StartupScreenHelper *helper, Handle<client::FontManager> fontManager);
+			              StartupScreenHelper *helper, Handle<client::FontManager> fontManager,
+			              bool* startRequested);
 
 			client::IRenderer *GetRenderer() { return &*renderer; }
 			client::IAudioDevice *GetAudioDevice() { return &*audioDevice; }
