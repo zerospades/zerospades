@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -20,6 +22,7 @@ public final class LauncherActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (BuildConfig.NATIVE_GAME) CrashDiagnostics.install(this);
         preferences = getSharedPreferences("graphics", MODE_PRIVATE);
 
         int padding = dp(24);
@@ -91,12 +94,50 @@ public final class LauncherActivity extends Activity {
         });
         content.addView(start, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        if (BuildConfig.NATIVE_GAME) {
+            Button diagnostics = new Button(this);
+            diagnostics.setText("View crash report");
+            diagnostics.setOnClickListener(view -> showDiagnostics(diagnostics));
+            content.addView(diagnostics, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
         Button preview = new Button(this);
         preview.setText(R.string.preview_hud);
         preview.setOnClickListener(view -> startActivity(new Intent(this, HudPreviewActivity.class)));
         content.addView(preview, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(scroll);
+    }
+
+    private void showDiagnostics(Button button) {
+        button.setEnabled(false);
+        new Thread(() -> {
+            String report;
+            try { report = CrashDiagnostics.collect(getApplicationContext()); }
+            catch (Throwable error) { report = "Could not collect diagnostics: " + error; }
+            final String result = report;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                button.setEnabled(true);
+                new AlertDialog.Builder(this)
+                        .setTitle("Crash report")
+                        .setMessage("Review before sharing: this may include device details, " +
+                                "file paths, server addresses and other log information. " +
+                                "Nothing is sent automatically.\n\n" + result)
+                        .setNegativeButton("Close", null)
+                        .setNeutralButton("Copy", (dialog, which) -> {
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("ZeroSpades crash report", result));
+                        })
+                        .setPositiveButton("Share", (dialog, which) -> {
+                            Intent intent = new Intent(Intent.ACTION_SEND);
+                            intent.setType("text/plain");
+                            intent.putExtra(Intent.EXTRA_SUBJECT, "ZeroSpades crash report");
+                            intent.putExtra(Intent.EXTRA_TEXT, result);
+                            startActivity(Intent.createChooser(intent, "Share crash report"));
+                        }).show();
+            });
+        }, "crash-diagnostics").start();
     }
 
     private void addText(LinearLayout content, int text, int size) {

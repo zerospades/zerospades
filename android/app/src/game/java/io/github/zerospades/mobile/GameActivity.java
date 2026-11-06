@@ -75,6 +75,8 @@ public final class GameActivity extends SDLActivity {
     };
 
     @Override protected void onCreate(Bundle state) {
+        // Also install when Android restores this activity in a fresh process.
+        CrashDiagnostics.install(this);
         super.onCreate(state);
         if (mBrokenLibraries || mLayout == null) return;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);

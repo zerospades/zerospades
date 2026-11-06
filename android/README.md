@@ -31,6 +31,13 @@ suitable for production or reliable upgrades between CI builds.
 The native launcher defaults to lower-cost water; its water reflections option
 adds a mirrored-scene pass. Both need device performance testing.
 
+If the experimental game exits during startup, reopen the app and select
+**View crash report**. You can inspect, copy, or share the report manually;
+no data is sent automatically. It may contain device details, file paths,
+server addresses, and Android crash traces, so review it before sharing. The
+engine log and crash trace might be unavailable if the process dies before
+logging starts or the Android version does not expose a trace.
+
 ## HUD integration contract
 
 `hud/TouchHudView` draws a transparent overlay, taking `HudState` snapshots on
