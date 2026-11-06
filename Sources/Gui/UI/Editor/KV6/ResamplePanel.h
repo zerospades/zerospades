@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <Core/Math.h>
+#include <Gui/UI/Components/StepSlider.h>
 #include <Gui/UI/Framework/FeedbackSounds.h>
 
 namespace spades {
@@ -34,38 +35,42 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		/**
-		 * Asks how coarse a low-poly model of a node should be: one voxel of it
-		 * for every `factor` voxels each way. The host shows it in place of the
-		 * node as the factor changes, and the panel says what it comes to.
+		 * Asks at what resolution to make a KV6 of a node: a slider over the
+		 * steps its owner gives (1/10 ... 10/1), and what the chosen one comes
+		 * to. The host shows the result in place of the node as it changes.
 		 *
-		 * While it is open it owns clicks and the keys it knows (the arrows or
-		 * a digit choose, Enter creates, Escape cancels); the host lets the
-		 * camera keep moving, to look the preview over.
+		 * While it is open it owns clicks and the keys it knows (Left and
+		 * Right step, Home and End go to the ends, Enter creates, Escape
+		 * cancels); the host lets the camera keep moving, to look the preview
+		 * over.
 		 */
-		class LowPolyPanel {
+		class ResamplePanel {
 		public:
 			enum class Action { None, Changed, Create, Cancel };
 
-			LowPolyPanel(client::IRenderer& renderer, client::IFont& font,
-			             client::IAudioDevice* audioDevice);
+			ResamplePanel(client::IRenderer& renderer, client::IFont& font,
+			              client::IAudioDevice* audioDevice);
 
-			/** Opens for the node called `name`, at `factor`. */
-			void Open(const std::string& name, int factor);
+			/** Opens for the node called `name`, over `steps`, at `index`. */
+			void Open(const std::string& name, std::vector<StepSlider::Step> steps, int index);
 			void Close() { open = false; }
 			bool IsOpen() const { return open; }
-			int Factor() const { return factor; }
+			int Index() const { return slider.Index(); }
 
-			/** What the node is and what the chosen factor makes of it; a
-			 *  result of no voxel cannot be created. */
-			void SetStats(const IntVector3& sourceSize, long sourceVoxels, const IntVector3& size,
-			              long voxels);
+			/** What the node is and what the chosen step makes of it; with
+			 *  `refused` set instead, why it makes nothing, and it cannot be
+			 *  created. */
+			void SetResult(const IntVector3& sourceSize, long sourceVoxels, const IntVector3& size,
+			               long voxels, const std::string& refused);
 
 			/** Its top left corner. */
 			void Layout(float x, float y);
 			bool Contains(const Vector2& at) const;
-			/** A left press; a factor is chosen on the press, a button runs on
-			 *  its release over it. */
+			/** A left press: on the slider it moves the choice; a button runs
+			 *  on its release over it. */
 			Action Press(const Vector2& at);
+			/** The pointer moving, the slider's handle following it while held. */
+			Action Move(const Vector2& at);
 			Action Release(const Vector2& at);
 			/** A key down: None when the panel has no use for it. */
 			Action Key(const std::string& key);
@@ -78,23 +83,21 @@ namespace spades {
 			client::IRenderer& renderer;
 			client::IFont& font;
 			ui::FeedbackSounds sounds;
+			StepSlider slider;
 			bool open = false;
 			std::string name;
-			int factor = 2;
 			IntVector3 sourceSize = MakeIntVector3(0, 0, 0), size = MakeIntVector3(0, 0, 0);
 			long sourceVoxels = 0, voxels = 0;
+			std::string refused;
 			float x = 0.0F, y = 0.0F;
 			Button pressed = Button::None;
-			int hoverChip = -1;
 			Button hoverButton = Button::None;
 
-			int ChipAt(const Vector2& at) const;
 			Button ButtonAt(const Vector2& at) const;
-			void ChipRect(int index, float& cx, float& cy, float& cw, float& ch) const;
 			void ButtonRect(Button button, float& bx, float& by, float& bw, float& bh) const;
-			bool CanCreate() const { return voxels > 0; }
-			/** Moves to the next factor that way; Changed when it moved. */
-			Action Step(int direction);
+			bool CanCreate() const { return refused.empty() && voxels > 0; }
+			/** Changed, with a tick, when the slider moved. */
+			Action Moved(bool moved);
 		};
 	} // namespace gui
 } // namespace spades

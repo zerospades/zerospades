@@ -27,6 +27,7 @@
 
 #include <Core/Math.h>
 #include <Core/VoxelModel2KV6.h>
+#include <Core/VoxelResample.h>
 
 namespace spades {
 	namespace client {
@@ -205,13 +206,19 @@ namespace spades {
 			/** Puts the node back where the edit found it. */
 			void CancelPlacement();
 
-			// --- Low-poly models ----------------------------------------------
+			// --- Models of a node at another resolution ------------------------
 			/**
-			 * Where voxel `i` of a model made `factor` times coarser from the
-			 * node's Composed model (DownsampledVoxelModel) lands: block `i`'s
-			 * middle, in the world.
+			 * The node (the whole scene for an empty path) with all under it,
+			 * hidden ones left out, as one model at `resolution` in the node's
+			 * own frame (ResampledScene): `frame` gets where its voxel `i` lies
+			 * there. Null, `why` saying why, when nothing of it is left or it
+			 * would be past what a KV6 holds.
 			 */
-			Matrix4 LowPolyFrame(const NodePath& path, const Vector3& base, int factor) const;
+			Handle<VoxelModel> Resampled(const NodePath& path, const VoxelResolution& resolution,
+			                             Matrix4& frame, std::string& why) const;
+			/** Where voxel `i` of a model Resampled gave with `frame` lands in
+			 *  the world. */
+			Matrix4 NodeFrame(const NodePath& path, const Matrix4& frame) const;
 			/**
 			 * Shows `model` (voxel `i` at `frame` times `i`) in place of the node
 			 * and all under it (the whole scene for an empty path) until
@@ -222,14 +229,14 @@ namespace spades {
 			/** Whether a preview stands in for the node now. */
 			bool PreviewHides(const NodePath& path) const;
 			/**
-			 * Adds `model`, made `factor` times coarser from the node's Composed
-			 * model (`base` as it gave), as a new object right after the node
-			 * among its siblings (after the scene's top objects for the scene),
-			 * set beside it, named after it with "_LowPoly"; selects it, as one
-			 * step. False, `why` saying why, when it cannot be placed there.
+			 * Adds `model`, which Resampled made of the node at `resolution`
+			 * with `frame`, as a new object right after the node among its
+			 * siblings (after the scene's top objects for the scene), set beside
+			 * it, named after it with the resolution ("Gun_4to1"); selects it,
+			 * as one step. False, `why` saying why, when it cannot go there.
 			 */
-			bool AddLowPoly(const NodePath& path, Handle<VoxelModel> model, const Vector3& base,
-			                int factor, std::string& why);
+			bool AddResampled(const NodePath& path, Handle<VoxelModel> model, const Matrix4& frame,
+			                  const VoxelResolution& resolution, std::string& why);
 
 			/** An object as copied: with all under it, its voxels its own, and
 			 *  where it was in the world. */
@@ -409,6 +416,11 @@ namespace spades {
 			const std::vector<VoxelObject>* ChildrenOf(const NodePath& parent) const;
 			/** What the node at `path` and its parents do to its voxels. */
 			Matrix4 NodeMatrix(const NodePath& path) const;
+			/** The node at `path` (the scene's top objects for the scene) as
+			 *  objects in its own frame, shown whatever it is set to; false, `why`
+			 *  saying why, when there is nothing there. `what` names it. */
+			bool NodeObjects(const NodePath& path, std::vector<VoxelObject>& objects,
+			                 std::string& what, std::string& why) const;
 			/** Its name and its parents', joined by '/' as tracks and scripts
 			 *  name it. */
 			std::string NamePath(const NodePath& path) const;

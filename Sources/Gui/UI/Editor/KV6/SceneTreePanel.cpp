@@ -583,7 +583,7 @@ namespace spades {
 				const float midY = y + kRowH * 0.5F;
 				const bool selected = row.node && scene.IsSelected(row.path);
 				const bool active = selected && scene.Active() == row.path;
-				// Hidden, or stood in for by a preview (a low-poly model of it).
+				// Hidden, or stood in for by a preview (a model of it at another resolution).
 				const bool hidden = row.node && (row.node->hidden || row.hiddenAbove ||
 				                                 scene.PreviewHides(row.path));
 				const bool hovered = i == hover;

@@ -808,33 +808,17 @@ namespace spades {
 		                                      std::string& why) const {
 			why.clear();
 			base = MakeVector3(0.0F, 0.0F, 0.0F);
-			std::vector<VoxelObject> objects;
-			std::string what = "the scene";
-			if (path.empty()) {
-				objects = roots;
-			} else {
-				const VoxelObject* node = Node(path);
-				if (!node) {
-					why = "there is nothing there";
-					return Handle<VoxelModel>();
-				}
-				what = Quoted(*node);
-				if (node->children.empty()) {
-					// Its own voxels, as they are: voxel `i` at `i`.
-					if (!node->model)
-						why = what + " holds no voxels";
-					return node->model;
-				}
-				// In its own frame, shown whatever it is set to: what hangs under
-				// it lands where it does, the hidden left out as the game leaves
-				// them.
-				VoxelObject object = *node;
-				object.position = MakeVector3(0.0F, 0.0F, 0.0F);
-				object.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
-				object.scale = MakeVector3(1.0F, 1.0F, 1.0F);
-				object.hidden = false;
-				objects.push_back(std::move(object));
+			const VoxelObject* node = Node(path);
+			if (node && node->children.empty()) {
+				// Its own voxels, as they are: voxel `i` at `i`.
+				if (!node->model)
+					why = Quoted(*node) + " holds no voxels";
+				return node->model;
 			}
+			std::vector<VoxelObject> objects;
+			std::string what;
+			if (!NodeObjects(path, objects, what, why))
+				return Handle<VoxelModel>();
 			try {
 				IntVector3 low;
 				Handle<VoxelModel> model = VoxelModelLoader::MergeScene(objects, &low);
@@ -852,13 +836,48 @@ namespace spades {
 			return Composed(path, base, why);
 		}
 
-		Matrix4 KV6Scene::LowPolyFrame(const NodePath& path, const Vector3& base, int factor) const {
-			// Block `i` holds voxels `i * factor` to `i * factor + factor - 1`:
-			// its middle is half a block less a voxel's half in from its start.
-			const float f = float(factor);
-			const float half = (f - 1.0F) * 0.5F;
-			return NodeMatrix(path) * Matrix4::Translate(base + MakeVector3(half, half, half)) *
-			       Matrix4::Scale(f);
+		bool KV6Scene::NodeObjects(const NodePath& path, std::vector<VoxelObject>& objects,
+		                           std::string& what, std::string& why) const {
+			objects.clear();
+			if (path.empty()) {
+				what = "the scene";
+				objects = roots;
+				return true;
+			}
+			const VoxelObject* node = Node(path);
+			if (!node) {
+				why = "there is nothing there";
+				return false;
+			}
+			what = Quoted(*node);
+			// In its own frame, shown whatever it is set to: what hangs under
+			// it lands where it does, the hidden left out as the game leaves
+			// them.
+			VoxelObject object = *node;
+			object.position = MakeVector3(0.0F, 0.0F, 0.0F);
+			object.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+			object.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+			object.hidden = false;
+			objects.push_back(std::move(object));
+			return true;
+		}
+
+		Handle<VoxelModel> KV6Scene::Resampled(const NodePath& path,
+		                                       const VoxelResolution& resolution, Matrix4& frame,
+		                                       std::string& why) const {
+			why.clear();
+			std::vector<VoxelObject> objects;
+			std::string what;
+			if (!NodeObjects(path, objects, what, why))
+				return Handle<VoxelModel>();
+			Handle<VoxelModel> model = ResampledScene(objects, resolution, frame, why);
+			if (!model)
+				why = what + ": " + why;
+			return model;
+		}
+
+		Matrix4 KV6Scene::NodeFrame(const NodePath& path, const Matrix4& frame) const {
+			return NodeMatrix(path) * frame;
 		}
 
 		void KV6Scene::SetPreview(const NodePath& hide, Handle<VoxelModel> model,
@@ -882,25 +901,23 @@ namespace spades {
 			return previewing && StartsWith(path, previewHides);
 		}
 
-		bool KV6Scene::AddLowPoly(const NodePath& path, Handle<VoxelModel> model,
-		                          const Vector3& base, int factor, std::string& why) {
+		bool KV6Scene::AddResampled(const NodePath& path, Handle<VoxelModel> model,
+		                            const Matrix4& frame, const VoxelResolution& resolution,
+		                            std::string& why) {
 			why.clear();
 			const VoxelObject* node = Node(path);
 			if (!model || (!path.empty() && !node)) {
 				why = "there is nothing to add";
 				return false;
 			}
-			// Where it lands in the node's parent's frame: as LowPolyFrame has it
-			// (the node's transform times its own block frame), then moved along
-			// the parent's x past the node's own extent, so the two stand side
-			// by side.
+			// Where it lands in the node's parent's frame: as NodeFrame has it
+			// (the node's transform times the model's frame in it), then moved
+			// along the parent's x past the node's own extent, so the two stand
+			// side by side.
 			const Matrix4 local =
 			  (path.empty() ? Matrix4::Identity()
 			                : LocalTransform(node->position, node->rotation, node->scale));
-			const float f = float(factor);
-			const float half = (f - 1.0F) * 0.5F;
-			const Matrix4 placed =
-			  local * Matrix4::Translate(base + MakeVector3(half, half, half)) * Matrix4::Scale(f);
+			const Matrix4 placed = local * frame;
 			float lo = std::numeric_limits<float>::max(), hi = -lo;
 			for (int c = 0; c < 8; c++) {
 				const Vector3 corner =
@@ -914,7 +931,8 @@ namespace spades {
 			const float width = hi - lo;
 			const float gap = std::max(2.0F, width * 0.1F);
 			VoxelObject o;
-			o.name = (path.empty() ? std::string("Scene") : node->name) + "_LowPoly";
+			o.name = (path.empty() ? std::string("Scene") : node->name) + "_" +
+			         std::to_string(resolution.finer) + "to" + std::to_string(resolution.coarser);
 			if (!DecomposeTransform(Matrix4::Translate(width + gap, 0.0F, 0.0F) * placed, o.position,
 			                        o.rotation, o.scale)) {
 				why = (path.empty() ? std::string("the scene") : Quoted(*node)) +

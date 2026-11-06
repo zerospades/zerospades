@@ -24,9 +24,10 @@
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+#include <Core/VoxelResample.h>
 
 #include "KV6Scene.h"
-#include "LowPolyPanel.h"
+#include "ResamplePanel.h"
 
 namespace spades {
 	class VoxelModel;
@@ -37,20 +38,22 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		/**
-		 * Makes a low-poly model of a node of a scene: asks how coarse
-		 * (LowPolyPanel), shows the result in the node's place, the node hidden
-		 * meanwhile (KV6Scene::SetPreview), and adds it to the scene beside the
-		 * node, or leaves the scene as it was.
+		 * Makes a KV6 of a node of a scene at another resolution, from ten
+		 * times coarser (a far model) to ten times finer (a part the scene
+		 * scales down, at the detail it was modelled at): asks which
+		 * (ResamplePanel), shows the result in the node's place, the node
+		 * hidden meanwhile (KV6Scene::SetPreview), and adds it to the scene
+		 * beside the node, or leaves the scene as it was.
 		 *
-		 * Its host routes it input first while it is open: it takes clicks and
-		 * the keys it knows, and leaves the rest to the host, which lets the
-		 * camera move, to look the preview over, and keeps everything else
-		 * from changing the scene under it.
+		 * Its host routes it input first while it is open: it takes clicks,
+		 * the pointer while its slider is held, and the keys it knows, and
+		 * leaves the rest to the host, which lets the camera move, to look the
+		 * preview over, and keeps everything else from changing the scene.
 		 */
-		class LowPolyTool {
+		class ResampleTool {
 		public:
-			LowPolyTool(client::IRenderer& renderer, client::IFont& font,
-			            client::IAudioDevice* audioDevice);
+			ResampleTool(client::IRenderer& renderer, client::IFont& font,
+			             client::IAudioDevice* audioDevice);
 
 			/** Starts on the node at `path` (the whole scene for an empty one);
 			 *  false, `why` saying why, when it holds no voxel in sight. */
@@ -63,6 +66,9 @@ namespace spades {
 			 */
 			bool Input(KV6Scene& scene, const std::string& key, bool down, const Vector2& cursor,
 			           std::string& said);
+			/** The pointer moved to `cursor`; true when it was the tool's (its
+			 *  slider held). */
+			bool Move(KV6Scene& scene, const Vector2& cursor);
 			/** Gives it up: the node is shown again, the scene as it was. */
 			void Cancel(KV6Scene& scene);
 
@@ -70,15 +76,17 @@ namespace spades {
 			void Draw(float x, float y, const Vector2& cursor);
 
 		private:
-			LowPolyPanel panel;
+			ResamplePanel panel;
 			NodePath node;
-			Handle<VoxelModel> source; // the node composed, as KV6Scene::Composed has it
-			Vector3 base = MakeVector3(0.0F, 0.0F, 0.0F);
+			IntVector3 sourceSize = MakeIntVector3(0, 0, 0); // the node at 1/1
 			long sourceVoxels = 0;
-			Handle<VoxelModel> model; // at the factor chosen
+			VoxelResolution resolution;
+			Handle<VoxelModel> model; // at the resolution chosen
+			Matrix4 frame = Matrix4::Identity();
 
-			/** Makes the model at the panel's factor and shows it. */
+			/** Makes the model at the panel's resolution and shows it. */
 			void Update(KV6Scene& scene);
+			std::string Run(KV6Scene& scene, ResamplePanel::Action action);
 			/** Ends, adding the model to the scene when `create`. */
 			std::string Finish(KV6Scene& scene, bool create);
 		};
