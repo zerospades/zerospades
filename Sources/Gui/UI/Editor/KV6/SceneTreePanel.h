@@ -178,6 +178,8 @@ namespace spades {
 			int VisibleRows() const;
 			int ClampedScroll(int rowCount) const;
 			float RowTop(int row) const;
+			/** The panel behind the rows shown, of `rowCount` in all. */
+			AABB2 Backdrop(int rowCount) const;
 			float LabelX(int depth) const;
 			/** The x the branch to the children at `depth` comes down at: under
 			 *  their parent's fold arrow. */
