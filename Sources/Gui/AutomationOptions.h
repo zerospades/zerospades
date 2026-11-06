@@ -38,6 +38,11 @@ namespace spades {
 			/** Reference images the model editor opened with --open shows at once,
 			 *  each across an axis (0 = x, 1 = y, 2 = z) (--editor-reference). */
 			std::vector<std::pair<int, std::string>> editorReferences;
+			/** A node of the scene --open opens, by its path of names ("Player/
+			 *  Standing"; "/" for the whole scene), to open Generate KV6 on at
+			 *  the resolution `editorGenerateAt` ("1/1") (--editor-generate). */
+			std::string editorGenerate;
+			std::string editorGenerateAt;
 		};
 
 		AutomationOptions& Automation();

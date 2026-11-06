@@ -193,6 +193,10 @@ namespace spades {
 			// --editor-reference: images to model from, shown from the start.
 			for (const auto& reference : Automation().editorReferences)
 				editor->ShowReferenceImage(reference.first, reference.second);
+
+			// --editor-generate: Generate KV6 open on a node, to look it over.
+			if (scene && !Automation().editorGenerate.empty())
+				OpenResampleByName(Automation().editorGenerate, Automation().editorGenerateAt);
 		}
 
 		KV6EditorView::~KV6EditorView() { SPADES_MARK_FUNCTION(); }
@@ -400,6 +404,33 @@ namespace spades {
 			std::string why;
 			if (!resample->Open(*scene, path, why))
 				editor->SetStatus("Cannot generate a KV6: " + why);
+		}
+
+		void KV6EditorView::OpenResampleByName(const std::string& names,
+		                                       const std::string& at) {
+			// The node at the path of names, "/" (or nothing) the scene.
+			NodePath path;
+			std::size_t start = names == "/" ? names.size() : 0;
+			while (start < names.size()) {
+				const std::size_t slash = names.find('/', start);
+				const std::string name = names.substr(start, slash - start);
+				const std::vector<VoxelObject>& level =
+				  path.empty() ? scene->Roots() : scene->Node(path)->children;
+				int found = -1;
+				for (std::size_t i = 0; i < level.size(); i++)
+					if (level[i].name == name)
+						found = int(i);
+				if (found < 0) {
+					SPLog("--editor-generate: no node '%s'", names.c_str());
+					return;
+				}
+				path.push_back(found);
+				start = slash == std::string::npos ? names.size() : slash + 1;
+			}
+			OpenResample(path);
+			VoxelResolution resolution;
+			if (!VoxelResolution::Parse(at, resolution) || !resample->Choose(*scene, resolution))
+				SPLog("--editor-generate: resolution '%s' is not offered", at.c_str());
 		}
 
 		bool KV6EditorView::ResampleInput(const std::string& key, bool down) {
