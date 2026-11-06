@@ -246,6 +246,13 @@ if(APPLE)
 	# Add optional code signing (can be configured via MACOSX_CODESIGN_IDENTITY)
 	# To sign: cmake -DMACOSX_CODESIGN_IDENTITY="Developer ID Application: Your Name" ..
 	# Note: Code signing must happen AFTER all binary modifications (install_name_tool, etc.)
+	# codesign refuses bundles carrying Finder or file-provider extended attributes
+	# ("resource fork, Finder information, or similar detritus not allowed"), which
+	# files pick up in synced folders such as an iCloud Desktop. Strip them first.
+	add_custom_command(TARGET ZeroSpades POST_BUILD
+		COMMAND xattr -cr "$<TARGET_BUNDLE_DIR:ZeroSpades>" || true
+		COMMENT "Clearing extended attributes from the macOS bundle"
+	)
 	if(MACOSX_CODESIGN_IDENTITY)
 		add_custom_command(TARGET ZeroSpades POST_BUILD
 			COMMAND codesign --force --deep --sign "${MACOSX_CODESIGN_IDENTITY}" "$<TARGET_BUNDLE_DIR:ZeroSpades>"
