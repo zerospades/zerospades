@@ -169,6 +169,10 @@ namespace spades {
 			bool leftToEditor = false, rightToEditor = false;
 			bool metaHeld = false; // Cmd, which adds to a selection as Ctrl does
 			bool altHeld = false;  // Option, which moves a caret by words on macOS
+			/** Locks or unlocks the node at `path`, as a template holds it. */
+			void SetNodeLocked(const NodePath& path, bool locked);
+			/** Unlocks it once the player has been told what that gives up. */
+			void ConfirmUnlock(const NodePath& path);
 			/** Starts typing a new name for the node at `path`, in its row. */
 			void RenameInTree(const NodePath& path);
 			/** Settles a name being typed before the tree's rows are used for

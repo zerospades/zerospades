@@ -270,9 +270,21 @@ namespace spades {
 			items.push_back(
 			  ContextMenuItem(onScene ? "Paste" : "Paste Into", [this, row] { PasteObjects(row); })
 			    .Enabled(!objectClipboard.empty()));
+			// A template's locks, near the end: they are set once, and undone
+			// only on purpose.
+			if (!onScene) {
+				const bool locked = node && node->locked;
+				items.push_back(
+				  ContextMenuItem(
+				    "Templating",
+				    std::vector<ContextMenuItem>{
+				      ContextMenuItem("Lock", [this, row] { SetNodeLocked(row, true); }).Enabled(!locked),
+				      ContextMenuItem("Unlock...", [this, row] { ConfirmUnlock(row); }).Enabled(locked)})
+				    .Separated());
+			}
 			items.push_back(ContextMenuItem("Delete", [this, selection] { DeleteObjects(selection); })
 			                  .Enabled(selected)
-			                  .Separated());
+			                  .Separated(onScene));
 			ui->GetContextMenu()->Open(softwareCursor->GetPosition(), std::move(items));
 		}
 
@@ -305,6 +317,29 @@ namespace spades {
 			else
 				editor->SetStatus("Cannot delete: " + why);
 			editor->ObjectSelectionChanged();
+		}
+
+		void KV6EditorView::SetNodeLocked(const NodePath& path, bool locked) {
+			if (!scene || !scene->SetLocked(path, locked))
+				return;
+			const VoxelObject* o = scene->Node(path);
+			editor->SetStatus((locked ? "Locked \"" : "Unlocked \"") + o->name + "\"");
+			editor->ObjectSelectionChanged(); // the panel and the gizmo follow the lock
+		}
+
+		void KV6EditorView::ConfirmUnlock(const NodePath& path) {
+			const VoxelObject* o = scene->Node(path);
+			if (!o)
+				return;
+			editor->ReleaseHeldInput();
+			// The dialog is modal: the tree cannot change under `path` meanwhile.
+			ConfirmEditorAction(
+			  *ui->GetOverlay(),
+			  "Unlock \"" + o->name +
+			    "\"? A template locks it because the game finds it by its name and its place "
+			    "in the tree. Unlocked, it can be renamed, moved under another object, turned, "
+			    "scaled or deleted, and the game may no longer find it.",
+			  [this, path] { SetNodeLocked(path, false); });
 		}
 
 		void KV6EditorView::RenameInTree(const NodePath& path) {

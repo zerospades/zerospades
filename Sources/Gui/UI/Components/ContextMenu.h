@@ -63,8 +63,8 @@ namespace spades {
 				enabled = on;
 				return *this;
 			}
-			ContextMenuItem& Separated() {
-				separated = true;
+			ContextMenuItem& Separated(bool on = true) {
+				separated = on;
 				return *this;
 			}
 			ContextMenuItem& Shortcut(std::string key) {
