@@ -258,6 +258,14 @@ namespace spades {
 			virtual bool IsRendererSW() const { return false; }
 
 			/**
+			 * Real pixels per unit of 2D coordinates: above 1 when the UI is scaled up
+			 * (see `ScaledRenderer`). Fonts rasterize glyphs at this density.
+			 */
+			virtual float GetUIScale() const { return 1.0F; }
+			/** Re-reads `ui_scale`; the new scale takes effect from the next frame. */
+			virtual void ApplyUIScale() {}
+
+			/**
 			 * Describes the backend, for the debug screen. The default implementation only
 			 * tells the software renderer apart.
 			 */

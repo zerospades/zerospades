@@ -359,6 +359,9 @@ namespace spades {
 			owner->enable = true;
 			SetParent(nullptr);
 			OnClosed();
+			// Applied now rather than live: a new scale resizes the virtual screen, and
+			// the UI rebuilds itself on that, which would close this window mid-drag.
+			GetManager().GetRenderer().ApplyUIScale();
 		}
 
 		void PreferenceView::Run() {
