@@ -55,10 +55,12 @@ final class CrashDiagnostics {
                 .append("Android: ").append(Build.VERSION.RELEASE).append(" (API ")
                 .append(Build.VERSION.SDK_INT).append(")\n")
                 .append("App: ").append(BuildConfig.VERSION_NAME).append('\n');
-        if (Build.VERSION.SDK_INT >= 30) Api30.appendExitInfo(context, report);
-        appendFile(report, "Last Java crash", new File(context.getFilesDir(), JAVA_CRASH), 24000);
+        // Put the engine log first so share targets that truncate long text do
+        // not cut off the most useful startup information.
         appendFile(report, "Native engine log", new File(context.getFilesDir(),
-                "user-resources/SystemMessages.log"), 40000);
+                "user-resources/SystemMessages.log"), 24000);
+        appendFile(report, "Last Java crash", new File(context.getFilesDir(), JAVA_CRASH), 12000);
+        if (Build.VERSION.SDK_INT >= 30) Api30.appendExitInfo(context, report);
         return report.toString();
     }
 
@@ -89,9 +91,13 @@ final class CrashDiagnostics {
                             .append(", reason: ").append(reason)
                             .append(", status: ").append(exit.getStatus())
                             .append(", description: ").append(exit.getDescription()).append('\n');
-                    // Android 12+ may expose native tombstones; other releases may return null.
+                    // Native traces are protobuf, not UTF-8 text; decode only
+                    // the crashing thread rather than displaying binary data.
                     try (InputStream trace = exit.getTraceInputStream()) {
-                        if (trace != null) out.append(DiagnosticFiles.beginning(trace, 32000)).append('\n');
+                        if (trace == null) out.append("Trace not available.\n");
+                        else if (reason == ApplicationExitInfo.REASON_CRASH_NATIVE)
+                            out.append(NativeTombstone.describe(trace)).append('\n');
+                        else out.append(DiagnosticFiles.beginning(trace, 12000)).append('\n');
                     } catch (Exception e) {
                         out.append("Trace unavailable: ").append(e.getClass().getSimpleName()).append('\n');
                     }
