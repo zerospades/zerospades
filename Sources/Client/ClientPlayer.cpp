@@ -37,6 +37,7 @@
 #include "Weapon.h"
 #include "World.h"
 #include "NetClient.h"
+#include "PlayerModels.h"
 #include <Core/Bitmap.h>
 #include <Core/Settings.h>
 #include <ScriptBindings/IBlockSkin.h>
@@ -1019,24 +1020,18 @@ namespace spades {
 				* Matrix4::Translate(0.0F, 1.0F, -torsoPosZ);
 
 			// Legs and Torso
+			PlayerModels& models = client.GetPlayerModels();
+			// A part of the set, at the matrix the game puts its joint at.
+			auto drawPart = [&](const char* name, const Matrix4& joint) {
+				const PlayerPart part = models.Get(modelPath, name);
+				param.matrix = joint * part.local;
+				renderer.RenderModel(*part.model, param);
+			};
+
 			if (!cg_hideBody) {
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
-				param.matrix = legLeft * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegRightCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
-				param.matrix = legRight * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "TorsoCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
-				param.matrix = torso * scaler;
-				renderer.RenderModel(*model, param);
+				drawPart(inp.crouch ? "LegCrouch" : "Leg", legLeft * scaler);
+				drawPart(inp.crouch ? "LegRightCrouch" : "LegRight", legRight * scaler);
+				drawPart(inp.crouch ? "TorsoCrouch" : "Torso", torso * scaler);
 			}
 
 			// Arms
@@ -1058,10 +1053,10 @@ namespace spades {
 				const float leftHandSqr = hands[0].GetSquaredLength();
 				const float rightHandSqr = hands[1].GetSquaredLength();
 				if (leftHandSqr > 0.01F || rightHandSqr > 0.01F) {
-					Handle<IModel> armModel = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
-					Handle<IModel> upperModel = renderer.RegisterModel((modelPath + "UpperArm.kv6").c_str());
-					Handle<IModel> armRightModel = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
-					Handle<IModel> upperRightModel = renderer.RegisterModel((modelPath + "UpperArmRight.kv6").c_str());
+					const PlayerPart armModel = models.Get(modelPath, "Arm");
+					const PlayerPart upperModel = models.Get(modelPath, "UpperArm");
+					const PlayerPart armRightModel = models.Get(modelPath, "ArmRight");
+					const PlayerPart upperRightModel = models.Get(modelPath, "UpperArmRight");
 
 					// manual adjustment
 					Vector3 trans = MakeVector3(0, 0, 0);
@@ -1105,12 +1100,14 @@ namespace spades {
 						const bool isLeftArm = mirrored ? (i != 0) : (i == 0);
 
 						// draw arm
-						param.matrix = getArmMatrix(hand, elbow);
-						renderer.RenderModel(isLeftArm ? *armModel : *armRightModel, param);
+						const PlayerPart& fore = isLeftArm ? armModel : armRightModel;
+						param.matrix = getArmMatrix(hand, elbow) * fore.local;
+						renderer.RenderModel(*fore.model, param);
 
 						// draw upper arm
-						param.matrix = getArmMatrix(elbow, shoulder);
-						renderer.RenderModel(isLeftArm ? *upperModel : *upperRightModel, param);
+						const PlayerPart& upper = isLeftArm ? upperModel : upperRightModel;
+						param.matrix = getArmMatrix(elbow, shoulder) * upper.local;
+						renderer.RenderModel(*upper.model, param);
 					};
 
 					if (leftHandSqr > 0.01F)
@@ -1142,11 +1139,11 @@ namespace spades {
 
 			if (!p.IsAlive()) {
 				if (!cg_ragdoll) {
-					model = renderer.RegisterModel((modelPath + "Dead.kv6").c_str());
+					const PlayerPart dead = client.GetPlayerModels().Get(modelPath, "Dead");
 					param.matrix = Matrix4::FromAxis(-right, front2D, -up, p.GetEye());
 					param.matrix = param.matrix * Matrix4::Translate(0.0F, 0.0F, -0.1F);
-					param.matrix = param.matrix * Matrix4::Scale(0.1F);
-					renderer.RenderModel(*model, param);
+					param.matrix = param.matrix * Matrix4::Scale(0.1F) * dead.local;
+					renderer.RenderModel(*dead.model, param);
 				}
 
 				return;
@@ -1266,49 +1263,37 @@ namespace spades {
 				* Matrix4::Translate(0.0F, 0.0F, armsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
 
+			PlayerModels& models = client.GetPlayerModels();
+			// A part of the set, at the matrix the game puts its joint at.
+			auto drawPart = [&](const PlayerPart& part, const Matrix4& joint) {
+				param.matrix = joint * part.local;
+				renderer.RenderModel(*part.model, param);
+			};
+
 			// Legs
-			{
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
-
-				param.matrix = legLeft * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegRightCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
-
-				param.matrix = legRight * scaler;
-				renderer.RenderModel(*model, param);
-			}
+			drawPart(models.Get(modelPath, inp.crouch ? "LegCrouch" : "Leg"), legLeft * scaler);
+			drawPart(models.Get(modelPath, inp.crouch ? "LegRightCrouch" : "LegRight"),
+			         legRight * scaler);
 
 			// Torso
-			{
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "TorsoCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
-
-				param.matrix = torso * scaler;
-				renderer.RenderModel(*model, param);
-			}
+			drawPart(models.Get(modelPath, inp.crouch ? "TorsoCrouch" : "Torso"), torso * scaler);
 
 			// Arms
+			drawPart(models.Get(modelPath, "Arms"), arms * scaler);
+
+			// Head: at Christmas, a set's own hat over it; a set without one
+			// shows the classic hatted head in its place.
 			{
-				model = renderer.RegisterModel((modelPath + "Arms.kv6").c_str());
-
-				param.matrix = arms * scaler;
-				renderer.RenderModel(*model, param);
-			}
-
-			// Head
-			{
-				model = client.isChristmasOn
-					? renderer.RegisterModel("Models/Player/XmasHat.kv6")
-					: renderer.RegisterModel((modelPath + "Head.kv6").c_str());
-
-				param.matrix = head * scaler;
-				renderer.RenderModel(*model, param);
+				const PlayerPart hat = client.isChristmasOn ? models.Hat(modelPath) : PlayerPart();
+				if (client.isChristmasOn && !hat) {
+					model = renderer.RegisterModel("Models/Player/XmasHat.kv6");
+					param.matrix = head * scaler;
+					renderer.RenderModel(*model, param);
+				} else {
+					drawPart(models.Get(modelPath, "Head"), head * scaler);
+					if (hat)
+						drawPart(hat, head * scaler);
+				}
 			}
 
 			// Tool
