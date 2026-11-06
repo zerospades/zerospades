@@ -119,7 +119,6 @@ namespace spades {
 		SDLGLDevice::SDLGLDevice(SDL_Window* s) : window(s) {
 			SPLog("Starting SDLGLDevice");
 
-			SDL_GetWindowSize(window, &w, &h);
 			context = SDL_GL_CreateContext(s);
 			if (!context) {
 				const char* err = SDL_GetError();
@@ -128,6 +127,19 @@ namespace spades {
 			}
 
 			SDL_GL_MakeCurrent(window, context);
+
+			// The framebuffer in real pixels. On a high-DPI window (Retina, a scaled
+			// Wayland output) it is larger than the window, which is in points; the
+			// renderer draws at full resolution and ScaledRenderer keeps the UI at
+			// its physical size.
+			SDL_GL_GetDrawableSize(window, &w, &h);
+			if (w <= 0 || h <= 0)
+				SDL_GetWindowSize(window, &w, &h);
+			{
+				int ww = 0, wh = 0;
+				SDL_GetWindowSize(window, &ww, &wh);
+				SPLog("GL framebuffer %dx%d for a %dx%d window", w, h, ww, wh);
+			}
 
 #ifndef __APPLE__
 			GLenum err = glewInit();
