@@ -170,11 +170,15 @@ namespace spades {
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
 				case SDL_WINDOWEVENT:
-					if (event.window.type == SDL_WINDOWEVENT_FOCUS_GAINED) {
-						SDL_SetRelativeMouseMode(SDL_TRUE);
+					if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+						// Only grab the mouse back if the view wants it grabbed: menus
+						// use an absolute cursor. This matches the state the client
+						// loop last set, so its cached mode stays in sync.
+						SDL_SetRelativeMouseMode(view.NeedsAbsoluteMouseCoordinate() ? SDL_FALSE
+						                                                               : SDL_TRUE);
 						SDL_ShowCursor(SDL_DISABLE);
 						m_active = true;
-					} else if (event.window.type == SDL_WINDOWEVENT_FOCUS_LOST) {
+					} else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 						SDL_SetRelativeMouseMode(SDL_FALSE);
 						SDL_ShowCursor(SDL_ENABLE);
 						m_active = false;
