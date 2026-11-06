@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ZeroSpades Preview</string>
+    <string name="app_name">ZeroSpades</string>
     <string name="title">ZeroSpades</string>
     <string name="subtitle">Android launcher preview</string>
     <string name="status">The Android game engine is not connected yet. These graphics preferences are saved on this device, but do not affect the game yet.</string>
