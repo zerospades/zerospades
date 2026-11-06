@@ -582,7 +582,7 @@ namespace spades {
 				Uint32 sdlFlags = 0;
 				switch (rtype) {
 					case RendererType::GL:
-						sdlFlags = SDL_WINDOW_OPENGL;
+						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
