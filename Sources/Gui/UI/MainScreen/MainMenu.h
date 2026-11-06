@@ -26,6 +26,7 @@
 #include <Gui/UI/MainScreen/DemoListView.h>
 #include <Gui/UI/MainScreen/ModListView.h>
 #include <Gui/UI/MainScreen/ServerListView.h>
+#include <Gui/UI/Settings/PreferenceView.h>
 #include <Gui/UI/Widgets/Button.h>
 #include <Gui/UI/Widgets/Field.h>
 #include <Gui/UI/Widgets/Label.h>
@@ -197,6 +198,9 @@ namespace spades {
 
 			MainScreenMainMenuState GetState();
 			void SetState(const MainScreenMainMenuState& state);
+
+			/** Opens the preferences window, on `state`'s tab and rows if given. */
+			void OpenSetup(Handle<PreferenceViewPersistedState> state = {});
 
 			void HotKey(const std::string& key) override;
 			void Render() override;

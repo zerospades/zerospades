@@ -49,6 +49,9 @@ namespace spades {
 			ClientMenu(ClientUI* ui);
 			void HotKey(const std::string& key) override;
 
+			/** Opens the preferences window, on `state`'s tab and rows if given. */
+			void OpenSetup(Handle<gui::PreferenceViewPersistedState> state = {});
+
 			// IModalMenu implementation (UIElement handles input/drawing)
 			bool IsActive() const override;
 			void Open() override;

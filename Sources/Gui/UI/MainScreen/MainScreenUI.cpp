@@ -59,6 +59,9 @@ namespace spades {
 			// The menu bakes the screen extent into its layout, so a resize has to
 			// rebuild it rather than just resize the root.
 			manager->screenSizeChanged = [this] { Reload(); };
+			// A reopen request left by a preferences window of an earlier screen
+			// isn't ours to honour.
+			PreferenceView::TakeReopenState();
 
 			Init();
 
@@ -106,6 +109,11 @@ namespace spades {
 			MainScreenMainMenuState state = mainMenu->GetState();
 			Init();
 			mainMenu->SetState(state);
+
+			// Rebuilt by an interface scale change made from the preferences window:
+			// bring it back where it was, so the change looks applied in place.
+			if (auto prefs = PreferenceView::TakeReopenState())
+				mainMenu->OpenSetup(std::move(prefs));
 		}
 
 		void MainScreenUI::SetupRenderer() {

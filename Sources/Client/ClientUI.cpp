@@ -52,6 +52,9 @@ namespace spades {
 			// These screens bake the screen extent into their layout, so a resize has
 			// to rebuild them rather than just resize the root.
 			manager->screenSizeChanged = [this] { ReloadScreens(); };
+			// A reopen request left by a preferences window of an earlier screen
+			// isn't ours to honour.
+			gui::PreferenceView::TakeReopenState();
 
 			// clientMenu is built lazily in EnterClientMenu() so that
 			// helper->IsDemoMode() reflects the demo flag, which isn't set until
@@ -155,6 +158,12 @@ namespace spades {
 			// better than leaving a misplaced one, and the partial message is not worth
 			// carrying across a resize.
 			CloseUI();
+			// A window opened from the menu (preferences, a dialog) attaches beside
+			// it on the root, so closing the menu leaves it behind with nothing to
+			// return to. Drop everything still attached, as the main screen does.
+			gui::ui::UIElement& root = manager->GetRootElement();
+			while (!root.GetChildren().empty())
+				root.RemoveChild(root.GetChildren()[0].GetPointerOrNull());
 
 			// Rebuild through the constructors so the new layout is exactly what
 			// entering the game at this extent would have produced. The menu is pure
@@ -164,6 +173,13 @@ namespace spades {
 			chatLogWindow = Handle<ChatLogWindow>::New(this);
 			for (const auto& record : chatLogRecords)
 				chatLogWindow->Record(record.first, record.second);
+
+			// Rebuilt by an interface scale change made from the preferences window:
+			// bring it back where it was, so the change looks applied in place.
+			if (auto prefs = gui::PreferenceView::TakeReopenState()) {
+				EnterClientMenu();
+				clientMenu->OpenSetup(std::move(prefs));
+			}
 		}
 
 		bool ClientUI::IsChatEnabled() {

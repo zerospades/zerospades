@@ -236,14 +236,16 @@ namespace spades {
 		}
 
 		void PreferenceView::SavePersistedState() {
-			if (!persistedState)
-				return;
+			if (persistedState)
+				SaveStateTo(*persistedState);
+		}
 
-			persistedState->selectedTabIndex = selectedTabIndex;
-			persistedState->tabScrollRows.resize(tabs.size());
+		void PreferenceView::SaveStateTo(PreferenceViewPersistedState& state) {
+			state.selectedTabIndex = selectedTabIndex;
+			state.tabScrollRows.resize(tabs.size());
 			for (size_t i = 0; i < tabs.size(); i++) {
 				ListView* list = GetTabList(static_cast<int>(i));
-				persistedState->tabScrollRows[i] = (list != nullptr) ? list->GetTopRowIndex() : 0;
+				state.tabScrollRows[i] = (list != nullptr) ? list->GetTopRowIndex() : 0;
 			}
 		}
 
@@ -358,10 +360,34 @@ namespace spades {
 			SavePersistedState();
 			owner->enable = true;
 			SetParent(nullptr);
+			// Closed by the user: nothing to bring back, even if a rescale requested
+			// from it turned out not to change the scale (and rebuilt nothing).
+			reopenState = nullptr;
 			OnClosed();
-			// Applied now rather than live: a new scale resizes the virtual screen, and
-			// the UI rebuilds itself on that, which would close this window mid-drag.
-			GetManager().GetRenderer().ApplyUIScale();
+		}
+
+		Handle<PreferenceViewPersistedState> PreferenceView::reopenState;
+
+		void PreferenceView::RescaleUIFrom(UIElement& descendant) {
+			PreferenceView* view = nullptr;
+			for (UIElement* e = &descendant; e && !view; e = e->GetParent())
+				view = dynamic_cast<PreferenceView*>(e);
+
+			if (view) {
+				// Its own state object (the in-game menu's) dies with the menu in the
+				// rebuild, and the main menu's window keeps none, so take a copy.
+				reopenState = Handle<PreferenceViewPersistedState>::New();
+				view->SaveStateTo(*reopenState);
+			}
+
+			// Takes effect between frames; the screens then rebuild on the new size.
+			descendant.GetManager().GetRenderer().ApplyUIScale();
+		}
+
+		Handle<PreferenceViewPersistedState> PreferenceView::TakeReopenState() {
+			Handle<PreferenceViewPersistedState> state = std::move(reopenState);
+			reopenState = nullptr;
+			return state;
 		}
 
 		void PreferenceView::Run() {
