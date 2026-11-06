@@ -44,7 +44,6 @@ namespace spades {
 			constexpr float kWheelRows = 2.0F; // rows a wheel step scrolls
 			constexpr std::size_t kMaxNameBytes = 255; // as the file holds them
 			constexpr float kNamePad = 3.0F;           // the name, in from its box
-			constexpr float kBackdropPad = 6.0F;       // the panel behind, out from the rows
 
 			const Vector4 kText = MakeVector4(0.86F, 0.87F, 0.90F, 1.0F);
 			const Vector4 kGroupText = MakeVector4(0.66F, 0.69F, 0.75F, 1.0F);
@@ -198,18 +197,8 @@ namespace spades {
 
 		// --- Input -------------------------------------------------------------
 
-		AABB2 SceneTreePanel::Backdrop(int rowCount) const {
-			const int shown = std::min(rowCount - scroll, VisibleRows());
-			const float x = left - kSlack - kBackdropPad;
-			const float y = top - kBackdropPad;
-			return AABB2(x, y, kWidth + kSlack + kBackdropPad * 2.0F,
-			             float(std::max(1, shown)) * kRowH + kBackdropPad * 2.0F);
-		}
-
 		bool SceneTreePanel::IsOver(const KV6Scene& scene, const Vector2& at) const {
-			// Its rows, and the panel round them: a press there picks nothing
-			// behind it.
-			return Backdrop(int(Rows(scene).size())).Contains(at);
+			return RowAt(Rows(scene), at) >= 0;
 		}
 
 		std::string SceneTreePanel::Press(KV6Scene& scene, const Vector2& at, bool toggle,
@@ -481,10 +470,10 @@ namespace spades {
 			                        ? LabelX(row.depth) - kFoldW - 3.0F
 			                        : LabelX(row.depth) - 4.0F;
 			lines.emplace_back(MakeVector2(x, midY), MakeVector2(tickEnd, midY));
-			const Vector2 offset = MakeVector2(1.0F, 1.0F);
+			// No panel behind: a dark line under each, wider than it, keeps it
+			// apart from the grid and the model.
 			for (const auto& l : lines)
-				OverlayStrokeLine(renderer, l.first + offset, l.second + offset, 1.0F,
-				                  Faded(kShadow, 0.5F));
+				OverlayStrokeLine(renderer, l.first, l.second, 3.0F, Faded(kShadow, 0.7F));
 			for (const auto& l : lines)
 				OverlayStrokeLine(renderer, l.first, l.second, 1.0F, kBranch);
 		}
@@ -492,8 +481,15 @@ namespace spades {
 		void SceneTreePanel::DrawText(const std::string& text, float x, float y,
 		                              const Vector4& color) {
 			const float h = font.Measure("Ag").y * kTextScale;
-			font.DrawShadow(text, MakeVector2(x, y + (kRowH - h) * 0.5F), kTextScale, color,
-			                Faded(kShadow, color.w));
+			const Vector2 at = MakeVector2(x, y + (kRowH - h) * 0.5F);
+			// No panel behind: a dark outline all round reads over the grid and
+			// the model alike, where a shadow below loses itself in either.
+			const Vector4 outline = Faded(kShadow, color.w * 0.9F);
+			for (const Vector2& d : {MakeVector2(-1, 0), MakeVector2(1, 0), MakeVector2(0, -1),
+			                         MakeVector2(0, 1), MakeVector2(-1, -1), MakeVector2(1, -1),
+			                         MakeVector2(-1, 1), MakeVector2(1, 1)})
+				font.Draw(text, at + d, kTextScale, outline);
+			font.Draw(text, at, kTextScale, color);
 		}
 
 		void SceneTreePanel::DrawEye(const Vector2& c, bool open, const Vector4& color) {
@@ -587,12 +583,6 @@ namespace spades {
 			const Drop drop =
 			  held == Held::Drag ? DropAt(scene, rows, cursor) : Drop();
 			const int last = std::min(int(rows.size()), scroll + VisibleRows());
-
-			// A panel behind the rows, as behind the editor's other panels, so
-			// they read over the grid and the model.
-			const AABB2 backdrop = Backdrop(int(rows.size()));
-			EditorTheme::PaintPanel(renderer, backdrop.GetMinX(), backdrop.GetMinY(),
-			                        backdrop.GetWidth(), backdrop.GetHeight());
 
 			for (int i = scroll; i < last; i++) {
 				const Row& row = rows[std::size_t(i)];

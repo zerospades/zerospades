@@ -56,6 +56,8 @@ namespace spades {
 			void Close() { open = false; }
 			bool IsOpen() const { return open; }
 			int Index() const { return slider.Index(); }
+			/** Chooses step `index`, as the slider would; false when it cannot be. */
+			bool Select(int index) { return slider.Select(index) || slider.Index() == index; }
 
 			/** What the node is and what the chosen step makes of it; with
 			 *  `refused` set instead, why it makes nothing, and it cannot be

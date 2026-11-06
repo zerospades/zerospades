@@ -82,9 +82,13 @@ namespace spades {
 								    Vector4 transformed4 = worldTransform * MakeVector4(pos.x, pos.y, pos.z, 1.0F);
 								    Vector3 transformed = MakeVector3(transformed4.x, transformed4.y, transformed4.z);
 
-								    int tx = int(std::round(transformed.x));
-								    int ty = int(std::round(transformed.y));
-								    int tz = int(std::round(transformed.z));
+								    // Halves rounded up, the same way on both sides of
+								    // zero: rounded away from it, a part whose voxels
+								    // sit on halves (pivots of 3.5) leaves an empty
+								    // plane at zero, splitting the model.
+								    int tx = int(std::floor(transformed.x + 0.5F));
+								    int ty = int(std::floor(transformed.y + 0.5F));
+								    int tz = int(std::floor(transformed.z + 0.5F));
 
 								    uint32_t color = obj.model->GetColor(x, y, z);
 								    voxels.push_back(std::make_tuple(tx, ty, tz, color));

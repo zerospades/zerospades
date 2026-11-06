@@ -236,6 +236,7 @@ namespace {
 	// refused unless --debug-tools is given too, so none is used by accident
 	// and --help lists only what a player may want.
 	const char* const kDebugOptions[] = {"--screenshot-quit", "--editor-reference",
+	                                     "--editor-generate",
 	                                     "--override-cvar",   "--replay-demo",
 	                                     "--demo",            "--player",
 	                                     "--kv6-tools",       "--2kv6-tools"};
@@ -293,6 +294,10 @@ namespace {
 		printf("  --editor-reference X|Y|Z IMAGE\n");
 		printf("                       show IMAGE as a reference image across that\n");
 		printf("                       axis in the model editor --open opens\n");
+		printf("  --editor-generate NODE RESOLUTION\n");
+		printf("                       open Generate KV6 on NODE (a path of names, or /\n");
+		printf("                       for the whole scene) at RESOLUTION (1/4, 1/1, 2/1)\n");
+		printf("                       in the scene editor --open opens\n");
 		printf("  --screenshot-quit SECONDS\n");
 		printf("                       take a screenshot that many seconds after\n");
 		printf("                       starting, then quit: to check what is drawn\n");
@@ -438,6 +443,15 @@ namespace {
 					}
 					spades::gui::Automation().editorReferences.emplace_back(
 					  index, LocalPathFromArgument(argv[i + 2]));
+					i += 3;
+					return i;
+				}
+				return 0;
+			}
+			if (!strcasecmp(a, "--editor-generate")) {
+				if (i + 2 < argc) {
+					spades::gui::Automation().editorGenerate = argv[i + 1];
+					spades::gui::Automation().editorGenerateAt = argv[i + 2];
 					i += 3;
 					return i;
 				}

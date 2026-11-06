@@ -313,6 +313,9 @@ namespace spades {
 			// Models of a node at another resolution, previewed in its place.
 			std::unique_ptr<ResampleTool> resample;
 			void OpenResample(const NodePath& path);
+			/** --editor-generate: Generate KV6 on the node at the path of
+			 *  `names`, at the resolution `at` ("1/1"). */
+			void OpenResampleByName(const std::string& names, const std::string& at);
 			/** A key or button while it is open; true when taken: its own,
 			 *  the camera's, and nothing that would change the scene. */
 			bool ResampleInput(const std::string& key, bool down);

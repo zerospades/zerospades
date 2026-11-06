@@ -63,7 +63,7 @@ namespace spades {
 			sourceSize = SizeOf(*composed);
 			sourceVoxels = SolidVoxels(*composed);
 
-			// Every step from 1/10 to 10/1, the even ones and the ends named;
+			// Every step from 1/10 to 10/1, the ends, the fives and 1/1 named;
 			// a finer one too big for a KV6 cannot be chosen.
 			const std::vector<VoxelResolution>& steps = VoxelResolution::Steps();
 			std::vector<StepSlider::Step> slider;
@@ -73,7 +73,7 @@ namespace spades {
 				StepSlider::Step s;
 				s.label = r.Label();
 				const int n = std::max(r.finer, r.coarser);
-				s.major = n == 1 || n == 2 || n == 5 || n == VoxelResolution::kMaxStep;
+				s.major = n == 1 || n == 5 || n == VoxelResolution::kMaxStep;
 				s.usable = Fits(r.SizeOf(sourceSize));
 				if (r == VoxelResolution())
 					start = int(i); // 1/1: the node as it is
@@ -85,6 +85,17 @@ namespace spades {
 			           std::move(slider), start);
 			Update(scene);
 			return true;
+		}
+
+		bool ResampleTool::Choose(KV6Scene& scene, const VoxelResolution& wanted) {
+			const std::vector<VoxelResolution>& steps = VoxelResolution::Steps();
+			for (std::size_t i = 0; i < steps.size(); i++) {
+				if (steps[i] == wanted && IsOpen() && panel.Select(int(i))) {
+					Update(scene);
+					return true;
+				}
+			}
+			return false;
 		}
 
 		void ResampleTool::Update(KV6Scene& scene) {
