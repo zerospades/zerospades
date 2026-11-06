@@ -56,22 +56,15 @@ namespace spades {
 			Handle<IImage> outlineImage;
 
 			/**
-			 * Pixel fonts stay sharp under a scaled UI. Glyphs are drawn from copies of
-			 * the atlases enlarged `texScale` times with nearest neighbour, never from
-			 * the 1x atlas magnified with bilinear filtering:
-			 * - texScale is the UI scale rounded up when the text then shrinks by no
-			 *   more than 1/sqrt(2) (beyond that the GPU would sample the next, blurry
-			 *   mip level): exact size, edges blended over at most one pixel, and
-			 *   exactly one texel per screen pixel at whole-number scales;
-			 * - otherwise (UI scales between 1 and about 1.41) it is the scale rounded
-			 *   down, drawn at exactly texScale screen pixels per font pixel, so the
-			 *   text is `pixelFit` (texScale / UI scale, at least 0.71) of its nominal
-			 *   size;
-			 * - below 1, one screen pixel per font pixel (pixelFit above 1).
-			 * Measure() reports the size drawn, so layouts stay consistent.
+			 * Pixel fonts stay sharp on a high-DPI or scaled-up screen ("sharp
+			 * bilinear"): glyphs are drawn from copies of the atlases enlarged
+			 * `texScale` times with nearest neighbour, texScale being the screen pixels
+			 * per font pixel rounded up, so the atlas is never magnified (which blurs
+			 * every glyph), only reduced a little, without mipmaps. At whole-number
+			 * scales each texel lands on whole screen pixels exactly; otherwise glyph
+			 * edges blend over at most one pixel. 1 = the plain atlases.
 			 */
 			int texScale = 1;
-			float pixelFit = 1.0F;
 			Handle<IImage> scaledTex;
 			Handle<IImage> scaledOutlineImage;
 			void SyncTextureScale();

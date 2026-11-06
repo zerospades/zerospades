@@ -362,10 +362,8 @@ namespace spades {
 			SetParent(nullptr);
 			// Closed by the user: nothing to bring back, even if a rescale requested
 			// from it turned out not to change the scale (and rebuilt nothing).
-			UIManager& manager = GetManager();
-			if (dynamic_cast<PreferenceViewPersistedState*>(
-			      manager.restoreAfterRebuild.GetPointerOrNull()))
-				manager.restoreAfterRebuild = nullptr;
+			if (persistedState)
+				persistedState->reopenAfterRebuild = false;
 			OnClosed();
 		}
 
@@ -376,21 +374,11 @@ namespace spades {
 
 			// Detached already: a rebuild is under way (a slider losing its capture as
 			// it is torn down lands here), and there is no window to keep.
-			if (!view || !view->GetParent())
+			if (!view || !view->GetParent() || !view->persistedState)
 				return;
 
-			// Its own state object (the in-game menu's) dies with the menu in the
-			// rebuild, and the main menu's window keeps none, so take a copy.
-			auto state = Handle<PreferenceViewPersistedState>::New();
-			view->SaveStateTo(*state);
-			view->GetManager().restoreAfterRebuild = std::move(state).Cast<RefCountedObject>();
-		}
-
-		Handle<PreferenceViewPersistedState> PreferenceView::TakeReopenState(UIManager& manager) {
-			Handle<RefCountedObject> held = std::move(manager.restoreAfterRebuild);
-			manager.restoreAfterRebuild = nullptr;
-			auto* state = dynamic_cast<PreferenceViewPersistedState*>(held.GetPointerOrNull());
-			return Handle<PreferenceViewPersistedState>(state);
+			view->SavePersistedState();
+			view->persistedState->reopenAfterRebuild = true;
 		}
 
 		void PreferenceView::Run() {

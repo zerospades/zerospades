@@ -35,8 +35,6 @@ namespace spades {
 		class ClientMenu : public gui::ui::UIElement, public gui::IModalMenu {
 			ClientUI* ui;           // weak
 			ClientUIHelper* helper; // weak
-			// Lives for the session so reopening Setup lands on the same tab/row.
-			Handle<gui::PreferenceViewPersistedState> preferenceState;
 
 			gui::ui::Label* escHint = nullptr; // weak
 
@@ -49,8 +47,8 @@ namespace spades {
 			ClientMenu(ClientUI* ui);
 			void HotKey(const std::string& key) override;
 
-			/** Opens the preferences window, on `state`'s tab and rows if given. */
-			void OpenSetup(Handle<gui::PreferenceViewPersistedState> state = {});
+			/** Opens the preferences window where it was last left this session. */
+			void OpenSetup();
 
 			// IModalMenu implementation (UIElement handles input/drawing)
 			bool IsActive() const override;

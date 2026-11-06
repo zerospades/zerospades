@@ -1252,8 +1252,15 @@ namespace spades {
 			renderStopwatch.Reset();
 			port->Swap();
 
-			// next frame's framebuffer
-			SetFramebuffer(&port->GetFramebuffer());
+			// next frame's framebuffer, of a new size if the window was resized
+			Bitmap& next = port->GetFramebuffer();
+			if (next.GetWidth() != fb->GetWidth() || next.GetHeight() != fb->GetHeight()) {
+				SPLog("Framebuffer resized to %dx%d", next.GetWidth(), next.GetHeight());
+				fb = nullptr;
+				depthBuffer.assign(static_cast<size_t>(next.GetWidth()) * next.GetHeight(), 0.0F);
+				imageRenderer->SetDepthBuffer(depthBuffer.data());
+			}
+			SetFramebuffer(&next);
 		}
 
 		Handle<Bitmap> SWRenderer::ReadBitmap() {

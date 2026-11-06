@@ -39,6 +39,7 @@ namespace spades {
 			friend class StartupScreen;
 			StartupScreen* scr;
 			SDL_Window* window; // the setup window while it is shown; weak
+			int currentDisplay; // the monitor it is on, as of its last move
 			std::vector<IntVector3> modes;
 			struct ReportLine {
 				std::string text;
@@ -74,15 +75,17 @@ namespace spades {
 
 			void ExamineSystem();
 
-			void SetWindow(SDL_Window* w) { window = w; }
+			void SetWindow(SDL_Window* w);
+			/** The setup window was moved, possibly onto another monitor. */
+			void WindowMoved();
 
 			// Questions about the monitor the setup window is on, which only the helper
 			// (holding the window) can answer. Process-wide display settings and facts,
 			// such as the auto-resolution mode or the monitor count, are in
 			// Gui/Utils/DisplayUtils.h.
 
-			/** The monitor the setup window is shown on. */
-			int GetCurrentDisplay();
+			/** The monitor the setup window is shown on (kept up to date, cheap). */
+			int GetCurrentDisplay() const { return currentDisplay; }
 			std::string GetCurrentDisplayName();
 			/** The desktop resolution of the monitor the setup window is shown on. */
 			bool GetDetectedResolution(int& width, int& height);

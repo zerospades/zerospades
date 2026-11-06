@@ -83,6 +83,7 @@ namespace spades {
 		StartupScreenHelper::StartupScreenHelper()
 			: scr(nullptr),
 			  window(nullptr),
+			  currentDisplay(0),
 			  shaderHighCapable(false),
 			  postFilterHighCapable(false),
 			  particleHighCapable(false) {
@@ -701,7 +702,14 @@ namespace spades {
 			scr->Start();
 		}
 
-		int StartupScreenHelper::GetCurrentDisplay() { return display::GetWindowDisplay(window); }
+		void StartupScreenHelper::SetWindow(SDL_Window* w) {
+			window = w;
+			WindowMoved();
+		}
+
+		void StartupScreenHelper::WindowMoved() {
+			currentDisplay = display::GetWindowDisplay(window);
+		}
 
 		std::string StartupScreenHelper::GetCurrentDisplayName() {
 			return display::GetDisplayName(GetCurrentDisplay());

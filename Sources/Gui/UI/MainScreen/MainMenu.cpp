@@ -1208,10 +1208,10 @@ namespace spades {
 
 		void MainScreenMainMenu::OnSetupPressed(UIElement&) { OpenSetup(); }
 
-		void MainScreenMainMenu::OpenSetup(Handle<PreferenceViewPersistedState> state) {
+		void MainScreenMainMenu::OpenSetup() {
 			PreferenceViewOptions opt;
 			opt.showOverlay = true;
-			opt.persistedState = std::move(state);
+			opt.persistedState.Set(&ui->GetPreferenceState(), true);
 			Handle<PreferenceView> al =
 			    Handle<PreferenceView>::New(this, opt, &ui->GetFontManager());
 			al->Run();

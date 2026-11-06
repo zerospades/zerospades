@@ -32,6 +32,9 @@
 #include <Gui/UI/Widgets/FieldWithHistory.h>
 
 namespace spades {
+	namespace gui {
+		class PreferenceViewPersistedState;
+	}
 	namespace client {
 		class FontManager;
 		class Client;
@@ -56,6 +59,9 @@ namespace spades {
 
 			Handle<ChatLogWindow> chatLogWindow;
 			Handle<ClientMenu> clientMenu;
+			// The preferences window's tab and scroll position, for the whole session;
+			// survives the screens being rebuilt.
+			Handle<gui::PreferenceViewPersistedState> preferenceState;
 
 			// The docked chat composer or the peek view while one of them is the active UI.
 			// Weak: `activeUI` owns it, so `SetActiveUI` clears this before it goes away.

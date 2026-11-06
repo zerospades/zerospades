@@ -32,7 +32,6 @@ namespace spades {
 	namespace client {
 		using gui::PreferenceView;
 		using gui::PreferenceViewOptions;
-		using gui::PreferenceViewPersistedState;
 		using gui::ui::Button;
 		using gui::ui::Label;
 		using gui::ui::UIElement;
@@ -68,7 +67,6 @@ namespace spades {
 
 		ClientMenu::ClientMenu(ClientUI* ui)
 		    : UIElement(&ui->GetUIManager()), ui(ui), helper(&ui->GetHelper()) {
-			preferenceState = Handle<PreferenceViewPersistedState>::New();
 
 			UIManager* manager = &GetManager();
 			float sw = manager->screenWidth;
@@ -138,16 +136,10 @@ namespace spades {
 
 		void ClientMenu::OnSetup(UIElement&) { OpenSetup(); }
 
-		void ClientMenu::OpenSetup(Handle<PreferenceViewPersistedState> state) {
-			// Carry it into this menu's own memory, which outlives the window.
-			if (state) {
-				preferenceState->selectedTabIndex = state->selectedTabIndex;
-				preferenceState->tabScrollRows = state->tabScrollRows;
-			}
-
+		void ClientMenu::OpenSetup() {
 			PreferenceViewOptions opt;
 			opt.gameActive = true;
-			opt.persistedState = preferenceState;
+			opt.persistedState = ui->preferenceState;
 
 			if (escHint)
 				escHint->visible = false; // hide while in settings

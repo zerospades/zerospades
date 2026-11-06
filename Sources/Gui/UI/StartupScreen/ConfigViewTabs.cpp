@@ -610,15 +610,9 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::Render() {
-			// Follow the setup window when it is dragged onto another monitor. A few
-			// checks a second are plenty for a window drag, and spare an SDL call
-			// per frame.
-			float now = GetManager().time;
-			if (now >= nextDisplayCheck) {
-				nextDisplayCheck = now + 0.25F;
-				if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
-					ApplyDetectedResolution();
-			}
+			// Follow the setup window when it is dragged onto another monitor.
+			if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
+				ApplyDetectedResolution();
 
 			client::IFont* font = GetFont();
 			if (font)

@@ -303,6 +303,12 @@ namespace spades {
 			return GLImage::FromBitmap(bmp, device.GetPointerOrNull()).Cast<client::IImage>();
 		}
 
+		Handle<client::IImage> GLRenderer::CreateImageWithoutMipmaps(spades::Bitmap& bmp) {
+			SPADES_MARK_FUNCTION();
+			return GLImage::FromBitmap(bmp, device.GetPointerOrNull(), false)
+			  .Cast<client::IImage>();
+		}
+
 		Handle<client::IModel> GLRenderer::CreateModel(spades::VoxelModel& model) {
 			SPADES_MARK_FUNCTION();
 			return Handle<GLOptimizedVoxelModel>::New(&model, *this).Cast<client::IModel>();
@@ -371,11 +377,18 @@ namespace spades {
 			}
 		}
 
+		// 2D drawing (and mouse input) is in window units. The framebuffer
+		// (device->ScreenWidth) is in pixels, more of them on a high-DPI display: the
+		// image renderer's projection maps one onto the other.
 		float GLRenderer::ScreenWidth() {
-			return static_cast<float>(device->ScreenWidth());
+			return static_cast<float>(device->WindowWidth());
 		}
 		float GLRenderer::ScreenHeight() {
-			return static_cast<float>(device->ScreenHeight());
+			return static_cast<float>(device->WindowHeight());
+		}
+		float GLRenderer::ScreenPixelRatio() {
+			return static_cast<float>(device->ScreenWidth()) /
+			       static_cast<float>(device->WindowWidth());
 		}
 
 		client::RendererInfo GLRenderer::GetRendererInfo() {
@@ -1294,7 +1307,8 @@ namespace spades {
 
 				device->BindFramebuffer(IGLDevice::Framebuffer, 0);
 				device->Enable(IGLDevice::Blend, false);
-				device->Viewport(0, 0, (int)sw, (int)sh);
+				// The whole framebuffer, in pixels; the quad below is in 2D units.
+				device->Viewport(0, 0, device->ScreenWidth(), device->ScreenHeight());
 
 				Handle<GLImage> image(new GLImage(handle.GetTexture(), device.GetPointerOrNull(),
 												  static_cast<float>(handle.GetWidth()),
@@ -1561,11 +1575,13 @@ namespace spades {
 			EnsureSceneNotStarted();
 			imageRenderer->Flush();
 
+			// The scissor box is in framebuffer pixels; outRect in 2D units.
+			const float ratio = ScreenPixelRatio();
 			const float sh = ScreenHeight();
-			const int x = (int)floorf(outRect.GetMinX());
-			const int y = (int)floorf(sh - outRect.GetMaxY());
-			const int w = (int)ceilf(outRect.GetWidth());
-			const int h = (int)ceilf(outRect.GetHeight());
+			const int x = (int)floorf(outRect.GetMinX() * ratio);
+			const int y = (int)floorf((sh - outRect.GetMaxY()) * ratio);
+			const int w = (int)ceilf(outRect.GetWidth() * ratio);
+			const int h = (int)ceilf(outRect.GetHeight() * ratio);
 
 			device->Enable(IGLDevice::ScissorTest, true);
 			device->Scissor(x, y, std::max(0, w), std::max(0, h));
@@ -1613,7 +1629,8 @@ namespace spades {
 
 				device->BindFramebuffer(IGLDevice::Framebuffer, 0);
 				device->Enable(IGLDevice::Blend, false);
-				device->Viewport(0, 0, (int)sw, (int)sh);
+				// The whole framebuffer, in pixels; the quad below is in 2D units.
+				device->Viewport(0, 0, device->ScreenWidth(), device->ScreenHeight());
 
 				auto image = Handle<GLImage>::New(lastColorBufferTexture,
 					device.GetPointerOrNull(), sw, sh, false);

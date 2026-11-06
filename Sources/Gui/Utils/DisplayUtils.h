@@ -41,10 +41,6 @@ namespace spades {
 				int height;
 			};
 
-			struct Rect {
-				int x, y, width, height;
-			};
-
 			/** Number of connected monitors (at least 1 once SDL video is up). */
 			int GetNumDisplays();
 
@@ -64,8 +60,24 @@ namespace spades {
 			void SetPreferredDisplay(int index);
 
 			/**
-			 * Whether the game uses the desktop resolution of its monitor
-			 * (`r_videoAutoResolution`, on by default) instead of r_videoWidth/Height.
+			 * Before SDL starts its video subsystem: on Windows, declares the game
+			 * aware of per-monitor DPI (SDL 2.24+). Windows then stops stretching the
+			 * finished frames of a high-DPI screen (blurring them); window units are
+			 * pixels there, as on X11, and the game scales its UI itself.
+			 */
+			void DeclareDpiAwareness();
+
+			/**
+			 * Once SDL video is up: turns auto-resolution on for configs from before
+			 * it whose resolution was never chosen (the stock 800x600, or the
+			 * monitor's own size). Runs once per config.
+			 */
+			void MigrateSettings();
+
+			/**
+			 * Whether the game opens at its monitor's size (`r_videoAutoResolution`,
+			 * on by default): fullscreen at the desktop mode, or windowed maximized,
+			 * instead of at r_videoWidth x r_videoHeight.
 			 */
 			bool IsAutoResolution();
 			void SetAutoResolution(bool on);
@@ -73,11 +85,6 @@ namespace spades {
 			/** The monitor's current desktop resolution; false if SDL can't tell. */
 			bool GetDesktopResolution(int index, Resolution& out);
 
-			/**
-			 * The part of the monitor a window may cover: all of it minus taskbars,
-			 * docks and menu bars. Needs SDL 2.0.5; with older SDL, the whole monitor.
-			 */
-			bool GetUsableBounds(int index, Rect& out);
 
 			/**
 			 * The monitor's distinct video modes of at least 640x480, largest first.
