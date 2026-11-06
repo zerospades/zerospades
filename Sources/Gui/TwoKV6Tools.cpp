@@ -34,6 +34,7 @@
 #include <Core/VoxelModel.h>
 #include <Core/VoxelModel2KV6.h>
 #include <Core/VoxelModelLoader.h>
+#include <Core/VoxelResample.h>
 #include <Gui/UI/Editor/KV6/KV6ModelIO.h>
 
 #include "KV6Tools.h"
@@ -82,12 +83,15 @@ namespace spades {
 		  "                           it stands in the scene; OUT.kv6: its voxels\n"
 		  "                           composed with all under it (--self: its own\n"
 		  "                           only), its pivot on the object's origin\n"
-		  "  flatten FILE OUT.kv6 [--scale 1/N]\n"
-		  "                           the whole scene composed as the game draws;\n"
-		  "                           --scale 1/N makes it N times coarser, a\n"
-		  "                           lighter model to show far away (each N^3 block\n"
-		  "                           kept when a quarter of a plane full)\n"
-		  "                           it, its pivot on the scene's origin\n"
+		  "  flatten FILE OUT.kv6 [--scale 1/N|N/1]\n"
+		  "                           the whole scene composed as the game draws it,\n"
+		  "                           its pivot on the scene's origin; --scale 1/N\n"
+		  "                           makes it N times coarser, a lighter model to\n"
+		  "                           show far away (each N^3 block kept when a\n"
+		  "                           quarter of a plane full); --scale N/1 (to 10/1)\n"
+		  "                           N times finer, each part sampled through its\n"
+		  "                           own transform: one the scene scales down keeps\n"
+		  "                           the detail it was modelled at\n"
 		  "\n"
 		  "  combine FILE TARGET SOURCE [--over|--under|--carve|--paint|--intersect]\n"
 		  "          [--grow]         combine SOURCE's voxels with TARGET's where they\n"
@@ -938,9 +942,21 @@ namespace spades {
 				Handle<VoxelModel> model;
 				if (cmd == "flatten") {
 					const Options o = TakeOptions(rest, 1, {{"--scale", 1}});
-					Need(o.rest, 1, "flatten FILE OUT.kv6 [--scale 1/N]");
+					Need(o.rest, 1, "flatten FILE OUT.kv6 [--scale 1/N|N/1]");
 					model = Composed(scene);
-					if (o.Has("--scale")) {
+					VoxelResolution resolution;
+					if (o.Has("--scale") && o.Values("--scale")[0].find('/') != std::string::npos &&
+					    o.Values("--scale")[0].compare(0, 2, "1/") != 0) {
+						// N/1: finer, each part sampled through its own transform.
+						if (!VoxelResolution::Parse(o.Values("--scale")[0], resolution))
+							throw UsageError("--scale takes 1/N or N/1, N from 1 to " +
+							                 std::to_string(VoxelResolution::kMaxStep));
+						Matrix4 frame;
+						std::string why;
+						model = ResampledScene(scene, resolution, frame, why);
+						if (!model)
+							throw std::runtime_error(why);
+					} else if (o.Has("--scale")) {
 						// 1/N, or N itself, the factor the model gets coarser by.
 						std::string factor = o.Values("--scale")[0];
 						if (factor.compare(0, 2, "1/") == 0)
