@@ -2,25 +2,26 @@
 # Builds a player model set's Player.2kv6 from its 13 classic .kv6 parts, as
 # the player template has them:
 #
-#   Player                        the player: turns with where they face
-#   ├─ UpperBody                  top of the torso: the torso, head and arms hang from it
-#   │  ├─ Torso                   Torso.kv6
-#   │  ├─ Neck                    the head nods about it, with the aim
-#   │  │  ├─ Head                 Head.kv6
-#   │  │  └─ SantaHat   [hidden]  worn over Head at Christmas
-#   │  └─ Shoulders               tilt with the aim
-#   │     └─ ArmsHolding          Arms.kv6: both arms holding a tool, third person
-#   ├─ LeftHip ─ LeftLeg          Leg.kv6
-#   └─ RightHip ─ RightLeg        LegRight.kv6
-#   Crouching           [hidden]  the same joints, crouched
-#   ├─ UpperBody ─ Torso          TorsoCrouch.kv6
-#   ├─ LeftHip ─ LeftLeg          LegCrouch.kv6
-#   └─ RightHip ─ RightLeg        LegRightCrouch.kv6
-#   JointedArms         [hidden]  bent by first person (half size), and the corpse's
-#   ├─ LeftShoulder ─ LeftUpperArm ─ LeftElbow ─ LeftForearm      UpperArm, Arm.kv6
-#   └─ RightShoulder ─ RightUpperArm ─ RightElbow ─ RightForearm  UpperArmRight, ArmRight
-#   Fallen              [hidden]  shown when ragdolls are off
-#   └─ Corpse                     Dead.kv6
+#   Player                            the player: turns with where they face
+#   ├─ Standing
+#   │  ├─ UpperBody                   top of the torso: torso, head and arms hang from it
+#   │  │  ├─ Torso                    Torso.kv6
+#   │  │  ├─ Neck                     the head nods about it, with the aim
+#   │  │  │  ├─ Head                  Head.kv6
+#   │  │  │  └─ SantaHat   [hidden]   worn over Head at Christmas
+#   │  │  └─ Shoulders                tilt with the aim
+#   │  │     └─ ArmsHolding           Arms.kv6: both arms holding a tool, third person
+#   │  ├─ LeftHip ─ LeftLeg           Leg.kv6
+#   │  └─ RightHip ─ RightLeg         LegRight.kv6
+#   ├─ Crouching          [hidden]    the same joints, crouched
+#   │  ├─ UpperBody ─ Torso           TorsoCrouch.kv6
+#   │  ├─ LeftHip ─ LeftLeg           LegCrouch.kv6
+#   │  └─ RightHip ─ RightLeg         LegRightCrouch.kv6
+#   └─ JointedArms        [hidden]    bent by first person (half size), and the corpse's
+#      ├─ LeftShoulder ─ LeftUpperArm ─ LeftElbow ─ LeftForearm      UpperArm, Arm.kv6
+#      └─ RightShoulder ─ RightUpperArm ─ RightElbow ─ RightForearm  UpperArmRight, ArmRight
+#   Fallen                [hidden]    shown when ragdolls are off: no joints
+#   └─ Corpse                         Dead.kv6
 #
 # The game places every joint itself and draws each part on its own hinge
 # (Client/PlayerModels.cpp), so the hinges' places here only show the parts
@@ -77,61 +78,62 @@ elbow() {
 scene new "$out" --force >/dev/null
 {
 	echo "add-hinge / Player"
-	echo "add-hinge Player UpperBody --at 0 0 -10"
-	part Player/UpperBody Torso Torso
-	echo "add-hinge Player/UpperBody Neck"
-	part Player/UpperBody/Neck Head Head
-	echo "add-model Player/UpperBody/Neck $hat --name SantaHat --at $hatAt"
-	echo "set-scale Player/UpperBody/Neck/SantaHat 1.05"
-	echo "hide Player/UpperBody/Neck/SantaHat"
-	echo "add-hinge Player/UpperBody Shoulders --at 0 0 1"
-	part Player/UpperBody/Shoulders Arms ArmsHolding
-	echo "add-hinge Player LeftHip --at 2.5 0 -1"
-	part Player/LeftHip Leg LeftLeg
-	echo "add-hinge Player RightHip --at -2.5 0 -1"
-	part Player/RightHip LegRight RightLeg
+	echo "add-hinge Player Standing"
+	echo "add-hinge Player/Standing UpperBody --at 0 0 -10"
+	part Player/Standing/UpperBody Torso Torso
+	echo "add-hinge Player/Standing/UpperBody Neck"
+	part Player/Standing/UpperBody/Neck Head Head
+	echo "add-model Player/Standing/UpperBody/Neck $hat --name SantaHat --at $hatAt"
+	echo "set-scale Player/Standing/UpperBody/Neck/SantaHat 1.05"
+	echo "hide Player/Standing/UpperBody/Neck/SantaHat"
+	echo "add-hinge Player/Standing/UpperBody Shoulders --at 0 0 1"
+	part Player/Standing/UpperBody/Shoulders Arms ArmsHolding
+	echo "add-hinge Player/Standing LeftHip --at 2.5 0 -1"
+	part Player/Standing/LeftHip Leg LeftLeg
+	echo "add-hinge Player/Standing RightHip --at -2.5 0 -1"
+	part Player/Standing/RightHip LegRight RightLeg
 
-	echo "add-hinge / Crouching"
-	echo "add-hinge Crouching UpperBody --at 0 0 -5"
-	part Crouching/UpperBody TorsoCrouch Torso
-	echo "add-hinge Crouching LeftHip --at 2.5 -2.5 -0.5"
-	part Crouching/LeftHip LegCrouch LeftLeg
-	echo "add-hinge Crouching RightHip --at -2.5 -2.5 -0.5"
-	part Crouching/RightHip LegRightCrouch RightLeg
-	echo "hide Crouching"
+	echo "add-hinge Player Crouching"
+	echo "add-hinge Player/Crouching UpperBody --at 0 0 -5"
+	part Player/Crouching/UpperBody TorsoCrouch Torso
+	echo "add-hinge Player/Crouching LeftHip --at 2.5 -2.5 -0.5"
+	part Player/Crouching/LeftHip LegCrouch LeftLeg
+	echo "add-hinge Player/Crouching RightHip --at -2.5 -2.5 -0.5"
+	part Player/Crouching/RightHip LegRightCrouch RightLeg
+	echo "hide Player/Crouching"
 
 	# Half size, as first person draws them; shoulders on the body's, the
 	# arms out to the sides.
-	echo "add-hinge / JointedArms"
-	echo "set-scale JointedArms 0.5"
-	echo "add-hinge JointedArms LeftShoulder --at 9 0 -19"
-	echo "set-rotation JointedArms/LeftShoulder 0 90 0"
-	part JointedArms/LeftShoulder UpperArm LeftUpperArm
-	echo "add-hinge JointedArms/LeftShoulder/LeftUpperArm LeftElbow --at $(elbow UpperArm)"
-	part JointedArms/LeftShoulder/LeftUpperArm/LeftElbow Arm LeftForearm
-	echo "add-hinge JointedArms RightShoulder --at -9 0 -19"
-	echo "set-rotation JointedArms/RightShoulder 0 -90 0"
-	part JointedArms/RightShoulder UpperArmRight RightUpperArm
-	echo "add-hinge JointedArms/RightShoulder/RightUpperArm RightElbow --at $(elbow UpperArmRight)"
-	part JointedArms/RightShoulder/RightUpperArm/RightElbow ArmRight RightForearm
-	echo "hide JointedArms"
+	echo "add-hinge Player JointedArms"
+	echo "set-scale Player/JointedArms 0.5"
+	echo "add-hinge Player/JointedArms LeftShoulder --at 9 0 -19"
+	echo "set-rotation Player/JointedArms/LeftShoulder 0 90 0"
+	part Player/JointedArms/LeftShoulder UpperArm LeftUpperArm
+	echo "add-hinge Player/JointedArms/LeftShoulder/LeftUpperArm LeftElbow --at $(elbow UpperArm)"
+	part Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow Arm LeftForearm
+	echo "add-hinge Player/JointedArms RightShoulder --at -9 0 -19"
+	echo "set-rotation Player/JointedArms/RightShoulder 0 -90 0"
+	part Player/JointedArms/RightShoulder UpperArmRight RightUpperArm
+	echo "add-hinge Player/JointedArms/RightShoulder/RightUpperArm RightElbow --at $(elbow UpperArmRight)"
+	part Player/JointedArms/RightShoulder/RightUpperArm/RightElbow ArmRight RightForearm
+	echo "hide Player/JointedArms"
 
 	echo "add-hinge / Fallen --at 0 -30 8"
 	part Fallen Dead Corpse
 	echo "hide Fallen"
 
-	for n in Player Player/UpperBody Player/UpperBody/Torso Player/UpperBody/Neck \
-		Player/UpperBody/Neck/Head Player/UpperBody/Neck/SantaHat Player/UpperBody/Shoulders \
-		Player/UpperBody/Shoulders/ArmsHolding Player/LeftHip Player/LeftHip/LeftLeg \
-		Player/RightHip Player/RightHip/RightLeg \
-		Crouching Crouching/UpperBody Crouching/UpperBody/Torso Crouching/LeftHip \
-		Crouching/LeftHip/LeftLeg Crouching/RightHip Crouching/RightHip/RightLeg \
-		JointedArms JointedArms/LeftShoulder JointedArms/LeftShoulder/LeftUpperArm \
-		JointedArms/LeftShoulder/LeftUpperArm/LeftElbow \
-		JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm \
-		JointedArms/RightShoulder JointedArms/RightShoulder/RightUpperArm \
-		JointedArms/RightShoulder/RightUpperArm/RightElbow \
-		JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm \
+	for n in Player Player/Standing Player/Standing/UpperBody Player/Standing/UpperBody/Torso Player/Standing/UpperBody/Neck \
+		Player/Standing/UpperBody/Neck/Head Player/Standing/UpperBody/Neck/SantaHat Player/Standing/UpperBody/Shoulders \
+		Player/Standing/UpperBody/Shoulders/ArmsHolding Player/Standing/LeftHip Player/Standing/LeftHip/LeftLeg \
+		Player/Standing/RightHip Player/Standing/RightHip/RightLeg \
+		Player/Crouching Player/Crouching/UpperBody Player/Crouching/UpperBody/Torso Player/Crouching/LeftHip \
+		Player/Crouching/LeftHip/LeftLeg Player/Crouching/RightHip Player/Crouching/RightHip/RightLeg \
+		Player/JointedArms Player/JointedArms/LeftShoulder Player/JointedArms/LeftShoulder/LeftUpperArm \
+		Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow \
+		Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm \
+		Player/JointedArms/RightShoulder Player/JointedArms/RightShoulder/RightUpperArm \
+		Player/JointedArms/RightShoulder/RightUpperArm/RightElbow \
+		Player/JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm \
 		Fallen Fallen/Corpse; do
 		echo "lock $n"
 	done
@@ -144,21 +146,21 @@ every joint itself; a part is drawn on its own hinge, as its classic .kv6
 was on its pivot. Give a part new voxels or move it on its hinge (its
 pivot); its name and turn are the template's.
 
-Part                                   Classic file        Used in
-Player/UpperBody/Torso                 Torso.kv6           third person, first person, corpse
-Player/UpperBody/Neck/Head             Head.kv6            third person, corpse
-Player/UpperBody/Neck/SantaHat         (XmasHat.kv6)       over Head, 20-27 December
-Player/UpperBody/Shoulders/ArmsHolding Arms.kv6            third person
-Player/LeftHip/LeftLeg                 Leg.kv6             third person, first person, corpse
-Player/RightHip/RightLeg               LegRight.kv6        third person, first person, corpse
-Crouching/UpperBody/Torso              TorsoCrouch.kv6     crouching, third and first person
-Crouching/LeftHip/LeftLeg              LegCrouch.kv6       crouching, third and first person
-Crouching/RightHip/RightLeg            LegRightCrouch.kv6  crouching, third and first person
-JointedArms/.../LeftUpperArm           UpperArm.kv6        first person
-JointedArms/.../LeftForearm            Arm.kv6             first person, corpse (whole arm)
-JointedArms/.../RightUpperArm          UpperArmRight.kv6   first person
-JointedArms/.../RightForearm           ArmRight.kv6        first person, corpse (whole arm)
-Fallen/Corpse                          Dead.kv6            dead, when ragdolls are off
+Part                                            Classic file        Used in
+Player/Standing/UpperBody/Torso                 Torso.kv6           third person, first person, corpse
+Player/Standing/UpperBody/Neck/Head             Head.kv6            third person, corpse
+Player/Standing/UpperBody/Neck/SantaHat         (XmasHat.kv6)       over Head, 20-27 December
+Player/Standing/UpperBody/Shoulders/ArmsHolding Arms.kv6            third person
+Player/Standing/LeftHip/LeftLeg                 Leg.kv6             third person, first person, corpse
+Player/Standing/RightHip/RightLeg               LegRight.kv6        third person, first person, corpse
+Player/Crouching/UpperBody/Torso                TorsoCrouch.kv6     crouching, third and first person
+Player/Crouching/LeftHip/LeftLeg                LegCrouch.kv6       crouching, third and first person
+Player/Crouching/RightHip/RightLeg              LegRightCrouch.kv6  crouching, third and first person
+Player/JointedArms/.../LeftUpperArm             UpperArm.kv6        first person
+Player/JointedArms/.../LeftForearm              Arm.kv6             first person, corpse (whole arm)
+Player/JointedArms/.../RightUpperArm            UpperArmRight.kv6   first person
+Player/JointedArms/.../RightForearm             ArmRight.kv6        first person, corpse (whole arm)
+Fallen/Corpse                                   Dead.kv6            dead, when ragdolls are off
 
 Axes: +Y is the front, +X the player's left, -Z up.
 EOF
