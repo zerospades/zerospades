@@ -90,6 +90,10 @@ namespace spades {
 	// to stdout/console but are no longer written to the file.
 	void StopLog();
 
+	/** Whether log messages are echoed to standard output, as they are by
+	 *  default; a command-line tool keeps its output to its results. */
+	void SetLogToStandardOutput(bool echo);
+
 	void LogMessage(const char* file, int line, const char* format, ...)
 #ifdef __GNUC__
 	  __attribute__((format(printf, 3, 4)))

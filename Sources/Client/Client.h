@@ -77,6 +77,7 @@ namespace spades {
 		class TCProgressView;
 		class ClientPlayer;
 		class BloodMarks;
+		class PlayerModels;
 		class ClientUI;
 		class PieMenuView;
 		class Teamplay;
@@ -545,6 +546,7 @@ namespace spades {
 			void RemoveAllLocalEntities();
 
 			std::unique_ptr<BloodMarks> bloodMarks;
+			std::unique_ptr<PlayerModels> playerModels;
 			Handle<IModel> blockCursorModel;
 
 			int nextMapShotIndex;
@@ -825,6 +827,8 @@ namespace spades {
 			void MarkWorldUpdate();
 
 			IRenderer& GetRenderer() { return *renderer; }
+			/** The player model sets, each .kv6 parts or one Player.2kv6. */
+			PlayerModels& GetPlayerModels() { return *playerModels; }
 			SceneDefinition GetLastSceneDef() { return lastSceneDef; }
 			IAudioDevice& GetAudioDevice() { return *audioDevice; }
 			gui::SoftwareCursor* GetCursor() { return cursor.get(); }

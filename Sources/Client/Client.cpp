@@ -26,6 +26,7 @@
 #include <fstream>
 
 #include "Client.h"
+#include "PlayerModels.h"
 #include "Fonts.h"
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
@@ -563,71 +564,6 @@ namespace spades {
 			// load models
 			renderer->RegisterModel("Models/MapObjects/CheckPoint.kv6");
 			renderer->RegisterModel("Models/MapObjects/Intel.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Arm.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/ArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Arms.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Leg.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/LegCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/LegRight.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/LegRightCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Torso.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/TorsoCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Dead.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/Head.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/UpperArm.kv6");
-			renderer->RegisterModel("Models/Player/Rifle/UpperArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Arm.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/ArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Arms.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Dead.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Head.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Leg.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/LegCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/LegRight.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/LegRightCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/Torso.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/TorsoCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/UpperArm.kv6");
-			renderer->RegisterModel("Models/Player/Shotgun/UpperArmRight.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Arm.kv6");
-			renderer->RegisterModel("Models/Player/SMG/ArmRight.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Arms.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Dead.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Head.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Leg.kv6");
-			renderer->RegisterModel("Models/Player/SMG/LegCrouch.kv6");
-			renderer->RegisterModel("Models/Player/SMG/LegRight.kv6");
-			renderer->RegisterModel("Models/Player/SMG/LegRightCrouch.kv6");
-			renderer->RegisterModel("Models/Player/SMG/Torso.kv6");
-			renderer->RegisterModel("Models/Player/SMG/TorsoCrouch.kv6");
-			renderer->RegisterModel("Models/Player/SMG/UpperArm.kv6");
-			renderer->RegisterModel("Models/Player/SMG/UpperArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Arm.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/ArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Arms.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Dead.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Head.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Leg.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/LegCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/LegRight.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/LegRightCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/Torso.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/TorsoCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/UpperArm.kv6");
-			renderer->RegisterModel("Models/Player/Zombie/UpperArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Arm.kv6");
-			renderer->RegisterModel("Models/Player/ArmRight.kv6");
-			renderer->RegisterModel("Models/Player/Arms.kv6");
-			renderer->RegisterModel("Models/Player/Dead.kv6");
-			renderer->RegisterModel("Models/Player/Head.kv6");
-			renderer->RegisterModel("Models/Player/Leg.kv6");
-			renderer->RegisterModel("Models/Player/LegCrouch.kv6");
-			renderer->RegisterModel("Models/Player/LegRight.kv6");
-			renderer->RegisterModel("Models/Player/LegRightCrouch.kv6");
-			renderer->RegisterModel("Models/Player/Torso.kv6");
-			renderer->RegisterModel("Models/Player/TorsoCrouch.kv6");
-			renderer->RegisterModel("Models/Player/UpperArm.kv6");
-			renderer->RegisterModel("Models/Player/UpperArmRight.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Pickaxe.kv6");
 			renderer->RegisterModel("Models/Weapons/Spade/Spade.kv6");
 			renderer->RegisterModel("Models/Weapons/Block/Block.kv6");
@@ -670,6 +606,11 @@ namespace spades {
 				renderer->RegisterModel("Models/MapObjects/XmasGift.kv6");
 				renderer->RegisterModel("Models/Player/XmasHat.kv6");
 			}
+
+			// The player model sets, each .kv6 parts or a Player.2kv6 scene.
+			playerModels = stmp::make_unique<PlayerModels>(*renderer);
+			for (const char* set : {"", "Rifle/", "SMG/", "Shotgun/", "Zombie/"})
+				playerModels->Preload(std::string("Models/Player/") + set, isChristmasOn);
 
 			std::string fullHostStr = hostname.ToString(false);
 			std::string hostStr = hostname.ToString();

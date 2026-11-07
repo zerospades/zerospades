@@ -23,6 +23,7 @@
 #include "IModel.h"
 #include "IRenderer.h"
 #include "Player.h"
+#include "PlayerModels.h"
 #include "Weapon.h"
 #include "World.h"
 #include <Core/Debug.h>
@@ -37,8 +38,9 @@ SPADES_SETTING(cg_classicPlayerModels);
 
 namespace spades {
 	namespace client {
-		Corpse::Corpse(IRenderer& renderer, GameMap& map, Player& p, bool isChristmasOn)
-			: renderer{renderer}, map{map}, isChristmasOn{isChristmasOn} {
+		Corpse::Corpse(IRenderer& renderer, PlayerModels& models, GameMap& map, Player& p,
+		               bool isChristmasOn)
+			: renderer{renderer}, models{models}, map{map}, isChristmasOn{isChristmasOn} {
 			SPADES_MARK_FUNCTION();
 
 			playerId = p.GetId();
@@ -538,7 +540,7 @@ namespace spades {
 
 			// Torso
 			{
-				model = renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
+				const PlayerPart part = models.Get(modelPath, "Torso");
 
 				Vector3 tX, tY, tZ;
 				tX = ((tX1 + tX2) * 0.5F).Normalize();
@@ -547,24 +549,35 @@ namespace spades {
 				tY = Vector3::Cross(tX, tZ).Normalize();
 				torso = Matrix4::FromAxis(tX, -tZ, -tY, center);
 
-				param.matrix = torso * scaler * Matrix4::Scale(-1, -1, 1); // rotate
-				renderer.RenderModel(*model, param);
+				param.matrix = torso * scaler * Matrix4::Scale(-1, -1, 1) * part.local; // rotate
+				renderer.RenderModel(*part.model, param);
 			}
 
 			// Head
 			{
-				model = isChristmasOn
-					? renderer.RegisterModel("Models/Player/XmasHat.kv6")
-					: renderer.RegisterModel((modelPath + "Head.kv6").c_str());
-
 				const Vector3 headBase = (torso * MakeVector3(0.0F, 0.0F, 0.0F)).GetXYZ();
 
 				Vector3 aX, aY, aZ;
 				aZ = ((nodes[Head].pos - center) - torso.GetAxis(2)).Normalize();
 				aY = Vector3::Cross(-tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(-aX, aY, -aZ, headBase) * scaler;
-				renderer.RenderModel(*model, param);
+				const Matrix4 joint = Matrix4::FromAxis(-aX, aY, -aZ, headBase) * scaler;
+				// At Christmas, a set's own hat over its head; a set without one
+				// shows the classic hatted head in its place.
+				const PlayerPart hat = isChristmasOn ? models.Hat(modelPath) : PlayerPart();
+				if (isChristmasOn && !hat) {
+					model = renderer.RegisterModel("Models/Player/XmasHat.kv6");
+					param.matrix = joint;
+					renderer.RenderModel(*model, param);
+				} else {
+					const PlayerPart head = models.Get(modelPath, "Head");
+					param.matrix = joint * head.local;
+					renderer.RenderModel(*head.model, param);
+					if (hat) {
+						param.matrix = joint * hat.local;
+						renderer.RenderModel(*hat.model, param);
+					}
+				}
 			}
 
 			// Arms
@@ -576,20 +589,20 @@ namespace spades {
 					* Matrix4::Scale(0.75F, 0.75F, 1.0F)
 					* Matrix4::Scale(-1, -1, 1);
 
-				model = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
+				PlayerPart part = models.Get(modelPath, "ArmRight");
 				Vector3 aX, aY, aZ;
 				aZ = (nodes[Arm1].pos - nodes[Torso1].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm1Base) * armsScale;
-				renderer.RenderModel(*model, param);
+				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm1Base) * armsScale * part.local;
+				renderer.RenderModel(*part.model, param);
 
-				model = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
+				part = models.Get(modelPath, "Arm");
 				aZ = (nodes[Arm2].pos - nodes[Torso2].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm2Base) * armsScale;
-				renderer.RenderModel(*model, param);
+				param.matrix = Matrix4::FromAxis(aY, -aX, aZ, arm2Base) * armsScale * part.local;
+				renderer.RenderModel(*part.model, param);
 			}
 
 			// Legs
@@ -597,20 +610,20 @@ namespace spades {
 				const Vector3 leg1Base = (torso * MakeVector3(0.25F, 0.0F, 0.9F)).GetXYZ();
 				const Vector3 leg2Base = (torso * MakeVector3(-0.25F, 0.0F, 0.9F)).GetXYZ();
 
-				model = renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
+				PlayerPart part = models.Get(modelPath, "LegRight");
 				Vector3 aX, aY, aZ;
 				aZ = (nodes[Leg1].pos - nodes[Torso3].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg1Base) * scaler;
-				renderer.RenderModel(*model, param);
+				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg1Base) * scaler * part.local;
+				renderer.RenderModel(*part.model, param);
 
-				model = renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
+				part = models.Get(modelPath, "Leg");
 				aZ = (nodes[Leg2].pos - nodes[Torso4].pos).Normalize();
 				aY = Vector3::Cross(tX1, aZ).Normalize();
 				aX = Vector3::Cross(aY, aZ).Normalize();
-				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg2Base) * scaler;
-				renderer.RenderModel(*model, param);
+				param.matrix = Matrix4::FromAxis(aX, aY, aZ, leg2Base) * scaler * part.local;
+				renderer.RenderModel(*part.model, param);
 			}
 		}
 

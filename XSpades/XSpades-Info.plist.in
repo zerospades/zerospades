@@ -8,6 +8,45 @@
 	<string>ZeroSpades</string>
 	<key>CFBundleIconFile</key>
 	<string>ZeroSpades.icns</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>KV6 voxel model</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>io.zerospades.kv6</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>ZeroSpades.icns</string>
+		</dict>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>io.zerospades.kv6</string>
+			<key>UTTypeDescription</key>
+			<string>KV6 voxel model</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeIconFile</key>
+			<string>ZeroSpades.icns</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>kv6</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>CFBundleIdentifier</key>
 	<string>io.zerospades.ZeroSpades</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -26,6 +65,8 @@
 	<string>public.app-category.action-games</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.13</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2017 yvt. All rights reserved.</string>
 	<key>NSMainNibFile</key>

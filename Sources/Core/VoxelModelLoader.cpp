@@ -22,16 +22,137 @@
 
 #include <json/json.h>
 
+#include <algorithm>
+#include <functional>
+#include <tuple>
+
 #include <Core/Debug.h>
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
+#include <Core/LocalFileSystem.h>
 #include <Core/Math.h>
 #include <Core/TMPUtils.h>
 #include <Core/VoxelModel.h>
+#include <Core/VoxelModel2KV6.h>
+#include <cctype>
 
 namespace spades {
 	namespace {
+		// Merge all objects in a scene hierarchy into a single composite VoxelModel
+		// with transforms applied (positions, rotations, scales).
+		// `scene`'s objects sit under `rootTransform`: what their parents impose
+		// when they are one part of a larger scene, the identity otherwise.
+		Handle<VoxelModel> MergeSceneObjects(const std::vector<VoxelObject>& scene,
+		                                     const Matrix4& rootTransform, IntVector3* lowCorner) {
+			if (scene.empty())
+				SPRaise(".2kv6 scene is empty");
+
+			// Find bounds of all objects
+			int minX = 0, minY = 0, minZ = 0;
+			int maxX = 0, maxY = 0, maxZ = 0;
+			bool hasAny = false;
+
+			// First pass: collect all voxel positions with transforms
+			std::vector<std::tuple<int, int, int, uint32_t>> voxels; // x, y, z, color
+
+			std::function<void(const VoxelObject&, const Matrix4&)> collectVoxels =
+			    [&](const VoxelObject& obj, const Matrix4& parentTransform) {
+				    if (obj.hidden)
+					    return; // out of sight, with everything under it
+				    // Build local transform: translate * rotate * scale
+				    Matrix4 scale = Matrix4::Scale(obj.scale);
+				    Matrix4 rotate = Quaternion(obj.rotation).ToRotationMatrix();
+				    Matrix4 translate = Matrix4::Translate(obj.position);
+				    Matrix4 localTransform = translate * rotate * scale;
+
+				    // Combine with parent transform
+				    Matrix4 worldTransform = parentTransform * localTransform;
+
+				    // Collect voxels from this object's model
+				    if (obj.model) {
+					    for (int x = 0; x < obj.model->GetWidth(); x++) {
+						    for (int y = 0; y < obj.model->GetHeight(); y++) {
+							    for (int z = 0; z < obj.model->GetDepth(); z++) {
+								    if (!obj.model->IsSolid(x, y, z))
+									    continue;
+
+								    // Transform voxel position
+								    Vector3 pos = MakeVector3(float(x), float(y), float(z));
+								    Vector4 transformed4 = worldTransform * MakeVector4(pos.x, pos.y, pos.z, 1.0F);
+								    Vector3 transformed = MakeVector3(transformed4.x, transformed4.y, transformed4.z);
+
+								    // Halves rounded up, the same way on both sides of
+								    // zero: rounded away from it, a part whose voxels
+								    // sit on halves (pivots of 3.5) leaves an empty
+								    // plane at zero, splitting the model.
+								    int tx = int(std::floor(transformed.x + 0.5F));
+								    int ty = int(std::floor(transformed.y + 0.5F));
+								    int tz = int(std::floor(transformed.z + 0.5F));
+
+								    uint32_t color = obj.model->GetColor(x, y, z);
+								    voxels.push_back(std::make_tuple(tx, ty, tz, color));
+
+								    if (!hasAny) {
+									    minX = maxX = tx;
+									    minY = maxY = ty;
+									    minZ = maxZ = tz;
+									    hasAny = true;
+								    } else {
+									    minX = std::min(minX, tx);
+									    maxX = std::max(maxX, tx);
+									    minY = std::min(minY, ty);
+									    maxY = std::max(maxY, ty);
+									    minZ = std::min(minZ, tz);
+									    maxZ = std::max(maxZ, tz);
+								    }
+							    }
+						    }
+					    }
+				    }
+
+				    // Recursively process children
+				    for (const VoxelObject& child : obj.children) {
+					    collectVoxels(child, worldTransform);
+				    }
+			    };
+
+			// Collect voxels from all root objects
+			for (const VoxelObject& root : scene) {
+				collectVoxels(root, rootTransform);
+			}
+
+			if (!hasAny)
+				SPRaise(".2kv6 scene has no voxel data");
+
+			// Create composite model with proper dimensions
+			int width = maxX - minX + 1;
+			int height = maxY - minY + 1;
+			int depth = maxZ - minZ + 1;
+
+			Handle<VoxelModel> result = Handle<VoxelModel>::New(width, height, depth);
+			if (lowCorner)
+				*lowCorner = MakeIntVector3(minX, minY, minZ);
+
+			// Place all voxels in the composite model
+			for (const auto& voxel : voxels) {
+				int x = std::get<0>(voxel);
+				int y = std::get<1>(voxel);
+				int z = std::get<2>(voxel);
+				uint32_t color = std::get<3>(voxel);
+
+				int dx = x - minX;
+				int dy = y - minY;
+				int dz = z - minZ;
+
+				if (dx >= 0 && dx < width && dy >= 0 && dy < height && dz >= 0 && dz < depth) {
+					result->SetSolid(dx, dy, dz, color);
+				}
+			}
+
+			return result;
+		}
+
 		// Copied from `ngspades`, a cancelled branch of OpenSpades
 		Vector3 ReadVector3(const Json::Value& json, const char* name) {
 			if (json.isArray() && json.size() == 3) {
@@ -74,11 +195,113 @@ namespace spades {
 				}
 			}
 		};
+		Matrix4 LocalTransformOf(const VoxelObject& obj) {
+			return Matrix4::Translate(obj.position) * Quaternion(obj.rotation).ToRotationMatrix() *
+			       Matrix4::Scale(obj.scale);
+		}
+
+		// The object `path` names ("Gun/Bolt"), and what its parents impose on
+		// it; null when the scene holds no such object. A name that several
+		// objects share at one level names none of them: picking one would
+		// draw whichever came first, so the scene must tell them apart.
+		const VoxelObject* FindPart(const std::vector<VoxelObject>& scene, const std::string& path,
+		                            Matrix4& parentTransform) {
+			const std::vector<VoxelObject>* level = &scene;
+			const VoxelObject* found = nullptr;
+			parentTransform = Matrix4::Identity();
+			std::size_t start = 0;
+			while (true) {
+				const std::size_t slash = path.find('/', start);
+				const std::string name =
+				  path.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+				if (found)
+					parentTransform = parentTransform * LocalTransformOf(*found);
+				found = nullptr;
+				for (const VoxelObject& o : *level) {
+					if (o.name != name)
+						continue;
+					if (found)
+						SPRaise("Several objects are named '%s' there: give them names of "
+						        "their own to load one by its path", name.c_str());
+					found = &o;
+				}
+				if (!found)
+					return nullptr;
+				if (slash == std::string::npos)
+					return found;
+				level = &found->children;
+				start = slash + 1;
+			}
+		}
 	} // namespace
 
+	std::vector<std::pair<std::string, Matrix4>> VoxelModelLoader::SceneTransforms(const char* path) {
+		std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
+		const std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
+		std::vector<std::pair<std::string, Matrix4>> found;
+		std::vector<std::string> shared;
+		std::function<void(const VoxelObject&, const std::string&, const Matrix4&)> visit =
+		  [&](const VoxelObject& o, const std::string& parentPath, const Matrix4& parent) {
+			  const std::string here = parentPath.empty() ? o.name : parentPath + "/" + o.name;
+			  const Matrix4 world = parent * LocalTransformOf(o);
+			  const bool taken = std::any_of(found.begin(), found.end(),
+			                                 [&](const std::pair<std::string, Matrix4>& f) {
+				                                 return f.first == here;
+			                                 });
+			  if (taken)
+				  shared.push_back(here);
+			  else
+				  found.emplace_back(here, world);
+			  for (const VoxelObject& child : o.children)
+				  visit(child, here, world);
+		  };
+		for (const VoxelObject& root : scene)
+			visit(root, std::string(), Matrix4::Identity());
+		found.erase(std::remove_if(found.begin(), found.end(),
+		                           [&](const std::pair<std::string, Matrix4>& f) {
+			                           return std::find(shared.begin(), shared.end(), f.first) !=
+			                                  shared.end();
+		                           }),
+		            found.end());
+		return found;
+	}
+
+	Handle<VoxelModel> VoxelModelLoader::MergeScene(const std::vector<VoxelObject>& scene,
+	                                                IntVector3* lowCorner) {
+		return MergeSceneObjects(scene, Matrix4::Identity(), lowCorner);
+	}
+
 	Handle<VoxelModel> VoxelModelLoader::Load(const char* path) {
+		std::string pathStr(path);
+
+		// "scene.2kv6#Gun/Bolt" names one object of a scene, with everything
+		// under it: a part a script draws and moves on its own. Composed into
+		// the scene's frame, it has the scene's resolution; "scene.2kv6##Gun/
+		// Bolt" is the same part in its own frame, at the resolution it was
+		// modelled at, for one the scene scales down (finer than the rest) to
+		// be drawn with its transform. No name starts with '#'.
+		std::string partPath;
+		bool ownFrame = false;
+		{
+			std::string lower = pathStr;
+			for (char& ch : lower)
+				ch = char(std::tolower(static_cast<unsigned char>(ch)));
+			const std::size_t at = lower.find(".2kv6#");
+			if (at != std::string::npos) {
+				partPath = pathStr.substr(at + 6);
+				pathStr.resize(at + 5);
+				if (!partPath.empty() && partPath[0] == '#') {
+					ownFrame = true;
+					partPath.erase(0, 1);
+				}
+			}
+		}
+
+		// Detect format from extension
+		bool is2KV6 = LocalFileSystem::HasExtension(pathStr, ".2kv6");
+
 		// Load the metadata file
-		std::string metadataPath = path;
+		std::string metadataPath = pathStr;
 		{
 			auto i = metadataPath.rfind('.');
 			if (i != std::string::npos)
@@ -103,9 +326,38 @@ namespace spades {
 			}
 		}
 
-		// Load the base KV6 model
+		// Load the model (either .kv6 or .2kv6)
 		Handle<VoxelModel> voxelModel;
-		{
+		if (is2KV6) {
+			// Load .2kv6 scene and merge all objects into a single composite model
+			SPLog("Loading '%s' as a .2kv6 scene file.", path);
+			std::unique_ptr<IStream> stream{FileManager::OpenForReading(pathStr.c_str())};
+			std::vector<VoxelObject> scene = VoxelModel2KV6::Load(*stream);
+			IntVector3 low;
+			if (partPath.empty()) {
+				voxelModel = MergeSceneObjects(scene, Matrix4::Identity(), &low);
+			} else {
+				Matrix4 parent;
+				const VoxelObject* part = FindPart(scene, partPath, parent);
+				if (!part)
+					SPRaise("No object '%s' in '%s'", partPath.c_str(), pathStr.c_str());
+				// Drawn when asked for by name, even if the scene hides it.
+				VoxelObject shown = *part;
+				shown.hidden = false;
+				if (ownFrame) {
+					shown.position = MakeVector3(0.0F, 0.0F, 0.0F);
+					shown.rotation = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
+					shown.scale = MakeVector3(1.0F, 1.0F, 1.0F);
+					parent = Matrix4::Identity();
+				}
+				voxelModel = MergeSceneObjects({shown}, parent, &low);
+			}
+			// A scene's pivot is its origin, so every part of one, drawn with the
+			// same matrix, lands where it belongs in it (a part in its own frame,
+			// drawn with its transform).
+			voxelModel->SetOrigin(MakeVector3(float(low.x), float(low.y), float(low.z)));
+		} else {
+			// Load .kv6 file (regular single-model)
 			SPLog("Loading '%s' as a KV6 voxel model.", path);
 			std::unique_ptr<IStream> stream{FileManager::OpenForReading(path)};
 			voxelModel = VoxelModel::LoadKV6(*stream);

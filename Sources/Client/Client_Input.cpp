@@ -917,7 +917,7 @@ namespace spades {
 						}
 
 						if (CheckKey(cg_keySpawnCorpse, name) && down && cg_debugCorpse) {
-							auto corp = stmp::make_unique<Corpse>(*renderer, *map, p, isChristmasOn);
+							auto corp = stmp::make_unique<Corpse>(*renderer, *playerModels, *map, p, isChristmasOn);
 							corp->AddImpulse(p.GetFront() * 32.0F);
 							corpses.emplace_back(std::move(corp));
 							RemoveCorpses();
