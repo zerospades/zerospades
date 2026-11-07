@@ -279,6 +279,8 @@ namespace spades {
 
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
+
+			bool IsRendererSW() const { return base->IsRendererSW(); }
 		};
 
 		namespace {
