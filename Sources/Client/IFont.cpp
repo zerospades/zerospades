@@ -27,7 +27,6 @@
 #include <Core/Exception.h>
 #include <Core/FileManager.h>
 #include <Core/IStream.h>
-#include <Draw/SW/SWRenderer.h> // FIXME: better way to check whether linear interpolation is performed
 
 namespace spades {
 	namespace client {
@@ -171,7 +170,7 @@ namespace spades {
 			// SW renderer doesn't perform linear interpolation on
 			// rendering images, so size rounding must be done to
 			// avoid unreadable texts.
-			roundSize = dynamic_cast<draw::SWRenderer*>(renderer) != nullptr;
+			roundSize = renderer->IsRendererSW();
 		}
 
 		FallbackFontRenderer::~FallbackFontRenderer() {

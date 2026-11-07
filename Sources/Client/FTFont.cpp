@@ -31,7 +31,6 @@
 #include <Core/Bitmap.h>
 #include <Core/FileManager.h>
 #include <Core/ThreadLocalStorage.h>
-#include <Draw/SW/SWRenderer.h>
 
 namespace spades {
 	namespace ngclient {
@@ -209,7 +208,7 @@ namespace spades {
 				binSize <<= 1;
 
 			baselineY = std::floor(height * 1.0F);
-			rendererIsLowQuality = dynamic_cast<draw::SWRenderer*>(renderer);
+			rendererIsLowQuality = renderer->IsRendererSW();
 
 			bins.emplace_back(binSize, binSize, *renderer);
 		}

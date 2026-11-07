@@ -31,7 +31,6 @@
 #include <Core/FileManager.h>
 #include <Core/Settings.h>
 #include <Core/Strings.h>
-#include <Draw/SW/SWRenderer.h>
 
 #include "CTFGameMode.h"
 #include "CenterMessageView.h"
@@ -413,23 +412,23 @@ namespace spades {
 
 		void Client::DrawRecordingIndicator() {
 			const float sw = renderer->ScreenWidth();
-			
+
 			const int t = static_cast<int>(net->GetDemoRecordingTime());
 			char buf[32];
 			snprintf(buf, sizeof(buf), "REC %d:%02d", t / 60, t % 60);
 
 			IFont& font = fontManager->GetSmallGuiFont();
 			const Vector2 size = font.Measure(buf);
-			
+
 			float minimapW = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
 			float minimapY = 8.0F;
 			const int statsMode = cg_stats;
 			if (statsMode == 2 || (statsMode >= 3 && scoreboardVisible))
 				minimapY += cg_statsSmallFont ? 10.0F : 20.0F;
-			
+
 			const float x = (sw - 8.0F) - minimapW - 8.0F - size.x;
 			const float y = minimapY;
-			
+
 			const float right = x + size.x + 4.0F;
 			const float bottom = y + size.y + 4.0F;
 
@@ -439,7 +438,7 @@ namespace spades {
 			const Vector4 fade2 = MakeVector4(0.0F, 0.0F, 0.0F, 0.55F);
 			const Vector4 textColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
 			const Vector4 outline = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
-			
+
 			const float pulse = 0.5F + 0.5F * sinf(time * 3.5F);
 			const Vector4 accent = black + (red - black) * pulse;
 
@@ -615,7 +614,7 @@ namespace spades {
 				prg *= 0.3F + (1.0F - hpper) * 0.7F;
 				prg = 1.0F - std::min(prg, 0.9F);
 
-				if (dynamic_cast<draw::SWRenderer*>(&GetRenderer())) {
+				if (renderer->IsRendererSW()) {
 					prg = (1.0F - prg) * 0.5F;
 					renderer->SetColorAlphaPremultiplied(hurt
 						? MakeVector4(prg, 0.0F, 0.0F, prg)
@@ -2631,12 +2630,12 @@ namespace spades {
 					} else {
 						DrawSpectateHUD();
 					}
-					
+
 					// the chat panel shows the history by itself while it is open
 					if (!isChatPanelVisible)
 						chatWindow->Draw();
 					killfeedWindow->Draw();
-					
+
 					if (netgraphVisible && !isDemoMode)
 						DrawNetGraph();
 
