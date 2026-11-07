@@ -20,12 +20,15 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "IAudioChunk.h"
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
 	namespace client {
-		class IAudioChunk;
 		class GameMap;
 
 		struct AudioParam {
@@ -44,7 +47,12 @@ namespace spades {
 		public:
 			virtual ~IAudioDevice() {}
 
-			virtual IAudioChunk* RegisterSound(const char* name) = 0;
+			/** Loads `name` once; later calls share the chunk. */
+			virtual Handle<IAudioChunk> RegisterSound(const char* name) = 0;
+			/** The files the chunks loaded via `RegisterSound` come from. */
+			virtual std::vector<std::string> GetRegisteredFiles() = 0;
+			/** Loads `name` into a new chunk, outside the `RegisterSound` cache. */
+			virtual Handle<IAudioChunk> CreateSound(const char* name) = 0;
 
 			/**
 			 * Clear the cache of chunks loaded via `RegisterSound`. This method

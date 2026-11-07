@@ -35,12 +35,27 @@
 #include <AngelScript/addons/scriptmathcomplex.h>
 #include <AngelScript/addons/scriptstdstring.h>
 #include <AngelScript/addons/weakref.h>
+#include <cstdint>
 #include <list>
 #include <mutex>
+#include <stdexcept>
+#include <string>
+#include <utility>
 
 namespace spades {
 
 	class ScriptContextHandle;
+
+	/** The scripts don't build. */
+	class ScriptBuildError : public std::runtime_error {
+		std::string file;
+
+	public:
+		ScriptBuildError(const std::string& message, std::string file)
+		    : std::runtime_error(message), file(std::move(file)) {}
+		/** The script at fault, as "Scripts/Skin/Foo.as", or "" if none is. */
+		const std::string& GetFile() const { return file; }
+	};
 
 	class ScriptManager {
 		friend class ScriptContextHandle;
@@ -52,6 +67,8 @@ namespace spades {
 		std::list<Context*> contextFreeList;
 
 		asIScriptEngine* engine;
+		std::uint64_t generation = 1;
+		std::string startupError, startupErrorFile;
 
 		ScriptManager();
 		~ScriptManager();
@@ -60,6 +77,33 @@ namespace spades {
 		static ScriptManager* GetInstance();
 
 		static void CheckError(int);
+
+		/**
+		 * Builds `Scripts/Main.as`, and what it includes, as the files are seen
+		 * now, into the module `name`, and checks it has every function the game
+		 * looks up. Returns the first error, or ""; a module with an error is
+		 * dropped, and `errorFile` names the script at fault, if one is.
+		 */
+		std::string BuildModule(const std::string& name, std::string& errorFile);
+		void DiscardModule(const std::string& name);
+
+		/**
+		 * Builds the scripts as mounted now into "Client", in place of the module
+		 * there. Returns the first error, or ""; on an error "Client" stays.
+		 */
+		std::string RebuildClientModule(std::string& errorFile);
+		/**
+		 * Why "Client" didn't build when the engine started, or "" if it did;
+		 * `file` names the script at fault, if one is. Rebuild it once the cause
+		 * is gone.
+		 */
+		std::string GetStartupError(std::string& file) const {
+			file = startupErrorFile;
+			return startupError;
+		}
+
+		/** Changes each time "Client" is rebuilt. */
+		std::uint64_t GetGeneration() const { return generation; }
 
 		asIScriptEngine* GetEngine() const { return engine; }
 

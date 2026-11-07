@@ -204,7 +204,8 @@ namespace spades {
 			renderer->SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 1));
 			renderer->DrawImage(nullptr, AABB2(0, 0, sw, sh));
 
-			Handle<IImage> img = renderer->RegisterImage("Gfx/Title/Logo.png");
+			// The loading screen is the software's, not the game's.
+			Handle<IImage> img = shellRenderer->RegisterImage("Gfx/Title/Logo.png");
 
 			Vector2 size = {img->GetWidth(), img->GetHeight()};
 			size *= std::min(1.0F, sw / size.x);

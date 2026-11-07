@@ -21,6 +21,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 
 #include "Player.h"
 #include <Core/Math.h>
@@ -35,6 +36,7 @@ namespace spades {
 		class IRenderer;
 		class IAudioDevice;
 		class SandboxedRenderer;
+		class Skin;
 
 		// TODO: Use `shared_ptr` instead of `RefCountedObject`
 		/** Representation of player which is used by
@@ -73,7 +75,18 @@ namespace spades {
 			asIScriptObject* weaponViewSkin;
 			asIScriptObject* grenadeViewSkin;
 
+			// What the player's assets load through: the skin they spawned with, if any.
+			Handle<IRenderer> viewRenderer;
+			Handle<IAudioDevice> viewAudio;
+
 			asIScriptObject* GetCurrentSkin(bool viewSkin);
+			/**
+			 * Builds the skins, from `skin` if there is one, loading through
+			 * `renderer` and `audio`. Raises if a skin script does, having released
+			 * what it made.
+			 */
+			void CreateSkins(Skin* skin, Handle<IRenderer> renderer, Handle<IAudioDevice> audio);
+			void MakeSkins(const std::string& module, IRenderer& renderer, IAudioDevice& audio);
 
 			Handle<SandboxedRenderer> sandboxedRenderer;
 
@@ -95,7 +108,7 @@ namespace spades {
 			AmbienceInfo ComputeAmbience();
 
 			// TODO: Naming convention violation
-			asIScriptObject* initScriptFactory(ScriptFunction& creator,
+			asIScriptObject* initScriptFactory(ScriptFunction& creator, const std::string& module,
 				IRenderer& renderer, IAudioDevice& audio);
 
 		protected:
@@ -104,6 +117,8 @@ namespace spades {
 		public:
 			ClientPlayer(Player& p, Client&);
 			Player& GetPlayer() const { return player; }
+			/** The renderer the player's assets load through, skin included. */
+			IRenderer& GetRenderer() { return *viewRenderer; }
 
 			void Update(float dt);
 			void AddToScene();
