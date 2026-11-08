@@ -1,6 +1,10 @@
 Shaders/OpenGL/Water3.fs
+Shaders/OpenGL/DynamicLight/LightsTileOnly.fs
+Shaders/OpenGL/WaterDynamicLight.fs
 Shaders/OpenGL/Water3.vs
-# Use lite version of shadow shaders because SSAO is not computed for the water surface
-*shadow-lite*
+# The water's shadows: no SSAO, which is not computed for the water surface, and
+# the ambient light of a surface facing up, which spares samplers for the dynamic
+# lights within the limit of 16.
+*shadow-water*
 Shaders/OpenGL/Fog.vs
 Shaders/OpenGL/PhysicalModel/CookTorrance.fs

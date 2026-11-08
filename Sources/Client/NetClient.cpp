@@ -300,6 +300,8 @@ namespace spades {
 			SPLog("Connecting to %u:%u", (unsigned int)addr.host, (unsigned int)addr.port);
 
 			savedPackets.clear();
+			packetsAwaitingSky.clear();
+			timeOfDay.reset();
 			customKickReasonString.clear();
 			serverExtensions.clear();
 
@@ -324,6 +326,7 @@ namespace spades {
 			statusString = _Tr("NetClient", "Not connected");
 
 			savedPackets.clear();
+			packetsAwaitingSky.clear();
 
 			ENetEvent event;
 			SPLog("Waiting for graceful disconnection");
@@ -472,7 +475,10 @@ namespace spades {
 						auto& reader = readerOrNone.value();
 						int type = reader.GetType();
 
-						if (type == PacketTypeMapChunk) {
+						if (!packetsAwaitingSky.empty()) {
+							// The map transfer is over; everything waits with StateData.
+							packetsAwaitingSky.push_back(reader.GetData());
+						} else if (type == PacketTypeMapChunk) {
 							std::vector<char> dt = reader.GetData();
 
 							mapLoader->AddRawChunk(dt.data() + 1, dt.size() - 1);
@@ -508,26 +514,13 @@ namespace spades {
 							//	  map load sequence.
 							//
 							if (type == PacketTypeStateData) {
-								status = NetClientStatusConnected;
-								statusString = _Tr("NetClient", "Connected");
-
-								try {
-									MapLoaded();
-								} catch (const std::exception& ex) {
-									if (strstr(ex.what(), "File truncated") ||
-										strstr(ex.what(), "EOF reached")) {
-										SPLog("Map decoder returned error:\n%s", ex.what());
-										Disconnect();
-										statusString = _Tr("NetClient", "Error");
-										throw;
-									}
-								} catch (...) {
-									Disconnect();
-									statusString = _Tr("NetClient", "Error");
-									throw;
+								if (IsAwaitingSky()) {
+									// The world is not drawn before the first Sky.
+									statusString = _Tr("NetClient", "Waiting for the time of day");
+									packetsAwaitingSky.push_back(reader.GetData());
+								} else {
+									FinishMapLoad(reader);
 								}
-
-								HandleGamePacket(reader);
 							} else if (type == PacketTypeWeaponReload) {
 								// Drop the reload packet. Pyspades does not
 								// cancel the reload packets on map change and
@@ -621,6 +614,7 @@ namespace spades {
 				case ExtensionTypeTeamplay: return "Teamplay";
 				case ExtensionTypePieMenu: return "Pie Menu";
 				case ExtensionTypeFlashlight: return "Flashlight";
+				case ExtensionTypeDaytimeWeather: return "Daytime and Weather";
 				case ExtensionTypePlayerLimit: return "Player Limit";
 				case ExtensionTypeMessageTypes: return "Message Types";
 				case ExtensionTypeKickReason: return "Kick Reason";
@@ -705,6 +699,10 @@ namespace spades {
 					if (status != NetClientStatusConnecting)
 						return false;
 					HandleFlashlightPacket(r);
+					return true;
+				case PacketTypeDaytimeWeather:
+					// A Sky needs no world and applies on arrival, whatever the stage.
+					HandleDaytimeWeatherPacket(r);
 					return true;
 				case PacketTypeVersionGet: {
 					if (r.GetNumRemainingBytes() > 0) {
@@ -941,6 +939,21 @@ namespace spades {
 			}
 
 			ApplyFlashlightPacket(r, *client, flashlightBeams, false);
+		}
+
+		void NetClient::HandleDaytimeWeatherPacket(spades::client::NetPacketReader& r) {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypeDaytimeWeather)) {
+				SPLog("Ignoring a Daytime and Weather packet from a server that did not "
+				      "negotiate the extension");
+				return;
+			}
+
+			ApplyDaytimeWeatherPacket(r, timeOfDay);
+
+			if (!packetsAwaitingSky.empty() && !IsAwaitingSky())
+				ReleasePacketsAwaitingSky();
 		}
 
 		void NetClient::HandleGamePacket(spades::client::NetPacketReader& r) {
@@ -2019,6 +2032,47 @@ namespace spades {
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
+		void NetClient::FinishMapLoad(NetPacketReader& stateData) {
+			SPADES_MARK_FUNCTION();
+
+			status = NetClientStatusConnected;
+			statusString = _Tr("NetClient", "Connected");
+
+			try {
+				MapLoaded();
+			} catch (const std::exception& ex) {
+				if (strstr(ex.what(), "File truncated") || strstr(ex.what(), "EOF reached")) {
+					SPLog("Map decoder returned error:\n%s", ex.what());
+					Disconnect();
+					statusString = _Tr("NetClient", "Error");
+					throw;
+				}
+			} catch (...) {
+				Disconnect();
+				statusString = _Tr("NetClient", "Error");
+				throw;
+			}
+
+			HandleGamePacket(stateData);
+		}
+
+		void NetClient::ReleasePacketsAwaitingSky() {
+			SPADES_MARK_FUNCTION();
+			SPAssert(status == NetClientStatusReceivingMap);
+
+			// Taken out first: handling them must not find them still held.
+			std::vector<std::vector<char>> packets = std::move(packetsAwaitingSky);
+			packetsAwaitingSky.clear();
+
+			NetPacketReader stateData(packets.front());
+			FinishMapLoad(stateData);
+
+			for (std::size_t i = 1; i < packets.size(); i++) {
+				NetPacketReader r(packets[i]);
+				HandleGamePacket(r);
+			}
+		}
+
 		void NetClient::MapLoaded() {
 			SPADES_MARK_FUNCTION();
 
@@ -2301,8 +2355,19 @@ namespace spades {
 
 			WriteInitialTeamplayDemoState();
 			WriteInitialFlashlightDemoState();
+			WriteInitialDaytimeWeatherDemoState();
 
 			SPLog("Initial demo state written successfully");
+		}
+
+		void NetClient::WriteInitialDaytimeWeatherDemoState() {
+			SPADES_MARK_FUNCTION();
+
+			if (!timeOfDay)
+				return;
+
+			std::vector<char> data = EncodeDaytimeWeatherSky(*timeOfDay);
+			demoRecorder->RecordPacket(data.data(), data.size());
 		}
 
 		void NetClient::WriteInitialTeamplayDemoState() {

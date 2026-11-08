@@ -21,6 +21,18 @@
 // Whether the map stands between a lit point and a dynamic light, walked block by
 // block through `GLMapOccupancy`.
 
+// 0 without a map to walk, where nothing is occluded
+uniform float dynamicLightMapOcclusion;
+
+// Whether the map is walked at all. A shader that can afford neither the walks nor
+// their sampler leaves them out, and then takes a point the spotlights' occlusion
+// maps can't prove lit as dark, never lighting what the map may hide.
+#ifndef DYNAMIC_LIGHT_MAP_WALKS
+#define DYNAMIC_LIGHT_MAP_WALKS 1
+#endif
+
+#if DYNAMIC_LIGHT_MAP_WALKS
+
 // `GLMapOccupancy`'s texture: each block's clearance out of 255, `0` for a solid
 // block; every block within `c - 1` of one with a clearance `c` is clear.
 // Unfiltered and without mipmaps, so it can be sampled inside the walk's
@@ -28,8 +40,6 @@
 uniform sampler3D dynamicLightMapOccupancy;
 // 1 / the map's size in blocks
 uniform vec3 dynamicLightMapSizeInversed;
-// 0 without a map to walk, where nothing is occluded
-uniform float dynamicLightMapOcclusion;
 
 // The most steps a walk takes, each to the next block or out of a clear cube: more
 // than a light's reach needs. A walk that has not got through by then stops where it
@@ -169,3 +179,20 @@ float DynamicLightMapVolumeVisibility(vec3 position, vec3 lightPosition) {
 		return 1.0;
 	return DynamicLightMapWalk(position, lightPosition, true) > 1.0 ? 1.0 : 0.0;
 }
+
+#else
+
+float DynamicLightMapVisibility(vec3 position, vec3 normal, vec3 lightPosition) {
+	return dynamicLightMapOcclusion < 0.5 ? 1.0 : 0.0;
+}
+
+float DynamicLightMapVisibilityBeyond(vec3 position, vec3 normal, vec3 lightPosition,
+                                      float clear) {
+	return dynamicLightMapOcclusion < 0.5 ? 1.0 : 0.0;
+}
+
+float DynamicLightMapVolumeVisibility(vec3 position, vec3 lightPosition) {
+	return dynamicLightMapOcclusion < 0.5 ? 1.0 : 0.0;
+}
+
+#endif // DYNAMIC_LIGHT_MAP_WALKS

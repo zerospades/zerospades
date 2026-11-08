@@ -48,7 +48,6 @@
 #include "GLModel.h"
 #include "GLModelManager.h"
 #include "GLModelRenderer.h"
-#include "GLNonlinearizeFilter.h"
 #include "GLOptimizedVoxelModel.h"
 #include "GLProfiler.h"
 #include "GLProgramAttribute.h"
@@ -406,10 +405,14 @@ namespace spades {
 		}
 
 		Vector3 GLRenderer::GetFogColorForSolidPass() {
+			return GetFullDaylightFogColorForSolidPass() * GetDaylight();
+		}
+
+		Vector3 GLRenderer::GetFullDaylightFogColorForSolidPass() {
 			if (settings.r_fogShadow && mapShadowRenderer)
 				return MakeVector3(0, 0, 0);
 			else
-				return GetFogColor();
+				return GetFullDaylightFogColor();
 		}
 
 #pragma mark - Resource Manager
@@ -1045,7 +1048,7 @@ namespace spades {
 			if (settings.r_water && waterRenderer) {
 				GLProfiler::Context p(*profiler, "Water");
 				waterRenderer->Update(dt);
-				waterRenderer->Render();
+				waterRenderer->Render(lights);
 			}
 
 			{
@@ -1212,23 +1215,25 @@ namespace spades {
 				// FIXME: these passes should be combined for lower VRAM bandwidth usage
 
 				if (settings.r_hdr) {
-					GLProfiler::Context p(*profiler, "Auto Exposure");
+					GLProfiler::Context p(*profiler, "Auto Exposure and Gamma Correction");
 					handle = autoExposureFilter->Filter(handle, dt);
-				}
-
-				if (settings.r_hdr) {
-					GLProfiler::Context p(*profiler, "Gamma Correction");
-					handle = GLNonlinearlizeFilter(*this).Filter(handle);
 				}
 
 				if (settings.r_colorCorrection) {
 					GLProfiler::Context p(*profiler, "Color Correction");
+
+					// The fog as the scene shows it: none at night, where there is neither
+					// a haze to sharpen through nor a tint to correct. Sharpening a dark
+					// scene as if it were hazy picks out every speck on the ground.
+					const Vector3 sceneFogColor = GetFogColor();
+
 					Vector3 tint = smoothedFogColor + MakeVector3(1, 1, 1) * 0.5F;
 					tint = MakeVector3(1, 1, 1) / tint;
 					tint = Mix(tint, MakeVector3(1, 1, 1), 0.2F);
 					tint *= 1.0F / std::min(std::min(tint.x, tint.y), tint.z);
 
-					float fogLuminance = (fogColor.x + fogColor.y + fogColor.z) * (1.0F / 3.0F);
+					float fogLuminance =
+					  (sceneFogColor.x + sceneFogColor.y + sceneFogColor.z) * (1.0F / 3.0F);
 					if (settings.ShouldUseFogFilter2()) {
 						// `GLFogFilter2` adds a GI factor, so the fog receives some light
 						// even if the fog color is set to dark.
@@ -1239,7 +1244,7 @@ namespace spades {
 					handle = GLColorCorrectionFilter(*this).Filter(handle, tint * exposure, fogLuminance);
 
 					// update smoothed fog color
-					smoothedFogColor = Mix(smoothedFogColor, fogColor, 0.002F);
+					smoothedFogColor = Mix(smoothedFogColor, sceneFogColor, 0.002F);
 				}
 			}
 

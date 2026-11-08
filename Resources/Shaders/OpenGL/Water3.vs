@@ -32,6 +32,8 @@ varying vec3 screenPosition;
 varying vec3 viewPosition;
 varying vec3 worldPosition;
 varying vec2 worldPositionOriginal;
+// The height of the water's surface, before the waves move it up or down
+varying float surfaceHeight;
 
 uniform sampler2DArray waveTextureArray;
 
@@ -65,6 +67,7 @@ void main() {
 
 	worldPosition = (modelMatrix * vertexPos).xyz;
 	worldPositionOriginal = worldPosition.xy;
+	surfaceHeight = worldPosition.z;
 	worldPosition += DisplaceWater(worldPositionOriginal);
 	viewPosition = (viewMatrix * vec4(worldPosition, 1.0)).xyz;
 	

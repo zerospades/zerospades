@@ -89,6 +89,20 @@ namespace spades {
 			return image;
 		}
 
+		void GLDynamicLightShader::SetUpNearestBatch(GLRenderer* renderer, GLProgram* program,
+		                                             int texStage, const Vector3& eye) {
+			// Stable, so lights as near as each other keep their order from frame to
+			// frame and the batch does not flicker between them.
+			std::stable_sort(pending.begin(), pending.end(),
+			                 [&eye](const GLDynamicLight* a, const GLDynamicLight* b) {
+				                 return (a->GetParam().origin - eye).GetSquaredLength() <
+				                        (b->GetParam().origin - eye).GetSquaredLength();
+			                 });
+
+			GLImage* image = TakeBatch();
+			SetUp(renderer, program, image, texStage);
+		}
+
 		void GLDynamicLightShader::SetUp(GLRenderer* renderer, GLProgram* program, GLImage* image,
 		                                 int texStage) {
 			// A new renderer has its own images and programs, none of them set up.
@@ -97,12 +111,15 @@ namespace spades {
 				lastRenderer = renderer->GetInstanceId();
 				// Its programs hold nothing uploaded yet, and it binds nothing yet.
 				uploadedProgram = nullptr;
-				boundPass = 0;
+				bound = false;
 			}
 
 			IGLDevice& device = renderer->GetGLDevice();
 			GLMapOccupancy* occupancy = renderer->GetMapOccupancy();
-			GLDynamicLightTable& lightTable = renderer->GetDynamicLightTable();
+			// Made once dynamic lights are on; without them, a draw takes no light and
+			// looks nothing up in them.
+			GLDynamicLightTable* lightTable = renderer->GetDynamicLightTable();
+			GLDynamicLightOcclusionMaps* lightOcclusion = renderer->GetDynamicLightOcclusionMaps();
 
 			// The units of the textures this program samples
 			projectionTexture(program);
@@ -123,7 +140,8 @@ namespace spades {
 
 			// Once a pass, the textures every batch shares
 			const std::uint32_t pass = renderer->GetDynamicLightPass();
-			if (pass != boundPass || units != boundUnits) {
+			if (!bound || pass != boundPass || units != boundUnits) {
+				bound = true;
 				boundPass = pass;
 				boundUnits = units;
 				boundImage = nullptr;
@@ -138,14 +156,15 @@ namespace spades {
 				// The lights the batch names rows of
 				if (units.table >= 0) {
 					device.ActiveTexture(units.table);
-					device.BindTexture(IGLDevice::Texture2D, lightTable.GetTexture());
+					device.BindTexture(IGLDevice::Texture2D,
+					                   lightTable ? lightTable->GetTexture() : 0);
 				}
 
 				// Where the map stops the spotlights that have a map
 				if (units.occlusionMaps >= 0) {
 					device.ActiveTexture(units.occlusionMaps);
 					device.BindTexture(IGLDevice::Texture2D,
-					                   renderer->GetDynamicLightOcclusionMaps().GetTexture());
+					                   lightOcclusion ? lightOcclusion->GetTexture() : 0);
 				}
 			}
 
@@ -189,7 +208,8 @@ namespace spades {
 				eye.SetValue(viewOrigin.x, viewOrigin.y, viewOrigin.z);
 				table.SetValue(units.table);
 				tableRowsInversed(program);
-				tableRowsInversed.SetValue(1.F / (float)std::max(lightTable.GetCapacity(), 1));
+				tableRowsInversed.SetValue(
+				  1.F / (float)std::max(lightTable ? lightTable->GetCapacity() : 1, 1));
 				occlusionMaps.SetValue(units.occlusionMaps);
 
 				// The water's reflection is drawn as a whole second scene: there, the
@@ -203,9 +223,11 @@ namespace spades {
 				return;
 			uploadedBatch = batch;
 
+			// Any light at all means dynamic lights are on, and the table was made.
+			SPAssert(batch.empty() || lightTable);
 			float rows[MaxLightsPerDraw] = {};
 			for (std::size_t i = 0; i < batch.size(); i++)
-				rows[i] = (float)lightTable.GetRow(*batch[i]);
+				rows[i] = (float)lightTable->GetRow(*batch[i]);
 
 			static_assert(MaxLightsPerDraw == 8, "the rows are sent as two vec4s");
 			count(program);

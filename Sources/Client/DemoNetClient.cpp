@@ -24,6 +24,7 @@
 
 #include "CTFGameMode.h"
 #include "Client.h"
+#include "DaytimeWeather.h"
 #include "DemoNetClient.h"
 #include "Flashlight.h"
 #include "NetProtocol.h"
@@ -161,6 +162,12 @@ namespace spades {
 				return;
 
 			NetPacketReader reader(data);
+
+			// A Sky needs no world and applies on arrival, whatever the stage.
+			if (reader.GetType() == PacketTypeDaytimeWeather) {
+				ApplyDaytimeWeatherPacket(reader, timeOfDay);
+				return;
+			}
 
 			try {
 				if (status == NetClientStatusConnecting) {
@@ -1002,9 +1009,10 @@ namespace spades {
 			w->SetMap(initialMap->Clone());
 			client->SetWorld(w);
 
-			// The replay sends the beams in force again, so none can leak back from
-			// later in the recording.
+			// The replay sends the beams and the Sky in force again, so none can leak
+			// back from later in the recording.
 			flashlightBeams.Clear();
+			timeOfDay.reset();
 
 			// Reset all per-player tracking state
 			recordedLocalPlayerId = -1;

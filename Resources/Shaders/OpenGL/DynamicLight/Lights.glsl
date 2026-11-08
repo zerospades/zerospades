@@ -315,3 +315,25 @@ vec3 EvaluateDynamicLightsScattered(vec3 position, vec3 normal) {
 	}
 	return light;
 }
+
+/**
+ * The light every dynamic light of the draw reflects off a glossy surface at
+ * `position`, facing `normal`, along `reflected`: the eye's ray mirrored by the
+ * surface. Both are unit length; `shininess` is the highlight's Phong exponent,
+ * and the result is normalized for it, so a tighter highlight is a brighter one.
+ * The caller weighs it by the surface's Fresnel term.
+ */
+vec3 EvaluateDynamicLightsSpecular(vec3 position, vec3 normal, vec3 reflected, float shininess) {
+	float normalization = (shininess + 2.0) * (1.0 / (2.0 * 3.14159265));
+	vec3 light = vec3(0.0);
+	for (int i = 0; i < DYNAMIC_LIGHT_MAX; i++) {
+		if (i >= dynamicLightCount)
+			break;
+		vec3 direction;
+		vec3 incidence = DynamicLightIncidence(i, position, normal, false, direction);
+		float cosIncidence = max(dot(direction, normal), 0.0);
+		float lobe = pow(max(dot(reflected, direction), 0.0), shininess);
+		light += incidence * (lobe * normalization * cosIncidence);
+	}
+	return light;
+}

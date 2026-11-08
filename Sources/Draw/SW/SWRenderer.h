@@ -57,6 +57,9 @@ namespace spades {
 
 			Handle<Bitmap> fb;
 			std::vector<float> depthBuffer;
+			/** The world's own colours, kept while the daylight dims the frame so that
+			 * dynamic lights still light them. Empty in full daylight. */
+			std::vector<uint32_t> albedoBuffer;
 
 			std::shared_ptr<SWImageManager> imageManager;
 			std::shared_ptr<SWModelManager> modelManager;
@@ -158,6 +161,10 @@ namespace spades {
 			 * the glares are drawn over them. */
 			void DrawGlares();
 
+			/** Dims what is drawn so far, the world and the sky, by the daylight, keeping
+			 * their colours in `albedoBuffer`. */
+			void ApplyDaylight();
+
 		protected:
 			~SWRenderer();
 
@@ -181,7 +188,9 @@ namespace spades {
 			void SetFogColor(Vector3 v) override;
 			void SetFogDistance(float f) override { fogDistance = f; }
 
-			Vector3 GetFogColor() { return fogColor; }
+			/** The colour the fog and the sky are drawn in: the Fog Colour times the
+			 * daylight. */
+			Vector3 GetFogColor() { return fogColor * sceneDef.daylight; }
 			float GetFogDistance() { return fogDistance; }
 
 			void StartScene(const client::SceneDefinition &) override;

@@ -143,7 +143,7 @@ def prelude(settings):
     ])
 
 
-def shadow_shaders(settings, variance=False, skip_ssao=False):
+def shadow_shaders(settings, variance=False, skip_ssao=False, facing_up=False):
     """`GLShadowShader::RegisterShader`."""
     s = ["Shadow/CommonNoSSAO.fs" if skip_ssao else "Shadow/Common.fs", "Shadow/Common.vs"]
     s += ["Shadow/MapVariance.fs", "Shadow/MapVariance.vs"] if variance else ["Shadow/Map.fs", "Shadow/Map.vs"]
@@ -155,7 +155,8 @@ def shadow_shaders(settings, variance=False, skip_ssao=False):
     else:
         s += ["Shadow/ModelNull.fs", "Shadow/ModelNull.vs"]
     if settings["r_radiosity"]:
-        s += ["Shadow/MapRadiosity.fs", "Shadow/MapRadiosity.vs"]
+        s += ["Shadow/MapRadiosityUp.fs" if facing_up else "Shadow/MapRadiosity.fs",
+              "Shadow/MapRadiosity.vs"]
     else:
         s += ["Shadow/MapRadiosityNull.fs", "Shadow/MapRadiosityNull.vs"]
     return ["Shaders/OpenGL/" + x for x in s]
@@ -163,7 +164,7 @@ def shadow_shaders(settings, variance=False, skip_ssao=False):
 
 SPECIAL = {
     "*shadow*": lambda st: shadow_shaders(st),
-    "*shadow-lite*": lambda st: shadow_shaders(st, skip_ssao=True),
+    "*shadow-water*": lambda st: shadow_shaders(st, skip_ssao=True, facing_up=True),
     "*shadow-variance*": lambda st: shadow_shaders(st, variance=True),
     "*dlight*": lambda st: ["Shaders/OpenGL/DynamicLight/" + x for x in
                             ("Lights.fs", "Common.fs", "Common.vs", "MapNull.fs", "MapNull.vs")],

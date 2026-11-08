@@ -141,9 +141,9 @@ namespace spades {
 					  GLShadowShader::RegisterShader(this, settings, false);
 					for (const auto& shader : shaders)
 						p->Attach(*shader);
-				} else if (text == "*shadow-lite*") {
+				} else if (text == "*shadow-water*") {
 					std::vector<GLShader*> shaders =
-					  GLShadowShader::RegisterShader(this, settings, false, true);
+					  GLShadowShader::RegisterShader(this, settings, false, true, true);
 					for (const auto& shader : shaders)
 						p->Attach(*shader);
 				} else if (text == "*shadow-variance*") {
