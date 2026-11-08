@@ -175,6 +175,36 @@ namespace spades {
 			}
 			SPLog("------------------");
 
+			// The limits a program only finds it is past when it fails to link on
+			// some GPU, which `Tools/gl_shader_audit.py --log` checks the shaders
+			// against.
+			{
+				const struct {
+					GLenum name;
+					const char* label;
+				} limits[] = {
+				  {GL_MAX_TEXTURE_IMAGE_UNITS, "GL_MAX_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, "GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS"},
+				  {GL_MAX_VERTEX_UNIFORM_COMPONENTS, "GL_MAX_VERTEX_UNIFORM_COMPONENTS"},
+				  {GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, "GL_MAX_FRAGMENT_UNIFORM_COMPONENTS"},
+				  {GL_MAX_VARYING_FLOATS, "GL_MAX_VARYING_FLOATS"},
+				  {GL_MAX_VERTEX_ATTRIBS, "GL_MAX_VERTEX_ATTRIBS"},
+				  {GL_MAX_DRAW_BUFFERS, "GL_MAX_DRAW_BUFFERS"},
+				  {GL_MAX_TEXTURE_SIZE, "GL_MAX_TEXTURE_SIZE"},
+				  {GL_MAX_3D_TEXTURE_SIZE, "GL_MAX_3D_TEXTURE_SIZE"},
+				};
+				for (const auto& limit : limits) {
+					GLint value = 0;
+					glGetIntegerv(limit.name, &value);
+					SPLog("GL limit %s: %d", limit.label, (int)value);
+				}
+				// A limit the context doesn't know leaves an error behind.
+				while (glGetError() != GL_NO_ERROR) {
+				}
+			}
+			SPLog("------------------");
+
 			CheckExistence(glFrontFace);
 			glFrontFace(GL_CW);
 
@@ -371,6 +401,8 @@ namespace spades {
 				case Version: return (const char*)glGetString(GL_VERSION);
 				case ShadingLanguageVersion:
 					return (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+				// The whole list at once, as the compatibility contexts this runs on have it
+				case Extensions: return (const char*)glGetString(GL_EXTENSIONS);
 				default: SPInvalidEnum("type", type);
 			}
 		}
@@ -893,6 +925,7 @@ namespace spades {
 				case RGB10A2: return GL_RGB10_A2;
 				case RGB16F: return GL_RGB16F;
 				case RGBA16F: return GL_RGBA16F;
+				case RGBA32F: return GL_RGBA32F;
 				case R16F: return GL_R16F;
 				case RGB5: return GL_RGB5;
 				case RGB5A1: return GL_RGB5_A1;

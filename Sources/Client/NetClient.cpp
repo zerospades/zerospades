@@ -29,6 +29,7 @@
 
 #include "CTFGameMode.h"
 #include "Client.h"
+#include "Flashlight.h"
 #include "GameMap.h"
 #include "NetProtocol.h"
 #include "GameMapLoader.h"
@@ -253,7 +254,7 @@ namespace spades {
 			lastPlayerInput = 0;
 			lastWeaponInput = 0;
 
-			const int slots = 256;
+			const int slots = NumPlayerSlots;
 			savedPlayerPos.resize(slots);
 			savedPlayerFront.resize(slots);
 			savedPlayerTeam.resize(slots);
@@ -619,6 +620,7 @@ namespace spades {
 				case ExtensionTypeDamageMarkers: return "Damage Markers";
 				case ExtensionTypeTeamplay: return "Teamplay";
 				case ExtensionTypePieMenu: return "Pie Menu";
+				case ExtensionTypeFlashlight: return "Flashlight";
 				case ExtensionTypePlayerLimit: return "Player Limit";
 				case ExtensionTypeMessageTypes: return "Message Types";
 				case ExtensionTypeKickReason: return "Kick Reason";
@@ -697,6 +699,13 @@ namespace spades {
 						return false;
 					HandlePieMenuPacket(r);
 					return true;
+				case PacketTypeFlashlight:
+					// The Connecting stage rejects anything but MapStart, so a Flashlight
+					// packet is applied here; later, it waits for the world like the rest.
+					if (status != NetClientStatusConnecting)
+						return false;
+					HandleFlashlightPacket(r);
+					return true;
 				case PacketTypeVersionGet: {
 					if (r.GetNumRemainingBytes() > 0) {
 						// Enhanced variant
@@ -719,7 +728,7 @@ namespace spades {
 					// before sending the map). Peek so non-kick chat falls through with
 					// an untouched reader cursor.
 					if (r.GetNumRemainingBytes() >= 2 &&
-						r.Peek(0) == 255 && r.Peek(1) == ChatTypeSystem) {
+						r.Peek(0) == kServerPlayerId && r.Peek(1) == ChatTypeSystem) {
 						r.ReadByte(); // playerId
 						r.ReadByte(); // chat type
 						CaptureKickReason(r);
@@ -776,16 +785,9 @@ namespace spades {
 				return;
 			}
 
-			auto hasBytes = [&r](size_t needed) {
-				if (r.GetNumRemainingBytes() >= needed)
-					return true;
-				SPLog("Ignoring a truncated Teamplay sub packet");
-				return false;
-			};
-
 			switch (r.ReadByte()) { // sub packet id
 				case TeamplaySubConfig: {
-					if (!hasBytes(kTeamplayConfigBytes))
+					if (!HasSubPacketBytes(r, kTeamplayConfigBytes, "Teamplay"))
 						break;
 
 					uint8_t features = r.ReadByte();
@@ -798,7 +800,7 @@ namespace spades {
 					client->TeamplayConfigured(features, northX, northY);
 				} break;
 				case TeamplaySubPing: {
-					if (!hasBytes(kTeamplayPingBytes))
+					if (!HasSubPacketBytes(r, kTeamplayPingBytes, "Teamplay"))
 						break;
 
 					int pId = r.ReadByte();
@@ -840,7 +842,7 @@ namespace spades {
 														 color, std::move(reason));
 				} break;
 				case TeamplaySubESPMark: {
-					if (!hasBytes(kTeamplayMarkBytes))
+					if (!HasSubPacketBytes(r, kTeamplayMarkBytes, "Teamplay"))
 						break;
 
 					int pId = r.ReadByte();
@@ -929,6 +931,18 @@ namespace spades {
 			client->DamageMarkerReceived(marker->playerId, marker->amount);
 		}
 
+		void NetClient::HandleFlashlightPacket(spades::client::NetPacketReader& r) {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypeFlashlight)) {
+				SPLog("Ignoring a Flashlight packet from a server that did not "
+				      "negotiate the extension");
+				return;
+			}
+
+			ApplyFlashlightPacket(r, *client, flashlightBeams, false);
+		}
+
 		void NetClient::HandleGamePacket(spades::client::NetPacketReader& r) {
 			SPADES_MARK_FUNCTION();
 
@@ -936,6 +950,7 @@ namespace spades {
 				case PacketTypeTeamplay: HandleTeamplayPacket(r); break;
 				case PacketTypePieMenu: HandlePieMenuPacket(r); break;
 				case PacketTypeDamageMarker: HandleDamageMarkerPacket(r); break;
+				case PacketTypeFlashlight: HandleFlashlightPacket(r); break;
 				case PacketTypePositionData: {
 					Player& p = GetLocalPlayer();
 					if (r.GetLength() != 13) {
@@ -1352,6 +1367,8 @@ namespace spades {
 					}
 
 					Player& victim = GetPlayer(victimId);
+					// Kill Action ends the victim's light, already dead or not.
+					victim.SetFlashlightOn(false);
 					Player& killer = GetPlayer(killerId);
 					victim.KilledBy(type, killer, respawnTime);
 					if (killerId != victimId)
@@ -1409,6 +1426,7 @@ namespace spades {
 					Player& p = GetPlayer(pId);
 
 					client->PlayerLeaving(p);
+					flashlightBeams.Forget(pId);
 					GetWorld()->GetPlayerPersistent(pId).score = 0;
 
 					savedPlayerTeam[pId] = -1;
@@ -1895,6 +1913,18 @@ namespace spades {
 			enet_peer_send(peer, 0, w.CreatePacket());
 		}
 
+		void NetClient::SendFlashlight(bool on) {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypeFlashlight))
+				return;
+
+			// Not recorded: the switch the server grants comes back and is recorded then.
+			std::vector<char> data = EncodeFlashlightLight(GetLocalPlayer().GetId(), on);
+			enet_peer_send(peer, 0,
+			               enet_packet_create(data.data(), data.size(), ENET_PACKET_FLAG_RELIABLE));
+		}
+
 		void NetClient::SendMapCached() {
 			SPADES_MARK_FUNCTION();
 
@@ -1952,7 +1982,7 @@ namespace spades {
 			// The Player ID is ignored in this direction; the server fills it in
 			// authoritatively. Sent as 255 so a server reading it sees "unset" rather
 			// than a plausible-looking impersonation of some other player.
-			w.WriteByte((uint8_t)Teamplay::kServerPlayerId);
+			w.WriteByte((uint8_t)kServerPlayerId);
 
 			w.WriteVector3(position);
 
@@ -2270,6 +2300,7 @@ namespace spades {
 			}
 
 			WriteInitialTeamplayDemoState();
+			WriteInitialFlashlightDemoState();
 
 			SPLog("Initial demo state written successfully");
 		}
@@ -2321,6 +2352,24 @@ namespace spades {
 				const auto& data = w.GetData();
 				demoRecorder->RecordPacket(data.data(), data.size());
 			}
+		}
+
+		void NetClient::WriteInitialFlashlightDemoState() {
+			SPADES_MARK_FUNCTION();
+
+			if (!HasExtension(ExtensionTypeFlashlight))
+				return;
+
+			auto record = [this](const std::vector<char>& data) {
+				demoRecorder->RecordPacket(data.data(), data.size());
+			};
+
+			// What the server would send a player joining now.
+			record(EncodeFlashlightLightState(GetWorld().value()));
+			if (const auto& serverDefault = flashlightBeams.GetDefault())
+				record(EncodeFlashlightLightConfig(kServerPlayerId, *serverDefault));
+			for (const auto& entry : flashlightBeams.GetPlayers())
+				record(EncodeFlashlightLightConfig(entry.first, entry.second));
 		}
 
 		bool NetClient::StartDemoRecording(const std::string& filename, const std::string& context) {

@@ -86,6 +86,12 @@ namespace spades {
 			};
 			std::vector<LongSprite> longSprites;
 
+			struct Glare {
+				Handle<SWImage> img;
+				client::GlareParam param;
+			};
+			std::vector<Glare> glares;
+
 			struct Model {
 				Handle<SWModel> model;
 				client::ModelRenderParam param;
@@ -142,6 +148,16 @@ namespace spades {
 
 			template <SWFeatureLevel> void ApplyDynamicLight(const DynamicLight &);
 
+			/** How much of the light a glare at `clip` comes from the scene just drawn
+			 * leaves in sight. */
+			float GetGlareVisibility(const Vector4 &clip);
+
+			/** Draws the scene's glares over the finished frame, hidden as far as the
+			 * scene covers their light. This renderer can't tell the first-person
+			 * view's models apart: they hide a light behind them like any other, and
+			 * the glares are drawn over them. */
+			void DrawGlares();
+
 		protected:
 			~SWRenderer();
 
@@ -178,6 +194,7 @@ namespace spades {
 
 			void AddSprite(client::IImage &, Vector3 center, float radius, float rotation) override;
 			void AddLongSprite(client::IImage &, Vector3 p1, Vector3 p2, float radius) override;
+			void AddGlare(client::IImage &, const client::GlareParam &) override;
 
 			void EndScene() override;
 
