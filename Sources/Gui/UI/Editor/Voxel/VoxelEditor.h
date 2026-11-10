@@ -270,6 +270,7 @@ namespace spades {
 			bool HasPlacement() const override { return edit.placing; }
 			void TransformPlacement(const PlacementTransform& t) override;
 			bool TransformPivot(IntVector3& out) const override;
+			bool MovedMiddle(IntVector3& out) const override;
 			bool TurnsAboutModelPivot() const override { return turnsAboutModelPivot; }
 			void SetTurnsAboutModelPivot(bool on) override { turnsAboutModelPivot = on; }
 			void ApplyPlacement() override;

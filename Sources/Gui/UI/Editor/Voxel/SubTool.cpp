@@ -740,11 +740,14 @@ namespace spades {
 		}
 
 		bool SweepSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
-			IntVector3 pivot;
-			if (ed.HasPlacement() || ed.SelectionCount() == 0 || !ed.TransformPivot(pivot))
+			IntVector3 middle;
+			// On the voxels it sweeps, not on the centre turns go round: a sweep
+			// never turns anything, so the Transform tool's Turn about setting has
+			// no business moving these arrows off the selection.
+			if (ed.HasPlacement() || ed.SelectionCount() == 0 || !ed.MovedMiddle(middle))
 				return false;
 			// The voxels change on release; the gizmo rides the drag meanwhile.
-			pose.position = VecOf(pivot) + gizmo.Total().translation;
+			pose.position = VecOf(middle) + gizmo.Total().translation;
 			for (int a = 0; a < 3; a++)
 				pose.axes[a] = AxisUnit(a);
 			return true;

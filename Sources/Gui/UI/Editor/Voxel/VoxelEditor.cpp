@@ -1640,15 +1640,19 @@ namespace spades {
 			edit.placement = std::move(next);
 		}
 
-		bool VoxelEditor::TransformPivot(IntVector3& out) const {
+		bool VoxelEditor::MovedMiddle(IntVector3& out) const {
 			// From what is known already (the waiting voxels' middle, the
 			// selection's cached box): it is asked for every frame.
 			if (edit.placing) {
-				out = TurnCentre(edit.placement.pivot);
+				out = edit.placement.pivot;
 				return true;
 			}
+			return SelectionMiddleOf(out);
+		}
+
+		bool VoxelEditor::TransformPivot(IntVector3& out) const {
 			IntVector3 middle;
-			if (!SelectionMiddleOf(middle))
+			if (!MovedMiddle(middle))
 				return false;
 			out = TurnCentre(middle);
 			return true;
