@@ -97,6 +97,14 @@ namespace spades {
 				if (ToolOption* o = Find(id))
 					o->value = value;
 			}
+			// What one press of a Number's arrows adds, where a setting of the
+			// tool's decides it rather than the kind of value: a tool whose Step
+			// the user picks sets it alongside the value, so the arrows and the
+			// tool's own dragging move by the same amount.
+			void SetStep(const std::string& id, float step) {
+				if (ToolOption* o = Find(id))
+					o->step = step;
+			}
 			// A read-only readout; the tool refreshes its text via SetLabel each frame.
 			void AddLabel(const std::string& id, const std::string& group = "") {
 				ToolOption o;
