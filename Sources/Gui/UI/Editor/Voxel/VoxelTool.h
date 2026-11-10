@@ -41,6 +41,10 @@ namespace spades {
 			// What this tool sets by number, which the editor's transform panel
 			// shows while it is active (Pivot's pivot); null for nothing.
 			virtual ITransformTarget* TransformTarget(IVoxelEditContext&) { return nullptr; }
+			// The step the panel's Location holds to while it is Ctrl-dragged: a
+			// tool whose Step the user picks (GizmoTool) answers with that, so the
+			// panel and the tool's own dragging agree. A whole voxel otherwise.
+			virtual float TransformStep() const { return 1.0F; }
 
 			// The user changed the brush colour on the colour picker. `committed`
 			// is false while the picker is still being dragged -- show it, but

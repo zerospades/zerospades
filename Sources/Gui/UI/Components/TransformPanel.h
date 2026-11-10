@@ -88,6 +88,10 @@ namespace spades {
 			void LayoutAbove(float right, float bottom);
 			/** Whether it showed last frame, and `at` is on it. */
 			bool Contains(const Vector2& at) const;
+			/** What Ctrl-dragging a Location holds to: the step whoever owns the
+			 *  target moves it in, so the panel and a drag of it agree. A
+			 *  rotation's and a scale's are the kind of value's, not a setting. */
+			void SetLocationStep(float step);
 
 			bool IsHolding() const;
 			bool IsTyping() const;

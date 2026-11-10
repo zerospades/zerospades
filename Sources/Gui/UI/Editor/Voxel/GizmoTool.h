@@ -44,6 +44,8 @@ namespace spades {
 			// Subclasses overriding these call them first.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			// Whatever sets this tool's numbers holds to the step it is set to.
+			float TransformStep() const override { return Step(); }
 
 		protected:
 			/**
