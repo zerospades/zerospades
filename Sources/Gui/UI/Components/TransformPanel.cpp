@@ -182,6 +182,12 @@ namespace spades {
 		void TransformPanel::Put(int index, float value) { Component(editing, index) = value; }
 
 		void TransformPanel::Press(ITransformTarget& target, const Vector2& at) {
+			// Whatever was being typed into is settled first, as a press anywhere
+			// else settles it: one field is being set at a time, so the one taken
+			// up here is never the second to hold the keyboard and draw a caret.
+			// A press on the panel but on none of its fields settles it too — the
+			// panel answers for every press on it, and nothing else will.
+			Settle(target);
 			for (int i = 0; i < 9; i++) {
 				NumberField& field = *fields[std::size_t(i)];
 				if (!field.Contains(at) || !field.IsEnabled())
@@ -290,6 +296,12 @@ namespace spades {
 					Settle(target); // what it was setting is gone
 				return;
 			}
+			// A field Begin would now refuse is not the one being set either: its
+			// row has gone, or the target only moves. What was typed is kept, as a
+			// press elsewhere would keep it, rather than left open in a field the
+			// panel draws greyed out or does not draw at all.
+			if (active >= 0 && (Slot(active / 3) < 0 || (onlyMoves && active >= 3)))
+				Settle(target);
 
 			const float x = Left(), h = Height();
 			EditorTheme::PaintPanel(renderer, x, top, kWidth, h);
