@@ -4265,6 +4265,20 @@ msgstr ""
 "Falta Mods/index.txt, así que ningún mod puede verificarse como oficial. "
 "Descarga los mods oficiales para crearlo."
 
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:215
+msgctxt "Preferences"
+msgid "Interface Scale"
+msgstr "Escala de la interfaz"
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:224
+msgctxt "Preferences"
+msgid ""
+"Size of the menus and HUD. At 100% they are sized for your screen "
+"automatically (twice as large on a 4K screen as on 1080p)."
+msgstr ""
+"Tamaño de los menús y del HUD. Al 100% se ajustan automáticamente a tu "
+"pantalla (el doble de grandes en una pantalla 4K que en 1080p)."
+
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:76
 msgctxt "StartupScreen"
 msgid ""
