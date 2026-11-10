@@ -22,8 +22,12 @@
 
 namespace spades {
 	namespace gui {
-		VoxelTool* ContainerTool::Cur() {
+		const VoxelTool* ContainerTool::Cur() const {
 			return (active >= 0 && active < int(subs.size())) ? subs[active].get() : nullptr;
+		}
+
+		VoxelTool* ContainerTool::Cur() {
+			return const_cast<VoxelTool*>(const_cast<const ContainerTool*>(this)->Cur());
 		}
 
 		void ContainerTool::SetSubTool(IVoxelEditContext& ed, int i) {

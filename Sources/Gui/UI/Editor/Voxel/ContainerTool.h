@@ -56,11 +56,19 @@ namespace spades {
 				VoxelTool* t = Cur();
 				return t ? t->TransformTarget(ed) : nullptr;
 			}
+			// The target comes from the sub-tool, so the step it is set in does
+			// too: the two are one answer, and a container that passed on only
+			// the first would have the panel setting it in some other step.
+			float TransformStep() const override {
+				const VoxelTool* t = Cur();
+				return t ? t->TransformStep() : VoxelTool::TransformStep();
+			}
 
 		protected:
 			std::vector<std::unique_ptr<VoxelTool>> subs;
 			int active = 0;
 			VoxelTool* Cur();
+			const VoxelTool* Cur() const;
 		};
 	} // namespace gui
 } // namespace spades
