@@ -60,10 +60,10 @@ namespace spades {
 		                0.5F) {
 			AddMirrorToggles(options);
 			// A box per axis, which both shows where a plane is and is how it is
-			// moved. They step by half a voxel because that is the grid the
-			// planes sit on; a whole step from a half keeps the half.
+			// moved. They step by the Step setting, as a drag does (UpdateOptions
+			// keeps them on it); a whole step from a half keeps the half.
 			for (int a = 0; a < 3; a++)
-				options.AddNumber(kPlaneOption[a], kAxisLabel[a], "Plane", kPlaneStep, kDecimals);
+				options.AddNumber(kPlaneOption[a], kAxisLabel[a], "Plane", Step(), kDecimals);
 			options.AddAction(kResetOption, "Reset to Pivot");
 			AddSnapOptions();
 		}
@@ -83,8 +83,12 @@ namespace spades {
 			// into alone.
 			const Vector3 plane = ed.MirrorPlane();
 			const float at[3] = {plane.x, plane.y, plane.z};
-			for (int a = 0; a < 3; a++)
+			for (int a = 0; a < 3; a++) {
 				options.SetNumber(kPlaneOption[a], at[a]);
+				// The Step setting is the tool's, not the gizmo's alone: an arrow
+				// moves a plane by what a drag of it would.
+				options.SetStep(kPlaneOption[a], Step());
+			}
 		}
 
 		void MirrorTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,

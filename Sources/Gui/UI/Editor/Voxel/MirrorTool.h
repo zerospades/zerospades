@@ -59,8 +59,7 @@ namespace spades {
 
 		private:
 			// A reflection only shifts at half a voxel, and the editor holds the
-			// planes to that grid, so the boxes step and are written to match it.
-			static constexpr float kPlaneStep = 0.5F;
+			// planes to that grid, so the boxes are written to match it.
 			static constexpr int kDecimals = 1;
 			// Which axis `id` names a plane of, or -1 if it names none of them.
 			static int AxisOf(const std::string& id);

@@ -57,6 +57,10 @@ namespace spades {
 			/** Adds Step and Snap to Grid at this point of the bar. */
 			void AddSnapOptions();
 
+			/** The step in use: what a drag moves by, and what a box of this
+			 *  tool's steps by, so the two never disagree. */
+			float Step() const { return step; }
+
 			ToolOptions options;
 
 		private:
