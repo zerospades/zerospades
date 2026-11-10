@@ -225,9 +225,9 @@ namespace spades {
 				case Part::Label: break;
 			}
 			if (!row.node) {
-				// The scene's own row: the click picks nothing.
+				// The scene's own row: no node, but its pivot to set.
 				if (!toggle && !extend)
-					scene.Select({}, {});
+					scene.SelectScene();
 				return std::string();
 			}
 
@@ -588,7 +588,7 @@ namespace spades {
 				const Row& row = rows[std::size_t(i)];
 				const float y = RowTop(i);
 				const float midY = y + kRowH * 0.5F;
-				const bool selected = row.node && scene.IsSelected(row.path);
+				const bool selected = row.node ? scene.IsSelected(row.path) : scene.SceneActive();
 				const bool active = selected && scene.Active() == row.path;
 				// Hidden, or stood in for by a preview (a model of it at another resolution).
 				const bool hidden = row.node && (row.node->hidden || row.hiddenAbove ||

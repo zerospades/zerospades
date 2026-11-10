@@ -69,14 +69,25 @@ namespace spades {
 			                                  bool through, bool removing) = 0;
 			virtual bool HasSelectedObjects() const = 0;
 			virtual void SelectNoObject() = 0;
-			/** Whether an object is picked: Edit mode then edits it. */
+			/** Whether an object is picked, with voxels or none: Edit mode then
+			 *  edits it. */
 			virtual bool HasPickedObject() const = 0;
 			/** The picked object's name, for the hint line. */
 			virtual std::string PickedObjectName() const = 0;
 
+			/** What a drag of the gizmo may do to what it is on. */
+			enum class Handling {
+				Free,        ///< an object with voxels: move, turn and scale
+				MoveAndTurn, ///< an empty: it has no voxels to scale
+				MoveOnly,    ///< held by its template, which keeps its turn and scale
+				ScenePivot   ///< the scene itself: its pivot moves, the objects stay
+			};
+			virtual Handling PickedObjectHandling() const = 0;
+
 			/**
-			 * Where the gizmo on the picked object sits: its pivot, turned with
-			 * it. False when nothing is picked.
+			 * Where the gizmo sits: on the picked object's pivot, turned with
+			 * it, or on the scene's when the scene itself is selected. False
+			 * when there is nothing to handle.
 			 */
 			virtual bool PickedObjectPose(GizmoPose& pose) const = 0;
 			/**

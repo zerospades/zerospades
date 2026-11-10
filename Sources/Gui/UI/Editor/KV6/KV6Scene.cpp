@@ -78,20 +78,8 @@ namespace spades {
 
 			// Voxels of its own for `o` and everything under it.
 			void CloneModels(VoxelObject& o) {
-				if (o.model) {
-					const VoxelModel& from = *o.model;
-					Handle<VoxelModel> copy =
-					  Handle<VoxelModel>::New(from.GetWidth(), from.GetHeight(), from.GetDepth());
-					copy->SetOrigin(from.GetOrigin());
-					for (int x = 0; x < from.GetWidth(); x++) {
-						for (int y = 0; y < from.GetHeight(); y++) {
-							copy->GetSolidBitsAt(x, y) = from.GetSolidBitsAt(x, y);
-							for (int z = 0; z < from.GetDepth(); z++)
-								copy->GetColor(x, y, z) = from.GetColor(x, y, z);
-						}
-					}
-					o.model = std::move(copy);
-				}
+				if (o.model)
+					o.model = KV6Scene::CopyOf(*o.model);
 				for (VoxelObject& child : o.children)
 					CloneModels(child);
 			}
@@ -145,6 +133,11 @@ namespace spades {
 			// The smallest a scale factor may shrink to: an object never folds
 			// flat, which no drag could bring back.
 			constexpr float kMinScale = 0.01F;
+			// Where the node turns and scales about, in its own frame.
+			Vector3 PivotOf(const VoxelObject& o) {
+				return o.model ? o.model->GetOrigin() * -1.0F : MakeVector3(0.0F, 0.0F, 0.0F);
+			}
+
 			float KeepScale(float s) {
 				return std::fabs(s) < kMinScale ? (s < 0.0F ? -kMinScale : kMinScale) : s;
 			}
@@ -166,7 +159,7 @@ namespace spades {
 			std::vector<VoxelObject> previous = std::move(roots);
 			roots = std::move(loaded.objects);
 			Index();
-			if (entries.empty()) {
+			if (roots.empty()) {
 				// Nothing in it to show or edit: the scene open stays.
 				roots = std::move(previous);
 				Index();
@@ -223,6 +216,7 @@ namespace spades {
 			selection.clear();
 			active.clear();
 			picked = -1;
+			sceneActive = false;
 			folded.clear();
 			dragging = false;
 			placing = false;
@@ -362,16 +356,26 @@ namespace spades {
 					selection.push_back(std::move(p));
 			}
 			active = IsSelected(newActive) ? std::move(newActive) : NodePath();
+			sceneActive = false;
 			SyncPicked();
 		}
 
+		void KV6Scene::SelectScene() {
+			Select({}, {});
+			sceneActive = true;
+		}
+
 		void KV6Scene::SyncPicked() {
-			// A drag of the picked object ends with it: whatever it was moving
-			// may be elsewhere now.
-			const int now = active.empty() ? -1 : ObjectIndexAt(active);
-			if (now != picked)
+			// Any node taken gives the scene up.
+			if (!selection.empty())
+				sceneActive = false;
+			picked = active.empty() ? -1 : ObjectIndexAt(active);
+			// A drag ends with what it handles: whatever it was moving may be
+			// elsewhere now.
+			if (dragging && (draggingScene ? !sceneActive : active != dragPath)) {
 				dragging = false;
-			picked = now;
+				scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
+			}
 		}
 
 		bool KV6Scene::IsFolded(const NodePath& path) const {
@@ -396,12 +400,13 @@ namespace spades {
 			return m * LocalMatrix(*e.object);
 		}
 
-		void KV6Scene::ParentFrame(int index, Quaternion& rotation, Vector3& scale) const {
+		void KV6Scene::ParentFrame(const NodePath& path, Quaternion& rotation, Vector3& scale) const {
 			rotation = Quaternion(0.0F, 0.0F, 0.0F, 1.0F);
 			scale = MakeVector3(1.0F, 1.0F, 1.0F);
-			for (const VoxelObject* parent : entries[std::size_t(index)].parents) {
-				rotation = rotation * Quaternion(parent->rotation);
-				scale = scale * parent->scale;
+			for (std::size_t n = 1; n < path.size(); n++) {
+				const VoxelObject& parent = *Node(NodePath(path.begin(), path.begin() + long(n)));
+				rotation = rotation * Quaternion(parent.rotation);
+				scale = scale * parent.scale;
 			}
 		}
 
@@ -1017,15 +1022,16 @@ namespace spades {
 		bool KV6Scene::AddChild(const NodePath& parent, Handle<VoxelModel> model,
 		                        const std::string& name, std::string& why) {
 			why.clear();
-			if (!model || !CanHold(parent)) {
+			if (!CanHold(parent)) {
 				why = "nothing to add there";
 				return false;
 			}
 			VoxelObject o;
 			o.name = name;
 			// Voxel `i` lands at the position plus `i`; the pivot, voxel
-			// `-origin`, lands on the parent's origin.
-			o.position = model->GetOrigin();
+			// `-origin`, lands on the parent's origin. An empty is its own pivot.
+			if (model)
+				o.position = model->GetOrigin();
 			o.model = std::move(model);
 			InsertUnder(parent, std::vector<VoxelObject>(1, std::move(o)));
 			return true;
@@ -1051,17 +1057,15 @@ namespace spades {
 				why = "it is not a scene this editor can read";
 				return false;
 			}
-			bool voxels = false;
 			std::function<void(VoxelObject&)> settle = [&](VoxelObject& o) {
 				o.locked = false;
-				voxels = voxels || o.model.GetPointerOrNull() != nullptr;
 				for (VoxelObject& child : o.children)
 					settle(child);
 			};
 			for (VoxelObject& o : objects)
 				settle(o);
-			if (!voxels) {
-				why = "it holds no voxels";
+			if (objects.empty()) {
+				why = "it holds no objects";
 				return false;
 			}
 			if (objects.size() > 1) {
@@ -1220,14 +1224,19 @@ namespace spades {
 
 		// --- Placing -----------------------------------------------------------
 
-		bool KV6Scene::PickedPose(GizmoPose& pose) const {
+		bool KV6Scene::ActivePose(GizmoPose& pose) const {
+			if (sceneActive) {
+				pose = GizmoPose();
+				pose.position = scenePivotOffset;
+				return true;
+			}
 			// No gizmo on what cannot be seen.
-			if (picked < 0 || picked >= Count() || !Shown(picked))
+			const VoxelObject* o = Node(active);
+			if (!o || !Shown(active))
 				return false;
-			const VoxelObject& o = Object(picked);
-			const Matrix4 world = WorldMatrix(picked);
+			const Matrix4 world = NodeMatrix(active);
 			// On the model's pivot, which is where it turns and scales about.
-			pose.position = Point(world, o.model->GetOrigin() * -1.0F);
+			pose.position = Point(world, PivotOf(*o));
 			for (int a = 0; a < 3; a++) {
 				const Vector3 axis = world.GetAxis(a);
 				const float length = axis.GetLength();
@@ -1249,24 +1258,36 @@ namespace spades {
 		}
 
 		void KV6Scene::BeginDrag() {
-			if (picked < 0)
+			draggingScene = sceneActive;
+			if (draggingScene) {
+				scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
+				dragging = true;
 				return;
-			dragStart = PlacementOf(Object(picked));
+			}
+			const VoxelObject* o = Node(active);
+			if (!o)
+				return;
+			dragPath = active;
+			dragStart = PlacementOf(*o);
 			dragging = true;
 		}
 
 		void KV6Scene::PreviewDrag(const GizmoTransform& total) {
-			if (!dragging || picked < 0)
+			if (!dragging)
 				return;
-			VoxelObject& o = Object(picked);
+			if (draggingScene) {
+				scenePivotOffset = total.translation;
+				return;
+			}
+			VoxelObject& o = *MutableNode(dragPath);
 			// The gizmo reports world changes about the pivot: they are brought
 			// into the parent's frame, and the object placed so its pivot moves by
 			// the translation alone.
 			Quaternion parentRotation;
 			Vector3 parentScale;
-			ParentFrame(picked, parentRotation, parentScale);
+			ParentFrame(dragPath, parentRotation, parentScale);
 			const Quaternion toParent = parentRotation.Conjugate();
-			const Vector3 pivot = o.model->GetOrigin() * -1.0F; // in voxel indices
+			const Vector3 pivot = PivotOf(o); // in voxel indices
 
 			const Quaternion startRotation(dragStart.rotation);
 			const Vector3 startPivot =
@@ -1276,26 +1297,41 @@ namespace spades {
 			                   move.z / KeepScale(parentScale.z));
 			const Quaternion turn = toParent * total.rotation * parentRotation;
 
-			const Quaternion rotation = (turn * startRotation).Normalize();
-			const Vector3 scale = MakeVector3(KeepScale(dragStart.scale.x * total.scale.x),
-			                                  KeepScale(dragStart.scale.y * total.scale.y),
-			                                  KeepScale(dragStart.scale.z * total.scale.z));
+			// A locked node keeps its turn and its scale, as in the panel.
+			const Quaternion rotation = o.locked ? startRotation : (turn * startRotation).Normalize();
+			const Vector3 scale =
+			  o.locked ? dragStart.scale
+			           : MakeVector3(KeepScale(dragStart.scale.x * total.scale.x),
+			                         KeepScale(dragStart.scale.y * total.scale.y),
+			                         KeepScale(dragStart.scale.z * total.scale.z));
 			o.rotation = rotation.v;
 			o.scale = scale;
 			o.position = startPivot + move - rotation.Apply(scale * pivot);
 		}
 
 		bool KV6Scene::CommitDrag() {
-			if (!dragging || picked < 0)
+			if (!dragging)
 				return false;
 			dragging = false;
-			const Placement now = PlacementOf(Object(picked));
+			if (draggingScene) {
+				const Vector3 shift = scenePivotOffset * -1.0F;
+				scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
+				if (shift.x == 0.0F && shift.y == 0.0F && shift.z == 0.0F)
+					return false;
+				ShiftRoots(shift);
+				Step step;
+				step.kind = Step::Kind::ScenePivot;
+				step.shift = shift;
+				Record(std::move(step));
+				return true;
+			}
+			const Placement now = PlacementOf(*Node(dragPath));
 			if (now.position == dragStart.position && now.rotation == dragStart.rotation &&
 			    now.scale == dragStart.scale)
 				return false;
 			Step step;
 			step.kind = Step::Kind::Place;
-			step.path = PathOf(picked);
+			step.path = dragPath;
 			step.before = dragStart;
 			step.after = now;
 			Record(std::move(step));
@@ -1310,10 +1346,28 @@ namespace spades {
 		}
 
 		void KV6Scene::CancelDrag() {
-			if (!dragging || picked < 0)
+			if (!dragging)
 				return;
-			Place(Object(picked), dragStart);
 			dragging = false;
+			if (draggingScene)
+				scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
+			else if (VoxelObject* o = MutableNode(dragPath))
+				Place(*o, dragStart);
+		}
+
+		void KV6Scene::ShiftRoots(const Vector3& by) {
+			for (VoxelObject& o : roots)
+				o.position = o.position + by;
+			// A top object's keys are placements in the scene's frame, as its
+			// position is; those of anything under it hang from its parent.
+			for (AnimationClip& clip : clips) {
+				for (AnimationTrack& track : clip.tracks) {
+					if (track.path.find('/') != std::string::npos)
+						continue;
+					for (TransformKeyframe& key : track.keyframes)
+						key.position = key.position + by;
+				}
+			}
 		}
 
 		bool KV6Scene::LocalPlacementOf(const NodePath& path, LocalPlacement& out) const {
@@ -1382,6 +1436,45 @@ namespace spades {
 			// so it lands where it was.
 			VoxelObject& o = Object(index);
 			o.position = o.position - Quaternion(o.rotation).Apply(o.scale * shift);
+			// What hangs from it hangs from its voxel 0 0 0, which moved with them.
+			for (VoxelObject& child : o.children)
+				child.position = child.position + shift;
+		}
+
+		Handle<VoxelModel> KV6Scene::CopyOf(const VoxelModel& from) {
+			Handle<VoxelModel> copy =
+			  Handle<VoxelModel>::New(from.GetWidth(), from.GetHeight(), from.GetDepth());
+			copy->SetOrigin(from.GetOrigin());
+			for (int x = 0; x < from.GetWidth(); x++) {
+				for (int y = 0; y < from.GetHeight(); y++) {
+					copy->GetSolidBitsAt(x, y) = from.GetSolidBitsAt(x, y);
+					for (int z = 0; z < from.GetDepth(); z++)
+						copy->GetColor(x, y, z) = from.GetColor(x, y, z);
+				}
+			}
+			return copy;
+		}
+
+		void KV6Scene::SetVoxels(const NodePath& path, Handle<VoxelModel> model) {
+			if (VoxelObject* o = MutableNode(path))
+				o->model = std::move(model);
+			Index();
+			SyncPicked();
+		}
+
+		void KV6Scene::GiveVoxels(const NodePath& path, Handle<VoxelModel> model) {
+			SetVoxels(path, std::move(model));
+		}
+
+		void KV6Scene::TakeVoxels(const NodePath& path, Handle<VoxelModel> before) {
+			SetVoxels(path, Handle<VoxelModel>());
+			if (!before)
+				return;
+			Step step;
+			step.kind = Step::Kind::Voxels;
+			step.path = path;
+			step.voxels = std::move(before);
+			Record(std::move(step));
 		}
 
 		std::string KV6Scene::StepLabel(const Step& step, bool done) const {
@@ -1413,6 +1506,8 @@ namespace spades {
 				}
 				case Step::Kind::Rename:
 					return "renaming \"" + step.rename->before + "\" to \"" + step.rename->after + "\"";
+				case Step::Kind::ScenePivot: return "setting the scene's pivot";
+				case Step::Kind::Voxels: return "emptying " + named(step.path);
 			}
 			return std::string();
 		}
@@ -1461,6 +1556,14 @@ namespace spades {
 					clips = step.rename->clipsBefore;
 					Select({step.path}, step.path);
 					break;
+				case Step::Kind::ScenePivot:
+					ShiftRoots(step.shift * -1.0F);
+					SelectScene();
+					break;
+				case Step::Kind::Voxels:
+					SetVoxels(step.path, step.voxels);
+					Select({step.path}, step.path);
+					break;
 			}
 			changeCount++;
 		}
@@ -1499,6 +1602,14 @@ namespace spades {
 				case Step::Kind::Rename:
 					MutableNode(step.path)->name = step.rename->after;
 					clips = step.rename->clipsAfter;
+					Select({step.path}, step.path);
+					break;
+				case Step::Kind::ScenePivot:
+					ShiftRoots(step.shift);
+					SelectScene();
+					break;
+				case Step::Kind::Voxels:
+					SetVoxels(step.path, Handle<VoxelModel>());
 					Select({step.path}, step.path);
 					break;
 			}

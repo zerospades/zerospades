@@ -189,6 +189,9 @@ namespace spades {
 			/** Whether a number is being scrubbed: the pointer's motion is then
 			 *  its, the host holding the pointer still. */
 			bool HoldsPointer() const;
+			/** Whether voxels are in the air: a button held on the view, or a
+			 *  placement not yet put down (its voxels are out of the document). */
+			bool IsWorkingVoxels() const { return lmbHeld || rmbHeld || edit.placing; }
 			/** Whether `at` is on the view itself: under the bars, off the colour
 			 *  picker and the transform panel, no button held for a tool. */
 			bool IsFreeViewportPoint(const Vector2& at);

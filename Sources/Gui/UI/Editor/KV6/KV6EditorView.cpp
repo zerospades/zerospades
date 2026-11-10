@@ -100,6 +100,8 @@ namespace spades {
 
 			// Edge length of the cube a new model's volume starts as.
 			constexpr int kNewModelSize = 32;
+			// What framing an empty, which has no size, shows round it.
+			constexpr float kEmptyFrameSize = 16.0F;
 
 			// The scene's tree: in from the left edge, under the bars, and
 			// clear of the hint lines along the bottom.
@@ -257,6 +259,7 @@ namespace spades {
 			items.push_back(ContextMenuItem(
 			  "Add Child",
 			  std::vector<ContextMenuItem>{
+			    ContextMenuItem("Empty", [this, row] { AddEmptyUnder(row); }),
 			    ContextMenuItem("Single Voxel", [this, row] { AddObjectUnder(row); }),
 			    ContextMenuItem("KV6 or 2KV6 File...", [this, row] { OpenAddChildFile(row); })}));
 			if (!onScene)
@@ -488,6 +491,15 @@ namespace spades {
 			ShowAdded();
 		}
 
+		void KV6EditorView::AddEmptyUnder(const NodePath& parent) {
+			std::string why;
+			if (!scene->AddChild(parent, Handle<VoxelModel>(), "Empty", why)) {
+				editor->SetStatus("Cannot add an empty there: " + why);
+				return;
+			}
+			ShowAdded();
+		}
+
 		void KV6EditorView::AddFileUnder(const NodePath& parent, const std::string& file) {
 			// Named after the file, as a scene's names allow: no leading '#',
 			// at most 255 bytes (a file name never holds a '/').
@@ -594,13 +606,19 @@ namespace spades {
 				return true;
 			}
 			if (EqualsIgnoringCase(key, kFrameSelectionKey) && ShowingObjects()) {
-				const bool picked = scene->Picked() >= 0;
-				if (picked)
+				GizmoPose pose;
+				const bool holdsVoxels = scene->Picked() >= 0;
+				const bool empty = !holdsVoxels && HasPickedObject() && scene->ActivePose(pose);
+				if (holdsVoxels) {
 					scene->Bounds(scene->Picked(), centre, size);
-				else
+				} else if (empty) { // a point, shown with room round it
+					centre = pose.position;
+					size = kEmptyFrameSize;
+				} else {
 					scene->Bounds(centre, size);
+				}
 				cam.FlyToFrame(centre, size);
-				editor->SetStatus(picked ? "Framed the object" : "Framed the scene");
+				editor->SetStatus(holdsVoxels || empty ? "Framed the object" : "Framed the scene");
 				return true;
 			}
 			if (EqualsIgnoringCase(key, kFrameSelectionKey)) {
@@ -668,6 +686,7 @@ namespace spades {
 			transformTarget.SetScene(nullptr);
 			tree->Reset();
 			scene.reset();
+			document.SetKeepsOneVoxel(true);
 		}
 
 		bool KV6EditorView::LoadScene(const std::string& path) {
@@ -681,7 +700,8 @@ namespace spades {
 			filePath = path;
 			// The document is the picked object's voxels, handed over as Edit
 			// mode is entered; it opens on the objects.
-			document.Assign(scene->Object(scene->Picked()).model);
+			document.Assign(scene->Picked() >= 0 ? scene->Object(scene->Picked()).model
+			                                     : Handle<VoxelModel>::New(1, 1, 1));
 			editor->DocumentReplaced();
 			editedState = editor->DocumentStateId();
 			editShift = MakeVector3(0.0F, 0.0F, 0.0F);
@@ -738,6 +758,27 @@ namespace spades {
 			if (editor->DocumentStateId() != editedState)
 				scene->MarkChanged();
 			editedState = editor->DocumentStateId();
+		}
+
+		bool KV6EditorView::EditedObjectIsBlank() const {
+			return document.VoxelCount() == 0 ||
+			       (editingEmpty && editor->DocumentStateId() == seededState);
+		}
+
+		void KV6EditorView::LeaveEmptiedObject() {
+			if (!scene || editor->InObjectMode() || document.VoxelCount() > 0 ||
+			    editor->IsWorkingVoxels())
+				return;
+			// The scene can bring back what a real object held, as one step,
+			// since leaving ends the voxel history that could: what was there
+			// is one edit back. An empty that was given a voxel loses nothing.
+			if (!editingEmpty) {
+				editor->Undo();
+				if (document.VoxelCount() > 0)
+					emptiedVoxels = KV6Scene::CopyOf(document.Model());
+				editor->Redo();
+			}
+			editor->SetObjectMode(true);
 		}
 
 		void KV6EditorView::DocumentReframed(const Vector3& shift) {
@@ -819,7 +860,7 @@ namespace spades {
 		}
 
 		bool KV6EditorView::HasSelectedObjects() const {
-			return scene && !scene->Selection().empty();
+			return scene && (!scene->Selection().empty() || scene->SceneActive());
 		}
 
 		void KV6EditorView::SelectNoObject() {
@@ -827,17 +868,29 @@ namespace spades {
 				scene->Select({}, {});
 		}
 
-		bool KV6EditorView::HasPickedObject() const { return scene && scene->Picked() >= 0; }
+		bool KV6EditorView::HasPickedObject() const { return scene && !scene->Active().empty(); }
 
 		std::string KV6EditorView::PickedObjectName() const {
 			if (!HasPickedObject())
 				return std::string();
-			const std::string& name = scene->Object(scene->Picked()).name;
-			return name.empty() ? "Object " + std::to_string(scene->Picked() + 1) : name;
+			const std::string& name = scene->Node(scene->Active())->name;
+			if (!name.empty())
+				return name;
+			return scene->Picked() >= 0 ? "Object " + std::to_string(scene->Picked() + 1)
+			                            : std::string("Empty");
 		}
 
 		bool KV6EditorView::PickedObjectPose(GizmoPose& pose) const {
-			return scene && scene->PickedPose(pose);
+			return scene && scene->ActivePose(pose);
+		}
+
+		IObjectModeHost::Handling KV6EditorView::PickedObjectHandling() const {
+			if (scene && scene->SceneActive())
+				return Handling::ScenePivot;
+			const VoxelObject* o = scene ? scene->Node(scene->Active()) : nullptr;
+			if (o && o->locked)
+				return Handling::MoveOnly;
+			return o && !o->model ? Handling::MoveAndTurn : Handling::Free;
 		}
 
 		void KV6EditorView::BeginObjectDrag() { scene->BeginDrag(); }
@@ -847,6 +900,16 @@ namespace spades {
 		}
 
 		void KV6EditorView::CommitObjectDrag() {
+			if (scene->SceneActive()) {
+				// The objects go the other way and the view with them, so nothing
+				// moves on the screen but the origin, onto the new pivot.
+				const Vector3 offset = scene->ScenePivotOffset();
+				if (scene->CommitDrag()) {
+					cam.Shift(offset * -1.0F);
+					editor->SetStatus("Set the scene's pivot");
+				}
+				return;
+			}
 			if (scene->CommitDrag())
 				editor->SetStatus("Placed " + PickedObjectName());
 		}
@@ -869,16 +932,43 @@ namespace spades {
 		}
 
 		void KV6EditorView::EditModeChanged(bool entering) {
-			if (!scene || scene->Picked() < 0)
+			if (!scene || scene->Active().empty())
 				return;
 			if (entering) {
+				// An empty starts from one voxel on its origin, so its frame and
+				// what hangs from it stay put.
+				editingEmpty = !scene->Node(scene->Active())->model;
+				if (editingEmpty) {
+					Handle<VoxelModel> seed = Handle<VoxelModel>::New(1, 1, 1);
+					seed->SetSolid(0, 0, 0, editor->CurrentColor());
+					scene->GiveVoxels(scene->Active(), seed);
+				}
 				// The picked object's voxels become the document, in its own frame.
+				document.SetKeepsOneVoxel(false);
 				document.Assign(scene->Object(scene->Picked()).model);
 				editor->DocumentReplaced();
-				editedState = editor->DocumentStateId();
+				editedState = seededState = editor->DocumentStateId();
 				editShift = MakeVector3(0.0F, 0.0F, 0.0F);
 				FrameCamera();
 				editor->SetStatus("Editing " + PickedObjectName());
+				return;
+			}
+			if (EditedObjectIsBlank()) {
+				const bool emptied = document.VoxelCount() == 0;
+				const std::string name = PickedObjectName();
+				// Nothing to undo to, yet the file may differ: what it was given
+				// was saved, or it held voxels the history could not bring back.
+				if (!emptiedVoxels && (!editingEmpty || editedState != seededState))
+					scene->MarkChanged();
+				scene->TakeVoxels(scene->Active(), std::move(emptiedVoxels));
+				emptiedVoxels = Handle<VoxelModel>();
+				editedState = editor->DocumentStateId();
+				editShift = MakeVector3(0.0F, 0.0F, 0.0F);
+				if (emptied)
+					editor->SetStatus(name + " holds no voxels now: an empty");
+				GizmoPose pose;
+				if (scene->ActivePose(pose))
+					cam.Frame(pose.position, kEmptyFrameSize);
 				return;
 			}
 			TakeBackEditedObject();
@@ -902,9 +992,19 @@ namespace spades {
 			if (scene) {
 				// The voxels being edited are the picked object's, which the scene
 				// holds once they are taken back.
-				if (!editor->InObjectMode())
+				const bool blank = !editor->InObjectMode() && EditedObjectIsBlank();
+				if (!editor->InObjectMode() && !blank)
 					TakeBackEditedObject();
-				if (!scene->Save(filePath)) {
+				// The voxel an empty was lent to edit from is not part of it.
+				Handle<VoxelModel> lent;
+				if (blank) {
+					lent = scene->Object(scene->Picked()).model;
+					scene->Object(scene->Picked()).model = Handle<VoxelModel>();
+				}
+				const bool saved = scene->Save(filePath);
+				if (blank)
+					scene->Object(scene->Picked()).model = lent;
+				if (!saved) {
 					editor->SetStatus("Save failed");
 					return false;
 				}
@@ -1665,6 +1765,7 @@ namespace spades {
 			cam.Update(dt, globalTime, float(span) * kCameraSpeedPerSize,
 			           !ui->GetMenuBar()->IsOpen() && !ui->GetOverlay()->IsActive());
 			editor->Update(dt);
+			LeaveEmptiedObject();
 
 			// While an image of the model is being made the view shows the model
 			// alone, as the image will.

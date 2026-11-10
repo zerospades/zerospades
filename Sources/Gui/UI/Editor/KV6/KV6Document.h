@@ -30,7 +30,8 @@ namespace spades {
 		/**
 		 * A KV6 voxel model as a VoxelEditor's document. The volume grows to hold
 		 * what is placed past it and trims to the voxels after a removal, up to
-		 * the size a KV6 can hold, and it always keeps at least one voxel.
+		 * the size a KV6 can hold, and it keeps at least one voxel, unless it is
+		 * told it need not (SetKeepsOneVoxel).
 		 */
 		class KV6Document final : public IVoxelDocument {
 		public:
@@ -49,6 +50,9 @@ namespace spades {
 			VoxelModel& Model() { return *model; }
 			const VoxelModel& Model() const { return *model; }
 			int VoxelCount() const { return voxelCount; }
+			/** False lets the last voxel go: an object of a scene left with
+			 *  none is an empty, where a model file would be nothing. */
+			void SetKeepsOneVoxel(bool keeps) { keepsOneVoxel = keeps; }
 
 			// IVoxelDocument
 			std::string Noun() const override { return "model"; }
@@ -60,7 +64,7 @@ namespace spades {
 			bool IsEditable(int, int, int) const override { return true; }
 			std::uint32_t Color(int x, int y, int z) const override;
 			void Write(int x, int y, int z, bool solid, std::uint32_t color) override;
-			int RemovableVoxels() const override { return voxelCount - 1; }
+			int RemovableVoxels() const override { return keepsOneVoxel ? voxelCount - 1 : voxelCount; }
 			std::string RemovalLimitMessage() const override {
 				return "A model keeps at least one voxel";
 			}
@@ -71,6 +75,7 @@ namespace spades {
 		private:
 			Handle<VoxelModel> model;
 			int voxelCount = 0;
+			bool keepsOneVoxel = true;
 			std::uint64_t version = 0;
 		};
 	} // namespace gui

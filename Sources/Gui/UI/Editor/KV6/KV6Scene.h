@@ -63,7 +63,7 @@ namespace spades {
 		class KV6Scene {
 		public:
 			/** Reads the scene at `path`; false (the scene untouched) when it
-			 *  cannot be read or holds no object with voxels. */
+			 *  cannot be read or holds no object. */
 			bool Load(const std::string& path);
 			/** Writes the scene to `path`, through a temporary file. */
 			bool Save(const std::string& path) const;
@@ -126,6 +126,11 @@ namespace spades {
 			bool IsSelected(const NodePath& path) const;
 			/** Selects `nodes` (the scene itself left out), `active` among them. */
 			void Select(std::vector<NodePath> nodes, NodePath active);
+			/** Selects the scene itself, in place of any node: what is handled
+			 *  then is its pivot. */
+			void SelectScene();
+			/** Whether the scene itself is selected. */
+			bool SceneActive() const { return sceneActive; }
 
 			// --- Folded nodes (how the tree is shown, kept across its changes)
 			bool IsFolded(const NodePath& path) const;
@@ -255,8 +260,9 @@ namespace spades {
 			 */
 			bool Paste(const std::vector<CopiedObject>& objects, const NodePath& parent,
 			           std::string& why);
-			/** A new object of `model` after `parent`'s children, its pivot on
-			 *  the parent's origin, named `name` made unique; selects it. */
+			/** A new object of `model` (none for an empty) after `parent`'s
+			 *  children, its pivot on the parent's origin, named `name` made
+			 *  unique; selects it. */
 			bool AddChild(const NodePath& parent, Handle<VoxelModel> model, const std::string& name,
 			              std::string& why);
 			/**
@@ -276,19 +282,41 @@ namespace spades {
 			 *  them, as WhyNotDelete allows. */
 			bool Delete(const std::vector<NodePath>& nodes, std::string& why);
 
-			// --- Placing the picked object ------------------------------------
-			/** Where the gizmo on the picked object sits: its pivot, turned with
-			 *  it. False when nothing is picked. */
-			bool PickedPose(GizmoPose& pose) const;
+			// --- Placing the active node ---------------------------------------
+			/** Where the gizmo on the active node sits, turned with it: on its
+			 *  pivot, or its own origin for an empty; with the scene selected, on
+			 *  the scene's pivot along the world's axes. False when there is
+			 *  nothing to handle, or it is hidden. */
+			bool ActivePose(GizmoPose& pose) const;
 			void BeginDrag();
-			/** Shows the picked object moved by `total` from where the drag began. */
+			/**
+			 * Shows the active node moved by `total` from where the drag began;
+			 * a locked node takes only the move. With the scene selected the
+			 * objects stay and only the pivot goes.
+			 */
 			void PreviewDrag(const GizmoTransform& total);
-			/** Keeps the drag as one step; false when it changed nothing. */
+			/** How far a drag has taken the scene's pivot from its origin. */
+			Vector3 ScenePivotOffset() const { return scenePivotOffset; }
+			/**
+			 * Keeps the drag as one step; false when it changed nothing. The
+			 * scene's pivot is kept by moving its top objects (and their keys) the
+			 * other way, so the pivot is the origin again: a scene has no other.
+			 */
 			bool CommitDrag();
 			void CancelDrag();
 			/** Moves object `index` so its voxels stay put in the world, its
 			 *  indices having been shifted by `shift` (a resized volume). */
 			void CompensateShift(int index, const Vector3& shift);
+
+			// --- An empty's voxels ----------------------------------------------
+			/** Gives the empty at `path` these voxels, for Edit mode to work on;
+			 *  not a step: what is done to them is Edit mode's history. */
+			void GiveVoxels(const NodePath& path, Handle<VoxelModel> model);
+			/** Takes the node's voxels, leaving an empty. With `before` (what
+			 *  it held, to bring back) it is one step, else none. */
+			void TakeVoxels(const NodePath& path, Handle<VoxelModel> before);
+			/** Voxels of their own, the same as `model`'s. */
+			static Handle<VoxelModel> CopyOf(const VoxelModel& model);
 
 			bool CanUndo() const { return undoTop > 0; }
 			bool CanRedo() const { return undoTop < int(history.size()); }
@@ -364,11 +392,23 @@ namespace spades {
 				std::vector<AnimationClip> clipsBefore, clipsAfter;
 			};
 			struct Step {
-				enum class Kind { Place, Hide, Lock, Move, Insert, Remove, Rename } kind = Kind::Place;
-				NodePath path;          // Place, Hide
+				enum class Kind {
+					Place,
+					Hide,
+					Lock,
+					Move,
+					Insert,
+					Remove,
+					Rename,
+					ScenePivot,
+					Voxels
+				} kind = Kind::Place;
+				NodePath path;          // Place, Hide, Voxels
 				Placement before, after; // Place
 				bool hidden = false;     // Hide: what it became
 				bool locked = false;     // Lock: what it became
+				Vector3 shift = MakeVector3(0.0F, 0.0F, 0.0F); // ScenePivot: what the top objects moved by
+				Handle<VoxelModel> voxels; // Voxels: what the node held before it was emptied
 				std::unique_ptr<MoveStep> move;
 				std::unique_ptr<InsertStep> insert; // Insert, Remove
 				std::unique_ptr<RenameStep> rename; // Rename, at `path`
@@ -383,6 +423,7 @@ namespace spades {
 			std::vector<NodePath> selection;
 			NodePath active;
 			int picked = -1;
+			bool sceneActive = false;
 			std::vector<NodePath> folded;
 			long shapeVersion = 0;
 
@@ -394,7 +435,10 @@ namespace spades {
 			Matrix4 previewFrame = Matrix4::Identity();
 
 			bool dragging = false;
+			bool draggingScene = false; // its pivot, rather than the node at dragPath
+			NodePath dragPath;
 			Placement dragStart;
+			Vector3 scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
 
 			// A node's placement being edited in a panel.
 			bool placing = false;
@@ -453,7 +497,11 @@ namespace spades {
 			static Placement PlacementOf(const VoxelObject& o);
 			static void Place(VoxelObject& o, const Placement& p);
 			// The rotation and the scale the picked object's parents give it.
-			void ParentFrame(int index, Quaternion& rotation, Vector3& scale) const;
+			void ParentFrame(const NodePath& path, Quaternion& rotation, Vector3& scale) const;
+			/** Moves the top objects, and their clips' keys, by `by`. */
+			void ShiftRoots(const Vector3& by);
+			/** What the node's voxels are, as one change the tree indexes. */
+			void SetVoxels(const NodePath& path, Handle<VoxelModel> model);
 		};
 	} // namespace gui
 } // namespace spades

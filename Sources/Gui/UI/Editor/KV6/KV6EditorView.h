@@ -127,6 +127,7 @@ namespace spades {
 			bool PickedObjectPose(GizmoPose& pose) const override;
 			void BeginObjectDrag() override;
 			void PreviewObjectDrag(const GizmoTransform& total) override;
+			Handling PickedObjectHandling() const override;
 			void CommitObjectDrag() override;
 			void CancelObjectDrag() override;
 			bool CanUndoObjects() const override;
@@ -159,6 +160,12 @@ namespace spades {
 			Vector3 editShift = MakeVector3(0.0F, 0.0F, 0.0F);
 			// The document's state when the object's voxels were last taken back.
 			long editedState = 0;
+			// Whether the object being edited was an empty, given one voxel to
+			// start from, and the document's state with only that voxel.
+			bool editingEmpty = false;
+			long seededState = 0;
+			// What an object emptied in Edit mode held, for the scene to undo.
+			Handle<VoxelModel> emptiedVoxels;
 			/** Whether the scene's objects are shown (Object mode on a scene). */
 			bool ShowingObjects() const;
 
@@ -198,6 +205,8 @@ namespace spades {
 			void OpenAddChildFile(const NodePath& parent);
 			/** A new object of one voxel, as a new model starts, under `parent`. */
 			void AddObjectUnder(const NodePath& parent);
+			/** A new empty, holding no voxels, under `parent`. */
+			void AddEmptyUnder(const NodePath& parent);
 			/** The model or scene at `file` under `parent`, named after it. */
 			void AddFileUnder(const NodePath& parent, const std::string& file);
 			/** After a node was added: shows it, says so, gives it the gizmo. */
@@ -208,6 +217,11 @@ namespace spades {
 			/** Hands the voxels being edited back to the picked object, which
 			 *  stays where it was whatever its volume did. */
 			void TakeBackEditedObject();
+			/** Whether the object being edited stays, or goes back to, an empty:
+			 *  no voxel left, or only the one it was given and never touched. */
+			bool EditedObjectIsBlank() const;
+			/** Back to Object mode the moment the object being edited has no voxel. */
+			void LeaveEmptiedObject();
 			/** Replaces the document with the scene at `path`, in Object mode.
 			 *  False leaves everything untouched. */
 			bool LoadScene(const std::string& path);
