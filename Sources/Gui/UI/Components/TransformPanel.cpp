@@ -97,6 +97,16 @@ namespace spades {
 
 		TransformPanel::~TransformPanel() {}
 
+		void TransformPanel::SetLocationStep(float step) {
+			if (step <= 0.0F)
+				return;
+			for (int i = 0; i < 3; i++) {
+				NumberField::Format format = FormatOf(0);
+				format.step = step;
+				fields[std::size_t(i)]->SetFormat(format);
+			}
+		}
+
 		float TransformPanel::Left() const { return right - kWidth; }
 
 		int TransformPanel::RowCount() const {

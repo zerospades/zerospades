@@ -2767,6 +2767,10 @@ namespace spades {
 			// over it.
 			if (ITransformTarget* target = PanelTarget()) {
 				transformPanel->LayoutAbove(panelRight, panelBottom);
+				// The tool owning the target says what its Step is, so Ctrl-dragging
+				// a Location moves it by what a drag of the gizmo would.
+				if (VoxelTool* tool = ActiveTool())
+					transformPanel->SetLocationStep(tool->TransformStep());
 				transformPanel->Draw(*target, cursor.GetPosition(), clock);
 			}
 			ui.GetColorPicker()->Draw(*renderer, *fontManager, cursor.GetPosition());
