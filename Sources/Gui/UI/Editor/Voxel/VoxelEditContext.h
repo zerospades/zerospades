@@ -210,8 +210,17 @@ namespace spades {
 			 * TurnsAboutModelPivot); false when there is nothing to move. The
 			 * middle stays put through the turns of one selection, so four
 			 * quarter turns always bring it back where it was.
+			 *
+			 * This is a turn centre, which the user chooses, and not where the
+			 * voxels are: use MovedMiddle for that.
 			 */
 			virtual bool TransformPivot(IntVector3& out) const = 0;
+			/**
+			 * The middle voxel of what a move moves: the waiting voxels, or else
+			 * the selection; false when there is nothing to move. Where the
+			 * voxels are, whichever centre turns go round.
+			 */
+			virtual bool MovedMiddle(IntVector3& out) const = 0;
 			/**
 			 * Whether turns go round the model's pivot rather than the middle of
 			 * the voxels being turned. Turns keep voxels on voxels only about a

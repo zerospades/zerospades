@@ -66,10 +66,13 @@ namespace spades {
 			options.SetBool(kAboutSelectionOption, !aboutPivot);
 			options.SetBool(kAboutPivotOption, aboutPivot);
 			// The Move boxes are where the voxels are, so they follow a gizmo
-			// drag, a paste and undo alike. With nothing to move there is no
-			// centre to show, and the boxes and the turns grey out.
+			// drag, a paste and undo alike -- and not where turns go round, which
+			// Turn about: Pivot would otherwise put in them, leaving the boxes
+			// showing the pivot and every arrow on them moving from it. With
+			// nothing to move there is no middle to show, and the boxes and the
+			// turns grey out.
 			IntVector3 centre;
-			const bool movable = ed.TransformPivot(centre);
+			const bool movable = ed.MovedMiddle(centre);
 			const int at[3] = {centre.x, centre.y, centre.z};
 			for (int a = 0; a < 3; a++) {
 				options.SetEnabled(kMoveOption[a], movable);
@@ -97,7 +100,7 @@ namespace spades {
 				return;
 			const int axis = AxisOf(kMoveOption, id);
 			IntVector3 centre;
-			if (axis < 0 || !ed.TransformPivot(centre))
+			if (axis < 0 || !ed.MovedMiddle(centre))
 				return;
 			const int at[3] = {centre.x, centre.y, centre.z};
 			int shift[3] = {0, 0, 0};
