@@ -214,11 +214,11 @@ namespace spades {
 
 				SPLog("Starting Client Loop");
 
+				m_uiScale = renderer->GetUIScale();
+				bool cursorNeedsResync = false;
+
 				while (running) {
 					SDL_Event event;
-
-					// The scale changes between frames (see ScaledRenderer::Flip).
-					m_uiScale = renderer->GetUIScale();
 
 					DispatchQueue::GetThreadQueue()->ProcessQueue();
 
@@ -240,12 +240,34 @@ namespace spades {
 					if ((int32_t)dt > 0) {
 						view->RunFrame((float)dt / 1000.0F);
 
+						// The UI was rebuilt for a new scale at the start of that frame;
+						// its cursor still holds a position in the old virtual pixels.
+						// Re-send the real one so hover and clicks line up without
+						// waiting for the mouse to move.
+						if (cursorNeedsResync) {
+							cursorNeedsResync = false;
+							if (absoluteMouseCoord && m_active) {
+								int mx, my;
+								SDL_GetMouseState(&mx, &my);
+								view->MouseEvent(static_cast<float>(mx) / m_uiScale,
+								                 static_cast<float>(my) / m_uiScale);
+							}
+						}
+
 						// Views draw; the runner is the only thing that presents. Present
 						// before `RunFrameLate`, which is where post-frame work happens
 						// (closing a subview, restoring renderer state) — that work must
 						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
 						renderer->Flip();
+
+						// The scale is re-evaluated in Flip (ScaledRenderer); the events
+						// polled below already belong to the next frame.
+						float scale = renderer->GetUIScale();
+						if (scale != m_uiScale) {
+							m_uiScale = scale;
+							cursorNeedsResync = true;
+						}
 
 						view->RunFrameLate((float)dt / 1000.0F);
 					}
