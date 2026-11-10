@@ -134,9 +134,15 @@ namespace spades {
 			// Stepping settles whatever was being typed first, so the step always
 			// works from a value the host has actually taken.
 			EndEditing(true);
-			const float scale = std::pow(10.0F, float(std::max(0, op.decimals)));
-			const float stepped = std::round((op.value + delta) * scale) / scale;
-			ReportNumber(op.id, stepped, true);
+			// Rounded only enough to keep press after press from drifting on the
+			// float. A value can hold more precision than the box shows -- a
+			// reference image's centre, left between the decimals by a gizmo drag
+			// -- and rounding to what is shown would quietly move it by the rest.
+			// The host is the one that knows what its value may be: it quantises
+			// (the mirror planes to their half voxel) or clamps as it sees fit.
+			constexpr double kFuzz = 1.0e4; // a ten-thousandth of a unit
+			const double stepped = std::round(double(op.value + delta) * kFuzz) / kFuzz;
+			ReportNumber(op.id, float(stepped), true);
 		}
 
 		bool OptionBar::Click(const Vector2& p) {
