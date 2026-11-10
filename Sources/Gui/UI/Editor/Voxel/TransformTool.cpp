@@ -35,6 +35,13 @@ namespace spades {
 			const char* const kAxisLabel[3] = {"X", "Y", "Z"};
 			// Voxels land on voxels, so a turn is a right angle or nothing.
 			const char* const kTurnGroup = "Turn 90";
+			// Where the voxels are, counted from the pivot: 0, 0, 0 sits them on
+			// it. The model's own frame, and not the volume's, because the volume
+			// is relabelled from 0 whenever it grows or is trimmed -- in those
+			// coordinates, moving voxels past the volume's low side renumbers
+			// everything else instead of them, and the box would hold still while
+			// the model moved under it.
+			const char* const kMoveGroup = "Location";
 
 			// Which of `ids` `id` is, or -1 if it is none of them.
 			int AxisOf(const char* const (&ids)[3], const std::string& id) {
@@ -51,7 +58,7 @@ namespace spades {
 		    : GizmoTool(std::unique_ptr<GizmoSubTool>(new TransformSubTool()), {1.0F}, 1.0F) {
 			// Whole voxels: the boxes have nothing to say after the decimal point.
 			for (int a = 0; a < 3; a++)
-				options.AddNumber(kMoveOption[a], kAxisLabel[a], "Move", 1.0F, 0);
+				options.AddNumber(kMoveOption[a], kAxisLabel[a], kMoveGroup, 1.0F, 0);
 			for (int a = 0; a < 3; a++)
 				options.AddAction(kTurnOption[a], kAxisLabel[a], kTurnGroup);
 			options.AddBool(kAboutSelectionOption, "Selection", "Turn about");
@@ -71,9 +78,10 @@ namespace spades {
 			// showing the pivot and every arrow on them moving from it. With
 			// nothing to move there is no middle to show, and the boxes and the
 			// turns grey out.
-			IntVector3 centre;
+			IntVector3 centre = MakeIntVector3(0, 0, 0);
 			const bool movable = ed.MovedMiddle(centre);
-			const int at[3] = {centre.x, centre.y, centre.z};
+			const IntVector3 from = centre - ed.PivotVoxel();
+			const int at[3] = {from.x, from.y, from.z};
 			for (int a = 0; a < 3; a++) {
 				options.SetEnabled(kMoveOption[a], movable);
 				options.SetNumber(kMoveOption[a], movable ? float(at[a]) : 0.0F);
@@ -102,7 +110,10 @@ namespace spades {
 			IntVector3 centre;
 			if (axis < 0 || !ed.MovedMiddle(centre))
 				return;
-			const int at[3] = {centre.x, centre.y, centre.z};
+			// The value is counted from the pivot (see kMoveGroup), so it is put
+			// back there to say where in the volume the voxels are to go.
+			const IntVector3 from = centre - ed.PivotVoxel();
+			const int at[3] = {from.x, from.y, from.z};
 			int shift[3] = {0, 0, 0};
 			shift[axis] = int(std::lround(value)) - at[axis];
 			if (shift[axis] == 0)

@@ -279,6 +279,7 @@ namespace spades {
 			                              const Vector4& color) override;
 			Vector3 GetPivot() const override;
 			void SetPivot(const Vector3& pivot) override;
+			IntVector3 PivotVoxel() const override;
 			void PreviewPivot(const Vector3& pivot) override;
 			std::vector<IntVector3> SweptCells(int axis, int steps, bool pocket) const override;
 			void SweepSelection(int axis, int steps, bool pocket) override;

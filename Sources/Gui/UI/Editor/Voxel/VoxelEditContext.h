@@ -244,6 +244,12 @@ namespace spades {
 			// ResetMirrorPlane). Float-valued.
 			virtual Vector3 GetPivot() const = 0;
 			virtual void SetPivot(const Vector3& pivot) = 0;
+			/**
+			 * The voxel nearest the pivot (on a tie the lower one, as for the
+			 * middle of a group): the pivot as a cell, which turns go round and
+			 * positions in the model's own frame are counted from.
+			 */
+			virtual IntVector3 PivotVoxel() const = 0;
 			// Shows the pivot at `pivot` for a drag in progress, without an undo
 			// step. A preview lasts until the user action ends or a command runs:
 			// commit it with SetPivot before then, or the pivot goes back.
