@@ -622,9 +622,14 @@ namespace spades {
 			host.DocumentReframed(shift); // the view stays on the relabelled voxels
 			// Everything else held in voxel coordinates follows the relabelling:
 			// the mirror planes (by whole voxels, so still on the half-step
-			// grid), the selection, and pending voxels, which would otherwise
-			// land in the wrong place.
+			// grid), the reference images, the selection, and pending voxels,
+			// which would otherwise land in the wrong place.
 			edit.mirror.plane += shift;
+			// An image is lined up with the voxels it is being modelled from, so
+			// it goes where they go rather than letting the model slide out from
+			// under it every time the volume grows or is trimmed.
+			for (ReferenceImage& ref : references)
+				ref.centre += shift;
 			// The middle a moved selection turns about goes with it, and stays
 			// its middle: the shifted selection is the same one, relabelled.
 			const bool middleKept =
