@@ -38,13 +38,21 @@ namespace spades {
 		namespace {
 			std::regex const g_fontNameRe(".*\\.(?:otf|ttf|ttc)", std::regex::icase);
 
+			// Takes precedence over the embedded 6x8 font when present.
+			constexpr const char* kSmallFontPath = "Gfx/Fonts/SmallFont.ttf";
+
 			struct GlobalFontInfo {
 				std::shared_ptr<ngclient::FTFontSet> squareFontSet, guiFontSet;
+				// A replacement for the embedded 6x8 font, if a pak provides one (see the
+				// FIXME in FontManager::FontManager); null otherwise.
+				std::shared_ptr<ngclient::FTFontSet> smallFontSet;
 
 				GlobalFontInfo() {
 					SPLog("Loading built-in fonts");
 					LoadFontSet(squareFontSet, "Gfx/Fonts/SquareFont.ttf", "SquareFont");
 					LoadFontSet(guiFontSet, "Gfx/Fonts/OpenSans.ttf", "Open Sans");
+					if (FileManager::FileExists(kSmallFontPath))
+						LoadFontSet(smallFontSet, kSmallFontPath, "Small font");
 
 					// Preliminary custom font support
 					auto files = FileManager::EnumFiles("Fonts");
@@ -129,8 +137,23 @@ namespace spades {
 			// glyph extent instead of the padded line box, so vertical centering is tight.
 			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 12.0F).Cast<IFont>();
 
-			// bitmap fonts
-			smallFont = CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8Cell);
+			// FIXME: licensing. The embedded 6x8 glyphs (fontdata::kFont6x8) come from
+			// VOXLAP5.C by Ken Silverman, the engine of Ben Aksoy's Ace of Spades, under
+			// the Voxlap license, not the GPL. They are a fallback, like a `.weak` asset:
+			// a font at Gfx/Fonts/SmallFont.ttf (an 8 px line), shipped in a pak, takes
+			// precedence. Replace them with a font under a GPL-compatible license (or one
+			// drawn for the project) that keeps the look, ideally as that TrueType font:
+			// FreeType renders it at the screen's pixel density like all other text, so
+			// it stays sharp at any UI scale and the enlarged-atlas machinery that keeps
+			// this bitmap font sharp (Quake3Font::SyncTextureScale and
+			// IRenderer::CreateImageWithoutMipmaps, its only user) can then be dropped.
+			if (instance.smallFontSet)
+				smallFont = Handle<ngclient::FTFont>::New(renderer, instance.smallFontSet, 8.0F,
+				                                         8.0F)
+				              .Cast<IFont>();
+			else
+				smallFont =
+				  CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8Cell);
 		}
 
 		FontManager::~FontManager() {}

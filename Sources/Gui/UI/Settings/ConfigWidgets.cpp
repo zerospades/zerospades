@@ -74,7 +74,8 @@ namespace spades {
 		}
 
 		void ConfigSlider::UpdateLabel() {
-			label->text = formatter.Format(static_cast<float>(config));
+			// The knob's value, which is what is (or, with writeOnRelease, will be) stored.
+			label->text = formatter.Format(static_cast<float>(value));
 		}
 
 		void ConfigSlider::DoRounding() {
@@ -89,8 +90,20 @@ namespace spades {
 		void ConfigSlider::OnChanged() {
 			ui::Slider::OnChanged();
 			DoRounding();
-			config = static_cast<float>(value);
+			if (!writeOnRelease)
+				config = static_cast<float>(value);
 			UpdateLabel();
+		}
+
+		void ConfigSlider::OnReleased() {
+			if (writeOnRelease) {
+				float v = static_cast<float>(value);
+				bool changed = static_cast<float>(config) != v;
+				config = v;
+				if (changed && committed)
+					committed(*this);
+			}
+			ui::Slider::OnReleased();
 		}
 
 		// -- ConfigHotKeyField --

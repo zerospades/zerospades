@@ -253,7 +253,10 @@ namespace spades {
 									cg_mouseExpPower = defaultValue;
 								}
 
-								float const fExp = powf(renderer->ScreenWidth() * 0.1F, 2);
+								// In window units, those of the mouse deltas: the UI scale
+								// must not change the acceleration curve.
+								float const fExp =
+								  powf(renderer->ScreenWidth() * renderer->UIScale() * 0.1F, 2);
 								rad = powf(rad / fExp, (float)cg_mouseExpPower * 0.5F - 0.5F);
 
 								// shouldn't happen...

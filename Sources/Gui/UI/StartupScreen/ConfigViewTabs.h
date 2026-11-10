@@ -75,8 +75,13 @@ namespace spades {
 			Settings::ItemHandle r_videoWidth;
 			Settings::ItemHandle r_videoHeight;
 			StartupScreenHelper* helper; // weak
+			bool updatingFields = false;
+			int shownDisplay = -1; // the monitor the auto-detected size came from
+			int nativeRow = -1;    // the drop-down row of the native mode (auto-detection)
 
 			void SaveConfig();
+			void ShowResolution(int w, int h);
+			void ApplyDetectedResolution();
 			void ValueEditHandler(ui::UIElement&);
 			void DropdownHandler(int index);
 			void ShowDropdown(ui::UIElement&);

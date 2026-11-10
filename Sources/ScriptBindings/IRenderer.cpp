@@ -557,6 +557,10 @@ namespace spades {
 						                              asMETHOD(IRenderer, IsRendererSW),
 						                              asCALL_THISCALL);
 						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer", "float get_ScreenPixelRatio() property",
+						                              asMETHOD(IRenderer, ScreenPixelRatio),
+						                              asCALL_THISCALL);
+						manager->CheckError(r);
 						break;
 					default: break;
 				}

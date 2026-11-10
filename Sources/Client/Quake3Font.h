@@ -50,9 +50,26 @@ namespace spades {
 			std::vector<GlyphInfo> glyphs;
 			float spaceWidth;
 
-			// Needed to build the outline atlas.
+			// The atlases as bitmaps, kept (a few KB) to build enlarged copies from.
 			Handle<Bitmap> source;
+			Handle<Bitmap> outlineAtlas;
 			Handle<IImage> outlineImage;
+
+			/**
+			 * Pixel fonts stay sharp on a high-DPI or scaled-up screen ("sharp
+			 * bilinear"): glyphs are drawn from copies of the atlases enlarged
+			 * `texScale` times with nearest neighbour, texScale being the screen pixels
+			 * per font pixel rounded up, so the atlas is never magnified (which blurs
+			 * every glyph), only reduced a little, without mipmaps. At whole-number
+			 * scales each texel lands on whole screen pixels exactly; otherwise glyph
+			 * edges blend over at most one pixel. 1 = the plain atlases.
+			 */
+			int texScale = 1;
+			Handle<IImage> scaledTex;
+			Handle<IImage> scaledOutlineImage;
+			void SyncTextureScale();
+			/** Rounds a text origin to whole screen pixels (whole UI pixels at 1x). */
+			Vector2 SnapOrigin(Vector2 offset) const;
 
 			float yMin, yMax;
 

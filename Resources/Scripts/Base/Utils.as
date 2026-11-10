@@ -98,7 +98,53 @@ namespace spades {
 		r.DrawFilledRect(x, y, w, h);
 	}
 
-	void DrawTarget(Renderer@ r, Vector2 pos, TargetParam param) {
+	// Variants of the two above on a grid of whole screen pixels, `unit` UI units
+	// apart (1 / Renderer.ScreenPixelRatio); see DrawTarget.
+	void DrawTargetOutlineRect(Renderer@ r, float unit, int x, int y, int w, int h, TargetParam param) {
+		int thickness = int(param.outlineThickness);
+		r.ColorNP = param.outlineColor;
+		if (param.useRoundedStyle) {
+			r.DrawFilledRect(x * unit, (y-thickness) * unit, w * unit, y * unit);
+			r.DrawFilledRect(x * unit, h * unit, w * unit, (h+thickness) * unit);
+		} else {
+			r.DrawFilledRect((x-thickness) * unit, (y-thickness) * unit, (w+thickness) * unit, y * unit);
+			r.DrawFilledRect((x-thickness) * unit, h * unit, (w+thickness) * unit, (h+thickness) * unit);
+		}
+		r.DrawFilledRect((x-thickness) * unit, y * unit, x * unit, h * unit);
+		r.DrawFilledRect(w * unit, y * unit, (w+thickness) * unit, h * unit);
+	}
+
+	void DrawTargetRect(Renderer@ r, float unit, int x, int y, int w, int h, TargetParam param) {
+		if (param.drawOutline)
+			DrawTargetOutlineRect(r, unit, x, y, w, h, param);
+		r.ColorNP = param.lineColor;
+		r.DrawFilledRect(x * unit, y * unit, w * unit, h * unit);
+	}
+
+	// Sizes in UI pixels, rounded to whole screen pixels (at least 1 if set to 1+).
+	float TargetPixels(float v, float scale) { return floor(v * scale + 0.5F); }
+	float TargetThickness(float v, float scale) {
+		float p = TargetPixels(v, scale);
+		return (v >= 1.0F and p < 1.0F) ? 1.0F : p;
+	}
+
+	void DrawTarget(Renderer@ r, Vector2 pos, TargetParam uiParam) {
+		// A crosshair is pixel-exact: laid out on the UI's grid and then scaled by a
+		// fractional interface scale, equal arms would come out 1 or 2 pixels thick
+		// depending on where they fall. So each size is scaled once and rounded to
+		// whole screen pixels, and the crosshair laid out on the screen's grid. At
+		// 1x this is the plain UI layout. (Mirrors Gui/UI/Settings/CrosshairRenderer.)
+		float scale = r.ScreenPixelRatio;
+		float unit = 1.0F / scale;
+		TargetParam param = uiParam;
+		param.lineGap = TargetPixels(uiParam.lineGap, scale);
+		param.lineLength = Vector2(TargetPixels(uiParam.lineLength.x, scale),
+			TargetPixels(uiParam.lineLength.y, scale));
+		param.lineThickness = TargetThickness(uiParam.lineThickness, scale);
+		param.outlineThickness = TargetThickness(uiParam.outlineThickness, scale);
+		param.dotThickness = TargetThickness(uiParam.dotThickness, scale);
+		pos *= scale;
+
 		int thickness = int(param.lineThickness);
 		int x = int(pos.x) - thickness / 2;
 		int y = int(pos.y) - thickness / 2;
@@ -115,8 +161,8 @@ namespace spades {
 			int innerRight = w + lineGap;
 			int outerLeft = innerLeft - lineLengthHorizontal;
 			int outerRight = innerRight + lineLengthHorizontal;
-			DrawTargetRect(r, outerLeft, y, innerLeft, h, param); // left
-			DrawTargetRect(r, innerRight, y, outerRight, h, param); // right
+			DrawTargetRect(r, unit, outerLeft, y, innerLeft, h, param); // left
+			DrawTargetRect(r, unit, innerRight, y, outerRight, h, param); // right
 
 			// vertical lines
 			int lineLengthVertical = int(param.lineLength.y);
@@ -125,8 +171,8 @@ namespace spades {
 			int outerTop = innerTop - lineLengthVertical;
 			int outerBottom = innerBottom + lineLengthVertical;
 			if (not param.useTStyle)
-				DrawTargetRect(r, x, outerTop, w, innerTop, param); // top
-			DrawTargetRect(r, x, innerBottom, w, outerBottom, param); // bottom
+				DrawTargetRect(r, unit, x, outerTop, w, innerTop, param); // top
+			DrawTargetRect(r, unit, x, innerBottom, w, outerBottom, param); // bottom
 		}
 
 		// draw center dot
@@ -138,9 +184,9 @@ namespace spades {
 			h = y + thickness;
 
 			if (param.drawOutline)
-				DrawTargetOutlineRect(r, x, y, w, h, param);
+				DrawTargetOutlineRect(r, unit, x, y, w, h, param);
 			r.ColorNP = param.dotColor;
-			r.DrawFilledRect(x, y, w, h);
+			r.DrawFilledRect(x * unit, y * unit, w * unit, h * unit);
 		}
 	}
 

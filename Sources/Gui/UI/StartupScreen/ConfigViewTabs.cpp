@@ -18,6 +18,7 @@
 
  */
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "ConfigViewTabs.h"
@@ -27,6 +28,7 @@
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
 #include <Core/Strings.h>
+#include <Gui/Utils/DisplayUtils.h>
 #include <Gui/StartupScreenHelper.h>
 #include <Gui/UI/Framework/UIManager.h>
 
@@ -68,6 +70,13 @@ namespace spades {
 				    Handle<StartupScreenGraphicsDisplayResolutionEditor>::New(ui);
 				e->SetBounds(AABB2(160.0F, 0.0F, 124.0F, 24.0F));
 				AddChild(e.GetPointerOrNull());
+				WatchHelpDeep(e.GetPointerOrNull(),
+				          [this](const std::string& s) { HandleHelpText(s); },
+				          _Tr("StartupScreen",
+				              "The size of the game window. The native size (the default) "
+				              "follows the monitor this window is on, and the game opens on "
+				              "that monitor. Typing a size or picking another one turns that "
+				              "off."));
 				resEdit = e.GetPointerOrNull();
 			}
 
@@ -493,8 +502,31 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::LoadConfig() {
-			widthField->SetText(std::to_string(static_cast<int>(r_videoWidth)));
-			heightField->SetText(std::to_string(static_cast<int>(r_videoHeight)));
+			if (display::IsAutoResolution()) {
+				ApplyDetectedResolution();
+				return;
+			}
+			ShowResolution(r_videoWidth, r_videoHeight);
+		}
+
+		void StartupScreenGraphicsDisplayResolutionEditor::ShowResolution(int w, int h) {
+			// SetText raises `changed`, which would read as the user typing a value
+			// and switch auto-detection off.
+			updatingFields = true;
+			widthField->SetText(std::to_string(w));
+			heightField->SetText(std::to_string(h));
+			updatingFields = false;
+		}
+
+		void StartupScreenGraphicsDisplayResolutionEditor::ApplyDetectedResolution() {
+			shownDisplay = helper->GetCurrentDisplay();
+			int w, h;
+			if (helper->GetDetectedResolution(w, h)) {
+				ShowResolution(w, h);
+				SaveConfig();
+			} else {
+				ShowResolution(r_videoWidth, r_videoHeight);
+			}
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::SaveConfig() {
@@ -507,30 +539,81 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ValueEditHandler(UIElement&) {
+			if (updatingFields)
+				return;
+			// A typed resolution is a manual choice.
+			display::SetAutoResolution(false);
 			SaveConfig();
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::DropdownHandler(int index) {
-			if (index >= 0) {
-				widthField->SetText(std::to_string(helper->GetVideoModeWidth(index)));
-				heightField->SetText(std::to_string(helper->GetVideoModeHeight(index)));
-				SaveConfig();
+			if (index < 0 || index >= helper->GetNumVideoModes())
+				return;
+			if (index == nativeRow) {
+				// The native mode is auto-detection: it follows the monitor.
+				display::SetAutoResolution(true);
+				ApplyDetectedResolution();
+				return;
 			}
+			display::SetAutoResolution(false);
+			ShowResolution(helper->GetVideoModeWidth(index), helper->GetVideoModeHeight(index));
+			SaveConfig();
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ShowDropdown(UIElement&) {
+			// The setup window may have been dragged onto another monitor since the
+			// last time, so list the modes of the one it is on now.
+			helper->RefreshVideoModes();
+
+			int nativeW = 0, nativeH = 0;
+			bool detected = helper->GetDetectedResolution(nativeW, nativeH);
+			bool autoMode = display::IsAutoResolution();
+			int curW = std::atoi(widthField->GetText().c_str());
+			int curH = std::atoi(heightField->GetText().c_str());
+
 			std::vector<std::string> items;
+			int selected = -1;
+			nativeRow = -1;
 			int cnt = helper->GetNumVideoModes();
 			for (int i = 0; i < cnt; i++) {
 				int w = helper->GetVideoModeWidth(i);
 				int h = helper->GetVideoModeHeight(i);
-				items.push_back(std::to_string(w) + "x" + std::to_string(h));
+				std::string item = std::to_string(w) + "x" + std::to_string(h);
+				if (detected && nativeRow < 0 && w == nativeW && h == nativeH) {
+					nativeRow = i;
+					item += " " + _Tr("StartupScreen", "(native)");
+					// Only worth naming the monitor when there is a choice of them.
+					if (display::GetNumDisplays() > 1)
+						item += " - " + helper->GetCurrentDisplayName();
+					if (autoMode)
+						selected = i;
+				}
+				if (!autoMode && selected < 0 && w == curW && h == curH)
+					selected = i;
+				items.push_back(std::move(item));
 			}
-			ui::ShowDropDownList(*this, std::move(items),
-			                     [this](int index) { DropdownHandler(index); });
+
+			// The editor is only 124px wide; size the list to its longest entry (a
+			// monitor name can be long) and keep it on screen.
+			AABB2 bnd = GetScreenBounds();
+			float width = bnd.GetWidth();
+			if (client::IFont* font = GetFont()) {
+				for (const auto& item : items)
+					width = std::max(width, font->Measure(item).x + 32.0F); // padding + scrollbar
+			}
+			float screenW = GetManager().GetRootElement().size.x;
+			width = std::min(width, screenW - 16.0F);
+			float x = std::min(bnd.min.x, screenW - 8.0F - width);
+
+			ui::ShowDropDownList(&GetManager(), x, bnd.max.y, width, std::move(items),
+			                     [this](int index) { DropdownHandler(index); }, selected);
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::Render() {
+			// Follow the setup window when it is dragged onto another monitor.
+			if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
+				ApplyDetectedResolution();
+
 			client::IFont* font = GetFont();
 			if (font)
 				font->Draw("x", MakeVector2(45.0F, 0.0F) + GetScreenPosition(), 1.0F,

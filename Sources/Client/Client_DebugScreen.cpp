@@ -80,15 +80,6 @@ namespace spades {
 				return std::string(buf);
 			}
 
-			/** Green for a good connection, red for a bad one. */
-			Vector4 PingColor(int ping) {
-				if (ping < 80)
-					return MakeVector4(0.45F, 1.0F, 0.45F, 1.0F);
-				if (ping < 150)
-					return MakeVector4(1.0F, 0.9F, 0.3F, 1.0F);
-				return MakeVector4(1.0F, 0.4F, 0.4F, 1.0F);
-			}
-
 			/** The CPUID brand string comes padded with spaces. */
 			std::string TrimBrand(const std::string& brand) {
 				const std::size_t first = brand.find_first_not_of(' ');

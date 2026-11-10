@@ -188,6 +188,13 @@ namespace spades {
 			virtual void ClearCache() {}
 
 			virtual Handle<IImage> CreateImage(Bitmap&) = 0;
+			/**
+			 * Like CreateImage, without a mipmap chain: when drawn smaller than its
+			 * size it is sampled from the full image, never from a blurrier
+			 * downsampled copy. For images prepared at a size close to their drawn
+			 * one (see Quake3Font). Defaults to CreateImage.
+			 */
+			virtual Handle<IImage> CreateImageWithoutMipmaps(Bitmap& bmp) { return CreateImage(bmp); }
 			virtual Handle<IModel> CreateModel(VoxelModel&) = 0;
 
 			/**
@@ -287,6 +294,22 @@ namespace spades {
 			 * SWRenderer (e.g. long sprites, circle/rect clipping).
 			 */
 			virtual bool IsRendererSW() const { return false; }
+
+			/**
+			 * Screen pixels per 2D drawing unit. Above 1 on a high-DPI display (the
+			 * window is in points, the framebuffer in pixels) and when the UI is
+			 * scaled up (ScaledRenderer); below 1 when it is scaled down. Anything
+			 * sized in screen pixels (glyph rasters, a pixel-exact crosshair, an
+			 * anti-aliasing fringe) uses it.
+			 */
+			virtual float ScreenPixelRatio() { return 1.0F; }
+
+			/**
+			 * Window units per 2D drawing unit: how much the UI is scaled up
+			 * (ScaledRenderer), 1 otherwise. Window units are those of mouse input,
+			 * so a mouse position divides by it to become a 2D position.
+			 */
+			virtual float UIScale() { return 1.0F; }
 
 			/**
 			 * Describes the backend, for the debug screen. The default implementation only

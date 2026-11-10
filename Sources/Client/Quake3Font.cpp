@@ -21,6 +21,7 @@
 #include "Quake3Font.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "IRenderer.h"
@@ -141,7 +142,11 @@ namespace spades {
 			float x = 0.0F, y = 0.0F;
 
 			if (scale == 1.0F)
-				offset = offset.Floor();
+				offset = SnapOrigin(offset);
+
+			SyncTextureScale();
+			IImage* image = scaledTex ? scaledTex.GetPointerOrNull() : tex;
+			const float texelScale = scaledTex ? static_cast<float>(texScale) : 1.0F;
 
 			float a = color.w;
 			color.w = 1.0F;
@@ -176,7 +181,11 @@ namespace spades {
 						AABB2 rt(x * scale + offset.x, y * scale + offset.y,
 						         info.imageRect.GetWidth() * scale,
 						         info.imageRect.GetHeight() * scale);
-						renderer->DrawImage(tex, rt, info.imageRect);
+						const AABB2& src = info.imageRect;
+						renderer->DrawImage(image, rt,
+						                    AABB2(src.min.x * texelScale, src.min.y * texelScale,
+						                          src.GetWidth() * texelScale,
+						                          src.GetHeight() * texelScale));
 						x += info.advance;
 					}
 				}
@@ -279,8 +288,42 @@ namespace spades {
 			}
 
 			outlineImage = renderer->CreateImage(*atlas);
-			// no longer needed once the atlas has been uploaded.
-			source = Handle<Bitmap>();
+			outlineAtlas = atlas;
+		}
+
+		namespace {
+			Handle<Bitmap> UpscaleNearest(Bitmap& src, int k) {
+				const int w = src.GetWidth(), h = src.GetHeight();
+				auto out = Handle<Bitmap>::New(w * k, h * k);
+				const uint32_t* in = src.GetPixels();
+				uint32_t* o = out->GetPixels();
+				for (int y = 0; y < h * k; y++)
+					for (int x = 0; x < w * k; x++)
+						*(o++) = in[(x / k) + (y / k) * w];
+				return out;
+			}
+		} // namespace
+
+		void Quake3Font::SyncTextureScale() {
+			// Screen pixels per font pixel, rounded up: the atlas is never magnified.
+			const int k = std::min(std::max(1, static_cast<int>(std::ceil(renderer->ScreenPixelRatio()))), 4);
+			if (k == texScale)
+				return;
+			texScale = k;
+			scaledTex = nullptr;
+			scaledOutlineImage = nullptr;
+			if (k > 1) {
+				if (source)
+					scaledTex = renderer->CreateImageWithoutMipmaps(*UpscaleNearest(*source, k));
+				if (outlineAtlas)
+					scaledOutlineImage =
+					  renderer->CreateImageWithoutMipmaps(*UpscaleNearest(*outlineAtlas, k));
+			}
+		}
+
+		Vector2 Quake3Font::SnapOrigin(Vector2 offset) const {
+			float s = renderer->ScreenPixelRatio();
+			return (offset * s).Floor() * (1.0F / s);
 		}
 
 		void Quake3Font::DrawOutlined(const std::string& txt, Vector2 offset, float scale, Vector4 color) {
@@ -288,7 +331,12 @@ namespace spades {
 
 			// Must match the rounding done in Draw() so the outline stays aligned with the text.
 			if (scale == 1.0F)
-				offset = offset.Floor();
+				offset = SnapOrigin(offset);
+
+			SyncTextureScale();
+			IImage* image = scaledOutlineImage ? scaledOutlineImage.GetPointerOrNull()
+			                                   : outlineImage.GetPointerOrNull();
+			const float texelScale = scaledOutlineImage ? static_cast<float>(texScale) : 1.0F;
 
 			float a = color.w;
 			color.w = 1.0F;
@@ -320,7 +368,11 @@ namespace spades {
 						AABB2 rt(x * scale + offset.x - margin, y * scale + offset.y - margin,
 						         info.outlineRect.GetWidth() * scale,
 						         info.outlineRect.GetHeight() * scale);
-						renderer->DrawImage(outlineImage.GetPointerOrNull(), rt, info.outlineRect);
+						const AABB2& src = info.outlineRect;
+						renderer->DrawImage(image, rt,
+						                    AABB2(src.min.x * texelScale, src.min.y * texelScale,
+						                          src.GetWidth() * texelScale,
+						                          src.GetHeight() * texelScale));
 						x += info.advance;
 						continue;
 					}
