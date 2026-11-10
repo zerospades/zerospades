@@ -38,6 +38,19 @@ namespace spades {
 				return GizmoHandleSet::All().Without(GizmoHandle::RotateTrackball);
 			}
 
+			// The handles for what the gizmo is on.
+			GizmoHandleSet HandlesFor(IObjectModeHost::Handling handling) {
+				switch (handling) {
+					case IObjectModeHost::Handling::Free: return ObjectHandles();
+					case IObjectModeHost::Handling::MoveAndTurn:
+						return GizmoHandleSet::Translation() |
+						       GizmoHandleSet::Rotation().Without(GizmoHandle::RotateTrackball);
+					case IObjectModeHost::Handling::MoveOnly:
+					case IObjectModeHost::Handling::ScenePivot: break;
+				}
+				return GizmoHandleSet::Translation();
+			}
+
 			// With the scale locked (IsScaleLocked), every scale handle scales
 			// evenly: the factor the drag gave the axes it stretches (those
 			// farthest from 1) goes to all three.
@@ -87,7 +100,15 @@ namespace spades {
 			protected:
 				bool CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) override {
 					IObjectModeHost* objects = ed.ObjectMode();
-					return objects && objects->PickedObjectPose(pose);
+					if (!objects || !objects->PickedObjectPose(pose))
+						return false;
+					// What is under it may have changed; a drag keeps its handles.
+					if (!gizmo.IsDragging()) {
+						const GizmoHandleSet handles = HandlesFor(objects->PickedObjectHandling());
+						gizmo.SetVisibleHandles(handles);
+						gizmo.SetEnabledHandles(handles);
+					}
+					return true;
 				}
 
 				void OnGizmoBegin(IVoxelEditContext& ed) override {
@@ -137,11 +158,21 @@ namespace spades {
 
 		std::string ObjectTool::Hint(IVoxelEditContext& ed) {
 			IObjectModeHost* objects = ed.ObjectMode();
+			const IObjectModeHost::Handling handling =
+			  objects ? objects->PickedObjectHandling() : IObjectModeHost::Handling::Free;
+			if (handling == IObjectModeHost::Handling::ScenePivot)
+				return "Scene:  drag the gizmo to set its pivot, the objects staying where they are  "
+				       "|  click nothing to select again";
 			if (!objects || !objects->HasPickedObject())
 				return "click an object to pick it  |  click nothing to select again";
-			return objects->PickedObjectName() +
-			       ":  drag the gizmo to move, turn or scale it  |  click another object to "
-			       "pick it, nothing to select again  |  [Tab] edit its voxels";
+			const char* action = "move, turn or scale it";
+			if (handling == IObjectModeHost::Handling::MoveAndTurn)
+				action = "move or turn it";
+			else if (handling == IObjectModeHost::Handling::MoveOnly)
+				action = "move it";
+			return objects->PickedObjectName() + ":  drag the gizmo to " + action +
+			       "  |  click another object to pick it, nothing to select again  |  [Tab] edit "
+			       "its voxels";
 		}
 	} // namespace gui
 } // namespace spades

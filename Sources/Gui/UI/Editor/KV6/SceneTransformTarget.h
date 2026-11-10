@@ -39,6 +39,8 @@ namespace spades {
 			/** The scene it works on; null for none. */
 			void SetScene(KV6Scene* s);
 
+			/** An empty has no voxels to scale: a place and a turn. */
+			unsigned ShownRows() const override;
 			bool CanLockScale() const override { return true; }
 
 			bool CurrentTransform(Transform& transform, std::string& name,

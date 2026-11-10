@@ -30,6 +30,11 @@ namespace spades {
 			scene = s;
 		}
 
+		unsigned SceneTransformTarget::ShownRows() const {
+			const VoxelObject* o = scene ? scene->Node(editing ? node : scene->Active()) : nullptr;
+			return o && !o->model ? unsigned(kLocation | kRotation) : unsigned(kAllRows);
+		}
+
 		bool SceneTransformTarget::CurrentTransform(Transform& transform, std::string& name,
 		                                            bool& onlyMoves) const {
 			if (!scene)
