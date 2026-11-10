@@ -75,7 +75,7 @@ namespace spades {
 			Settings::ItemHandle r_videoWidth;
 			Settings::ItemHandle r_videoHeight;
 			StartupScreenHelper* helper; // weak
-			bool updatingFields = false;
+			bool dropdownOpen = false; // a list is up: its rows describe one monitor
 			int shownDisplay = -1; // the monitor the auto-detected size came from
 			int nativeRow = -1;    // the drop-down row of the native mode (auto-detection)
 			float nextDisplayCheck = 0.0F; // UIManager time of the next monitor check

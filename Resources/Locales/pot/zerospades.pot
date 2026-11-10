@@ -4198,7 +4198,7 @@ msgid ""
 "or picking another one turns that off."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:584
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:581
 msgctxt "StartupScreen"
 msgid "(native)"
 msgstr ""

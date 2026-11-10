@@ -84,11 +84,23 @@ namespace spades {
 				if (indexValid && RealDisplayName(index) == name)
 					return index;
 
-				// Monitors were plugged in or out and the indices shifted: follow the name.
+				// Monitors were plugged in or out and the indices shifted: follow the
+				// name. Empty ones can't match a name that isn't.
+				bool anyNamed = false;
 				for (int i = 0; i < count; i++) {
-					if (RealDisplayName(i) == name)
+					std::string other = RealDisplayName(i);
+					if (other.empty())
+						continue;
+					anyNamed = true;
+					if (other == name)
 						return i;
 				}
+
+				// No monitor is named at all, though one was when the choice was saved:
+				// this backend (another driver, X11 against Wayland, an older SDL) can't
+				// name them, so the saved index is all there is to go on.
+				if (!anyNamed)
+					return indexValid ? index : 0;
 
 				// The monitor is gone. Its old index may now be a different monitor, so
 				// use the primary one.

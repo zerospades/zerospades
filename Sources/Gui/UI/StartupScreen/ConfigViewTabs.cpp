@@ -510,12 +510,11 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ShowResolution(int w, int h) {
-			// SetText raises `changed`, which would read as the user typing a value
-			// and switch auto-detection off.
-			updatingFields = true;
+			// `SetText` doesn't raise `changed`: only a user's own edit does, which is
+			// what lets this show a detected size without it reading as a typed one.
+			// The settings widgets rely on the same, loading their value this way.
 			widthField->SetText(std::to_string(w));
 			heightField->SetText(std::to_string(h));
-			updatingFields = false;
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ApplyDetectedResolution() {
@@ -539,22 +538,25 @@ namespace spades {
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::ValueEditHandler(UIElement&) {
-			if (updatingFields)
-				return;
 			// A typed resolution is a manual choice.
 			display::SetAutoResolution(false);
 			SaveConfig();
 		}
 
 		void StartupScreenGraphicsDisplayResolutionEditor::DropdownHandler(int index) {
-			if (index < 0 || index >= helper->GetNumVideoModes())
+			dropdownOpen = false;
+			if (index < 0) // dismissed without choosing
 				return;
+			// Checked before the range: the native row is appended past the modes when
+			// none of them matches the monitor.
 			if (index == nativeRow) {
 				// The native mode is auto-detection: it follows the monitor.
 				display::SetAutoResolution(true);
 				ApplyDetectedResolution();
 				return;
 			}
+			if (index >= helper->GetNumVideoModes())
+				return;
 			display::SetAutoResolution(false);
 			ShowResolution(helper->GetVideoModeWidth(index), helper->GetVideoModeHeight(index));
 			SaveConfig();
@@ -571,6 +573,18 @@ namespace spades {
 			int curW = std::atoi(widthField->GetText().c_str());
 			int curH = std::atoi(heightField->GetText().c_str());
 
+			// Marks the row that stands for auto-detection, with the size it detected
+			// (empty when there is none to show).
+			auto nativeLabel = [this](std::string size) {
+				if (!size.empty())
+					size += " ";
+				size += _Tr("StartupScreen", "(native)");
+				// Only worth naming the monitor when there is a choice of them.
+				if (display::GetNumDisplays() > 1)
+					size += " - " + helper->GetCurrentDisplayName();
+				return size;
+			};
+
 			std::vector<std::string> items;
 			int selected = -1;
 			nativeRow = -1;
@@ -581,16 +595,26 @@ namespace spades {
 				std::string item = std::to_string(w) + "x" + std::to_string(h);
 				if (detected && nativeRow < 0 && w == nativeW && h == nativeH) {
 					nativeRow = i;
-					item += " " + _Tr("StartupScreen", "(native)");
-					// Only worth naming the monitor when there is a choice of them.
-					if (display::GetNumDisplays() > 1)
-						item += " - " + helper->GetCurrentDisplayName();
+					item = nativeLabel(std::move(item));
 					if (autoMode)
 						selected = i;
 				}
 				if (!autoMode && selected < 0 && w == curW && h == curH)
 					selected = i;
 				items.push_back(std::move(item));
+			}
+
+			// The detected size is normally among the modes (GetVideoModes adds the
+			// desktop one), but not when it is under their 640x480 floor, and there is
+			// nothing to match when the query fails. Auto-detection then gets a row of
+			// its own, past the modes, so it can still be switched back on.
+			if (nativeRow < 0) {
+				nativeRow = static_cast<int>(items.size());
+				items.push_back(nativeLabel(
+				  detected ? std::to_string(nativeW) + "x" + std::to_string(nativeH)
+				           : std::string()));
+				if (autoMode)
+					selected = nativeRow;
 			}
 
 			// The editor is only 124px wide; size the list to its longest entry (a
@@ -605,6 +629,9 @@ namespace spades {
 			width = std::min(width, screenW - 16.0F);
 			float x = std::min(bnd.min.x, screenW - 8.0F - width);
 
+			// Cleared in DropdownHandler, which the list always calls: with the chosen
+			// row, or with -1 when it is dismissed.
+			dropdownOpen = true;
 			ui::ShowDropDownList(&GetManager(), x, bnd.max.y, width, std::move(items),
 			                     [this](int index) { DropdownHandler(index); }, selected);
 		}
@@ -616,7 +643,13 @@ namespace spades {
 			float now = GetManager().time;
 			if (now >= nextDisplayCheck) {
 				nextDisplayCheck = now + 0.25F;
-				if (display::IsAutoResolution() && helper->GetCurrentDisplay() != shownDisplay)
+				// Not while a list is up: its rows, and the "(native)" one among them,
+				// describe the monitor it was built for. Re-detecting under it would
+				// leave the row that matches the newly shown size looking like the
+				// native one, and picking it would turn auto-detection off. The check
+				// after the list closes follows the move instead.
+				if (!dropdownOpen && display::IsAutoResolution() &&
+				    helper->GetCurrentDisplay() != shownDisplay)
 					ApplyDetectedResolution();
 			}
 

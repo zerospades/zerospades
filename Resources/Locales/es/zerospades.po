@@ -4276,7 +4276,7 @@ msgstr ""
 "monitor en el que está esta ventana, y el juego se abre en ese monitor. "
 "Escribir un tamaño o elegir otro lo desactiva."
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:584
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:581
 msgctxt "StartupScreen"
 msgid "(native)"
 msgstr "(nativa)"
