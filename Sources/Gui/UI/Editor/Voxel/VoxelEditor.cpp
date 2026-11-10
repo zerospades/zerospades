@@ -1658,14 +1658,16 @@ namespace spades {
 			return true;
 		}
 
-		IntVector3 VoxelEditor::TurnCentre(const IntVector3& groupMiddle) const {
-			if (!turnsAboutModelPivot)
-				return groupMiddle;
+		IntVector3 VoxelEditor::PivotVoxel() const {
 			// The voxel nearest the pivot; on a tie the lower one, as for the
 			// middle of a group.
 			const Vector3 p = GetPivot();
 			auto nearest = [](float c) { return int(std::ceil(c - 0.5F)); };
 			return MakeIntVector3(nearest(p.x), nearest(p.y), nearest(p.z));
+		}
+
+		IntVector3 VoxelEditor::TurnCentre(const IntVector3& groupMiddle) const {
+			return turnsAboutModelPivot ? PivotVoxel() : groupMiddle;
 		}
 
 		bool VoxelEditor::ClampPlacementAnchor(const IntVector3& box, IntVector3& anchor) const {
