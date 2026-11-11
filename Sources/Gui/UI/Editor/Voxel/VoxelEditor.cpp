@@ -787,6 +787,181 @@ namespace spades {
 			TrimVolume();
 		}
 
+		// --- Cavity ------------------------------------------------------------
+
+		std::size_t VoxelEditor::Cell(const IntVector3& v) const {
+			const IntVector3 size = document.Size();
+			return std::size_t(v.x) +
+			       std::size_t(size.x) * (std::size_t(v.y) + std::size_t(size.y) * std::size_t(v.z));
+		}
+
+		bool VoxelEditor::InVolume(const IntVector3& v) const {
+			return InBounds(v.x, v.y, v.z);
+		}
+
+		std::vector<std::uint8_t> VoxelEditor::OutsideAir() const {
+			const IntVector3 size = document.Size();
+			std::vector<std::uint8_t> outside(
+			  std::size_t(size.x) * std::size_t(size.y) * std::size_t(size.z), 0);
+			std::vector<IntVector3> queue;
+			// Air at the volume's sides is outside air: past them is open space.
+			auto reach = [&](const IntVector3& v) {
+				if (!InVolume(v) || document.IsSolid(v.x, v.y, v.z) || outside[Cell(v)])
+					return;
+				outside[Cell(v)] = 1;
+				queue.push_back(v);
+			};
+			for (int x = 0; x < size.x; x++)
+				for (int y = 0; y < size.y; y++) {
+					reach(MakeIntVector3(x, y, 0));
+					reach(MakeIntVector3(x, y, size.z - 1));
+				}
+			for (int x = 0; x < size.x; x++)
+				for (int z = 0; z < size.z; z++) {
+					reach(MakeIntVector3(x, 0, z));
+					reach(MakeIntVector3(x, size.y - 1, z));
+				}
+			for (int y = 0; y < size.y; y++)
+				for (int z = 0; z < size.z; z++) {
+					reach(MakeIntVector3(0, y, z));
+					reach(MakeIntVector3(size.x - 1, y, z));
+				}
+			// ...and so is whatever air it reaches from there, face by face.
+			for (std::size_t i = 0; i < queue.size(); i++) {
+				const IntVector3 at = queue[i];
+				for (const IntVector3& step : kFaceNeighbours)
+					reach(at + step);
+			}
+			return outside;
+		}
+
+		void VoxelEditor::CarveCavity(int thickness) {
+			DocumentCommand command(*this, DocumentCommand::Pending::Keep);
+			if (thickness < 1 || edit.selection.Empty()) {
+				SetStatus("Nothing selected");
+				return;
+			}
+
+			const std::vector<std::uint8_t> outside = OutsideAir();
+			auto openAt = [&](const IntVector3& v) {
+				// Past the volume is open space, and so is air the outside air
+				// reached. Air it did not reach is a cavity already within the
+				// model, which this one may join on to.
+				return !InVolume(v) || outside[Cell(v)];
+			};
+			auto onSkin = [&](const IntVector3& v) {
+				for (const IntVector3& step : kFaceNeighbours) {
+					if (openAt(v + step))
+						return true;
+				}
+				return false;
+			};
+
+			// Every selected voxel is the mouth of the cavity, so every one of
+			// them has to be a voxel, and one on the outside: a mouth facing
+			// nothing but solid or another cavity opens the dig onto nothing.
+			int notOnSkin = 0;
+			edit.selection.ForEach([&](const IntVector3& v) {
+				if (!document.IsSolid(v.x, v.y, v.z) || !onSkin(v))
+					notOnSkin++;
+			});
+			if (notOnSkin > 0) {
+				SetStatus("Cavity: " + std::to_string(notOnSkin) + " of the selected voxels " +
+				          (notOnSkin == 1 ? "is" : "are") + " not on the model's outside");
+				return;
+			}
+
+			// How deep each voxel lies under the outside, by faces: the wall is
+			// what lies within `thickness` of it, and everything deeper is what
+			// a cavity may take.
+			const IntVector3 size = document.Size();
+			std::vector<std::uint8_t> depth(
+			  std::size_t(size.x) * std::size_t(size.y) * std::size_t(size.z), 0);
+			std::vector<IntVector3> queue;
+			for (int x = 0; x < size.x; x++)
+				for (int y = 0; y < size.y; y++)
+					for (int z = 0; z < size.z; z++) {
+						const IntVector3 v = MakeIntVector3(x, y, z);
+						if (!document.IsSolid(x, y, z) || !onSkin(v))
+							continue;
+						depth[Cell(v)] = 1;
+						queue.push_back(v);
+					}
+			for (std::size_t i = 0; i < queue.size(); i++) {
+				const IntVector3 at = queue[i];
+				const std::uint8_t next =
+				  std::uint8_t(std::min(254, int(depth[Cell(at)]) + 1)); // deep enough is deep enough
+				for (const IntVector3& step : kFaceNeighbours) {
+					const IntVector3 n = at + step;
+					if (!InVolume(n) || !document.IsSolid(n.x, n.y, n.z) || depth[Cell(n)] != 0)
+						continue;
+					depth[Cell(n)] = next;
+					queue.push_back(n);
+				}
+			}
+			auto isWall = [&](const IntVector3& v) {
+				const std::uint8_t d = depth[Cell(v)];
+				return d != 0 && int(d) <= thickness;
+			};
+
+			// From the mouth inwards, as far as the solid behind it goes: what
+			// the dig can reach is what it takes. It stops at the wall and never
+			// steps out into the open, so a cavity stays inside the solid the
+			// selection opened and the rest of the model is untouched.
+			std::vector<std::uint8_t> taken(depth.size(), 0);
+			std::vector<IntVector3> removing;
+			queue.clear();
+			edit.selection.ForEach([&](const IntVector3& v) {
+				taken[Cell(v)] = 1;
+				removing.push_back(v);
+				queue.push_back(v);
+			});
+			const std::size_t mouth = removing.size();
+			for (std::size_t i = 0; i < queue.size(); i++) {
+				const IntVector3 at = queue[i];
+				for (const IntVector3& step : kFaceNeighbours) {
+					const IntVector3 n = at + step;
+					if (!InVolume(n) || taken[Cell(n)] || openAt(n))
+						continue;
+					taken[Cell(n)] = 1;
+					if (!document.IsSolid(n.x, n.y, n.z)) {
+						queue.push_back(n); // a cavity already there: the dig joins it
+						continue;
+					}
+					if (isWall(n))
+						continue; // the wall is what is left standing
+					removing.push_back(n);
+					queue.push_back(n);
+				}
+			}
+			if (removing.size() == mouth) {
+				SetStatus("Cavity: nothing behind the selection to hollow out");
+				return;
+			}
+
+			// The voxels this document will not have edited are left where they
+			// are, as every other edit leaves them.
+			removing.erase(std::remove_if(removing.begin(), removing.end(),
+			                              [&](const IntVector3& v) {
+				                              return !Editable(v.x, v.y, v.z);
+			                              }),
+			               removing.end());
+			if (int(removing.size()) > document.RemovableVoxels()) {
+				SetStatus(document.RemovalLimitMessage());
+				return;
+			}
+
+			{
+				VoxelUndoStack::Step step(undo, "Cavity");
+				edit.selection.Clear(); // the voxels it held are the mouth, now gone
+				for (const IntVector3& v : removing)
+					WriteVoxel(v.x, v.y, v.z, false, 0);
+				TrimVolume();
+			}
+			SetStatus("Cavity: removed " + std::to_string(removing.size()) + " voxels, wall " +
+			          std::to_string(thickness) + (thickness == 1 ? " voxel" : " voxels") + " thick");
+		}
+
 		// --- Sweeping (Extrude, Pocket) ----------------------------------------
 
 		std::vector<VoxelEditor::SweptCell> VoxelEditor::SweepPath(int axis, int steps, bool pocket,
