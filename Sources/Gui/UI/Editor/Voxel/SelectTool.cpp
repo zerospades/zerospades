@@ -26,13 +26,7 @@
 namespace spades {
 	namespace gui {
 		namespace {
-			const char* const kSelectAllOption = "select.all";
-			const char* const kClearSelectionOption = "select.clear";
-			const char* const kDeleteSelectionOption = "select.delete";
 			const char* const kFillSelectionOption = "select.fill";
-			const char* const kCopyOption = "clipboard.copy";
-			const char* const kCutOption = "clipboard.cut";
-			const char* const kPasteOption = "clipboard.paste";
 			const char* const kDiameterOption = "select.diameter";
 			const char* const kXRayOption = "select.xray";
 			// Pixels a press may move and still be a click.
@@ -60,15 +54,10 @@ namespace spades {
 			brushIndex = int(subs.size());
 			subs.push_back(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(voxels, screen)));
 
-			// Whole-selection commands, available whichever sub-tool is active.
-			// Their keys work in every tool; these buttons are their one home.
-			options.AddAction(kSelectAllOption, "Select All");
-			options.AddAction(kClearSelectionOption, "Select None");
-			options.AddAction(kDeleteSelectionOption, "Delete");
+			// Only the commands with no key of their own: Select All, Select
+			// None, Delete, Copy, Cut and Paste are in the menu with theirs,
+			// where a command belongs, leaving this bar to the active sub-tool.
 			options.AddAction(kFillSelectionOption, "Fill");
-			options.AddAction(kCopyOption, "Copy", "Clipboard");
-			options.AddAction(kCutOption, "Cut", "Clipboard");
-			options.AddAction(kPasteOption, "Paste", "Clipboard");
 			// The screen selections' settings, shown with them only.
 			options.AddNumber(kDiameterOption, "Size", "Brush", 5.0F, 0);
 			options.AddBool(kXRayOption, "X-Ray", "", screen.through);
@@ -97,13 +86,7 @@ namespace spades {
 
 		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
 			ContainerTool::UpdateOptions(ed);
-			const bool selected = ed.SelectionCount() > 0;
-			options.SetEnabled(kClearSelectionOption, selected);
-			options.SetEnabled(kDeleteSelectionOption, selected);
-			options.SetEnabled(kFillSelectionOption, selected);
-			options.SetEnabled(kCopyOption, selected);
-			options.SetEnabled(kCutOption, selected);
-			options.SetEnabled(kPasteOption, ed.CanPaste());
+			options.SetEnabled(kFillSelectionOption, ed.SelectionCount() > 0);
 			options.SetVisible(kDiameterOption, active == brushIndex);
 			options.SetVisible(kXRayOption, active == rectIndex || active == brushIndex);
 			options.SetNumber(kDiameterOption, screen.diameter);
@@ -126,28 +109,8 @@ namespace spades {
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			ContainerTool::OnAction(ed, id);
-			// Each reports a count: selecting is invisible on a model that was
-			// already fully selected, and a button that seems to do nothing reads
-			// as broken. Matches By Colour / Copy / Cut.
-			if (id == kSelectAllOption) {
-				ed.SelectAll();
-				ed.SetStatus("Selected " + std::to_string(ed.SelectionCount()) + " voxels");
-			} else if (id == kDeleteSelectionOption) {
-				ed.DeleteSelection(); // reports what it removed, or why not
-			} else if (id == kFillSelectionOption) {
-				ed.RecolorSelection(ed.CurrentColor());
-			} else if (id == kClearSelectionOption) {
-				int count = ed.SelectionCount();
-				ed.ClearSelection();
-				ed.SetStatus(count ? "Deselected " + std::to_string(count) + " voxels"
-				                   : "Nothing was selected");
-			} else if (id == kCopyOption) {
-				ed.CopySelection();
-			} else if (id == kCutOption) {
-				ed.CutSelection();
-			} else if (id == kPasteOption) {
-				ed.Paste();
-			}
+			if (id == kFillSelectionOption)
+				ed.RecolorSelection(ed.CurrentColor()); // reports what it recoloured
 		}
 
 		void SelectTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,

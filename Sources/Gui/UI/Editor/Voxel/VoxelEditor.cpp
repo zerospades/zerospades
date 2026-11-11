@@ -1016,9 +1016,17 @@ namespace spades {
 		}
 
 		void VoxelEditor::ClearSelection() {
-			DocumentCommand command(*this);
-			VoxelUndoStack::Step step(undo, "Clear Selection");
-			edit.selection.Clear();
+			const int count = SelectionCount();
+			{
+				DocumentCommand command(*this);
+				VoxelUndoStack::Step step(undo, "Clear Selection");
+				edit.selection.Clear();
+			}
+			// Reported here rather than by whoever asked: a command that seems to
+			// do nothing reads as broken, and it is asked for from the menu, a
+			// key and a button alike.
+			SetStatus(count ? "Deselected " + std::to_string(count) + " voxels"
+			                : "Nothing was selected");
 		}
 
 		std::vector<IntVector3> VoxelEditor::LinkedColorRegion(int x, int y, int z) const {
@@ -1164,6 +1172,7 @@ namespace spades {
 
 		void VoxelEditor::SelectAll() {
 			SelectBox(MakeIntVector3(0, 0, 0), document.Size() - MakeIntVector3(1, 1, 1));
+			SetStatus("Selected " + std::to_string(SelectionCount()) + " voxels");
 		}
 
 		void VoxelEditor::SelectCells(const std::vector<IntVector3>& cells) {
@@ -2366,7 +2375,7 @@ namespace spades {
 		}
 
 		bool VoxelEditor::IsEditShortcut(const std::string& key) {
-			for (const char* k : {"c", "x", "v", "z", "y"}) {
+			for (const char* k : {"a", "c", "x", "v", "z", "y"}) {
 				if (EqualsIgnoringCase(key, k))
 					return true;
 			}
@@ -2377,7 +2386,14 @@ namespace spades {
 			// A shortcut changes the document or the placement under a drag in
 			// progress (a paste replaces it), so that drag is abandoned.
 			CancelToolInteraction();
-			if (EqualsIgnoringCase(key, "c"))
+			if (EqualsIgnoringCase(key, "a")) {
+				// Select All, and with Shift the other way about, as a list in
+				// any application does it.
+				if (shiftHeld)
+					ClearSelection();
+				else
+					SelectAll();
+			} else if (EqualsIgnoringCase(key, "c"))
 				CopySelection();
 			else if (EqualsIgnoringCase(key, "x"))
 				CutSelection();
