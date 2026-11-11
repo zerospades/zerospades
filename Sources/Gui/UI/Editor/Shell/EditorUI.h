@@ -41,8 +41,8 @@ namespace spades {
 
 		/**
 		 * The chrome every editor view shares: the menu bar, the toolbar, the
-		 * option bar, the colour picker, and the overlay its modal dialogs (the
-		 * file browser) are shown in. It only owns them; the view lays them
+		 * option bar, the colour picker, and the overlay its modal dialogs
+		 * (the file browser) are shown in. It only owns them; the view lays them
 		 * out, draws them and routes input to them.
 		 */
 		class EditorUI : public IGameModeUI {

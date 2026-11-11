@@ -663,12 +663,16 @@ namespace spades {
 				editor->ReleaseHeldInput();
 				return;
 			}
-			// Escape otherwise backs out of whatever the editor has in hand --
-			// a number being typed, a box half drawn, the selection -- and does
-			// nothing once there is nothing left to back out of. There is no
-			// menu behind it: the commands are on the bar, in sight.
+			// Escape backs out of whatever the editor has in hand -- a number
+			// being typed, a box half drawn, the selection -- one layer at a
+			// time. With nothing left to back out of it leaves the editor,
+			// asking about unsaved work first; everything else the editor can
+			// be told to do is on the menu bar, in sight.
 			if (down && key == "Escape") {
-				editor->EscapeOnce();
+				if (!editor->EscapeOnce()) {
+					editor->ReleaseHeldInput();
+					ConfirmDiscardChanges([this] { wantsClose = true; });
+				}
 				return;
 			}
 

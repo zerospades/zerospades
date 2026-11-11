@@ -415,7 +415,9 @@ namespace spades {
 				case EscapeLayer::Selection: return "select nothing";
 				case EscapeLayer::None: break;
 			}
-			return std::string(); // nothing in hand: Escape has nothing to do
+			// Nothing in hand: what Escape does then is the host's to decide
+			// (this one leaves, asking about unsaved work first).
+			return "exit to menu";
 		}
 
 		void VoxelEditor::Escape(EscapeLayer layer) {
