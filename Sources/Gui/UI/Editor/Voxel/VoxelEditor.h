@@ -454,6 +454,9 @@ namespace spades {
 			void ReframeRaw(const IntVector3& size, const IntVector3& shift);
 			void TrimVolume();
 			std::string SizeLimitMessage() const;
+			/** As above, naming the way `wanted` ran out of room and by how
+			 *  much; the plain one where that is not known. */
+			std::string SizeLimitMessage(const IntVector3& wanted) const;
 
 			// --- Editing ------------------------------------------------------
 			int MirrorIdx(int i, float plane) const;

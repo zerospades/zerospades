@@ -388,6 +388,25 @@ namespace spades {
 			return "Reached the maximum " + document.Noun() + " size";
 		}
 
+		std::string VoxelEditor::SizeLimitMessage(const IntVector3& wanted) const {
+			// Which way it ran out, and by how much. "Too large" leaves the user
+			// to guess which of three limits they met and how far off they are,
+			// and the three are not alike: a model may be thousands of voxels
+			// across and only a few dozen deep.
+			const IntVector3 limit = document.MaxSize();
+			const char* const axes[3] = {"X", "Y", "Z"};
+			const int want[3] = {wanted.x, wanted.y, wanted.z};
+			const int most[3] = {limit.x, limit.y, limit.z};
+			for (int a = 0; a < 3; a++) {
+				if (want[a] > most[a]) {
+					return "A " + document.Noun() + " reaches " + std::to_string(most[a]) +
+					       " voxels along " + axes[a] + ", and this would need " +
+					       std::to_string(want[a]);
+				}
+			}
+			return SizeLimitMessage();
+		}
+
 		// --- Escape -----------------------------------------------------------
 
 		VoxelEditor::EscapeLayer VoxelEditor::NextEscape() {
@@ -750,7 +769,7 @@ namespace spades {
 			// it can grow.
 			const VolumeFrame frame = FrameHolding(lo, hi);
 			if (!Fits(frame)) {
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(frame.size));
 				return;
 			}
 			VoxelUndoStack::Step step(undo, label);
@@ -1057,7 +1076,7 @@ namespace spades {
 				return;
 			const VolumeFrame frame = FrameHolding(lo, hi);
 			if (!Fits(frame)) {
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(frame.size));
 				return;
 			}
 			VoxelUndoStack::Step step(undo, "Extrude");
@@ -1665,7 +1684,7 @@ namespace spades {
 			PendingPlacement moved;
 			bool clamped = false;
 			if (!TransformedPlacement(selected, t, moved, clamped)) {
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(selected.Extent()));
 				return;
 			}
 			if (clamped)
@@ -1675,7 +1694,7 @@ namespace spades {
 			const VolumeFrame frame =
 			  FrameHolding(moved.anchor, moved.anchor + moved.Extent() - MakeIntVector3(1, 1, 1));
 			if (!Fits(frame)) {
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(frame.size));
 				return;
 			}
 
@@ -1821,7 +1840,7 @@ namespace spades {
 			PendingPlacement next;
 			bool clamped = false;
 			if (!TransformedPlacement(edit.placement, t, next, clamped)) {
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(edit.placement.Extent()));
 				return;
 			}
 			if (clamped)
@@ -1893,7 +1912,7 @@ namespace spades {
 			  pending.anchor, pending.anchor + pending.Extent() - MakeIntVector3(1, 1, 1));
 			if (!Fits(frame)) {
 				CancelPlacement();
-				SetStatus(SizeLimitMessage());
+				SetStatus(SizeLimitMessage(frame.size));
 				return;
 			}
 
