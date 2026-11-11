@@ -31,16 +31,17 @@ namespace spades {
 		 * A tool that moves something with a gizmo, its one sub-tool (Pivot,
 		 * Mirror, Transform).
 		 *
-		 * Its bar carries the gizmo's snapping, a setting of the tool: a Step of
-		 * 1, 0.5 or 0.1, which is how far a drag moves what it holds, and Snap
-		 * to Grid, which instead lands it on the voxel corners -- the lattice a
-		 * voxel apart that the editor draws on its ground -- whatever the step
-		 * is. From a corner, a step of 0.5 reaches a voxel's centre in one
-		 * press, which is the other place a pivot or a mirror plane belongs.
+		 * Its bar carries a Step of 1, 0.5 or 0.1 -- how far a drag moves what
+		 * the tool holds, keeping wherever between the steps it already sat --
+		 * and Snap to Grid.
 		 *
-		 * A tool offers only the steps what it moves can take, and Snap to Grid
-		 * only where what it moves can sit on a corner at all; the rest shows
-		 * greyed out.
+		 * Snap to Grid is a one-off, not a mode: it rounds what the tool moves
+		 * to the nearest whole voxel, once, as one undo step (SnapToGrid). It is
+		 * for tidying up a position dragged roughly into place, so it latches
+		 * nothing and leaves dragging alone; a drag after it moves by the step
+		 * as it always did. A tool offers only the steps what it moves can take,
+		 * and offers Snap to Grid only where what it moves can be off the grid
+		 * at all.
 		 */
 		class GizmoTool : public ContainerTool {
 		public:
@@ -48,6 +49,7 @@ namespace spades {
 			// Subclasses overriding these call them first.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
 			// Whatever sets this tool's numbers holds to the step it is set to.
 			float TransformStep() const override { return Step(); }
 
@@ -56,36 +58,45 @@ namespace spades {
 			 * `gizmo` becomes the only sub-tool. `steps` are the steps (of 1, 0.5
 			 * and 0.1) it can take, the first being the one it starts on. `grid`
 			 * is the grid what it moves always sits on (0 for none): where that
-			 * is a whole voxel, it can never sit on a corner and Snap to Grid is
-			 * greyed out.
+			 * is a whole voxel, it is on the grid already whatever anyone does
+			 * to it, and Snap to Grid is left off the bar.
 			 */
 			GizmoTool(std::unique_ptr<GizmoSubTool> gizmo, std::vector<float> steps, float grid);
 
-			/** Adds Step and Snap to Grid at this point of the bar. */
+			/** Adds Step, and Snap to Grid where it applies, at this point of the bar. */
 			void AddSnapOptions();
 
 			/** The step in use: what a drag moves by, and what a box of this
 			 *  tool's steps by, so the two never disagree. */
 			float Step() const { return step; }
 
+			/** `v` with each coordinate on the nearest whole voxel. */
+			static Vector3 OnGrid(const Vector3& v);
+			/**
+			 * Puts what this tool moves on the grid, as one undo step, and says
+			 * where it went. Called by the Snap to Grid button; a tool that never
+			 * offers it needs no override.
+			 */
+			virtual void SnapToGrid(IVoxelEditContext&) {}
+
 			ToolOptions options;
 
 		private:
-			// The grid Snap to Grid lands on: the voxel corners, a voxel apart,
-			// through -0.5 (a voxel spans i - 0.5 to i + 0.5). See GridSnapApplies.
+			// The grid Snap to Grid rounds to: the whole voxels, which is where
+			// the voxels themselves are.
 			static constexpr float kGridStep = 1.0F;
-			static constexpr float kGridAt = -0.5F;
+			static constexpr float kGridAt = 0.0F;
 
 			GizmoSubTool* gizmo; // owned by `subs`
 			std::vector<float> steps;
 			float grid;
 			float step;
-			bool toGrid = false;
 
 			bool Offers(float candidate) const;
-			// Whether Snap to Grid changes anything at the current step.
+			// Whether what this tool moves can be off the grid, and so whether
+			// there is ever anything for Snap to Grid to do.
 			bool GridSnapApplies() const;
-			// Hands the current step and grid setting to the gizmo.
+			// Hands the current step to the gizmo.
 			void ApplySnap();
 		};
 	} // namespace gui

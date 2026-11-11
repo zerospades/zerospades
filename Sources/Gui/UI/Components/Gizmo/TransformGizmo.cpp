@@ -676,29 +676,14 @@ namespace spades {
 				move = axis * Vector3::Dot(move, axis);
 			}
 
-			// Snap the running total, per pose axis, not each step. On a grid the
-			// position reached is snapped, and the total is what gets it there,
-			// but only along the axes this handle moves: an arrow must never pull
-			// what it moves onto the grid sideways.
-			auto moves = [&](int i) {
-				if (info.shape == Shape::Axis)
-					return i == info.axis;
-				if (info.shape == Shape::Plane)
-					return i != info.axis;
-				return true; // the screen-plane handle moves along all three
-			};
+			// Snap the running total, per pose axis, not each step: a drag that
+			// wanders keeps ending up where its distance from the grab says,
+			// rather than drifting by a part of a step each move.
 			Vector3 wanted = total.translation + move;
 			Vector3 snapped = MakeVector3(0.0F, 0.0F, 0.0F);
 			for (int i = 0; i < 3; i++) {
 				const float along = Vector3::Dot(wanted, drag.axes[i]);
-				// To the grid: where it started plus how far it has come, landed
-				// on the nearest line of the lattice, and back to a distance
-				// moved. Otherwise the distance itself is what lands on the step.
-				const bool toGrid = snap.translationGrid > 0.0F && moves(i);
-				const float from = toGrid ? Vector3::Dot(drag.grabPosition, drag.axes[i]) : 0.0F;
-				const float at = toGrid ? snap.translationGridAt : 0.0F;
-				const float increment = toGrid ? snap.translationGrid : snap.translation;
-				snapped += drag.axes[i] * (SnapTo(from + along - at, increment) + at - from);
+				snapped += drag.axes[i] * SnapTo(along, snap.translation);
 			}
 			Vector3 delta = snapped - total.translation;
 			if (delta == MakeVector3(0.0F, 0.0F, 0.0F))

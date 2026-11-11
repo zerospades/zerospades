@@ -50,7 +50,10 @@ namespace spades {
 		void GizmoTool::AddSnapOptions() {
 			for (const StepChoice& choice : kStepChoices)
 				options.AddBool(choice.id, choice.label, kStepGroup);
-			options.AddBool(kGridOption, "Snap to Grid");
+			// A one-off, so a button that does something rather than a toggle
+			// that latches, and only where there is ever anything to round.
+			if (GridSnapApplies())
+				options.AddAction(kGridOption, "Snap to Grid");
 		}
 
 		bool GizmoTool::Offers(float candidate) const {
@@ -61,22 +64,25 @@ namespace spades {
 			return false;
 		}
 
-		// Snap to Grid lands what is moved on the voxel corners: the lattice a
-		// voxel apart that the editor draws on its ground, which a voxel's edges
-		// sit on (voxel i spans i - 0.5 to i + 0.5). It is the grid the user can
-		// see, so it is the one the button means, whatever Step is set to -- and
-		// from a corner, a half-voxel step is one press away where a centre is
-		// what is wanted.
+		// Snap to Grid rounds what is moved to the whole voxels -- the
+		// coordinates the voxels themselves have. It tidies up a position
+		// dragged roughly into place; half a voxel along is where a pivot or a
+		// mirror plane belongs about as often, and from the grid that is one
+		// press of a 0.5 step away.
+		Vector3 GizmoTool::OnGrid(const Vector3& v) {
+			auto nearest = [](float c) {
+				return std::round((c - kGridAt) / kGridStep) * kGridStep + kGridAt;
+			};
+			return MakeVector3(nearest(v.x), nearest(v.y), nearest(v.z));
+		}
+
 		bool GizmoTool::GridSnapApplies() const {
-			// Only where what is moved can sit on a corner at all: voxels
-			// themselves never can, as they only ever sit on whole voxels.
+			// Only where what is moved can be off the grid in the first place:
+			// voxels never are, as they only ever sit on whole voxels.
 			return grid < kGridStep && !SameStep(grid, kGridStep);
 		}
 
-		void GizmoTool::ApplySnap() {
-			const bool on = toGrid && GridSnapApplies();
-			gizmo->SetTranslationSnap(step, on ? kGridStep : 0.0F, kGridAt);
-		}
+		void GizmoTool::ApplySnap() { gizmo->SetTranslationSnap(step); }
 
 		void GizmoTool::UpdateOptions(IVoxelEditContext&) {
 			// The steps act as radio buttons, so each shows whether it is the one
@@ -85,17 +91,12 @@ namespace spades {
 				options.SetBool(choice.id, SameStep(choice.step, step));
 				options.SetEnabled(choice.id, Offers(choice.step));
 			}
-			// Kept while unavailable, so going back to a coarser step restores it.
-			options.SetBool(kGridOption, toGrid);
-			options.SetEnabled(kGridOption, GridSnapApplies());
 		}
 
-		void GizmoTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) {
-			if (id == kGridOption) {
-				toGrid = value;
-				ApplySnap();
-				return;
-			}
+		// The steps are radio buttons: a click picks its choice, whatever the
+		// toggle it landed on was showing, so the value it was flipped to is of
+		// no interest here.
+		void GizmoTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool) {
 			for (const StepChoice& choice : kStepChoices) {
 				if (id == choice.id && Offers(choice.step)) {
 					step = choice.step;
@@ -103,6 +104,12 @@ namespace spades {
 					return;
 				}
 			}
+		}
+
+		// Subclasses with actions of their own call this first.
+		void GizmoTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			if (id == kGridOption)
+				SnapToGrid(ed);
 		}
 	} // namespace gui
 } // namespace spades

@@ -115,10 +115,19 @@ namespace spades {
 		}
 
 		void MirrorTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			GizmoTool::OnAction(ed, id); // Snap to Grid
 			if (id == kResetOption) {
 				ed.ResetMirrorPlane();
 				ed.SetStatus("Mirror planes reset to the pivot");
 			}
+		}
+
+		void MirrorTool::SnapToGrid(IVoxelEditContext& ed) {
+			const Vector3 was = ed.MirrorPlane();
+			const Vector3 now = OnGrid(was);
+			ed.SetMirrorPlane(now);
+			ed.SetStatus(was == now ? "The mirror planes are on the grid"
+			                        : "Mirror planes snapped to whole voxels");
 		}
 	} // namespace gui
 } // namespace spades
