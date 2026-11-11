@@ -2042,10 +2042,73 @@ namespace spades {
 					}
 		}
 
+		void VoxelEditor::BuildSelectionOutline() const {
+			if (selectionOutline.version == edit.selection.Version())
+				return;
+			selectionOutline.version = edit.selection.Version();
+			selectionOutline.edges.clear();
+
+			// Only the edges on the outside of the selection. An edge four
+			// selected voxels share is inside it: nothing can be seen of it,
+			// and drawing one cage per voxel buries the shape of a selection
+			// under its own hatching -- at twelve lines a voxel, which is what
+			// made a large selection cost what it did every frame, even at
+			// rest.
+			const IntVector3 unit[3] = {MakeIntVector3(1, 0, 0), MakeIntVector3(0, 1, 0),
+			                            MakeIntVector3(0, 0, 1)};
+			const Vector3 half[3] = {MakeVector3(0.5F, 0.0F, 0.0F), MakeVector3(0.0F, 0.5F, 0.0F),
+			                         MakeVector3(0.0F, 0.0F, 0.5F)};
+			auto before = [](const IntVector3& p, const IntVector3& q) {
+				return std::tie(p.x, p.y, p.z) < std::tie(q.x, q.y, q.z);
+			};
+			edit.selection.ForEach([&](const IntVector3& v) {
+				for (int d = 0; d < 3; d++) {
+					const int u = (d + 1) % 3, w = (d + 2) % 3;
+					for (int su = -1; su <= 1; su += 2) {
+						for (int sv = -1; sv <= 1; sv += 2) {
+							// The four voxels this edge runs between: this one,
+							// the two beside it, and the one diagonally across.
+							const IntVector3 corner[4] = {v, v + unit[u] * su, v + unit[w] * sv,
+							                              v + unit[u] * su + unit[w] * sv};
+							bool taken[4] = {true, false, false, false};
+							bool ours = true; // whether this voxel is the one to draw it
+							int count = 1;
+							for (int c = 1; c < 4; c++) {
+								taken[c] = edit.selection.Contains(corner[c]);
+								if (!taken[c])
+									continue;
+								count++;
+								// Drawn once, by the first of the voxels sharing
+								// it: the same edge is on all four of them.
+								if (before(corner[c], v))
+									ours = false;
+							}
+							if (!ours)
+								continue;
+							// Where the selection's surface bends, and nowhere
+							// else. All four voxels selected and the edge is
+							// buried inside it; two of them side by side and the
+							// surface runs flat through it, which is every edge
+							// ruled across a face. What is left is the shape of
+							// the selection: its silhouette and its steps.
+							if (count == 4 || (count == 2 && (taken[1] || taken[2])))
+								continue;
+							const Vector3 at = MakeVector3(float(v.x), float(v.y), float(v.z)) +
+							                   half[u] * float(su) + half[w] * float(sv);
+							selectionOutline.edges.push_back({at - half[d], at + half[d]});
+						}
+					}
+				}
+			});
+		}
+
 		void VoxelEditor::DrawSelection() {
 			const Vector4 col = MakeVector4(1.0F, 0.55F, 0.1F, 0.95F);
-			edit.selection.ForEach(
-			  [&](const IntVector3& v) { DrawCellOutline(v.x, v.y, v.z, col); });
+			// Worked out once per selection and kept: at rest a frame only
+			// hands the lines over again.
+			BuildSelectionOutline();
+			for (const SelectionEdge& e : selectionOutline.edges)
+				overlayLines.Emit(e.a, e.b, col);
 		}
 
 		// --- Undo / redo ------------------------------------------------------
