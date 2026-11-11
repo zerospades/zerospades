@@ -61,9 +61,22 @@ namespace spades {
 			return false;
 		}
 
-		bool GizmoTool::GridSnapApplies() const { return step > grid && !SameStep(step, grid); }
+		// Snap to Grid lands what is moved on the voxel corners: the lattice a
+		// voxel apart that the editor draws on its ground, which a voxel's edges
+		// sit on (voxel i spans i - 0.5 to i + 0.5). It is the grid the user can
+		// see, so it is the one the button means, whatever Step is set to -- and
+		// from a corner, a half-voxel step is one press away where a centre is
+		// what is wanted.
+		bool GizmoTool::GridSnapApplies() const {
+			// Only where what is moved can sit on a corner at all: voxels
+			// themselves never can, as they only ever sit on whole voxels.
+			return grid < kGridStep && !SameStep(grid, kGridStep);
+		}
 
-		void GizmoTool::ApplySnap() { gizmo->SetTranslationSnap(step, toGrid && GridSnapApplies()); }
+		void GizmoTool::ApplySnap() {
+			const bool on = toGrid && GridSnapApplies();
+			gizmo->SetTranslationSnap(step, on ? kGridStep : 0.0F, kGridAt);
+		}
 
 		void GizmoTool::UpdateOptions(IVoxelEditContext&) {
 			// The steps act as radio buttons, so each shows whether it is the one

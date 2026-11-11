@@ -691,10 +691,14 @@ namespace spades {
 			Vector3 snapped = MakeVector3(0.0F, 0.0F, 0.0F);
 			for (int i = 0; i < 3; i++) {
 				const float along = Vector3::Dot(wanted, drag.axes[i]);
-				const float from = (snap.translationToGrid && moves(i))
-				                     ? Vector3::Dot(drag.grabPosition, drag.axes[i])
-				                     : 0.0F;
-				snapped += drag.axes[i] * (SnapTo(from + along, snap.translation) - from);
+				// To the grid: where it started plus how far it has come, landed
+				// on the nearest line of the lattice, and back to a distance
+				// moved. Otherwise the distance itself is what lands on the step.
+				const bool toGrid = snap.translationGrid > 0.0F && moves(i);
+				const float from = toGrid ? Vector3::Dot(drag.grabPosition, drag.axes[i]) : 0.0F;
+				const float at = toGrid ? snap.translationGridAt : 0.0F;
+				const float increment = toGrid ? snap.translationGrid : snap.translation;
+				snapped += drag.axes[i] * (SnapTo(from + along - at, increment) + at - from);
 			}
 			Vector3 delta = snapped - total.translation;
 			if (delta == MakeVector3(0.0F, 0.0F, 0.0F))
