@@ -41,6 +41,22 @@ namespace spades {
 		};
 
 		/**
+		 * The settings above as bar options, declared by whichever screen
+		 * selection is active so they show with it and go with it: X-Ray for
+		 * both, and the brush's size for the Brush. The settings themselves
+		 * are the tool's, shared by its sub-tools, so a size set under one
+		 * holds under the other.
+		 */
+		void AddXRayOption(ToolOptions& options, const ScreenSelectSettings& settings);
+		void AddBrushSizeOption(ToolOptions& options);
+		void SyncScreenOptions(ToolOptions& options, const ScreenSelectSettings& settings);
+		/** Applies a clicked toggle; false when `id` is not X-Ray's. */
+		bool ApplyXRayOption(ScreenSelectSettings& settings, const std::string& id, bool value);
+		/** Applies a changed number; false when `id` is not the size's. */
+		bool ApplyBrushSizeOption(ScreenSelectSettings& settings, const std::string& id,
+		                          float value);
+
+		/**
 		 * What Rect and Brush select on the screen: voxels in Edit mode, the
 		 * scene's objects in Object mode. The sub-tools say where on the screen
 		 * and whether to add or take away; this decides what that takes.
@@ -98,8 +114,10 @@ namespace spades {
 		 */
 		class RectSelectSubTool : public VoxelTool {
 		public:
-			RectSelectSubTool(IScreenSelectable& target, const ScreenSelectSettings& settings)
-			    : target(target), settings(settings) {}
+			RectSelectSubTool(IScreenSelectable& target, ScreenSelectSettings& settings)
+			    : target(target), settings(settings) {
+				AddXRayOption(options, settings);
+			}
 			const char* Label() const override { return "Rect"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
@@ -107,10 +125,18 @@ namespace spades {
 			void OnEscape(IVoxelEditContext&) override { dragging = false; }
 			void CancelInteraction(IVoxelEditContext&) override { dragging = false; }
 			void DrawOverlay(IVoxelEditContext&) override;
+			ToolOptions* Options() override { return &options; }
+			void UpdateOptions(IVoxelEditContext&) override {
+				SyncScreenOptions(options, settings);
+			}
+			void OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) override {
+				ApplyXRayOption(settings, id, value);
+			}
 
 		private:
 			IScreenSelectable& target;
-			const ScreenSelectSettings& settings;
+			ScreenSelectSettings& settings;
+			ToolOptions options;
 			bool dragging = false;
 			bool removing = false;
 			Vector2 start = MakeVector2(0.0F, 0.0F), end = MakeVector2(0.0F, 0.0F);
@@ -126,17 +152,32 @@ namespace spades {
 		class BrushSelectSubTool : public VoxelTool {
 		public:
 			BrushSelectSubTool(IScreenSelectable& target, ScreenSelectSettings& settings)
-			    : target(target), settings(settings) {}
+			    : target(target), settings(settings) {
+				AddBrushSizeOption(options);
+				AddXRayOption(options, settings);
+			}
 			const char* Label() const override { return "Brush"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
 			void OnKey(IVoxelEditContext&, const KeyInput&) override;
 			void CancelInteraction(IVoxelEditContext&) override { painting = false; }
 			void DrawOverlay(IVoxelEditContext&) override;
+			ToolOptions* Options() override { return &options; }
+			void UpdateOptions(IVoxelEditContext&) override {
+				SyncScreenOptions(options, settings);
+			}
+			void OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) override {
+				ApplyXRayOption(settings, id, value);
+			}
+			void OnOptionNumberChanged(IVoxelEditContext&, const std::string& id, float value,
+			                           bool) override {
+				ApplyBrushSizeOption(settings, id, value);
+			}
 
 		private:
 			IScreenSelectable& target;
 			ScreenSelectSettings& settings;
+			ToolOptions options;
 			bool painting = false;
 			bool removing = false;
 			Vector2 last = MakeVector2(0.0F, 0.0F);

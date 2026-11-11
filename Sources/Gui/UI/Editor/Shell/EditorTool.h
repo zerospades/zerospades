@@ -112,6 +112,9 @@ namespace spades {
 			// while this tool is active (e.g. Select's Voxel / Box / By Colour).
 			virtual int SubToolCount() const { return 0; }
 			virtual const char* SubToolLabel(int) const { return ""; }
+			// Sub-tools sharing a group are drawn together on the bar, parted
+			// from the next group by a rule. Empty leaves them in one run.
+			virtual const char* SubToolGroup(int) const { return ""; }
 			// The sub-tool itself, for callers that must find one by what it is
 			// rather than by its label; null when out of range.
 			virtual BasicEditorTool* SubTool(int) { return nullptr; }

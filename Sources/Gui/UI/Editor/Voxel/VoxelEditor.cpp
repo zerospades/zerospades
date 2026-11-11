@@ -2318,6 +2318,13 @@ namespace spades {
 				}
 			}
 			SetActiveTool(ToolIndex(id));
+			// The tool asked for may be the one already active, with a sub-tool
+			// that acts on a selection: it goes back to choosing voxels.
+			if (returningToSelect) {
+				returningToSelect = false;
+				if (VoxelTool* t = ActiveTool())
+					t->OnReturnToSelect(*this);
+			}
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
@@ -2760,6 +2767,7 @@ namespace spades {
 					btn.label = t->SubToolLabel(i);
 					const std::string key = SubToolHotKey(*t, i);
 					btn.hotKey = KeyIsTaken(key) ? std::string() : key;
+					btn.group = t->SubToolGroup(i);
 					btn.active = (t->ActiveSubTool() == i);
 					subTools.push_back(btn);
 				}

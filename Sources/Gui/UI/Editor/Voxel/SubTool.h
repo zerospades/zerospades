@@ -259,11 +259,22 @@ namespace spades {
 		public:
 			TransformSubTool();
 			const char* Label() const override { return "Transform"; }
+			// The key it was known by as a tool of its own.
+			std::string HotKey() const override { return "T"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnDeactivate(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
 			void OnKey(IVoxelEditContext&, const KeyInput&) override;
 			void DrawScene(IVoxelEditContext&) override;
+
+			// Where the voxels are and what turns them: its own, so they show
+			// with it and go with it.
+			ToolOptions* Options() override { return &options; }
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
+			                           bool committed) override;
 
 		protected:
 			// A drag only previews: the voxels move once, on release.
@@ -272,6 +283,9 @@ namespace spades {
 			// Places a waiting paste or import where it is; with none, a press on
 			// nothing gives the selection up for Select.
 			void OnClickAway(IVoxelEditContext& ed) override;
+
+		private:
+			ToolOptions options;
 		};
 
 		/**
@@ -286,6 +300,9 @@ namespace spades {
 		public:
 			explicit SweepSubTool(bool pocket);
 			const char* Label() const override { return pocket ? "Pocket" : "Extrude"; }
+			// Extrude keeps the key it was known by as a tool of its own; a
+			// pocket is a recess, which is the letter left for it.
+			std::string HotKey() const override { return pocket ? "R" : "E"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void DrawScene(IVoxelEditContext&) override;
 

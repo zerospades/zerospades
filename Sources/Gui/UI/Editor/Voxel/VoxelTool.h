@@ -38,6 +38,10 @@ namespace spades {
 			// whose action has no inverse (recolouring) says no, and the editor
 			// then keeps the right button from all of its sub-tools.
 			virtual bool RightButtonInverts() const { return true; }
+			// The editor was asked to go back to choosing voxels (a click on
+			// nothing under a sub-tool that acts on a selection). A tool that
+			// both chooses and acts puts itself back to choosing here.
+			virtual void OnReturnToSelect(IVoxelEditContext&) {}
 			// What this tool sets by number, which the editor's transform panel
 			// shows while it is active (Pivot's pivot); null for nothing.
 			virtual ITransformTarget* TransformTarget(IVoxelEditContext&) { return nullptr; }

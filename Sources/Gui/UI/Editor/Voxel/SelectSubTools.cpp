@@ -39,6 +39,13 @@ namespace spades {
 
 			const char* const kXRayOn = "  |  X-Ray: hidden voxels too";
 
+			const char* const kXRayOption = "select.xray";
+			const char* const kDiameterOption = "select.diameter";
+			// Screen pixels one press of the size box's arrows adds. The brush
+			// is measured on the screen, not in voxels, so it steps in a stride
+			// that tells at a glance rather than one voxel at a time.
+			constexpr float kDiameterStep = 5.0F;
+
 			void Take(IVoxelEditContext& ed, const std::vector<IntVector3>& cells, bool removing) {
 				if (cells.empty())
 					return;
@@ -56,6 +63,37 @@ namespace spades {
 				return (p - (a + ab * t)).GetLength();
 			}
 		} // namespace
+
+		void AddXRayOption(ToolOptions& options, const ScreenSelectSettings& settings) {
+			options.AddBool(kXRayOption, "X-Ray", "", settings.through);
+		}
+
+		void AddBrushSizeOption(ToolOptions& options) {
+			options.AddNumber(kDiameterOption, "Size", "Brush", kDiameterStep, 0);
+		}
+
+		void SyncScreenOptions(ToolOptions& options, const ScreenSelectSettings& settings) {
+			// Whatever set them -- a box, a bracket key, another sub-tool -- the
+			// options show the settings as they stand.
+			options.SetBool(kXRayOption, settings.through);
+			options.SetNumber(kDiameterOption, settings.diameter);
+		}
+
+		bool ApplyXRayOption(ScreenSelectSettings& settings, const std::string& id, bool value) {
+			if (id != kXRayOption)
+				return false;
+			settings.through = value;
+			return true;
+		}
+
+		bool ApplyBrushSizeOption(ScreenSelectSettings& settings, const std::string& id,
+		                          float value) {
+			if (id != kDiameterOption)
+				return false;
+			settings.diameter = std::max(ScreenSelectSettings::kMinDiameter,
+			                             std::min(ScreenSelectSettings::kMaxDiameter, value));
+			return true;
+		}
 
 		// --- Voxels, as the screen selections take them ------------------------
 
