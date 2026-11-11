@@ -166,7 +166,7 @@ namespace spades {
 			                   cy - Vector3::Dot(v, view.up) * r);
 		}
 
-		Vector2 NavigationCube::HomeCentre() const {
+		Vector2 NavigationCube::ButtonCentre(int index) const {
 			// The cube's farthest vertices, (1, t, t) and the like, never reach
 			// past this on screen, however it is turned.
 			const float reach = r * std::sqrt(1.0F + 2.0F * kFaceHalf * kFaceHalf);
@@ -174,26 +174,62 @@ namespace spades {
 			// far out (and a gap more) along the diagonal: clear of the cube in
 			// every view, and of the bars above it.
 			const float d = (reach + kHomeGap) / std::sqrt(2.0F) + kHomeSize * 0.5F;
-			return MakeVector2(cx - d, cy + d);
+			// The buttons hang in a column under the first, which sits off the
+			// cube's bottom left corner.
+			return MakeVector2(cx - d, cy + d + float(index) * (kHomeSize + kHomeGap));
 		}
 
-		bool NavigationCube::HomeAt(const Vector2& p) const {
-			const Vector2 c = HomeCentre();
+		bool NavigationCube::ButtonAt(const Vector2& p, int index) const {
+			const Vector2 c = ButtonCentre(index);
 			const float h = kHomeSize * 0.5F;
 			return std::fabs(p.x - c.x) <= h && std::fabs(p.y - c.y) <= h;
 		}
 
-		void NavigationCube::DrawHome(client::IRenderer& renderer, bool hovered) const {
-			const Vector2 c = HomeCentre();
+		void NavigationCube::DrawButtonFace(client::IRenderer& renderer, const Vector2& c,
+		                                    bool hovered, bool lit) const {
 			const float h = kHomeSize * 0.5F;
 			const Vector2 box[4] = {c + MakeVector2(-h, -h), c + MakeVector2(h, -h),
 			                        c + MakeVector2(h, h), c + MakeVector2(-h, h)};
 			OverlayFillConvexPolygon(renderer, box, 4,
-			                         hovered ? kHighlight : MakeVector4(0.2F, 0.21F, 0.24F, 0.92F));
+			                         hovered ? kHighlight
+			                         : lit   ? MakeVector4(0.30F, 0.32F, 0.37F, 0.95F)
+			                                 : MakeVector4(0.2F, 0.21F, 0.24F, 0.92F));
 			const Vector4 ec = MakeVector4(0.08F, 0.08F, 0.1F, 0.85F);
 			for (int e = 0; e < 4; e++)
 				OverlayStrokeLine(renderer, box[e], box[(e + 1) % 4], 1.0F, ec);
+		}
 
+		// A box seen in each projection, which is what the button changes: the
+		// faces of a cube drawn as the view it switches to would draw them.
+		void NavigationCube::DrawProjection(client::IRenderer& renderer, bool hovered,
+		                                    bool orthogonal) const {
+			const Vector2 c = ButtonCentre(kProjectionButton);
+			DrawButtonFace(renderer, c, hovered, false);
+			const Vector4 ink = MakeVector4(0.92F, 0.92F, 0.95F, 1.0F);
+			const float g = kHomeSize * kHomeGlyph;
+			// The near face, and the far one behind it: as wide as the near one
+			// in a parallel view, narrower in a perspective one.
+			const float far = orthogonal ? 1.0F : 0.55F;
+			const Vector2 off = MakeVector2(g * 0.55F, -g * 0.55F);
+			const Vector2 near[4] = {c + MakeVector2(-g, -g), c + MakeVector2(g, -g),
+			                         c + MakeVector2(g, g), c + MakeVector2(-g, g)};
+			const Vector2 back[4] = {near[0] * 1.0F + off, near[1] * 1.0F + off,
+			                         near[2] * 1.0F + off, near[3] * 1.0F + off};
+			Vector2 scaled[4];
+			const Vector2 backCentre = c + off;
+			for (int i = 0; i < 4; i++)
+				scaled[i] = backCentre + (back[i] - backCentre) * far;
+			for (int e = 0; e < 4; e++)
+				OverlayStrokeLine(renderer, scaled[e], scaled[(e + 1) % 4], 1.0F, ink);
+			for (int e = 0; e < 4; e++)
+				OverlayStrokeLine(renderer, near[e], scaled[e], 1.0F, ink);
+			for (int e = 0; e < 4; e++)
+				OverlayStrokeLine(renderer, near[e], near[(e + 1) % 4], 1.4F, ink);
+		}
+
+		void NavigationCube::DrawHome(client::IRenderer& renderer, bool hovered) const {
+			const Vector2 c = ButtonCentre(kHomeButton);
+			DrawButtonFace(renderer, c, hovered, false);
 			// A house: a shallow roof overhanging a body nearly as wide, with a
 			// door cut in it (a body much narrower than the roof reads as an arrow).
 			const float g = kHomeSize * kHomeGlyph;
@@ -230,7 +266,8 @@ namespace spades {
 		}
 
 		void NavigationCube::Draw(client::IRenderer& renderer, client::IFont& font,
-		                          const GizmoView& view, const Vector2& cursor) const {
+		                          const GizmoView& view, const Vector2& cursor,
+		                          bool orthogonal) const {
 			const std::vector<NaviFacet>& facets = NaviFacets();
 			Vector3 hdir;
 			const bool hov = DirectionAt(view, cursor, hdir);
@@ -275,7 +312,8 @@ namespace spades {
 				font.DrawShadow(f.label, ctr - MakeVector2(ts.x * ls * 0.5F, ts.y * ls * 0.5F), ls,
 				                MakeVector4(1, 1, 1, 1), MakeVector4(0, 0, 0, 0.8F));
 			}
-			DrawHome(renderer, HomeAt(cursor));
+			DrawHome(renderer, ButtonAt(cursor, kHomeButton));
+			DrawProjection(renderer, ButtonAt(cursor, kProjectionButton), orthogonal);
 		}
 	} // namespace gui
 } // namespace spades

@@ -292,8 +292,25 @@ namespace spades {
 			sceneDef.viewAxis[2] = dir;
 			sceneDef.fovY = DEG2RAD(kVerticalFovDegrees);
 			sceneDef.fovX = 2.0F * atanf(tanf(sceneDef.fovY * 0.5F) * (width / height));
+			// A parallel view takes in exactly what the perspective one did at
+			// the orbited point, so the model holds its size and its place on
+			// the screen as the projection changes under it.
+			sceneDef.orthogonal = orthogonal;
+			sceneDef.orthoHeight = 2.0F * distance * tanf(sceneDef.fovY * 0.5F);
 			sceneDef.zNear = kNearPlane;
 			sceneDef.zFar = ViewDistance();
+			if (orthogonal) {
+				// A parallel view has no vanishing point to stand behind, but it
+				// still clips at the near plane, and zooming in walks the eye
+				// into the model. So the eye stands back out of it, and the far
+				// plane follows it back by as much. Nothing moves on the screen:
+				// where the eye sits along the line of sight is the one thing a
+				// parallel projection does not care about -- only what is still
+				// in front of it to be seen.
+				const float back = ViewDistance();
+				sceneDef.viewOrigin = eye - dir * back;
+				sceneDef.zFar += back;
+			}
 			sceneDef.viewportLeft = 0;
 			sceneDef.viewportTop = 0;
 			sceneDef.viewportWidth = int(width);
@@ -305,6 +322,8 @@ namespace spades {
 			view.forward = sceneDef.viewAxis[2];
 			view.tanHalfFovX = tanf(sceneDef.fovX * 0.5F);
 			view.tanHalfFovY = tanf(sceneDef.fovY * 0.5F);
+			view.orthogonal = sceneDef.orthogonal;
+			view.orthoHeight = sceneDef.orthoHeight;
 			view.viewportX = 0.0F;
 			view.viewportY = 0.0F;
 			view.viewportWidth = width;

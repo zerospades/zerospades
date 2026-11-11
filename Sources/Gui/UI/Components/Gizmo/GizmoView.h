@@ -25,8 +25,11 @@
 namespace spades {
 	namespace gui {
 		/**
-		 * A perspective camera as seen by an on-screen manipulator: enough to put a
-		 * world point on the screen and to turn a screen point back into a ray.
+		 * A camera as seen by an on-screen manipulator: enough to put a world
+		 * point on the screen and to turn a screen point back into a ray. It
+		 * describes either projection -- a perspective one, where the rays all
+		 * come from the eye, or a parallel one, where they are all `forward`
+		 * and start from the plane the eye is on.
 		 *
 		 * It carries no renderer or scene state, so any 3D view (model editor, map
 		 * editor, ...) can describe itself with one and hand it to a gizmo.
@@ -40,6 +43,12 @@ namespace spades {
 			Vector3 forward = MakeVector3(0.0F, 0.0F, 1.0F);
 			float tanHalfFovX = 1.0F;
 			float tanHalfFovY = 1.0F;
+			// A parallel projection instead, `orthoHeight` world units of it
+			// from the top of the viewport to the bottom, at every depth. The
+			// fields above still give the shape of the viewport, so the width
+			// taken in is the height times their ratio.
+			bool orthogonal = false;
+			float orthoHeight = 0.0F;
 			// Viewport in screen pixels.
 			float viewportX = 0.0F;
 			float viewportY = 0.0F;
@@ -51,6 +60,10 @@ namespace spades {
 
 			/** Distance of `world` in front of the eye, along `forward`. */
 			float Depth(const Vector3& world) const;
+			/** Half the world height the viewport takes in at the depth of
+			 *  `world`: what a perspective view's distance does to the scale,
+			 *  and a flat number in a parallel one. */
+			float HalfHeightAt(float depth) const;
 
 			/**
 			 * Screen position of `world`. False, with `screen` untouched, when the

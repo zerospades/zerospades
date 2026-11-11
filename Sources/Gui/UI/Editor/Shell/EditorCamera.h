@@ -89,6 +89,18 @@ namespace spades {
 			void Pan(float dx, float dy);
 			/** Zooms by a wheel motion. */
 			void Zoom(float wheel);
+
+			/**
+			 * Whether the view is a parallel projection rather than a
+			 * perspective one: equal things draw equal size however far off
+			 * they are, and a view from a side reads as a true elevation.
+			 *
+			 * It is the same camera either way -- the same orbit, the same
+			 * distance, the same framing -- so turning it on and off does not
+			 * move anything on the screen.
+			 */
+			void SetOrthogonal(bool on) { orthogonal = on; }
+			bool IsOrthogonal() const { return orthogonal; }
 			/** Turns smoothly to look at the orbited point from `dir`. */
 			void SnapToward(const Vector3& dir);
 			/** Forgets held keys whose release a modal may swallow. */
@@ -117,6 +129,7 @@ namespace spades {
 			float targetYaw = 0.0F, targetPitch = 0.0F; // a snap animates toward these
 			bool snapping = false;
 			Vector3 target = MakeVector3(0.0F, 0.0F, 0.0F);
+			bool orthogonal = false;
 			float distance = 56.0F;
 			// A flight in progress carries `target` and `distance` toward these.
 			// Moving, panning or zooming by hand takes over from it.

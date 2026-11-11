@@ -28,6 +28,13 @@ namespace spades {
 			int viewportLeft, viewportTop;
 			int viewportWidth, viewportHeight;
 			float fovX, fovY;
+			// A parallel projection instead, taking in `orthoHeight` world
+			// units from the top of the viewport to the bottom at every depth;
+			// the field of view still gives the viewport's shape, so the width
+			// taken in is that height times its ratio. The editors offer it;
+			// the game is always a perspective view.
+			bool orthogonal;
+			float orthoHeight;
 			Vector3 viewOrigin;
 			Vector3 viewAxis[3];
 			float zNear, zFar;
@@ -79,6 +86,8 @@ namespace spades {
 				viewportLeft = viewportTop = 0;
 				viewportWidth = viewportHeight = 0;
 				fovX = fovY = 0.0F;
+				orthogonal = false;
+				orthoHeight = 0.0F;
 				viewOrigin = MakeVector3(0, 0, 0);
 				viewAxis[0] = MakeVector3(1, 0, 0);
 				viewAxis[1] = MakeVector3(0, 1, 0);

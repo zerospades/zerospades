@@ -43,21 +43,30 @@ namespace spades {
 			/** The direction to look from for the spot `p` on the cube, as seen
 			 *  through `view`; false when `p` is not over the cube. */
 			bool DirectionAt(const GizmoView& view, const Vector2& p, Vector3& dir) const;
-			/** Whether `p` is over the home button, off the cube's bottom left. */
-			bool HomeAt(const Vector2& p) const;
+			/** The buttons under the cube, off its bottom left, in the order
+			 *  they hang. */
+			enum Button { kHomeButton = 0, kProjectionButton = 1 };
+			/** Whether `p` is over button `index`. */
+			bool ButtonAt(const Vector2& p, int index) const;
 
-			/** Draws the cube as `view` sees it, lighting the facet under `cursor`. */
+			/** Draws the cube as `view` sees it, lighting the facet under
+			 *  `cursor`, with its buttons; `orthogonal` is what the projection
+			 *  button shows the view to be. */
 			void Draw(client::IRenderer& renderer, client::IFont& font, const GizmoView& view,
-			          const Vector2& cursor) const;
+			          const Vector2& cursor, bool orthogonal) const;
 
 		private:
 			float cx = 0.0F, cy = 0.0F, r = 0.0F;
 
 			// A vertex of the cube (in [-1, 1]^3) on screen, as `view` turns it.
 			Vector2 Project(const GizmoView& view, const Vector3& v) const;
-			// The home button's centre on screen.
-			Vector2 HomeCentre() const;
+			// Button `index`'s centre on screen.
+			Vector2 ButtonCentre(int index) const;
+			// The plate every button is drawn on, lit while hovered.
+			void DrawButtonFace(client::IRenderer& renderer, const Vector2& centre, bool hovered,
+			                    bool lit) const;
 			void DrawHome(client::IRenderer& renderer, bool hovered) const;
+			void DrawProjection(client::IRenderer& renderer, bool hovered, bool orthogonal) const;
 		};
 	} // namespace gui
 } // namespace spades
