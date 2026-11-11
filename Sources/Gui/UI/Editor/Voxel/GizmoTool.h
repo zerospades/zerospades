@@ -32,11 +32,15 @@ namespace spades {
 		 * Mirror, Transform).
 		 *
 		 * Its bar carries the gizmo's snapping, a setting of the tool: a Step of
-		 * 1, 0.5 or 0.1, and Snap to Grid, which lands what is moved on multiples
-		 * of the step (with 1, on voxel centres) instead of moving it by them. A
-		 * tool offers only the steps what it moves can take, and Snap to Grid
-		 * only with a step coarser than the grid it always sits on anyway; the
-		 * rest shows greyed out.
+		 * 1, 0.5 or 0.1, which is how far a drag moves what it holds, and Snap
+		 * to Grid, which instead lands it on the voxel corners -- the lattice a
+		 * voxel apart that the editor draws on its ground -- whatever the step
+		 * is. From a corner, a step of 0.5 reaches a voxel's centre in one
+		 * press, which is the other place a pivot or a mirror plane belongs.
+		 *
+		 * A tool offers only the steps what it moves can take, and Snap to Grid
+		 * only where what it moves can sit on a corner at all; the rest shows
+		 * greyed out.
 		 */
 		class GizmoTool : public ContainerTool {
 		public:
@@ -51,8 +55,9 @@ namespace spades {
 			/**
 			 * `gizmo` becomes the only sub-tool. `steps` are the steps (of 1, 0.5
 			 * and 0.1) it can take, the first being the one it starts on. `grid`
-			 * is the grid what it moves always sits on (0 for none), which Snap
-			 * to Grid cannot improve on.
+			 * is the grid what it moves always sits on (0 for none): where that
+			 * is a whole voxel, it can never sit on a corner and Snap to Grid is
+			 * greyed out.
 			 */
 			GizmoTool(std::unique_ptr<GizmoSubTool> gizmo, std::vector<float> steps, float grid);
 
@@ -66,6 +71,11 @@ namespace spades {
 			ToolOptions options;
 
 		private:
+			// The grid Snap to Grid lands on: the voxel corners, a voxel apart,
+			// through -0.5 (a voxel spans i - 0.5 to i + 0.5). See GridSnapApplies.
+			static constexpr float kGridStep = 1.0F;
+			static constexpr float kGridAt = -0.5F;
+
 			GizmoSubTool* gizmo; // owned by `subs`
 			std::vector<float> steps;
 			float grid;

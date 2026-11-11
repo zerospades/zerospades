@@ -112,10 +112,14 @@ namespace spades {
 			float translation = 0.0F; // world units, per pose axis
 			float rotation = 0.0F;    // radians
 			float scale = 0.0F;       // added to a factor of 1 (0.1 gives 1.0, 1.1, ...)
-			// Translation lands the position the drag started from on multiples
-			// of `translation` along each pose axis (an absolute grid), instead of
-			// moving it by multiples of it.
-			bool translationToGrid = false;
+			// Translation lands the position the drag started from on a fixed
+			// lattice along each pose axis -- the lines `translationGrid` apart
+			// that pass through `translationGridAt` -- instead of moving it by
+			// multiples of `translation`. A grid of zero leaves it moving by the
+			// step. The lattice is the one the host draws, so what is moved ends
+			// up where the user can see it belongs, whatever the step is set to.
+			float translationGrid = 0.0F;
+			float translationGridAt = 0.0F;
 		};
 
 		/** A change made by a drag, about the gizmo's position. */
