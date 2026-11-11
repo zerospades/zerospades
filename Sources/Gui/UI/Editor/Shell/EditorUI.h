@@ -32,7 +32,7 @@
 namespace spades {
 	namespace gui {
 		class ColorPicker;
-		class EditorMenu;
+		class MenuBar;
 		class IEditorMenuHost;
 		class OptionBar;
 		class SoftwareCursor;
@@ -40,8 +40,8 @@ namespace spades {
 		class UIOverlayHost;
 
 		/**
-		 * The chrome every editor view shares: the toolbar, the option bar, the
-		 * colour picker, the Esc menu, and the overlay its modal dialogs (the
+		 * The chrome every editor view shares: the menu bar, the toolbar, the
+		 * option bar, the colour picker, and the overlay its modal dialogs (the
 		 * file browser) are shown in. It only owns them; the view lays them
 		 * out, draws them and routes input to them.
 		 */
@@ -54,7 +54,7 @@ namespace spades {
 			std::unique_ptr<Toolbar> toolbar;
 			std::unique_ptr<OptionBar> optionBar;
 			std::unique_ptr<ColorPicker> colorPicker;
-			std::unique_ptr<EditorMenu> editorMenu;
+			std::unique_ptr<MenuBar> menuBar;
 
 			bool shouldClose = false;
 
@@ -62,8 +62,7 @@ namespace spades {
 			~EditorUI();
 
 		public:
-			/** `menuHost` supplies the Esc menu's title and commands; it must
-			 *  outlive this. */
+			/** `menuHost` supplies the menu bar's menus; it must outlive this. */
 			EditorUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			         client::FontManager* fontManager, IEditorMenuHost& menuHost,
 			         SoftwareCursor* cursor);
@@ -90,7 +89,7 @@ namespace spades {
 			Toolbar* GetToolbar() { return toolbar.get(); }
 			OptionBar* GetOptionBar() { return optionBar.get(); }
 			ColorPicker* GetColorPicker() { return colorPicker.get(); }
-			EditorMenu* GetEditorMenu() { return editorMenu.get(); }
+			MenuBar* GetMenuBar() { return menuBar.get(); }
 			/** Hosts modal `spades::ui` dialogs (the file browser) over the editor. */
 			UIOverlayHost* GetOverlay() { return overlay.get(); }
 		};

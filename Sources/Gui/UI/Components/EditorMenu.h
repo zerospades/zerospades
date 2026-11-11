@@ -24,21 +24,9 @@
 #include <string>
 #include <vector>
 
-#include <Core/Math.h>
-#include <Core/RefCountedObject.h>
-#include "IModalMenu.h"
-#include <Gui/UI/Framework/FeedbackSounds.h>
-
 namespace spades {
-    namespace client {
-        class IRenderer;
-        class FontManager;
-        class IAudioDevice;
-    } // namespace client
     namespace gui {
-        class SoftwareCursor;
-
-        /** One row of the editor's Esc menu, supplied by the host. */
+        /** One row of an editor's menu, supplied by the host. */
         struct EditorMenuItem {
             std::string caption;
             std::function<void()> run;
@@ -50,56 +38,26 @@ namespace spades {
             /** A rule between two blocks of commands rather than a command: it
              *  is not picked, clicked or stepped onto. */
             bool separator = false;
+            /** Ticked: a command that turns something on shows whether it is. */
+            bool checked = false;
+        };
+
+        /** One menu of a menu bar: its title and what it offers. */
+        struct EditorMenuGroup {
+            std::string title;
+            std::vector<EditorMenuItem> items;
         };
 
         class IEditorMenuHost {
         public:
             virtual ~IEditorMenuHost() = default;
-            virtual std::string GetMenuTitle() = 0;
             /**
-             * The document commands (Save, Save As, Exit, ...), rebuilt each time
-             * the menu opens so their enabled state is current. "Resume" is added
-             * by the menu itself.
+             * The menus of the editor's menu bar, rebuilt whenever one is
+             * opened so that what it offers, what is greyed out and what is
+             * ticked are as they stand at that moment.
              */
-            virtual std::vector<EditorMenuItem> GetMenuItems() = 0;
-            virtual bool OnMenuEscape() { return false; }
+            virtual std::vector<EditorMenuGroup> GetMenus() = 0;
         };
 
-        class EditorMenu : public IModalMenu {
-        public:
-            EditorMenu(IEditorMenuHost& host, client::IRenderer& renderer,
-                      client::FontManager& fontManager, SoftwareCursor& cursor,
-                      client::IAudioDevice* audioDevice);
-
-            // IModalMenu implementation
-            bool IsActive() const override { return menuOpen; }
-            void Open() override;
-            void Close() override;
-            bool KeyEvent(const std::string& key, bool down) override;
-            void Draw() override;
-
-        private:
-            IEditorMenuHost& host;
-            Handle<client::IRenderer> renderer;
-            Handle<client::FontManager> fontManager;
-            SoftwareCursor& cursor;
-            ui::FeedbackSounds sounds;
-
-            bool menuOpen = false;
-            int selectedItem = 0;
-            int prevSelectedItem = -1;
-            std::vector<EditorMenuItem> items; // "Resume" plus the host's commands
-
-            void RebuildItems();
-            void Activate(int index);
-            void DrawMenu(float sw, float sh);
-            int MenuButtonAt(const Vector2& p) const;
-            /** How tall the title and every row come to. */
-            float Height() const;
-            /** Where the title sits for a screen `sh` tall. */
-            float Top(float sh) const;
-            /** The row `by` steps from `from`, past the rules and round the ends. */
-            int Step(int from, int by) const;
-        };
     } // namespace gui
 } // namespace spades
