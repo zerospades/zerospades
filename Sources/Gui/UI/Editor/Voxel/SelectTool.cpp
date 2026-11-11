@@ -27,6 +27,11 @@ namespace spades {
 	namespace gui {
 		namespace {
 			const char* const kFillSelectionOption = "select.fill";
+			const char* const kCavityOption = "select.cavity";
+			// A wall one voxel thick. The dig takes a thickness and the box to
+			// set it can go on the bar the day one is wanted; until then the
+			// thinnest wall is the one a model this size is hollowed to.
+			constexpr int kCavityThickness = 1;
 			// The bar's three bands: where the voxels are chosen, how they are
 			// chosen on the screen, and what is then done to them.
 			const char* const kInModelGroup = "model";
@@ -72,6 +77,7 @@ namespace spades {
 			// None, Delete, Copy, Cut and Paste are in the menu with theirs,
 			// where a command belongs, leaving this bar to the active sub-tool.
 			options.AddAction(kFillSelectionOption, "Fill");
+			options.AddAction(kCavityOption, "Cavity");
 		}
 
 		void SelectTool::SetSubTool(IVoxelEditContext& ed, int i) {
@@ -111,13 +117,20 @@ namespace spades {
 
 		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
 			ContainerTool::UpdateOptions(ed);
-			options.SetEnabled(kFillSelectionOption, ed.SelectionCount() > 0);
+			const bool selected = ed.SelectionCount() > 0;
+			options.SetEnabled(kFillSelectionOption, selected);
+			// Whether the selection is on the model's outside is the dig's own
+			// answer, which costs a walk of the volume: it is asked when the
+			// button is pressed, and refused there with the reason.
+			options.SetEnabled(kCavityOption, selected);
 		}
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			ContainerTool::OnAction(ed, id);
 			if (id == kFillSelectionOption)
 				ed.RecolorSelection(ed.CurrentColor()); // reports what it recoloured
+			else if (id == kCavityOption)
+				ed.CarveCavity(kCavityThickness); // reports what it took, or why not
 		}
 
 		void SelectTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,

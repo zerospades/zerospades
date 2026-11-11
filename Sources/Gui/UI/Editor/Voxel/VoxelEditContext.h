@@ -265,6 +265,22 @@ namespace spades {
 			 * would dig out, the selected ones first. For a preview.
 			 */
 			virtual std::vector<IntVector3> SweptCells(int axis, int steps, bool pocket) const = 0;
+			// --- Cavity --------------------------------------------------------
+			/**
+			 * Hollows the model out behind the selection, as one undo step: the
+			 * selected voxels go, opening a mouth, and the solid they let into
+			 * is dug out until only a wall `thickness` voxels thick is left
+			 * around it. Nothing else of the model is touched -- the dig never
+			 * leaves the solid it is let into -- and the cavity is always open
+			 * at the mouth, which a KV6 needs it to be: air sealed inside a
+			 * closed shell is not kept by the format and reads back solid.
+			 *
+			 * Refused, with a status line saying why, unless every selected
+			 * voxel is solid and on the model's outside, and unless there is
+			 * something behind them to hollow.
+			 */
+			virtual void CarveCavity(int thickness) = 0;
+
 			/**
 			 * Sweeps the selection as one undo step. Extruding fills the cells
 			 * each selected voxel passes, in its colour; pocketing digs them out.

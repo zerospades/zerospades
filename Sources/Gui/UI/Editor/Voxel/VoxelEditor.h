@@ -284,6 +284,7 @@ namespace spades {
 			void PreviewPivot(const Vector3& pivot) override;
 			std::vector<IntVector3> SweptCells(int axis, int steps, bool pocket) const override;
 			void SweepSelection(int axis, int steps, bool pocket) override;
+			void CarveCavity(int thickness) override;
 			ReferenceImage& Reference(int axis) override;
 			void LoadReferenceImage(int axis) override;
 			void ClearReferenceImage(int axis) override;
@@ -407,6 +408,19 @@ namespace spades {
 			int documentCommandDepth = 0;
 			void NotifyDocumentChanged();
 			void HistoryReplayed();
+
+			// --- Cavity --------------------------------------------------------
+			/**
+			 * Which cells of the volume the air outside the model reaches,
+			 * flooding in from past its sides: what tells a voxel on the
+			 * model's outside from one facing a cavity within it. One byte a
+			 * cell, indexed as Cell() does.
+			 */
+			std::vector<std::uint8_t> OutsideAir() const;
+			/** The index of `v` in a volume-sized array of the document's size. */
+			std::size_t Cell(const IntVector3& v) const;
+			/** Whether `v` is a cell of the volume at all. */
+			bool InVolume(const IntVector3& v) const;
 
 			// --- Sweeping ------------------------------------------------------
 			// A cell a sweep of the selection changes, with the colour of the
