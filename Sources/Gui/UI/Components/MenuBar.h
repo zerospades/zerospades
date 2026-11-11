@@ -96,6 +96,13 @@ namespace spades {
 			float barX = 0.0F, barH = 0.0F, width = 0.0F;
 			std::vector<bool> titleHover;       // for the hover sound
 
+			// How large each menu's panel comes out, measured with the titles
+			// every frame. A menu's panel is hit-tested the moment it is
+			// clicked, which may be before it has ever been drawn -- hovering
+			// from one title to the next opens a menu between two frames --
+			// so its size may not be worked out while drawing it.
+			std::vector<float> panelW, panelH;
+
 			int open = -1;      // the menu showing, or -1
 			int selected = -1;  // the row under the pointer or the keys
 			float menuX = 0.0F, menuY = 0.0F, menuW = 0.0F, menuH = 0.0F;
@@ -106,8 +113,9 @@ namespace spades {
 			int TitleAt(const Vector2& p) const;
 			/** Which row of the open menu `p` is on, or -1 (a rule is none). */
 			int RowAt(const Vector2& p) const;
-			/** Sizes the open menu's panel from what it holds. */
-			void LayoutOpenMenu(client::IFont& font);
+			/** Puts the open menu's panel under its title, at the size measured
+			 *  for it. */
+			void PlaceOpenMenu();
 			/** Runs row `index` of the open menu and closes. */
 			void Activate(int index);
 			/** The row `by` steps from `selected`, past the rules. */

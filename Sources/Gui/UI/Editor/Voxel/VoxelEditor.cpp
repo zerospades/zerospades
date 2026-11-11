@@ -2664,12 +2664,11 @@ namespace spades {
 				// A menu of the bar owns every press on itself and on its titles,
 				// and a press anywhere else puts it away before that press does
 				// whatever it does.
-				if (ui.GetMenuBar()->IsOpen()) {
-					const bool ours = ui.GetMenuBar()->Contains(at);
-					ui.GetMenuBar()->Click(at);
-					if (ours)
-						return;
-				}
+				// A menu of the bar owns every press while it is down: on itself
+				// it picks a command, and anywhere else it closes and that is
+				// all that press does.
+				if (ui.GetMenuBar()->IsOpen() && ui.GetMenuBar()->Click(at))
+					return;
 
 				// The open picker owns every press on its panel, gaps included, so
 				// nothing behind it is ever edited through it.

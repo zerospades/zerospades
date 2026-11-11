@@ -72,7 +72,39 @@ namespace spades {
 			}
 			titleHover.resize(menus.size(), false);
 			width = at - x;
+
+			// Each menu's panel is measured here too, with the font in hand, so
+			// that a click on one lands where the next frame will draw it.
+			panelW.assign(menus.size(), 0.0F);
+			panelH.assign(menus.size(), 0.0F);
+			for (std::size_t i = 0; i < menus.size(); i++) {
+				float widest = kMenuMinW;
+				float tall = kMenuPadY * 2.0F;
+				for (const EditorMenuItem& item : menus[i].items) {
+					tall += item.separator ? kRuleH : kRowH;
+					if (item.separator)
+						continue;
+					float w = font.Measure(item.caption).x * kTextScale + kRowPadX * 2.0F;
+					if (!item.hotKey.empty())
+						w += kKeyGap + font.Measure(item.hotKey).x * kTextScale;
+					widest = std::max(widest, w);
+				}
+				panelW[i] = widest;
+				panelH[i] = tall;
+			}
+			PlaceOpenMenu(); // the open one follows the titles if they move
 			return width;
+		}
+
+		void MenuBar::PlaceOpenMenu() {
+			if (!IsOpen() || std::size_t(open) >= panelW.size()) {
+				menuW = menuH = 0.0F;
+				return;
+			}
+			menuX = titleX[std::size_t(open)];
+			menuY = barH;
+			menuW = panelW[std::size_t(open)];
+			menuH = panelH[std::size_t(open)];
 		}
 
 		void MenuBar::Close() {
@@ -92,6 +124,9 @@ namespace spades {
 			}
 			open = index;
 			selected = -1;
+			// Where it is and how large, now rather than when it is first
+			// drawn: the click that picks a row may come first.
+			PlaceOpenMenu();
 		}
 
 		int MenuBar::TitleAt(const Vector2& p) const {
@@ -137,8 +172,12 @@ namespace spades {
 			if (!IsOpen())
 				return false;
 			if (!OverlayInRect(p, menuX, menuY, menuW, menuH)) {
-				Close(); // a press anywhere else puts the menu away
-				return false;
+				// A press anywhere else puts the menu away, and goes no
+				// further: dismissing a menu is all that press does, as it is
+				// in any application, and a stray voxel drawn under one that
+				// was merely being read is not what was asked for.
+				Close();
+				return true;
 			}
 			const int row = RowAt(p);
 			if (row >= 0 && menus[std::size_t(open)].items[std::size_t(row)].enabled) {
@@ -213,25 +252,6 @@ namespace spades {
 				run();
 		}
 
-		void MenuBar::LayoutOpenMenu(client::IFont& font) {
-			const std::vector<EditorMenuItem>& items = menus[std::size_t(open)].items;
-			float widest = kMenuMinW;
-			float height = kMenuPadY * 2.0F;
-			for (const EditorMenuItem& item : items) {
-				height += item.separator ? kRuleH : kRowH;
-				if (item.separator)
-					continue;
-				float w = font.Measure(item.caption).x * kTextScale + kRowPadX * 2.0F;
-				if (!item.hotKey.empty())
-					w += kKeyGap + font.Measure(item.hotKey).x * kTextScale;
-				widest = std::max(widest, w);
-			}
-			menuX = titleX[std::size_t(open)];
-			menuY = barH;
-			menuW = widest;
-			menuH = height;
-		}
-
 		void MenuBar::DrawTitles(client::IRenderer& renderer, client::FontManager& fontManager,
 		                         const Vector2& cursor) {
 			client::IFont& font = fontManager.GetSmallGuiFont();
@@ -258,7 +278,6 @@ namespace spades {
 			if (!IsOpen())
 				return;
 			client::IFont& font = fontManager.GetSmallGuiFont();
-			LayoutOpenMenu(font);
 			// The pointer picks the row under it; the keys keep theirs where it
 			// is not over the menu at all.
 			const int under = RowAt(cursor);
