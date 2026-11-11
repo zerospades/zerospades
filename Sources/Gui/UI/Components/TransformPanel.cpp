@@ -52,13 +52,18 @@ namespace spades {
 				}
 			}
 
+			// A quarter of a step per pixel dragged: four pixels move a Location
+			// one step of whatever the tool is set to, so a finer step is a
+			// finer drag as well as a finer snap.
+			constexpr float kStepsPerPixel = 0.25F;
+
 			NumberField::Format FormatOf(int row) {
 				NumberField::Format f;
 				switch (row) {
 					case 0: // voxels
 						f.decimals = 2;
-						f.perPixel = 0.25F;
 						f.step = 1.0F;
+						f.perPixel = f.step * kStepsPerPixel;
 						break;
 					case 1: // degrees
 						f.decimals = 1;
@@ -102,7 +107,12 @@ namespace spades {
 				return;
 			for (int i = 0; i < 3; i++) {
 				NumberField::Format format = FormatOf(0);
+				// The step is what Ctrl holds a drag to, and it sets how fast a
+				// drag moves at all: picking the finest step is how the user asks
+				// to place something precisely, and a scrub that still swept a
+				// voxel every four pixels would not let them.
 				format.step = step;
+				format.perPixel = step * kStepsPerPixel;
 				fields[std::size_t(i)]->SetFormat(format);
 			}
 		}
