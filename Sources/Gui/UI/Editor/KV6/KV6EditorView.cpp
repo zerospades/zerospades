@@ -40,6 +40,7 @@
 #include <Gui/UI/Editor/Shell/EditorFileDialog.h>
 #include <Gui/UI/Editor/Shell/EditorKeys.h>
 #include <Gui/UI/Editor/Shell/EditorPrompts.h>
+#include <Gui/UI/Components/MenuBar.h>
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditor.h>
 #include <Gui/UI/Editor/Voxel/VoxelOverlayLines.h>
@@ -268,12 +269,6 @@ namespace spades {
 			return true;
 		}
 
-		std::string KV6EditorView::GetMenuTitle() {
-			const std::string name = filePath.empty() ? std::string("Untitled model")
-			                                          : LocalFileSystem::GetFileName(filePath);
-			return HasUnsavedChanges() ? name + " *" : name;
-		}
-
 		void KV6EditorView::NewDocument() {
 			ConfirmDiscardChanges([this] {
 				NewModel(kNewModelSize, std::string());
@@ -281,57 +276,77 @@ namespace spades {
 			});
 		}
 
-		std::vector<EditorMenuItem> KV6EditorView::GetMenuItems() {
-			std::vector<EditorMenuItem> items;
-			// The file commands first, then the one command that edits the open
-			// document with a file: inserting a model is a paste that happens to come
-			// from disk, and it belongs beside Paste rather than beside Save.
-			items.push_back(EditorMenuItem{"New Model", [this] { NewDocument(); }, true, "Ctrl+N"});
-			items.push_back(
-			  EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"});
-			// Always available: a document with nowhere to go yet is asked where.
-			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true, "Ctrl+S"});
-			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
-			items.push_back(EditorMenuItem{"Insert Model...", [this] { OpenInsertDialog(); }, true});
-			// Then what is done to the selection. These are commands, not ways
-			// of working, so they belong in a menu with their keys beside them
-			// rather than on the tool bar, which is for what the active tool is
-			// doing. Every one of them has a key; the menu is where it is found.
-			items.push_back(EditorMenuItem{"", nullptr, true, "", true});
-			const bool selected = editor->SelectionCount() > 0;
+		std::vector<EditorMenuGroup> KV6EditorView::GetMenus() {
+			// A command edits behind whatever the active tool had in progress,
+			// as a shortcut does, so that is abandoned before it runs.
 			auto command = [this](std::function<void()> run) {
-				// As a shortcut does: a command edits behind whatever the active
-				// tool had in progress, so that is abandoned first.
 				return [this, run] {
 					editor->CancelToolInteraction();
 					run();
 				};
 			};
-			items.push_back(EditorMenuItem{"Select All",
-			                               command([this] { editor->SelectAll(); }), true,
-			                               "Ctrl+A"});
-			items.push_back(EditorMenuItem{"Select None",
-			                               command([this] { editor->ClearSelection(); }), selected,
-			                               "Ctrl+Shift+A"});
-			items.push_back(EditorMenuItem{
+			auto rule = [] { return EditorMenuItem{"", nullptr, true, "", true}; };
+			const bool selected = editor->SelectionCount() > 0;
+
+			EditorMenuGroup file;
+			file.title = "File";
+			file.items.push_back(
+			  EditorMenuItem{"New Model", [this] { NewDocument(); }, true, "Ctrl+N"});
+			file.items.push_back(
+			  EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"});
+			// Always available: a document with nowhere to go yet is asked where.
+			file.items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true, "Ctrl+S"});
+			file.items.push_back(
+			  EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
+			// The one command that edits the open document with a file:
+			// inserting a model is a paste that happens to come from disk.
+			file.items.push_back(
+			  EditorMenuItem{"Insert Model...", command([this] { OpenInsertDialog(); }), true});
+			file.items.push_back(rule());
+			file.items.push_back(EditorMenuItem{
+			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); },
+			  true});
+
+			EditorMenuGroup edit;
+			edit.title = "Edit";
+			edit.items.push_back(EditorMenuItem{"Undo", command([this] { editor->Undo(); }),
+			                                    editor->CanUndo(), "Ctrl+Z"});
+			edit.items.push_back(EditorMenuItem{"Redo", command([this] { editor->Redo(); }),
+			                                    editor->CanRedo(), "Ctrl+Y"});
+			edit.items.push_back(rule());
+			edit.items.push_back(EditorMenuItem{
+			  "Select All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"});
+			edit.items.push_back(EditorMenuItem{
+			  "Select None", command([this] { editor->ClearSelection(); }), selected,
+			  "Ctrl+Shift+A"});
+			edit.items.push_back(EditorMenuItem{
 			  "Delete Selection", command([this] { editor->DeleteSelection(); }), selected, "Del"});
-			items.push_back(EditorMenuItem{
+			edit.items.push_back(rule());
+			edit.items.push_back(EditorMenuItem{
 			  "Copy", command([this] { editor->CopySelection(); }), selected, "Ctrl+C"});
-			items.push_back(EditorMenuItem{
-			  "Cut", command([this] { editor->CutSelection(); }), selected, "Ctrl+X"});
-			items.push_back(EditorMenuItem{"Paste", command([this] { editor->Paste(); }),
-			                               editor->CanPaste(), "Ctrl+V"});
+			edit.items.push_back(
+			  EditorMenuItem{"Cut", command([this] { editor->CutSelection(); }), selected, "Ctrl+X"});
+			edit.items.push_back(EditorMenuItem{"Paste", command([this] { editor->Paste(); }),
+			                                    editor->CanPaste(), "Ctrl+V"});
 
-			items.push_back(EditorMenuItem{"", nullptr, true, "", true});
-			items.push_back(EditorMenuItem{
-			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }, true});
-			return items;
-		}
+			// What the view does, which until now only its keys could ask for.
+			EditorMenuGroup view;
+			view.title = "View";
+			view.items.push_back(
+			  EditorMenuItem{"Reset View", [this] { ResetView(); }, true, kHomeViewKey});
+			view.items.push_back(EditorMenuItem{"Frame Selection",
+			                                    [this] { ViewKey(kFrameSelectionKey); }, true,
+			                                    kFrameSelectionKey});
+			EditorMenuItem parallel{"Parallel Projection", [this] { ToggleProjection(); }, true,
+			                        kProjectionKey};
+			parallel.checked = cam.IsOrthogonal();
+			view.items.push_back(parallel);
+			view.items.push_back(rule());
+			view.items.push_back(
+			  EditorMenuItem{"Save Screenshot", [this] { wantScreenShot = true; }, true,
+			                 cg_keyScreenshot});
 
-		bool KV6EditorView::OnMenuEscape() {
-			// The menu asks before opening, so it only opens once nothing is left
-			// to back out of.
-			return editor->EscapeOnce();
+			return {file, edit, view};
 		}
 
 		void KV6EditorView::ShowMessage(const std::string& text) {
@@ -554,12 +569,18 @@ namespace spades {
 			OverlayColorNP(*renderer, MakeVector4(0.06F, 0.06F, 0.08F, 1.0F));
 			OverlayFillRect(*renderer, 0.0F, 0.0F, sw, VoxelEditor::RibbonHeight());
 
+			// The menus stand where the editor's name used to: the file open is
+			// named right of them, which says more than the application does.
+			MenuBar& menus = *ui->GetMenuBar();
+			const float namesAt =
+			  12.0F + menus.Layout(font, 12.0F, VoxelEditor::RibbonHeight()) + 16.0F;
+			menus.DrawTitles(*renderer, *fontManager, softwareCursor->GetPosition());
+
 			std::string name = (!filePath.empty()) ? filePath : "(unsaved model)";
 			if (HasUnsavedChanges())
 				name += " *";
-			font.Draw("KV6 Editor", MakeVector2(12.0F, 4.0F), 0.95F, MakeVector4(1, 1, 1, 1));
 			font.Draw(name + "   (" + std::to_string(document.VoxelCount()) + " voxels)",
-			          MakeVector2(120.0F, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
+			          MakeVector2(namesAt, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
 
 			std::string save = "[Ctrl+S] save";
 			Vector2 cs = font.Measure(save);
@@ -621,7 +642,7 @@ namespace spades {
 		void KV6EditorView::WheelEvent(float x, float y) {
 			if (ui->GetOverlay()->WheelEvent(x, y))
 				return;
-			if (ui->GetEditorMenu()->IsActive())
+			if (ui->GetMenuBar()->IsOpen())
 				return;
 			cam.Zoom(y);
 		}
@@ -636,10 +657,18 @@ namespace spades {
 			if (ui->GetOverlay()->KeyEvent(key, down))
 				return;
 
-			if (ui->GetEditorMenu()->KeyEvent(key, down)) {
-				// Releases are swallowed too while the menu is up: drop held
-				// movement/look so nothing keeps going once it closes.
+			// A menu of the bar owns the keyboard while it is down, Escape
+			// included: it is what Escape puts away first.
+			if (ui->GetMenuBar()->KeyEvent(key, down)) {
 				editor->ReleaseHeldInput();
+				return;
+			}
+			// Escape otherwise backs out of whatever the editor has in hand --
+			// a number being typed, a box half drawn, the selection -- and does
+			// nothing once there is nothing left to back out of. There is no
+			// menu behind it: the commands are on the bar, in sight.
+			if (down && key == "Escape") {
+				editor->EscapeOnce();
 				return;
 			}
 
@@ -754,7 +783,7 @@ namespace spades {
 			const IntVector3 size = document.Size();
 			const int span = std::max(size.x, std::max(size.y, size.z));
 			cam.Update(dt, globalTime, float(span) * kCameraSpeedPerSize,
-			           !ui->GetEditorMenu()->IsActive() && !ui->GetOverlay()->IsActive());
+			           !ui->GetMenuBar()->IsOpen() && !ui->GetOverlay()->IsActive());
 			editor->Update(dt);
 
 			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
@@ -801,7 +830,10 @@ namespace spades {
 			// level with the colour picker's.
 			editor->SetPanelCorner(sw - kNaviCubeMargin, sh - kPanelBottomGap);
 			editor->DrawPanels();
-			ui->GetEditorMenu()->Draw();
+			// Over everything, the bars included: a menu hangs from the ribbon
+			// across them, though it answers for its presses before they do.
+			ui->GetMenuBar()->DrawOpenMenu(*renderer, *fontManager,
+			                               softwareCursor->GetPosition());
 
 			// Dialogs draw their own pointer (with the text-field I-beam), so the
 			// editor's cursor steps aside while one is open.

@@ -153,13 +153,10 @@ namespace spades {
 			std::string HelpLine() const;
 
 			// --- IEditorMenuHost ---
-			/** The document the menu is about: its file name, or that it has never
-			 *  been saved, with a marker while it has changes that have not been
-			 *  written. The menu is where saving is decided, so it is where the
-			 *  player has to be able to see what they are deciding about. */
-			std::string GetMenuTitle() override;
-			std::vector<EditorMenuItem> GetMenuItems() override;
-			bool OnMenuEscape() override;
+			/** File, Edit and View, for the bar along the ribbon: everything
+			 *  this editor can be told to do that is a command rather than a
+			 *  way of working, with the key that does the same beside it. */
+			std::vector<EditorMenuGroup> GetMenus() override;
 
 			// --- Document commands behind the menu items ---
 			std::string GetDocumentExtension() const { return DefaultExtension(DocumentKind::Model); }

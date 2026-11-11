@@ -119,6 +119,10 @@ namespace spades {
 
 			void Undo();
 			void Redo();
+			/** Whether there is anything to undo or redo: what a menu row or a
+			 *  button offering it greys itself out by. */
+			bool CanUndo() const { return undo.CanUndo(); }
+			bool CanRedo() const { return undo.CanRedo(); }
 
 			/** The box of what the selection commands act on: the voxels waiting
 			 *  to be placed while there are some, else the selection. False when

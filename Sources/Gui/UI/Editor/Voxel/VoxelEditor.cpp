@@ -40,7 +40,7 @@
 #include <Core/VoxelModel.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
-#include <Gui/UI/Components/EditorMenu.h>
+#include <Gui/UI/Components/MenuBar.h>
 #include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 #include <Gui/UI/Components/OptionBar.h>
@@ -415,7 +415,7 @@ namespace spades {
 				case EscapeLayer::Selection: return "select nothing";
 				case EscapeLayer::None: break;
 			}
-			return "menu";
+			return std::string(); // nothing in hand: Escape has nothing to do
 		}
 
 		void VoxelEditor::Escape(EscapeLayer layer) {
@@ -2603,6 +2603,9 @@ namespace spades {
 				return;
 			}
 			const Vector2& at = cursor.GetPosition();
+			ui.GetMenuBar()->MouseMove(at);
+			if (ui.GetMenuBar()->IsOpen())
+				return; // the menu has the pointer while it is down
 			if (target && OnPanel(at))
 				return;
 			if (ui.GetColorPicker()->IsOpen())
@@ -2658,6 +2661,16 @@ namespace spades {
 				if (at.y < kRibbonH + kToolbarH || at.y >= BarsHeight())
 					ui.GetOptionBar()->EndEditing(true);
 
+				// A menu of the bar owns every press on itself and on its titles,
+				// and a press anywhere else puts it away before that press does
+				// whatever it does.
+				if (ui.GetMenuBar()->IsOpen()) {
+					const bool ours = ui.GetMenuBar()->Contains(at);
+					ui.GetMenuBar()->Click(at);
+					if (ours)
+						return;
+				}
+
 				// The open picker owns every press on its panel, gaps included, so
 				// nothing behind it is ever edited through it.
 				if (ui.GetColorPicker()->IsOverPicker(at)) {
@@ -2674,6 +2687,12 @@ namespace spades {
 				// Over the bars, a click belongs to whichever button is under it
 				// (the callbacks wired in WireUI act on it), or to nothing.
 				if (at.y < BarsHeight()) {
+					if (ui.GetMenuBar()->Click(at)) {
+						// A menu taking the keyboard means nothing may stay held
+						// from before it was opened.
+						ReleaseHeldInput();
+						return;
+					}
 					if (!ui.GetToolbar()->Click(at, screenWidth))
 						ui.GetOptionBar()->Click(at);
 					// Typing into a box means the keyboard is the box's now, so
@@ -2822,8 +2841,12 @@ namespace spades {
 				if (!hint.empty())
 					line += ":  " + hint;
 			}
-			// What Escape does next, from the same list Escape acts on.
-			const std::string escape = "[Esc] " + EscapeLabel(NextEscape());
+			// What Escape does next, from the same list Escape acts on; with
+			// nothing in hand it does nothing, and says nothing.
+			const std::string backOut = EscapeLabel(NextEscape());
+			if (backOut.empty())
+				return line;
+			const std::string escape = "[Esc] " + backOut;
 			return line.empty() ? escape : line + kHintSeparator + escape;
 		}
 
@@ -2925,7 +2948,7 @@ namespace spades {
 			ui.GetToolbar()->SetRedoButton(undo.CanRedo());
 
 			ui.GetToolbar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
-			                      ui.GetEditorMenu()->IsActive(), sw);
+			                      ui.GetMenuBar()->IsOpen(), sw);
 		}
 
 		void VoxelEditor::DrawOptionBar(float sw) {
@@ -2979,7 +3002,7 @@ namespace spades {
 			}
 			ui.GetOptionBar()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetOptionBar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
-			                        ui.GetEditorMenu()->IsActive(), sw);
+			                        ui.GetMenuBar()->IsOpen(), sw);
 		}
 
 		void VoxelEditor::DrawPanels() {
