@@ -589,6 +589,18 @@ namespace spades {
 			float screenWidth = 1024.0F; // for toolbar hit tests
 			void RefreshPlacementModel();
 			void DrawSelection();
+			/** A line of the selection's outline, in document coordinates. */
+			struct SelectionEdge {
+				Vector3 a, b;
+			};
+			/** The selection's outline: the edges with a voxel on one side and
+			 *  none on the other, each drawn once, kept for as long as the
+			 *  selection they belong to. */
+			mutable struct {
+				std::vector<SelectionEdge> edges;
+				std::uint64_t version = ~std::uint64_t(0);
+			} selectionOutline;
+			void BuildSelectionOutline() const;
 			void DrawPlacementPreview();
 			std::string ToolHintLine();
 			void DrawToolbar(float sw);
