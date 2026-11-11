@@ -54,6 +54,9 @@ SPADES_SETTING(cg_keyJump);
 SPADES_SETTING(cg_keyCrouch);
 SPADES_SETTING(cg_keySprint);
 SPADES_SETTING(cg_keyScreenshot);
+// Which projection the model editor opens in, kept between runs: a way of
+// working, not a property of what is open.
+DEFINE_SPADES_SETTING(cg_editorOrthogonal, "0");
 
 namespace spades {
 	namespace gui {
@@ -98,6 +101,9 @@ namespace spades {
 			// Named as SDL names them (Home), compared ignoring case.
 			const char* const kHomeViewKey = "Home";
 			const char* const kFrameSelectionKey = "F";
+			// Blender's Numpad 5, which this keyboard may not have, and the
+			// digits belong to the sub-tools: the key beside F it is.
+			const char* const kProjectionKey = "G";
 
 			// Whether one of the player's key settings the view acts on (the
 			// camera's, the screenshot key) is bound to `key`; those come before
@@ -135,6 +141,10 @@ namespace spades {
 				ownedCursor = std::make_unique<SoftwareCursor>(*renderer);
 				softwareCursor = ownedCursor.get();
 			}
+
+			// The projection the editor was last left in: a way of working, like
+			// the tool keys, rather than anything about the model opened.
+			cam.SetOrthogonal(static_cast<int>(cg_editorOrthogonal) != 0);
 
 			ui = Handle<EditorUI>::New(renderer.GetPointerOrNull(), audioDevice.GetPointerOrNull(),
 			                           &*fontManager, *this, softwareCursor);
@@ -187,6 +197,10 @@ namespace spades {
 			float size;
 			if (EqualsIgnoringCase(key, kHomeViewKey)) {
 				ResetView();
+				return true;
+			}
+			if (EqualsIgnoringCase(key, kProjectionKey)) {
+				ToggleProjection();
 				return true;
 			}
 			if (EqualsIgnoringCase(key, kFrameSelectionKey)) {
@@ -444,14 +458,26 @@ namespace spades {
 			ShowEditorFileDialog(*ui->GetOverlay(), title, std::move(options), std::move(picked));
 		}
 
+		void KV6EditorView::ToggleProjection() {
+			cam.SetOrthogonal(!cam.IsOrthogonal());
+			cg_editorOrthogonal = cam.IsOrthogonal() ? 1 : 0;
+			editor->SetStatus(cam.IsOrthogonal() ? "Parallel projection"
+			                                     : "Perspective projection");
+		}
+
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
 			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
-			       EqualsIgnoringCase(key, kFrameSelectionKey);
+			       EqualsIgnoringCase(key, kFrameSelectionKey) ||
+			       EqualsIgnoringCase(key, kProjectionKey);
 		}
 
 		bool KV6EditorView::ClickViewportWidget(const Vector2& cursor) {
-			if (naviCube.HomeAt(cursor)) {
+			if (naviCube.ButtonAt(cursor, NavigationCube::kHomeButton)) {
 				ResetView();
+				return true;
+			}
+			if (naviCube.ButtonAt(cursor, NavigationCube::kProjectionButton)) {
+				ToggleProjection();
 				return true;
 			}
 			Vector3 navDir;
@@ -566,6 +592,7 @@ namespace spades {
 			};
 			viewKey(kHomeViewKey, "reset view");
 			viewKey(kFrameSelectionKey, "frame selection");
+			viewKey(kProjectionKey, "perspective/parallel");
 			keys({cg_keyScreenshot}, "screenshot");
 			return help;
 		}
@@ -768,7 +795,7 @@ namespace spades {
 			                VoxelEditor::BarsHeight() + kNaviCubeTopGap + kNaviCubeBox * 0.5F,
 			                kNaviCubeBox * 0.5F - kNaviCubeInset);
 			naviCube.Draw(*renderer, fontManager->GetSmallGuiFont(), cam.View(),
-			              softwareCursor->GetPosition());
+			              softwareCursor->GetPosition(), cam.IsOrthogonal());
 
 			// The transform panel, in the view's bottom right corner, its foot
 			// level with the colour picker's.

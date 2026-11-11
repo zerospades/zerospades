@@ -129,6 +129,9 @@ namespace spades {
 			void FrameCamera();
 			// Flies back to the view the model opened with.
 			void ResetView();
+			// Perspective or parallel, from the navigation cube's button or
+			// its key; remembered between runs.
+			void ToggleProjection();
 			// Home flies back to the view the model opened with, F frames the
 			// selection (or the model); true when `key` was one of them.
 			bool ViewKey(const std::string& key);

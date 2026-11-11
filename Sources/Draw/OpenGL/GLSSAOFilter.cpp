@@ -61,6 +61,7 @@ namespace spades {
 				static GLProgramUniform pixelShift("pixelShift");
 				static GLProgramUniform fieldOfView("fieldOfView");
 				static GLProgramUniform sampleOffsetScale("sampleOffsetScale");
+				static GLProgramUniform perspective("perspective");
 
 				positionAttribute(program);
 				depthTexture(program);
@@ -70,13 +71,26 @@ namespace spades {
 				pixelShift(program);
 				fieldOfView(program);
 				sampleOffsetScale(program);
+				perspective(program);
 
 				program->Use();
 
 				const client::SceneDefinition& def = renderer.GetSceneDef();
 
 				zNearFar.SetValue(def.zNear, def.zFar);
-				fieldOfView.SetValue(std::tan(def.fovX * 0.5F), std::tan(def.fovY * 0.5F));
+				// How far across the view reaches: per unit of depth in a
+				// perspective view, and outright in a parallel one, where the
+				// shader must not scale it by the depth (nor read the depth
+				// buffer as the reciprocal curve a frustum writes).
+				if (def.orthogonal) {
+					const float halfHeight = def.orthoHeight * 0.5F;
+					const float halfWidth =
+					  halfHeight * (std::tan(def.fovX * 0.5F) / std::tan(def.fovY * 0.5F));
+					fieldOfView.SetValue(halfWidth, halfHeight);
+				} else {
+					fieldOfView.SetValue(std::tan(def.fovX * 0.5F), std::tan(def.fovY * 0.5F));
+				}
+				perspective.SetValue(def.orthogonal ? 0.0F : 1.0F);
 				pixelShift.SetValue(1.0F / (float)width, 1.0F / (float)height);
 
 				float kernelSize = std::max(1.0F, std::min(width, height) * 0.0018F);

@@ -463,6 +463,25 @@ namespace spades {
 			frustrum[0].w -= sceneDef.zNear;
 			frustrum[1].w += sceneDef.zFar;
 
+			if (sceneDef.orthogonal) {
+				// A box, not a pyramid: the sides are parallel to the line of
+				// sight and stand half the view's height and width out from it.
+				const float halfHeight = sceneDef.orthoHeight * 0.5F;
+				const float halfWidth =
+				  halfHeight * (std::tan(sceneDef.fovX * 0.5F) / std::tan(sceneDef.fovY * 0.5F));
+				const Vector3& side = sceneDef.viewAxis[0];
+				const Vector3& up = sceneDef.viewAxis[1];
+				frustrum[2] = Plane3::PlaneWithPointOnPlane(
+				  sceneDef.viewOrigin - side * halfWidth, side);
+				frustrum[3] = Plane3::PlaneWithPointOnPlane(
+				  sceneDef.viewOrigin + side * halfWidth, -side);
+				frustrum[4] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - up * halfHeight, up);
+				frustrum[5] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + up * halfHeight, -up);
+				return;
+			}
+
 			float cx = cosf(sceneDef.fovX * 0.5F);
 			float sx = sinf(sceneDef.fovX * 0.5F);
 			float cy = cosf(sceneDef.fovY * 0.5F);
