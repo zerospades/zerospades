@@ -279,9 +279,6 @@ namespace spades {
 			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true, "Ctrl+S"});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
 			items.push_back(EditorMenuItem{"Insert Model...", [this] { OpenInsertDialog(); }, true});
-			// Taken at the end of the next frame, once the menu has closed, so
-			// the picture is of the model rather than of the menu.
-			items.push_back(EditorMenuItem{"Save Screenshot", [this] { wantScreenShot = true; }, true});
 			// Then what is done to the selection. These are commands, not ways
 			// of working, so they belong in a menu with their keys beside them
 			// rather than on the tool bar, which is for what the active tool is

@@ -33,12 +33,16 @@
 namespace spades {
     namespace gui {
         namespace {
-            const float kItemW = 260.0F;
-            const float kItemH = 36.0F;
-            const float kItemPitch = 44.0F;
+            // Rows are as tall as a row of text wants to be and no taller: the
+            // menu is read down in one glance, and a list of commands that
+            // covers the model behind it is a list that has to be dismissed
+            // before the model can be looked at again.
+            const float kItemW = 230.0F;
+            const float kItemH = 26.0F;
+            const float kItemPitch = 30.0F;
             // A rule between two blocks of commands takes less room than a row.
-            const float kSeparatorPitch = 16.0F;
-            const float kTitlePitch = kItemPitch;
+            const float kSeparatorPitch = 12.0F;
+            const float kTitlePitch = 34.0F;
 
             /** The start of the codepoint `i` is inside, so that nothing removed
              *  from a string ever leaves half a character behind. */
