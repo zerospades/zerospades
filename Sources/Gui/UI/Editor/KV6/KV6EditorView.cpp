@@ -272,15 +272,46 @@ namespace spades {
 			// The file commands first, then the one command that edits the open
 			// document with a file: inserting a model is a paste that happens to come
 			// from disk, and it belongs beside Paste rather than beside Save.
-			items.push_back(EditorMenuItem{"New Model", [this] { NewDocument(); }, true});
-			items.push_back(EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true});
+			items.push_back(EditorMenuItem{"New Model", [this] { NewDocument(); }, true, "Ctrl+N"});
+			items.push_back(
+			  EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"});
 			// Always available: a document with nowhere to go yet is asked where.
-			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true});
+			items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true, "Ctrl+S"});
 			items.push_back(EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
 			items.push_back(EditorMenuItem{"Insert Model...", [this] { OpenInsertDialog(); }, true});
 			// Taken at the end of the next frame, once the menu has closed, so
 			// the picture is of the model rather than of the menu.
 			items.push_back(EditorMenuItem{"Save Screenshot", [this] { wantScreenShot = true; }, true});
+			// Then what is done to the selection. These are commands, not ways
+			// of working, so they belong in a menu with their keys beside them
+			// rather than on the tool bar, which is for what the active tool is
+			// doing. Every one of them has a key; the menu is where it is found.
+			items.push_back(EditorMenuItem{"", nullptr, true, "", true});
+			const bool selected = editor->SelectionCount() > 0;
+			auto command = [this](std::function<void()> run) {
+				// As a shortcut does: a command edits behind whatever the active
+				// tool had in progress, so that is abandoned first.
+				return [this, run] {
+					editor->CancelToolInteraction();
+					run();
+				};
+			};
+			items.push_back(EditorMenuItem{"Select All",
+			                               command([this] { editor->SelectAll(); }), true,
+			                               "Ctrl+A"});
+			items.push_back(EditorMenuItem{"Select None",
+			                               command([this] { editor->ClearSelection(); }), selected,
+			                               "Ctrl+Shift+A"});
+			items.push_back(EditorMenuItem{
+			  "Delete Selection", command([this] { editor->DeleteSelection(); }), selected, "Del"});
+			items.push_back(EditorMenuItem{
+			  "Copy", command([this] { editor->CopySelection(); }), selected, "Ctrl+C"});
+			items.push_back(EditorMenuItem{
+			  "Cut", command([this] { editor->CutSelection(); }), selected, "Ctrl+X"});
+			items.push_back(EditorMenuItem{"Paste", command([this] { editor->Paste(); }),
+			                               editor->CanPaste(), "Ctrl+V"});
+
+			items.push_back(EditorMenuItem{"", nullptr, true, "", true});
 			items.push_back(EditorMenuItem{
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }, true});
 			return items;

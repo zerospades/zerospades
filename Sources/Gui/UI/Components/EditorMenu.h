@@ -44,6 +44,12 @@ namespace spades {
             std::function<void()> run;
             /** False draws the row greyed out and ignores clicks on it. */
             bool enabled = true;
+            /** The key that does the same, shown on the row's right: a menu is
+             *  where a key is learned. Empty for a command with no key. */
+            std::string hotKey;
+            /** A rule between two blocks of commands rather than a command: it
+             *  is not picked, clicked or stepped onto. */
+            bool separator = false;
         };
 
         class IEditorMenuHost {
@@ -88,6 +94,12 @@ namespace spades {
             void Activate(int index);
             void DrawMenu(float sw, float sh);
             int MenuButtonAt(const Vector2& p) const;
+            /** How tall the title and every row come to. */
+            float Height() const;
+            /** Where the title sits for a screen `sh` tall. */
+            float Top(float sh) const;
+            /** The row `by` steps from `from`, past the rules and round the ends. */
+            int Step(int from, int by) const;
         };
     } // namespace gui
 } // namespace spades

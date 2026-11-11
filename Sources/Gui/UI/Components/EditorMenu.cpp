@@ -36,6 +36,9 @@ namespace spades {
             const float kItemW = 260.0F;
             const float kItemH = 36.0F;
             const float kItemPitch = 44.0F;
+            // A rule between two blocks of commands takes less room than a row.
+            const float kSeparatorPitch = 16.0F;
+            const float kTitlePitch = kItemPitch;
 
             /** The start of the codepoint `i` is inside, so that nothing removed
              *  from a string ever leaves half a character behind. */
@@ -101,17 +104,47 @@ namespace spades {
         }
         void EditorMenu::Close() { menuOpen = false; }
 
+        float EditorMenu::Height() const {
+            float h = kTitlePitch; // the title the list hangs under
+            for (const EditorMenuItem& item : items)
+                h += item.separator ? kSeparatorPitch : kItemPitch;
+            return h;
+        }
+
+        float EditorMenu::Top(float sh) const {
+            // Centred on its own height, so a menu stays put in the middle
+            // however many commands the host offers.
+            return (sh - Height()) * 0.5F;
+        }
+
         int EditorMenu::MenuButtonAt(const Vector2& p) const {
             float sw = renderer->ScreenWidth();
-            float sh = renderer->ScreenHeight();
             float x = (sw - kItemW) * 0.5F;
-            float y = sh * 0.5F - 110.0F + kItemPitch;
+            float y = Top(renderer->ScreenHeight()) + kTitlePitch;
             for (int i = 0; i < int(items.size()); i++) {
+                if (items[i].separator) {
+                    y += kSeparatorPitch;
+                    continue; // a rule is not a row to click
+                }
                 if (OverlayInRect(p, x, y, kItemW, kItemH))
                     return i;
                 y += kItemPitch;
             }
             return -1;
+        }
+
+        int EditorMenu::Step(int from, int by) const {
+            const int count = int(items.size());
+            if (count == 0)
+                return -1;
+            // Past the rules, and round the ends, so the keyboard reaches every
+            // command and stops on none of the gaps between them.
+            for (int n = 1; n <= count; n++) {
+                const int at = ((from + by * n) % count + count) % count;
+                if (!items[at].separator)
+                    return at;
+            }
+            return from;
         }
 
         void EditorMenu::DrawMenu(float sw, float sh) {
@@ -120,14 +153,14 @@ namespace spades {
             OverlayFillRect(*renderer, 0, 0, sw, sh);
 
             float x = (sw - kItemW) * 0.5F;
-            float y = sh * 0.5F - 110.0F;
+            float y = Top(sh);
 
             // The title names the document, so it is as long as a file name can be.
             std::string title = ElideToWidth(font, host.GetMenuTitle(), kItemW);
             Vector2 sz = font.Measure(title);
             font.Draw(title, MakeVector2(x + (kItemW - sz.x) * 0.5F, y), 1.0F,
                       MakeVector4(1, 1, 1, 1));
-            y += kItemPitch;
+            y += kTitlePitch;
 
             int hover = MenuButtonAt(cursor.GetPosition());
             if (hover >= 0)
@@ -139,10 +172,20 @@ namespace spades {
             }
 
             for (int i = 0; i < int(items.size()); i++) {
+                if (items[i].separator) {
+                    OverlayColorNP(*renderer, MakeVector4(1.0F, 1.0F, 1.0F, 0.18F));
+                    OverlayFillRect(*renderer, x + kItemW * 0.1F,
+                                    y + (kSeparatorPitch - 1.0F) * 0.5F, kItemW * 0.8F, 1.0F);
+                    y += kSeparatorPitch;
+                    continue;
+                }
+                // The command in the middle, the key that does the same on the
+                // right: whoever opens this menu twice for a command learns it.
                 widgets::PaintButton(*renderer, font, MakeVector2(x, y),
                                      MakeVector2(kItemW, kItemH), items[i].caption,
-                                     MakeVector2(0.5F, 0.5F), "", MakeVector2(1.0F, 0.5F),
-                                     items[i].enabled, selectedItem == i, false, false);
+                                     MakeVector2(0.5F, 0.5F), items[i].hotKey,
+                                     MakeVector2(1.0F, 0.5F), items[i].enabled,
+                                     selectedItem == i, false, false);
                 y += kItemPitch;
             }
         }
@@ -152,9 +195,8 @@ namespace spades {
                 if (!down)
                     return true;
                 if (key == "Escape") { menuOpen = false; return true; }
-                int count = int(items.size());
-                if (key == "Up") { selectedItem = (selectedItem + count - 1) % count; return true; }
-                if (key == "Down") { selectedItem = (selectedItem + 1) % count; return true; }
+                if (key == "Up") { selectedItem = Step(selectedItem, -1); return true; }
+                if (key == "Down") { selectedItem = Step(selectedItem, 1); return true; }
                 if (key == "Enter" || key == "LeftMouseButton") {
                     int b = (key == "LeftMouseButton") ? MenuButtonAt(cursor.GetPosition()) : selectedItem;
                     if (b >= 0 && items[b].enabled)
