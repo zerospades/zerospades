@@ -43,7 +43,10 @@ namespace spades {
 		static const float kTbX0 = 12.0F;
 		static const float kBandY = kRibbonH + kToolbarH;
 		static const float kBtnY = kBandY + (kSubBarH - kTbH) * 0.5F;
-		static const float kSubBtn = 88.0F;
+		// A sub-tool button holds its label and, on its right, its key. Narrow
+		// ones (an axis letter) still read as buttons at the minimum.
+		static const float kSubBtnMin = 52.0F;
+		static const float kSubBtnKeyGap = 10.0F;
 		// A readout is at least this wide, so the options after it hold still
 		// while its text changes.
 		static const float kLabelW = 190.0F;
@@ -321,8 +324,14 @@ namespace spades {
 
 			for (size_t i = 0; i < subToolButtons.size(); i++) {
 				const SubToolButton& button = subToolButtons[i];
-				advance(false);
-				const Span span{x, kSubBtn};
+				advance(i > 0 && button.group != subToolButtons[i - 1].group);
+				// As wide as what it says, as the options are: a row of them is
+				// the longest thing on the bar, and a fixed width spends the
+				// room of the longest label on every one of them.
+				const float keyWidth =
+				  button.hotKey.empty() ? 0.0F : font.Measure(button.hotKey).x + kSubBtnKeyGap;
+				const Span span{x, std::max(kSubBtnMin, font.Measure(button.label).x + keyWidth +
+				                                          kButtonTextInset)};
 				subToolSpans.push_back(span);
 				bool hover = hovered(span, true, previousSubToolHoverState, i);
 				Vector2 labelAlign =
