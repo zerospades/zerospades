@@ -342,7 +342,7 @@ namespace spades {
 			// activates tool `toolIndex` in `mode`.
 			void Activate(int toolIndex, EditorMode mode);
 			// Keys 1-9 pick the active tool's sub-tools, in bar order.
-			static std::string SubToolHotKey(int index);
+			std::string SubToolHotKey(VoxelTool& tool, int index);
 			bool SwitchByHotKey(const std::string& key);
 			// Whether a key already does something (the host's keys, delete), so
 			// it cannot serve as a tool's hot key.

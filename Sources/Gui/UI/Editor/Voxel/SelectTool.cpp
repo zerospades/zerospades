@@ -74,8 +74,6 @@ namespace spades {
 			options.AddBool(kXRayOption, "X-Ray", "", screen.through);
 		}
 
-		ToolOptions* SelectTool::Options() { return &options; }
-
 		void SelectTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
 			if (e.IsDown() && e.IsLeft()) {
 				// Asked before the sub-tool sees the press: a box under way says so.
@@ -98,6 +96,7 @@ namespace spades {
 		}
 
 		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
+			ContainerTool::UpdateOptions(ed);
 			const bool selected = ed.SelectionCount() > 0;
 			options.SetEnabled(kClearSelectionOption, selected);
 			options.SetEnabled(kDeleteSelectionOption, selected);
@@ -111,19 +110,22 @@ namespace spades {
 			options.SetBool(kXRayOption, screen.through);
 		}
 
-		void SelectTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) {
+		void SelectTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
+			ContainerTool::OnOptionToggled(ed, id, value);
 			if (id == kXRayOption)
 				screen.through = value;
 		}
 
-		void SelectTool::OnOptionNumberChanged(IVoxelEditContext&, const std::string& id, float value,
-		                                       bool) {
+		void SelectTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
+		                                       float value, bool committed) {
+			ContainerTool::OnOptionNumberChanged(ed, id, value, committed);
 			if (id == kDiameterOption)
 				screen.diameter = std::max(ScreenSelectSettings::kMinDiameter,
 				                           std::min(ScreenSelectSettings::kMaxDiameter, value));
 		}
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			ContainerTool::OnAction(ed, id);
 			// Each reports a count: selecting is invisible on a model that was
 			// already fully selected, and a button that seems to do nothing reads
 			// as broken. Matches By Colour / Copy / Cut.

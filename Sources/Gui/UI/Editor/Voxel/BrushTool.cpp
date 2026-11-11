@@ -25,9 +25,11 @@ namespace spades {
 	namespace gui {
 		BrushTool::BrushTool() { AddMirrorToggles(options); }
 
-		void BrushTool::UpdateOptions(IVoxelEditContext& ed) { SyncMirrorToggles(options, ed); }
+		void BrushTool::UpdateOptions(IVoxelEditContext& ed) {
+			ContainerTool::UpdateOptions(ed); SyncMirrorToggles(options, ed); }
 
 		void BrushTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
+			ContainerTool::OnOptionToggled(ed, id, value);
 			ApplyMirrorToggle(ed, id, value);
 		}
 	} // namespace gui

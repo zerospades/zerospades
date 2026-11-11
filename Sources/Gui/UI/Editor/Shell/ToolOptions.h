@@ -135,6 +135,12 @@ namespace spades {
 				return nullptr;
 			}
 
+			void Clear() { items.clear(); }
+			/** Adds `other`'s options after these, as they stand. */
+			void Append(const ToolOptions& other) {
+				items.insert(items.end(), other.items.begin(), other.items.end());
+			}
+
 			int Count() const { return int(items.size()); }
 			ToolOption& At(int i) { return items[i]; }
 			const ToolOption& At(int i) const { return items[i]; }
