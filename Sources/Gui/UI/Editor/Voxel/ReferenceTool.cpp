@@ -142,6 +142,7 @@ namespace spades {
 		}
 
 		void ReferenceTool::UpdateOptions(IVoxelEditContext& ed) {
+			ContainerTool::UpdateOptions(ed);
 			const ReferenceImage& ref = ed.Reference(active);
 			const bool loaded = ref.Loaded();
 			options.SetNumber(kSizeOption, ref.size);
@@ -163,6 +164,7 @@ namespace spades {
 
 		void ReferenceTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id,
 		                                    bool value) {
+			ContainerTool::OnOptionToggled(ed, id, value);
 			ReferenceImage& ref = ed.Reference(active);
 			if (id == kShowOption)
 				ref.visible = value;
@@ -171,7 +173,8 @@ namespace spades {
 		}
 
 		void ReferenceTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
-		                                          float value, bool) {
+		                                          float value, bool committed) {
+			ContainerTool::OnOptionNumberChanged(ed, id, value, committed);
 			// Nothing here is journaled, so a value shows as soon as it is typed.
 			ReferenceImage& ref = ed.Reference(active);
 			if (id == kSizeOption)
@@ -185,6 +188,7 @@ namespace spades {
 		}
 
 		void ReferenceTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			ContainerTool::OnAction(ed, id);
 			if (id == kLoadOption)
 				ed.LoadReferenceImage(active);
 			else if (id == kClearOption)

@@ -30,6 +30,50 @@ namespace spades {
 			return const_cast<VoxelTool*>(const_cast<const ContainerTool*>(this)->Cur());
 		}
 
+		ToolOptions* ContainerTool::Options() {
+			// Built here rather than kept in step: every value, enabled state and
+			// label on it comes from the tools each frame, and this runs after
+			// all of that has happened (the editor updates, then draws).
+			shown.Clear();
+			shown.Append(options);
+			if (VoxelTool* s = Cur()) {
+				if (ToolOptions* theirs = s->Options())
+					shown.Append(*theirs);
+			}
+			return &shown;
+		}
+
+		void ContainerTool::UpdateOptions(IVoxelEditContext& ed) {
+			if (VoxelTool* s = Cur())
+				s->UpdateOptions(ed);
+		}
+
+		// Anything the container did not declare belongs to the sub-tool whose
+		// options it came from, which is the active one: the bar only ever shows
+		// that one's.
+		void ContainerTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			if (Owns(id))
+				return;
+			if (VoxelTool* s = Cur())
+				s->OnAction(ed, id);
+		}
+
+		void ContainerTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id,
+		                                    bool value) {
+			if (Owns(id))
+				return;
+			if (VoxelTool* s = Cur())
+				s->OnOptionToggled(ed, id, value);
+		}
+
+		void ContainerTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
+		                                          float value, bool committed) {
+			if (Owns(id))
+				return;
+			if (VoxelTool* s = Cur())
+				s->OnOptionNumberChanged(ed, id, value, committed);
+		}
+
 		void ContainerTool::SetSubTool(IVoxelEditContext& ed, int i) {
 			if (i == active || i < 0 || i >= int(subs.size()))
 				return;

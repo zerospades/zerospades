@@ -44,6 +44,12 @@ namespace spades {
 			// Short label shown on the toolbar button.
 			virtual const char* Label() const = 0;
 
+			// The key this tool answers to as a sub-tool of another, where it
+			// deserves one of its own rather than its place in the bar: a tool
+			// folded in as a sub-tool keeps the key it was known by. Empty
+			// leaves it on the digits (see VoxelEditor::SubToolHotKey).
+			virtual std::string HotKey() const { return std::string(); }
+
 			virtual void OnActivate(Context&) {}
 			virtual void OnDeactivate(Context&) {}
 

@@ -28,9 +28,19 @@
 
 namespace spades {
 	namespace gui {
-		// A tool that is just a set of child tools (shown in the secondary toolbar).
-		// All input/drawing forwards to the active child, so concrete tools (Draw,
-		// Select) only have to populate `subs` and provide a Label.
+		/**
+		 * A tool that is just a set of child tools (shown in the secondary
+		 * toolbar). All input and drawing forwards to the active child, so
+		 * concrete tools (Draw, Select) only have to populate `subs` and provide
+		 * a Label.
+		 *
+		 * Options work the same way. The bar shows the container's own, which
+		 * hold whichever child is active (Select's commands), and then the
+		 * active child's, which are that child's alone (a brush's size, a
+		 * transform's boxes) and go when it does. A child declares what it
+		 * needs, answers for it, and nothing has to be hidden and shown again
+		 * as the children change.
+		 */
 		class ContainerTool : public VoxelTool {
 		public:
 			int SubToolCount() const override { return int(subs.size()); }
@@ -52,6 +62,18 @@ namespace spades {
 			std::string Hint(IVoxelEditContext&) override;
 			void DrawScene(IVoxelEditContext&) override;
 			void DrawOverlay(IVoxelEditContext&) override;
+			// The container's own options and the active sub-tool's, as one list
+			// for the bar to draw. Rebuilt on the way out, after everything that
+			// updates an option has run.
+			ToolOptions* Options() override;
+			// Subclasses overriding these call them first; each hands what it
+			// does not answer for to the active sub-tool.
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
+			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
+			                           bool committed) override;
+
 			ITransformTarget* TransformTarget(IVoxelEditContext& ed) override {
 				VoxelTool* t = Cur();
 				return t ? t->TransformTarget(ed) : nullptr;
@@ -69,6 +91,15 @@ namespace spades {
 			int active = 0;
 			VoxelTool* Cur();
 			const VoxelTool* Cur() const;
+
+			/** The container's own options: what holds across its sub-tools. */
+			ToolOptions options;
+			/** Whether `id` is one of the container's own rather than a sub-tool's. */
+			bool Owns(const std::string& id) { return options.Find(id) != nullptr; }
+
+		private:
+			// `options` followed by the active sub-tool's, rebuilt by Options().
+			ToolOptions shown;
 		};
 	} // namespace gui
 } // namespace spades

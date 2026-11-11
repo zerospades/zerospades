@@ -35,7 +35,6 @@ namespace spades {
 			SelectTool();
 			const char* Label() const override { return "Select"; }
 
-			ToolOptions* Options() override;
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
@@ -53,7 +52,6 @@ namespace spades {
 			void OnPointer(IVoxelEditContext& ed, const PointerInput& e) override;
 
 		private:
-			ToolOptions options;
 			ScreenSelectSettings screen; // Rect's and Brush's
 			VoxelsOnScreen voxels;       // what they select
 			int rectIndex = -1, brushIndex = -1;

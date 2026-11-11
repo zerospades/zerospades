@@ -45,7 +45,6 @@ namespace spades {
 		 */
 		class GizmoTool : public ContainerTool {
 		public:
-			ToolOptions* Options() override { return &options; }
 			// Subclasses overriding these call them first.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
@@ -78,8 +77,6 @@ namespace spades {
 			 * offers it needs no override.
 			 */
 			virtual void SnapToGrid(IVoxelEditContext&) {}
-
-			ToolOptions options;
 
 		private:
 			// The grid Snap to Grid rounds to: the whole voxels, which is where

@@ -36,7 +36,6 @@ namespace spades {
 		public:
 			ReferenceTool();
 			const char* Label() const override { return "Reference"; }
-			ToolOptions* Options() override { return &options; }
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
 			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
@@ -44,8 +43,6 @@ namespace spades {
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
 			std::string Hint(IVoxelEditContext& ed) override;
 
-		private:
-			ToolOptions options;
 		};
 	} // namespace gui
 } // namespace spades

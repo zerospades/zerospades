@@ -84,7 +84,8 @@ namespace spades {
 
 		void GizmoTool::ApplySnap() { gizmo->SetTranslationSnap(step); }
 
-		void GizmoTool::UpdateOptions(IVoxelEditContext&) {
+		void GizmoTool::UpdateOptions(IVoxelEditContext& ed) {
+			ContainerTool::UpdateOptions(ed);
 			// The steps act as radio buttons, so each shows whether it is the one
 			// in use, whatever a click on it flipped it to.
 			for (const StepChoice& choice : kStepChoices) {
@@ -96,7 +97,8 @@ namespace spades {
 		// The steps are radio buttons: a click picks its choice, whatever the
 		// toggle it landed on was showing, so the value it was flipped to is of
 		// no interest here.
-		void GizmoTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool) {
+		void GizmoTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
+			ContainerTool::OnOptionToggled(ed, id, value);
 			for (const StepChoice& choice : kStepChoices) {
 				if (id == choice.id && Offers(choice.step)) {
 					step = choice.step;
@@ -108,6 +110,7 @@ namespace spades {
 
 		// Subclasses with actions of their own call this first.
 		void GizmoTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			ContainerTool::OnAction(ed, id);
 			if (id == kGridOption)
 				SnapToGrid(ed);
 		}

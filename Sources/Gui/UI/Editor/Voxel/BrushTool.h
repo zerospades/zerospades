@@ -34,15 +34,11 @@ namespace spades {
 		 */
 		class BrushTool : public ContainerTool {
 		public:
-			ToolOptions* Options() override { return &options; }
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) override;
 
 		protected:
 			BrushTool();
-
-		private:
-			ToolOptions options;
 		};
 	} // namespace gui
 } // namespace spades

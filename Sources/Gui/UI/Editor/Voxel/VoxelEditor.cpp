@@ -2216,7 +2216,16 @@ namespace spades {
 			return (option && option->type == type) ? option : nullptr;
 		}
 
-		std::string VoxelEditor::SubToolHotKey(int index) {
+		// A sub-tool's key is its own where it declares one, and otherwise its
+		// place in the bar. A sub-tool that was a tool of its own keeps the key
+		// it was known by (Transform's T), and the digits stay where they are
+		// for the rest, so nothing shifts under the user when one is added.
+		std::string VoxelEditor::SubToolHotKey(VoxelTool& tool, int index) {
+			if (auto* sub = tool.SubTool(index)) {
+				const std::string own = sub->HotKey();
+				if (!own.empty())
+					return own;
+			}
 			return (index >= 0 && index < 9) ? std::to_string(index + 1) : std::string();
 		}
 
@@ -2238,7 +2247,7 @@ namespace spades {
 			if (!tool || tool->SubToolCount() < 2)
 				return false;
 			for (int sub = 0; sub < tool->SubToolCount(); sub++) {
-				if (SubToolHotKey(sub) == key) {
+				if (EqualsIgnoringCase(SubToolHotKey(*tool, sub), key)) {
 					tool->SetSubTool(*this, sub);
 					return true;
 				}
@@ -2733,7 +2742,8 @@ namespace spades {
 				for (int i = 0; i < t->SubToolCount(); i++) {
 					OptionBar::SubToolButton btn;
 					btn.label = t->SubToolLabel(i);
-					btn.hotKey = KeyIsTaken(SubToolHotKey(i)) ? std::string() : SubToolHotKey(i);
+					const std::string key = SubToolHotKey(*t, i);
+					btn.hotKey = KeyIsTaken(key) ? std::string() : key;
 					btn.active = (t->ActiveSubTool() == i);
 					subTools.push_back(btn);
 				}
