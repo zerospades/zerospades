@@ -124,6 +124,7 @@ namespace spades {
 		}
 
 		void TransformTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			GizmoTool::OnAction(ed, id);
 			const int axis = AxisOf(kTurnOption, id);
 			if (axis < 0)
 				return;

@@ -56,6 +56,7 @@ namespace spades {
 			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
 			                           bool committed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			void SnapToGrid(IVoxelEditContext& ed) override;
 
 		private:
 			// A reflection only shifts at half a voxel, and the editor holds the

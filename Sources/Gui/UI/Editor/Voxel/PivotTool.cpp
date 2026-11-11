@@ -21,8 +21,19 @@
 #include "PivotTool.h"
 #include "VoxelEditContext.h"
 
+#include <cmath>
+#include <string>
+
 namespace spades {
 	namespace gui {
+		namespace {
+			// A point of the grid, written as the whole numbers it is made of.
+			std::string PointText(const Vector3& v) {
+				auto whole = [](float c) { return std::to_string(int(std::lround(c))); };
+				return whole(v.x) + ", " + whole(v.y) + ", " + whole(v.z);
+			}
+		} // namespace
+
 		// The pivot is a point anywhere, on no grid: it takes every step, finest first.
 		PivotTool::PivotTool()
 		    : GizmoTool(std::unique_ptr<GizmoSubTool>(new PivotGizmoSubTool()), {0.1F, 0.5F, 1.0F},
@@ -33,6 +44,14 @@ namespace spades {
 		// Where the pivot is, set by number: the transform panel's Location.
 		ITransformTarget* PivotTool::TransformTarget(IVoxelEditContext& ed) {
 			return &ed.PivotTransform();
+		}
+
+		void PivotTool::SnapToGrid(IVoxelEditContext& ed) {
+			const Vector3 was = ed.GetPivot();
+			const Vector3 now = OnGrid(was);
+			ed.SetPivot(now); // nothing to undo where it was there already
+			ed.SetStatus(was == now ? "The pivot is on the grid"
+			                        : "Pivot snapped to " + PointText(now));
 		}
 	} // namespace gui
 } // namespace spades

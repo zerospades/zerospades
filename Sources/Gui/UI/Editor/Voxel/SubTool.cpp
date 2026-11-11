@@ -614,11 +614,9 @@ namespace spades {
 
 		void GizmoSubTool::OnEscape(IVoxelEditContext& ed) { CancelDrag(ed); }
 
-		void GizmoSubTool::SetTranslationSnap(float step, float grid, float gridAt) {
+		void GizmoSubTool::SetTranslationSnap(float step) {
 			GizmoSnap snap = gizmo.Snap();
 			snap.translation = step;
-			snap.translationGrid = grid;
-			snap.translationGridAt = gridAt;
 			gizmo.SetSnap(snap);
 		}
 

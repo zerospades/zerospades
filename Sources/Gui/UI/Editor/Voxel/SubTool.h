@@ -205,12 +205,8 @@ namespace spades {
 			void OnDocumentChanged(IVoxelEditContext&) override;
 			void DrawOverlay(IVoxelEditContext&) override;
 
-			/**
-			 * Moves snap to multiples of `step`, or, with a `grid` above zero,
-			 * land on the lattice `grid` apart through `gridAt` instead. Turns
-			 * keep their own snap.
-			 */
-			void SetTranslationSnap(float step, float grid, float gridAt);
+			/** Moves snap to multiples of `step`. Turns keep their own snap. */
+			void SetTranslationSnap(float step);
 
 		protected:
 			/** The gizmo snaps by `snap` and shows (and responds to) `handles`. */

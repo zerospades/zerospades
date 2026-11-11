@@ -32,6 +32,7 @@ namespace spades {
 			PivotTool();
 			const char* Label() const override { return "Pivot"; }
 			ITransformTarget* TransformTarget(IVoxelEditContext& ed) override;
+			void SnapToGrid(IVoxelEditContext& ed) override;
 		};
 	} // namespace gui
 } // namespace spades
