@@ -27,8 +27,11 @@ namespace spades {
 	namespace gui {
 		namespace {
 			const char* const kFillSelectionOption = "select.fill";
-			const char* const kDiameterOption = "select.diameter";
-			const char* const kXRayOption = "select.xray";
+			// The bar's three bands: where the voxels are chosen, how they are
+			// chosen on the screen, and what is then done to them.
+			const char* const kInModelGroup = "model";
+			const char* const kOnScreenGroup = "screen";
+			const char* const kActOnGroup = "act";
 			// Pixels a press may move and still be a click.
 			constexpr float kClickReach = 4.0F;
 		} // namespace
@@ -42,25 +45,43 @@ namespace spades {
 			auto deselect = [](IVoxelEditContext& ed, const std::vector<IntVector3>& cells) {
 				ed.DeselectCells(cells);
 			};
-			subs.push_back(std::unique_ptr<VoxelTool>(new SelectVoxelSubTool()));
-			subs.push_back(std::unique_ptr<VoxelTool>(
-			  new BoxSubTool({select, "select"}, {deselect, "deselect"}, false)));
-			subs.push_back(std::unique_ptr<VoxelTool>(new ByColourSubTool()));
-			subs.push_back(std::unique_ptr<VoxelTool>(
-			  new CylinderSubTool({select, "select"}, {deselect, "deselect"})));
-			subs.push_back(std::unique_ptr<VoxelTool>(new PlaneSelectSubTool()));
-			rectIndex = int(subs.size());
-			subs.push_back(std::unique_ptr<VoxelTool>(new RectSelectSubTool(voxels, screen)));
-			brushIndex = int(subs.size());
-			subs.push_back(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(voxels, screen)));
+			// Ways of choosing voxels: in the model, then on the screen.
+			AddSub(std::unique_ptr<VoxelTool>(new SelectVoxelSubTool()), kInModelGroup);
+			AddSub(std::unique_ptr<VoxelTool>(
+			         new BoxSubTool({select, "select"}, {deselect, "deselect"}, false)),
+			       kInModelGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new ByColourSubTool()), kInModelGroup);
+			AddSub(std::unique_ptr<VoxelTool>(
+			         new CylinderSubTool({select, "select"}, {deselect, "deselect"})),
+			       kInModelGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new PlaneSelectSubTool()), kInModelGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new RectSelectSubTool(voxels, screen)),
+			       kOnScreenGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new BrushSelectSubTool(voxels, screen)),
+			       kOnScreenGroup);
+
+			// Then what is done with the voxels chosen. Each needs a selection to
+			// work on, so each lives here rather than as a tool of its own: the
+			// bar reads left to right as choose, then do.
+			actingIndex = int(subs.size());
+			AddSub(std::unique_ptr<VoxelTool>(new TransformSubTool()), kActOnGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(false)), kActOnGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(true)), kActOnGroup);
 
 			// Only the commands with no key of their own: Select All, Select
 			// None, Delete, Copy, Cut and Paste are in the menu with theirs,
 			// where a command belongs, leaving this bar to the active sub-tool.
 			options.AddAction(kFillSelectionOption, "Fill");
-			// The screen selections' settings, shown with them only.
-			options.AddNumber(kDiameterOption, "Size", "Brush", 5.0F, 0);
-			options.AddBool(kXRayOption, "X-Ray", "", screen.through);
+		}
+
+		void SelectTool::SetSubTool(IVoxelEditContext& ed, int i) {
+			ContainerTool::SetSubTool(ed, i);
+			if (Selecting())
+				lastSelecting = active;
+		}
+
+		void SelectTool::OnReturnToSelect(IVoxelEditContext& ed) {
+			SetSubTool(ed, lastSelecting);
 		}
 
 		void SelectTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
@@ -68,7 +89,11 @@ namespace spades {
 				// Asked before the sub-tool sees the press: a box under way says so.
 				const bool placing = Cur() && !Cur()->EscapeLabel(ed).empty();
 				ed.DoPick();
-				pressOnNothing = !placing && !ed.HasPick();
+				// Only while choosing voxels. A sub-tool that acts on them has
+				// its own answer to a click on nothing -- it hands the selection
+				// back to the last way of choosing -- and must not have the
+				// selection it is working on taken away underneath it.
+				pressOnNothing = Selecting() && !placing && !ed.HasPick();
 				pressAt = e.pos;
 			}
 			if (e.IsDrag() && pressOnNothing &&
@@ -87,24 +112,6 @@ namespace spades {
 		void SelectTool::UpdateOptions(IVoxelEditContext& ed) {
 			ContainerTool::UpdateOptions(ed);
 			options.SetEnabled(kFillSelectionOption, ed.SelectionCount() > 0);
-			options.SetVisible(kDiameterOption, active == brushIndex);
-			options.SetVisible(kXRayOption, active == rectIndex || active == brushIndex);
-			options.SetNumber(kDiameterOption, screen.diameter);
-			options.SetBool(kXRayOption, screen.through);
-		}
-
-		void SelectTool::OnOptionToggled(IVoxelEditContext& ed, const std::string& id, bool value) {
-			ContainerTool::OnOptionToggled(ed, id, value);
-			if (id == kXRayOption)
-				screen.through = value;
-		}
-
-		void SelectTool::OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id,
-		                                       float value, bool committed) {
-			ContainerTool::OnOptionNumberChanged(ed, id, value, committed);
-			if (id == kDiameterOption)
-				screen.diameter = std::max(ScreenSelectSettings::kMinDiameter,
-				                           std::min(ScreenSelectSettings::kMaxDiameter, value));
 		}
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {

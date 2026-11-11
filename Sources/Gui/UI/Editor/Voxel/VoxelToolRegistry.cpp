@@ -21,13 +21,11 @@
 #include "VoxelTool.h"
 
 #include "DrawTool.h"
-#include "ExtrudeTool.h"
 #include "MirrorTool.h"
 #include "PaintTool.h"
 #include "PivotTool.h"
 #include "ReferenceTool.h"
 #include "SelectTool.h"
-#include "TransformTool.h"
 
 namespace spades {
 	namespace gui {
@@ -50,13 +48,14 @@ namespace spades {
 				// Built-in tools, in toolbar order: the everyday ones first, the
 				// set-up ones last. Seeding here (rather than via static
 				// initialisers in each tool's TU) keeps the order deterministic.
-				// The keys lean on common editor conventions (Q select, B brush,
-				// T transform) and keep clear of the default WASD movement keys.
+				// The keys lean on common editor conventions (Q select, B brush)
+				// and keep clear of the default WASD movement keys. What is done
+				// to a selection -- Transform, Extrude, Pocket -- needs one to
+				// work on, so it lives inside Select as a sub-tool and keeps its
+				// own key there (T, E, R).
 				registry.Register(Make<SelectTool>(), "select", kEditingGroup, "Q");
 				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B");
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
-				registry.Register(Make<TransformTool>(), "transform", kEditingGroup, "T");
-				registry.Register(Make<ExtrudeTool>(), "extrude", kEditingGroup, "E");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
 				// The images to model from, across each axis.

@@ -21,6 +21,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "VoxelTool.h"
@@ -45,6 +46,9 @@ namespace spades {
 		public:
 			int SubToolCount() const override { return int(subs.size()); }
 			const char* SubToolLabel(int i) const override { return subs[i]->Label(); }
+			const char* SubToolGroup(int i) const override {
+				return i >= 0 && i < int(subGroups.size()) ? subGroups[i].c_str() : "";
+			}
 			VoxelTool* SubTool(int i) override {
 				return (i >= 0 && i < int(subs.size())) ? subs[i].get() : nullptr;
 			}
@@ -92,12 +96,25 @@ namespace spades {
 			VoxelTool* Cur();
 			const VoxelTool* Cur() const;
 
+			/**
+			 * Adds a sub-tool, in `group` where its container arranges its bar
+			 * in groups. The group belongs to the container, not to the
+			 * sub-tool: the same Box serves Draw, Paint and Select, which each
+			 * lay their bar out their own way.
+			 */
+			void AddSub(std::unique_ptr<VoxelTool> sub, const char* group = "") {
+				subGroups.resize(subs.size());
+				subGroups.push_back(group);
+				subs.push_back(std::move(sub));
+			}
+
 			/** The container's own options: what holds across its sub-tools. */
 			ToolOptions options;
 			/** Whether `id` is one of the container's own rather than a sub-tool's. */
 			bool Owns(const std::string& id) { return options.Find(id) != nullptr; }
 
 		private:
+			std::vector<std::string> subGroups; // AddSub's, by sub-tool
 			// `options` followed by the active sub-tool's, rebuilt by Options().
 			ToolOptions shown;
 		};
