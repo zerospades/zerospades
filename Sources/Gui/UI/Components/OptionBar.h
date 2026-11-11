@@ -71,6 +71,10 @@ namespace spades {
 			struct SubToolButton {
 				std::string label;
 				std::string hotKey; // drawn on the button's right; empty for none
+				// Buttons sharing a group are drawn together, parted from the
+				// next group by a separator: a tool's ways of selecting read
+				// apart from what it then does with the selection.
+				std::string group;
 				bool active = false;
 			};
 
