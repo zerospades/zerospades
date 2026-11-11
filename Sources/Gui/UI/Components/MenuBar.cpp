@@ -110,6 +110,7 @@ namespace spades {
 		void MenuBar::Close() {
 			open = -1;
 			selected = -1;
+			openedByPress = false;
 		}
 
 		void MenuBar::Open(int index) {
@@ -124,6 +125,7 @@ namespace spades {
 			}
 			open = index;
 			selected = -1;
+			openedByPress = false; // the presser says otherwise, after this
 			// Where it is and how large, now rather than when it is first
 			// drawn: the click that picks a row may come first.
 			PlaceOpenMenu();
@@ -160,12 +162,17 @@ namespace spades {
 		bool MenuBar::Click(const Vector2& p) {
 			const int title = TitleAt(p);
 			if (title >= 0) {
-				// The title of the menu already showing closes it again, as a
-				// menu bar does everywhere.
-				if (open == title)
+				// A press on the title of the menu it opened closes it again, as
+				// a menu bar does everywhere. A menu the pointer opened on its
+				// way along the bar stays: that press is the one that came to
+				// open it, and closing it under the hand that asked for it is
+				// how a menu comes to look as though its commands do nothing.
+				if (open == title && openedByPress) {
 					Close();
-				else
+				} else {
 					Open(title);
+					openedByPress = true;
+				}
 				sounds.Activate();
 				return true;
 			}
@@ -219,6 +226,13 @@ namespace spades {
 
 		bool MenuBar::KeyEvent(const std::string& key, bool down) {
 			if (!IsOpen())
+				return false;
+			// A mouse button reaches a view as a key in this engine, and it is
+			// not the keyboard's: it belongs to the press path, which knows
+			// where the pointer is. Swallowing it here leaves an open menu
+			// taking the keys and eating every click on the screen -- its own
+			// commands first of all.
+			if (key.find("MouseButton") != std::string::npos)
 				return false;
 			if (!down)
 				return true; // the menu has the keyboard: releases go nowhere else

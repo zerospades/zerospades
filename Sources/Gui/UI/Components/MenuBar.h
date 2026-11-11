@@ -104,6 +104,12 @@ namespace spades {
 			std::vector<float> panelW, panelH;
 
 			int open = -1;      // the menu showing, or -1
+			// Whether the press that opened it was on its own title. Walking
+			// along the bar opens each menu in turn as the pointer crosses it,
+			// and the press that follows is the one that meant to open the
+			// menu already showing -- it must not be read as the press that
+			// closes it again.
+			bool openedByPress = false;
 			int selected = -1;  // the row under the pointer or the keys
 			float menuX = 0.0F, menuY = 0.0F, menuW = 0.0F, menuH = 0.0F;
 
