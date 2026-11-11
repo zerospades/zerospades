@@ -300,16 +300,18 @@ namespace spades {
 			sceneDef.zNear = kNearPlane;
 			sceneDef.zFar = ViewDistance();
 			if (orthogonal) {
-				// A parallel view has no vanishing point to stand behind, but it
-				// still clips at the near plane, and zooming in walks the eye
-				// into the model. So the eye stands back out of it, and the far
-				// plane follows it back by as much. Nothing moves on the screen:
-				// where the eye sits along the line of sight is the one thing a
-				// parallel projection does not care about -- only what is still
-				// in front of it to be seen.
-				const float back = ViewDistance();
-				sceneDef.viewOrigin = eye - dir * back;
-				sceneDef.zFar += back;
+				// A parallel view still clips at the near plane, and zooming in
+				// would walk the eye into the model. Its box simply starts
+				// behind the eye instead -- a parallel projection has no
+				// vanishing point to stand in front of, so a near plane behind
+				// the viewer is as good as one in front.
+				//
+				// The eye itself stays exactly where the perspective camera put
+				// it. Moving it back would be invisible in the projection but
+				// not to everything else: distance from the eye is what the fog
+				// is measured by, among other things, and a camera standing a
+				// view away from the model fogs it out of sight.
+				sceneDef.zNear = -ViewDistance();
 			}
 			sceneDef.viewportLeft = 0;
 			sceneDef.viewportTop = 0;
