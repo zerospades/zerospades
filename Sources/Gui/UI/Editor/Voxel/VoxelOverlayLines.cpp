@@ -77,25 +77,32 @@ namespace spades {
 			// line's screen length, and the work spent along it, covers what shows.
 			bool ClipToView(const GizmoView& view, float margin, Vector3& a, Vector3& b) {
 				const Vector3 eye = view.eye;
-				if (!ClipToPlane(
+				// Nothing in front of the eye in a perspective view has a place
+				// on the screen. A parallel view has no such limit: its box
+				// starts behind the eye, and what is level with it is drawn.
+				if (!view.orthogonal &&
+				    !ClipToPlane(
 				      [&](const Vector3& p) { return view.Depth(p) - EditorCamera::kNearPlane; }, a,
 				      b))
 					return false;
-				// The sides, widened by the margin, as planes through the eye: a point
-				// is inside when its offset across the view is within the frustum's
-				// half-width at its depth.
-				const float halfWidth =
-				  view.tanHalfFovX * (1.0F + 2.0F * margin / view.viewportWidth);
-				const float halfHeight =
-				  view.tanHalfFovY * (1.0F + 2.0F * margin / view.viewportHeight);
+				// The sides, widened by the margin. In a perspective view they are
+				// planes through the eye and a point is within the half-width at
+				// its own depth; in a parallel one they are parallel to the line
+				// of sight and the half-width is the same at every depth.
+				const float wide = 1.0F + 2.0F * margin / view.viewportWidth;
+				const float tall = 1.0F + 2.0F * margin / view.viewportHeight;
+				const float aspect = view.tanHalfFovX / view.tanHalfFovY;
 				const Vector3 sides[4] = {view.right, view.right * -1.0F, view.up, view.up * -1.0F};
 				for (int k = 0; k < 4; k++) {
 					const Vector3& across = sides[k];
-					const float half = (k < 2) ? halfWidth : halfHeight;
 					if (!ClipToPlane(
 					      [&](const Vector3& p) {
 						      const Vector3 rel = p - eye;
-						      return Vector3::Dot(rel, view.forward) * half - Vector3::Dot(rel, across);
+						      const float depth = Vector3::Dot(rel, view.forward);
+						      const float halfHeight = view.HalfHeightAt(depth);
+						      const float half =
+						        (k < 2) ? halfHeight * aspect * wide : halfHeight * tall;
+						      return half - Vector3::Dot(rel, across);
 					      },
 					      a, b))
 						return false;
@@ -107,7 +114,8 @@ namespace spades {
 			bool SameView(const GizmoView& a, const GizmoView& b) {
 				return a.eye == b.eye && a.right == b.right && a.up == b.up &&
 				       a.forward == b.forward && a.tanHalfFovX == b.tanHalfFovX &&
-				       a.tanHalfFovY == b.tanHalfFovY && a.viewportX == b.viewportX &&
+				       a.tanHalfFovY == b.tanHalfFovY && a.orthogonal == b.orthogonal &&
+				       a.orthoHeight == b.orthoHeight && a.viewportX == b.viewportX &&
 				       a.viewportY == b.viewportY && a.viewportWidth == b.viewportWidth &&
 				       a.viewportHeight == b.viewportHeight;
 			}
