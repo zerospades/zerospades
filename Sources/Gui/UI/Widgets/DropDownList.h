@@ -39,6 +39,7 @@ namespace spades {
 			class DropDownViewItem : public Button {
 			public:
 				int index = 0;
+				bool selected = false; // the current value; drawn highlighted
 				DropDownViewItem(UIManager* manager) : Button(manager) {}
 				void Render() override;
 			};
@@ -52,6 +53,7 @@ namespace spades {
 
 			public:
 				DropDownListHandler handler;
+				int selected = -1;
 
 				DropDownViewModel(UIManager* manager, std::vector<std::string> list);
 				int GetNumRows() override { return static_cast<int>(list.size()); }
@@ -79,14 +81,16 @@ namespace spades {
 				DropDownBackground* bg = nullptr; // weak; our parent
 
 				DropDownView(UIManager* manager, DropDownListHandler handler,
-				             std::vector<std::string> items);
+				             std::vector<std::string> items, int selected = -1);
 				void Destroy();
 			};
 
+			/** `selected` is the row holding the current value, drawn highlighted. */
 			void ShowDropDownList(UIManager* manager, float x, float y, float width,
-			                      std::vector<std::string> items, DropDownListHandler handler);
+			                      std::vector<std::string> items, DropDownListHandler handler,
+			                      int selected = -1);
 			void ShowDropDownList(UIElement& e, std::vector<std::string> items,
-			                      DropDownListHandler handler);
+			                      DropDownListHandler handler, int selected = -1);
 		} // namespace ui
 	} // namespace gui
 } // namespace spades

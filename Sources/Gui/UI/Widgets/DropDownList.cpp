@@ -32,10 +32,11 @@ namespace spades {
 				Vector2 pos = GetScreenPosition();
 				Vector2 sz = size;
 
-				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, hover ? 0.2F : 0.0F));
+				float fill = hover ? 0.2F : (selected ? 0.12F : 0.0F);
+				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, fill));
 				r.DrawFilledRect(pos.x + 1, pos.y + 1, pos.x + sz.x - 1, pos.y + sz.y - 1);
 
-				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, hover ? 0.3F : 0.0F));
+				SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, (hover || selected) ? 0.3F : 0.0F));
 				r.DrawOutlinedRect(pos.x, pos.y, pos.x + sz.x, pos.y + sz.y);
 
 				client::IFont* font = GetFont();
@@ -63,6 +64,7 @@ namespace spades {
 				Handle<DropDownViewItem> i = Handle<DropDownViewItem>::New(manager);
 				i->caption = list[row];
 				i->index = row;
+				i->selected = row == selected;
 				i->activated = [this](UIElement& sender) { ItemClicked(sender); };
 				return std::move(i).Cast<UIElement>();
 			}
@@ -101,10 +103,11 @@ namespace spades {
 			// -- DropDownView --
 
 			DropDownView::DropDownView(UIManager* manager, DropDownListHandler handler,
-			                           std::vector<std::string> items)
+			                           std::vector<std::string> items, int selected)
 			    : ListView(manager), handler(std::move(handler)) {
 				Handle<DropDownViewModel> model =
 				    Handle<DropDownViewModel>::New(manager, std::move(items));
+				model->selected = selected;
 				model->handler = [this](int index) { ItemActivated(index); };
 				SetModel(model.GetPointerOrNull());
 			}
@@ -121,9 +124,10 @@ namespace spades {
 			// -- ShowDropDownList --
 
 			void ShowDropDownList(UIManager* manager, float x, float y, float width,
-			                      std::vector<std::string> items, DropDownListHandler handler) {
+			                      std::vector<std::string> items, DropDownListHandler handler,
+			                      int selected) {
 				Handle<DropDownView> view =
-				    Handle<DropDownView>::New(manager, std::move(handler), items);
+				    Handle<DropDownView>::New(manager, std::move(handler), items, selected);
 				Handle<DropDownBackground> bg =
 				    Handle<DropDownBackground>::New(manager, view.GetPointerOrNull());
 				view->bg = bg.GetPointerOrNull();
@@ -144,10 +148,10 @@ namespace spades {
 			}
 
 			void ShowDropDownList(UIElement& e, std::vector<std::string> items,
-			                      DropDownListHandler handler) {
+			                      DropDownListHandler handler, int selected) {
 				AABB2 b = e.GetScreenBounds();
 				ShowDropDownList(&e.GetManager(), b.min.x, b.max.y, b.max.x - b.min.x,
-				                 std::move(items), std::move(handler));
+				                 std::move(items), std::move(handler), selected);
 			}
 		} // namespace ui
 	} // namespace gui

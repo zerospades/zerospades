@@ -4264,3 +4264,25 @@ msgid ""
 msgstr ""
 "Falta Mods/index.txt, así que ningún mod puede verificarse como oficial. "
 "Descarga los mods oficiales para crearlo."
+
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:76
+msgctxt "StartupScreen"
+msgid ""
+"The size of the game window. The native size (the default) follows the "
+"monitor this window is on, and the game opens on that monitor. Typing a size "
+"or picking another one turns that off."
+msgstr ""
+"El tamaño de la ventana del juego. El tamaño nativo (por defecto) sigue al "
+"monitor en el que está esta ventana, y el juego se abre en ese monitor. "
+"Escribir un tamaño o elegir otro lo desactiva."
+
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:581
+msgctxt "StartupScreen"
+msgid "(native)"
+msgstr "(nativa)"
+
+#: Sources/Gui/Utils/DisplayUtils.cpp:68
+#, c++-format
+msgctxt "StartupScreen"
+msgid "Display {0}"
+msgstr "Pantalla {0}"
