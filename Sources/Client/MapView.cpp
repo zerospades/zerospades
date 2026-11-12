@@ -324,7 +324,9 @@ namespace spades {
 			scrPos.x -= size.x * 0.5F;
 			scrPos.y -= size.y;
 
-			font.DrawShadow(s, scrPos, 1.0F, col, MakeVector4(0, 0, 0, col.w));
+			Vector4 shadow = MakeVector4(0, 0, 0, col.w * 0.5F);
+
+			font.DrawShadow(s, scrPos, 1.0F, col, shadow);
 		}
 
 		stmp::optional<Vector2> MapView::ProjectVisible(const Vector2& pos) const {
