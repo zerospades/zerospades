@@ -26,6 +26,7 @@
 #include "PaintTool.h"
 #include "PivotTool.h"
 #include "ReferenceTool.h"
+#include "RenderTool.h"
 #include "SelectTool.h"
 
 namespace spades {
@@ -37,6 +38,8 @@ namespace spades {
 			constexpr int kSelectionGroup = 0;
 			constexpr int kEditingGroup = 1;
 			constexpr int kSetupGroup = 2;
+			// And what makes something of the model without changing it.
+			constexpr int kOutputGroup = 3;
 
 			template <class T> VoxelToolRegistry::Factory Make() {
 				return [] { return std::unique_ptr<VoxelTool>(new T()); };
@@ -63,6 +66,8 @@ namespace spades {
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
 				// The images to model from, across each axis.
 				registry.Register(Make<ReferenceTool>(), "reference", kSetupGroup, "I");
+				// An image of the model, from where the camera stands.
+				registry.Register(Make<RenderTool>(), "render", kOutputGroup, "");
 			}
 			return registry;
 		}

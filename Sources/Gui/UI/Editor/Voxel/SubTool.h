@@ -322,33 +322,6 @@ namespace spades {
 			int StepsOf(const GizmoTransform& total) const;
 		};
 
-		/**
-		 * Recolours the selected voxels (Modify's "Paint"): with the brush
-		 * colour on a click or on Fill, and with each colour chosen on the
-		 * picker while it is active, live while it is being chosen. A waiting
-		 * paste or import is recoloured where it waits.
-		 */
-		class PaintSelectionSubTool : public VoxelTool {
-		public:
-			PaintSelectionSubTool();
-			const char* Label() const override { return "Paint"; }
-			// C for colour: P is the Paint tool's, which colours any voxel.
-			std::string HotKey() const override { return "C"; }
-			std::string Hint(IVoxelEditContext&) override;
-			// A press on a voxel paints the selection; one on nothing gives the
-			// selection up for Select.
-			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
-			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
-			                         bool committed) override;
-
-			ToolOptions* Options() override { return &options; }
-			void UpdateOptions(IVoxelEditContext& ed) override;
-			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
-
-		private:
-			ToolOptions options;
-		};
-
 		// Moves the model pivot with the gizmo, snapped as the Pivot tool sets it.
 		// Voxels stay put. The pivot follows the drag live and is committed as one
 		// undo step on release.

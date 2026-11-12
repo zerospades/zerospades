@@ -28,6 +28,8 @@
 #include <Client/IFont.h>
 #include <Client/IModel.h>
 #include <Client/ScreenShot.h>
+#include <Core/Bitmap.h>
+#include <Gui/UI/Editor/Shell/RenderImage.h>
 #include <Core/Debug.h>
 #include <Core/LocalFileSystem.h>
 #include <Core/Settings.h>
@@ -100,6 +102,17 @@ namespace spades {
 
 			// The view keys: back to the opening view, and frame the selection.
 			// Named as SDL names them (Home), compared ignoring case.
+			// What the view is drawn on.
+			const Vector3 kBackground = MakeVector3(0.10F, 0.10F, 0.12F);
+			// How many times further than the far plane the fog is put for an
+			// image of the model: far enough to leave it its own colours.
+			constexpr float kRenderFogReach = 1000.0F;
+			// The two backgrounds an image's model is told from. As dark between
+			// them as the view's own, so whatever the renderer's filters make of
+			// a scene by its background they make of these what the view shows;
+			// far apart in hue, so that background is unmistakable.
+			const Vector3 kRenderKeyFirst = MakeVector3(0.30F, 0.00F, 0.02F);
+			const Vector3 kRenderKeySecond = MakeVector3(0.00F, 0.30F, 0.02F);
 			const char* const kHomeViewKey = "Home";
 			const char* const kFrameSelectionKey = "F";
 			// Blender's Numpad 5, which this keyboard may not have, and the
@@ -483,6 +496,14 @@ namespace spades {
 			                                     : "Perspective projection");
 		}
 
+		void KV6EditorView::LookIsometric(float elevation) {
+			// Isometric is a parallel projection by definition: in perspective
+			// the three axes would not keep their one scale.
+			cam.SetOrthogonal(true);
+			cg_editorOrthogonal = 1;
+			cam.TurnToCorner(elevation);
+		}
+
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
 			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
 			       EqualsIgnoringCase(key, kFrameSelectionKey) ||
@@ -789,6 +810,52 @@ namespace spades {
 			return editor->TextInputRect();
 		}
 
+		void KV6EditorView::DrawSceneContents(bool modelOnly) {
+			if (renderModel) {
+				client::ModelRenderParam param;
+				// Cancel the KV6 pivot so the model sits in the editor's grid space.
+				param.matrix = Matrix4::Translate(document.Origin() * -1.0F);
+				renderer->RenderModel(*renderModel, param);
+			}
+			if (modelOnly)
+				return;
+			DrawHelpers();
+			DrawOriginAxes();
+			editor->DrawScene();
+		}
+
+		void KV6EditorView::ServeRender(const client::SceneDefinition& sceneDef) {
+			// The model alone, twice, on two backgrounds: what differs between
+			// the two pictures is background and what does not is the model,
+			// whatever the renderer's filters did to either (see LiftSubject).
+			// Each is a whole frame, finished and read back before the frame
+			// the user sees is begun: `FrameDone` is what makes the read-back
+			// a complete image, as for a screenshot.
+			auto picture = [&](const Vector3& fog) {
+				renderer->SetFogColor(fog);
+				renderer->StartScene(sceneDef);
+				DrawSceneContents(true);
+				renderer->EndScene();
+				renderer->FrameDone();
+				return renderer->ReadBitmap();
+			};
+			// No fog near enough to reach the model, or it would take on each
+			// background's colour with distance and read as part of it.
+			renderer->SetFogDistance(cam.ViewDistance() * kRenderFogReach);
+			try {
+				Handle<Bitmap> first = picture(kRenderKeyFirst);
+				Handle<Bitmap> second = picture(kRenderKeySecond);
+				Handle<Bitmap> image =
+				  LiftSubject(*first, *second, renderBackground, renderTransparent);
+				editor->SetStatus("Render saved: " + SaveRenderImage(*image));
+			} catch (const std::exception& ex) {
+				editor->SetStatus("Render failed");
+				SPLog("Editor render failed: %s", ex.what());
+			}
+			renderer->SetFogColor(kBackground);
+			renderer->SetFogDistance(cam.ViewDistance());
+		}
+
 		void KV6EditorView::RunFrame(float dt) {
 			SPADES_MARK_FUNCTION();
 			float sw = renderer->ScreenWidth();
@@ -803,7 +870,10 @@ namespace spades {
 			           !ui->GetMenuBar()->IsOpen() && !ui->GetOverlay()->IsActive());
 			editor->Update(dt);
 
-			renderer->SetFogColor(MakeVector3(0.10F, 0.10F, 0.12F));
+			// While an image of the model is being made the view shows the model
+			// alone, as the image will.
+			const bool modelOnly = editor->PresentsRender();
+			renderer->SetFogColor(kBackground);
 			// Matches the far plane: fog that ended closer would swallow the model
 			// at the far end of the zoom range.
 			renderer->SetFogDistance(cam.ViewDistance());
@@ -820,16 +890,12 @@ namespace spades {
 				renderModel = renderer->CreateModel(document.Model());
 				renderModelVersion = document.Version();
 			}
-			renderer->StartScene(sceneDef);
-			if (renderModel) {
-				client::ModelRenderParam param;
-				// Cancel the KV6 pivot so the model sits in the editor's grid space.
-				param.matrix = Matrix4::Translate(document.Origin() * -1.0F);
-				renderer->RenderModel(*renderModel, param);
+			if (wantRender) {
+				wantRender = false;
+				ServeRender(sceneDef);
 			}
-			DrawHelpers();
-			DrawOriginAxes();
-			editor->DrawScene();
+			renderer->StartScene(sceneDef);
+			DrawSceneContents(modelOnly);
 			renderer->EndScene();
 
 			editor->DrawViewportOverlays(sw, sh, HelpLine());

@@ -29,6 +29,10 @@ namespace spades {
 		// Plane (a flat face), and on the screen Rect and Brush. It only ever
 		// changes which voxels are selected -- its bar ends with All, None and
 		// Invert -- and what is then done with them is Modify's.
+		/** What a colour chosen on the picker does while voxels are selected:
+		 *  recolours them, shown as it is chosen and kept once it is. */
+		void RecolourSelectionAsChosen(IVoxelEditContext& ed, std::uint32_t color, bool committed);
+
 		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
@@ -37,6 +41,10 @@ namespace spades {
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+			// A colour chosen on the picker recolours the selection, live while
+			// it is being chosen.
+			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+			                         bool committed) override;
 			// A click on nothing selects nothing, whichever way of selecting is
 			// active, as in every modeller: but for a box or a cylinder being
 			// placed, whose next point may well be in empty space.

@@ -21,6 +21,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -28,6 +29,7 @@
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+#include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 #include <Gui/UI/Editor/Shell/ToolOptions.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
@@ -194,6 +196,10 @@ namespace spades {
 			/** The pending voxels, selection, mirror planes and the active tool's
 			 *  preview; inside the host's scene. */
 			void DrawScene();
+			/** Whether the active tool shows the view as an image being made
+			 *  (see VoxelTool::PresentsRender): the host then leaves out what
+			 *  it draws to work by, as DrawScene and DrawViewportOverlays do. */
+			bool PresentsRender();
 			/** Over the finished scene: the overlay lines, then the hint lines
 			 *  under the viewport, `help` (the host's own keys) at the bottom. */
 			void DrawViewportOverlays(float sw, float sh, const std::string& help);
@@ -252,6 +258,9 @@ namespace spades {
 			                                      bool through) const override;
 			void SelectAll() override;
 			void InvertSelection() override;
+			void LookIsometric(float elevation) override;
+			void TurnView(int quarterTurns) override;
+			void SaveRender(std::uint32_t background, bool transparent) override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
 			void SwitchTool(const std::string& id) override { pendingTool = id; }
 			void ReturnToSelect() override {
@@ -344,7 +353,21 @@ namespace spades {
 			int ToolIndex(const std::string& id) const;
 			// The active tool's option `id` if it is of `type`, else null: where a
 			// click on the option bar lands.
-			ToolOption* ActiveOption(const std::string& id, ToolOption::Type type);
+			/** `tool`'s option `id`, among its bar's and its strip's commands,
+			 *  if it is of `type`. */
+			ToolOption* FindOption(VoxelTool* tool, const std::string& id, ToolOption::Type type);
+			/** The tool whose sub-tools and options the option bar shows: the
+			 *  active one, or the one it is the strip of, whose bar stays put
+			 *  while its strip is worked with. */
+			VoxelTool* BarTool();
+			int BarToolIndex() const;
+			/** Wires `bar`'s clicks to the tool `indexOf` names when they land. */
+			void WireBar(OptionBar& bar, std::function<int()> indexOf);
+			/** The colour the picker and the swatch show and set: the brush's,
+			 *  unless the active tool has one of its own for them. */
+			std::uint32_t& PickerColor();
+			bool BarsEditing() const;
+			void EndBarEdits(bool commit);
 			void SetActiveTool(int index);
 			void SetMode(EditorMode mode);
 			// Deactivates the outgoing tool (where a pending placement lands) and
@@ -610,6 +633,7 @@ namespace spades {
 			void DrawToolbar(float sw);
 			void DrawOptionBar(float sw);
 			void DrawContextStrip(float sw);
+			std::vector<OptionBar::SubToolButton> SubToolButtons(VoxelTool& tool);
 			/** The tool whose sub-tools the strip offers now: the strip of the
 			 *  active tool, or the active tool itself when it is one, as long
 			 *  as it has anything to work on. Null for no strip. */

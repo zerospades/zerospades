@@ -88,6 +88,13 @@ namespace spades {
 			bool ClickViewportWidget(const Vector2& cursor) override;
 			void DocumentReframed(const Vector3& shift) override { cam.Shift(shift); }
 			void ReleaseHeldKeys() override { cam.ReleaseHeld(); }
+			void LookIsometric(float elevation) override;
+			void TurnView(int quarterTurns) override { cam.TurnQuarters(quarterTurns); }
+			void SaveRender(std::uint32_t background, bool transparent) override {
+				wantRender = true;
+				renderBackground = background;
+				renderTransparent = transparent;
+			}
 			void PickImageFile(const std::string& title,
 			                   std::function<void(const std::string&)> picked) override;
 
@@ -122,6 +129,15 @@ namespace spades {
 			float globalTime = 0.0F;
 			bool wantsClose = false;
 			bool wantScreenShot = false; // set by the screenshot key, served at end of frame
+			bool wantRender = false;     // set by the Render tool, served before the frame
+			std::uint32_t renderBackground = 0; // 0x00BBGGRR, what it is rendered on
+			bool renderTransparent = false;     // ... unless on nothing
+			// The scene between StartScene and EndScene: the model, and unless
+			// it is an image of it being made, what the editor works by.
+			void DrawSceneContents(bool modelOnly);
+			// Draws the model alone, frames of its own ahead of the one the
+			// user sees, and saves the image made of them.
+			void ServeRender(const client::SceneDefinition& sceneDef);
 
 			// --- Camera -------------------------------------------------------
 			EditorCamera cam;

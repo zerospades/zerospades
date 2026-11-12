@@ -20,28 +20,26 @@
 
 #include "ModifyTool.h"
 
+#include "SelectTool.h"
 #include "VoxelEditContext.h"
 
 namespace spades {
 	namespace gui {
 		namespace {
+			const char* const kFillOption = "modify.fill";
 			const char* const kCavityOption = "modify.cavity";
 			// A wall one voxel thick. The dig takes a thickness and the box to
 			// set it can go on the bar the day one is wanted; until then the
 			// thinnest wall is the one a model this size is hollowed to.
 			constexpr int kCavityThickness = 1;
-			// The strip's two bands: what changes where the voxels are, and what
-			// changes their colour.
-			const char* const kShapeGroup = "shape";
-			const char* const kColourGroup = "colour";
 		} // namespace
 
 		ModifyTool::ModifyTool() {
-			AddSub(std::unique_ptr<VoxelTool>(new TransformSubTool()), kShapeGroup);
-			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(false)), kShapeGroup);
-			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(true)), kShapeGroup);
-			AddSub(std::unique_ptr<VoxelTool>(new PaintSelectionSubTool()), kColourGroup);
+			AddSub(std::unique_ptr<VoxelTool>(new TransformSubTool()));
+			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(false)));
+			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(true)));
 
+			commands.AddAction(kFillOption, "Fill");
 			commands.AddAction(kCavityOption, "Cavity");
 		}
 
@@ -56,19 +54,21 @@ namespace spades {
 			// button is pressed, and refused there with the reason. Voxels
 			// still waiting to be placed are not a selection to hollow out,
 			// though the count of what the commands act on includes them.
+			commands.SetEnabled(kFillOption, ed.SelectionCount() > 0);
 			commands.SetEnabled(kCavityOption, ed.SelectionCount() > 0 && !ed.HasPlacement());
 		}
 
 		void ModifyTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			ContainerTool::OnAction(ed, id);
-			if (id == kCavityOption)
+			if (id == kFillOption)
+				ed.RecolorSelection(ed.CurrentColor()); // reports what it recoloured
+			else if (id == kCavityOption)
 				ed.CarveCavity(kCavityThickness); // reports what it took, or why not
 		}
 
 		void ModifyTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
 		                                     bool committed) {
-			if (VoxelTool* sub = Cur())
-				sub->OnBrushColorChanged(ed, color, committed);
+			RecolourSelectionAsChosen(ed, color, committed);
 		}
 	} // namespace gui
 } // namespace spades

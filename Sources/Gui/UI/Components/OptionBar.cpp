@@ -65,6 +65,8 @@ namespace spades {
 		static const float kNumberLabelGap = 4.0F;
 		static const float kNumberBoxW = 52.0F;
 		static const float kNumberArrowW = 11.0F;
+		// A colour in hex is seven characters and has no arrows to step it.
+		static const float kHexBoxW = 68.0F;
 		static const float kNumberTextInset = 5.0F;
 		// Half the arrow glyph, which is drawn as a triangle rather than an
 		// image: at this size two of them stack inside the bar's button height.
@@ -139,7 +141,10 @@ namespace spades {
 			editingOwner = owner;
 			editingId = op.id;
 			editingStartValue = op.value;
-			entry.Begin(op.value, op.decimals);
+			if (op.hex)
+				entry.BeginHex(op.value);
+			else
+				entry.Begin(op.value, op.decimals);
 		}
 
 		void OptionBar::StepNumber(size_t i, float delta) {
@@ -391,7 +396,8 @@ namespace spades {
 						width = std::max(kActionMinW, textSize.x + kActionPad);
 						break;
 					case OptionType::Number:
-						width = textSize.x + kNumberLabelGap + kNumberBoxW + kNumberArrowW;
+						width = textSize.x + kNumberLabelGap +
+						        (op.hex ? kHexBoxW : kNumberBoxW + kNumberArrowW);
 						break;
 				}
 				const Span span{x, width};
@@ -430,22 +436,25 @@ namespace spades {
 			font.Draw(op.label, MakeVector2(span.x, btnY + (kTbH - labelSize.y) * 0.5F), 1.0F,
 			          op.enabled ? labelColor : disabledColor);
 			const float boxX = span.x + labelSize.x + kNumberLabelGap;
-			const float arrowX = boxX + kNumberBoxW;
+			const float boxW = op.hex ? kHexBoxW : kNumberBoxW;
+			const float arrowX = boxX + boxW;
 			const float half = kTbH * 0.5F;
 
 			NumberSpans& ns = numberSpans[i];
-			ns.box = Span{boxX, kNumberBoxW};
-			ns.arrows = Span{arrowX, kNumberArrowW};
+			ns.box = Span{boxX, boxW};
+			ns.arrows = Span{arrowX, op.hex ? 0.0F : kNumberArrowW};
 
 			const bool boxHover = !menuActive && op.enabled &&
-			                      OverlayInRect(cursorPos, boxX, btnY, kNumberBoxW, kTbH);
-			widgets::PaintField(renderer, MakeVector2(boxX, btnY),
-			                    MakeVector2(kNumberBoxW, kTbH), isEditing, boxHover);
+			                      OverlayInRect(cursorPos, boxX, btnY, boxW, kTbH);
+			widgets::PaintField(renderer, MakeVector2(boxX, btnY), MakeVector2(boxW, kTbH),
+			                    isEditing, boxHover);
 
 			// While it is typed into the box shows the text as it stands, caret
 			// and all; otherwise the value the tool last put there.
 			const std::string shown =
-			  isEditing ? entry.Text() : NumberEntry::Format(op.value, op.decimals);
+			  isEditing ? entry.Text()
+			            : (op.hex ? NumberEntry::FormatHex(op.value)
+			                      : NumberEntry::Format(op.value, op.decimals));
 			const Vector2 shownSize = font.Measure(shown);
 			font.Draw(shown, MakeVector2(boxX + kNumberTextInset, btnY + (kTbH - shownSize.y) * 0.5F),
 			          1.0F, op.enabled ? valueColor : disabledColor);
@@ -455,6 +464,9 @@ namespace spades {
 				OverlayColorNP(renderer, valueColor);
 				OverlayFillRect(renderer, caretX, btnY + 4.0F, 1.0F, kTbH - 8.0F);
 			}
+
+			if (op.hex)
+				return;
 
 			// Triangles rather than an image: the bar draws everything else from
 			// primitives, and these have to sit in half a button's height.

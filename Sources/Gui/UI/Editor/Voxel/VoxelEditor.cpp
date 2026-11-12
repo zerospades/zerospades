@@ -223,7 +223,7 @@ namespace spades {
 		}
 
 		bool VoxelEditor::IsTyping() const {
-			return transformPanel->IsTyping() || ui.GetOptionBar()->IsEditing();
+			return transformPanel->IsTyping() || BarsEditing();
 		}
 
 		bool VoxelEditor::HoldsPointer() const { return transformPanel->IsHolding(); }
@@ -242,7 +242,17 @@ namespace spades {
 					transformPanel->Insert(text);
 				return;
 			}
-			ui.GetOptionBar()->TextInputEvent(text);
+			ui.GetOptionBar()->TextInputEvent(text); // whichever is being typed into
+			ui.GetContextStrip()->TextInputEvent(text);
+		}
+
+		bool VoxelEditor::BarsEditing() const {
+			return ui.GetOptionBar()->IsEditing() || ui.GetContextStrip()->IsEditing();
+		}
+
+		void VoxelEditor::EndBarEdits(bool commit) {
+			ui.GetOptionBar()->EndEditing(commit);
+			ui.GetContextStrip()->EndEditing(commit);
 		}
 
 		void VoxelEditor::TextComposition(const std::string& text) {
@@ -253,8 +263,10 @@ namespace spades {
 		bool VoxelEditor::AcceptsTextInput() const { return IsTyping(); }
 
 		AABB2 VoxelEditor::TextInputRect() const {
-			return transformPanel->IsTyping() ? transformPanel->TextRect()
-			                                  : ui.GetOptionBar()->EditingRect();
+			if (transformPanel->IsTyping())
+				return transformPanel->TextRect();
+			return ui.GetContextStrip()->IsEditing() ? ui.GetContextStrip()->EditingRect()
+			                                         : ui.GetOptionBar()->EditingRect();
 		}
 
 		void VoxelEditor::WireUI() {
@@ -272,61 +284,11 @@ namespace spades {
 			ui.GetToolbar()->OnUndoClicked = [this]() { Undo(); };
 			ui.GetToolbar()->OnRedoClicked = [this]() { Redo(); };
 
-			// The option bar's content belongs to the active tool, so a click only
-			// counts while that tool still is.
-			ui.GetOptionBar()->CurrentOwner = [this] {
-				return static_cast<const void*>(ActiveTool());
-			};
-			ui.GetOptionBar()->OnSubToolClicked = [this](int index) {
-				if (VoxelTool* tool = ActiveTool())
-					tool->SetSubTool(*this, index);
-			};
-			ui.GetOptionBar()->OnBoolToggled = [this](const std::string& id) {
-				if (ToolOption* opt = ActiveOption(id, ToolOption::Type::Bool)) {
-					opt->bvalue = !opt->bvalue;
-					ActiveTool()->OnOptionToggled(*this, id, opt->bvalue);
-				}
-			};
-			ui.GetOptionBar()->OnActionClicked = [this](const std::string& id) {
-				if (ActiveOption(id, ToolOption::Type::Action))
-					ActiveTool()->OnAction(*this, id);
-			};
-			ui.GetOptionBar()->OnNumberChanged = [this](const std::string& id, float value,
-			                                            bool committed) {
-				ToolOption* opt = ActiveOption(id, ToolOption::Type::Number);
-				if (!opt)
-					return;
-				// A settled value is one user action, so a typed number or an
-				// arrow press undoes in one go; an unsettled one only previews
-				// and has nothing to record.
-				if (committed)
-					undo.BeginAction();
-				UserActionEnd end(*this, committed);
-				ActiveTool()->OnOptionNumberChanged(*this, id, value, committed);
-			};
-
-			// The strip's content belongs to the tool it is the strip of. A
-			// press on one of its sub-tools goes to that tool, whichever was
-			// active; a command runs behind the active tool's back, as one
-			// from a menu does.
-			ui.GetContextStrip()->CurrentOwner = [this] {
-				return static_cast<const void*>(StripTool());
-			};
-			ui.GetContextStrip()->OnSubToolClicked = [this](int index) {
-				const int strip = StripToolIndex();
-				SetActiveTool(strip);
-				if (strip >= 0 && activeTool == strip)
-					tools[static_cast<size_t>(strip)].tool->SetSubTool(*this, index);
-			};
-			ui.GetContextStrip()->OnActionClicked = [this](const std::string& id) {
-				VoxelTool* tool = StripTool();
-				ToolOptions* commands = tool ? tool->StripCommands() : nullptr;
-				const ToolOption* command = commands ? commands->Find(id) : nullptr;
-				if (!command || !command->enabled)
-					return;
-				CancelToolInteraction();
-				tool->OnAction(*this, id);
-			};
+			// The option bar's content belongs to the tool whose bar it is, the
+			// strip's to the tool it is the strip of; a click only counts while
+			// that tool still is the one, and goes to it whichever is active.
+			WireBar(*ui.GetOptionBar(), [this] { return BarToolIndex(); });
+			WireBar(*ui.GetContextStrip(), [this] { return StripToolIndex(); });
 
 			// The brush colour is the editor's, shared by every tool: its swatch
 			// sits on the main toolbar and opens or closes the picker, which
@@ -336,17 +298,75 @@ namespace spades {
 				if (picker.IsOpen()) {
 					picker.Close();
 				} else {
-					picker.SetColor(currentColor);
+					picker.SetColor(PickerColor());
 					picker.Open();
 				}
 			};
 			// The active tool follows the colour as it is chosen (Select
 			// recolours the selection with it), live while the picker is pressed.
 			ui.GetColorPicker()->OnColorChanged = [this](std::uint32_t c) {
-				currentColor = c;
+				// A tool with a colour of its own for the picker has it set
+				// and that is all: the brush, and what follows it, stay put.
+				std::uint32_t& target = PickerColor();
+				target = c;
+				if (&target != &currentColor)
+					return;
 				if (pickerHeld)
 					pickerChangedColor = true;
 				BrushColorChanged(!pickerHeld);
+			};
+		}
+
+		std::uint32_t& VoxelEditor::PickerColor() {
+			if (VoxelTool* t = ActiveTool()) {
+				if (std::uint32_t* own = t->PickerColor())
+					return *own;
+			}
+			return currentColor;
+		}
+
+		void VoxelEditor::WireBar(OptionBar& bar, std::function<int()> indexOf) {
+			auto toolOf = [this, indexOf]() -> VoxelTool* {
+				const int index = indexOf();
+				return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
+			};
+			bar.CurrentOwner = [toolOf] { return static_cast<const void*>(toolOf()); };
+			bar.OnSubToolClicked = [this, indexOf](int sub) {
+				const int index = indexOf();
+				SetActiveTool(index); // says why not, when it has nothing to work on
+				if (index >= 0 && activeTool == index)
+					tools[static_cast<size_t>(index)].tool->SetSubTool(*this, sub);
+			};
+			bar.OnBoolToggled = [this, toolOf](const std::string& id) {
+				VoxelTool* tool = toolOf();
+				if (ToolOption* opt = FindOption(tool, id, ToolOption::Type::Bool)) {
+					opt->bvalue = !opt->bvalue;
+					tool->OnOptionToggled(*this, id, opt->bvalue);
+				}
+			};
+			bar.OnActionClicked = [this, toolOf](const std::string& id) {
+				VoxelTool* tool = toolOf();
+				const ToolOption* opt = FindOption(tool, id, ToolOption::Type::Action);
+				if (!opt || !opt->enabled)
+					return;
+				// A command of a tool that is not the active one runs behind
+				// the active one's back, as a command from a menu does.
+				if (tool != ActiveTool())
+					CancelToolInteraction();
+				tool->OnAction(*this, id);
+			};
+			bar.OnNumberChanged = [this, toolOf](const std::string& id, float value,
+			                                     bool committed) {
+				VoxelTool* tool = toolOf();
+				if (!FindOption(tool, id, ToolOption::Type::Number))
+					return;
+				// A settled value is one user action, so a typed number or an
+				// arrow press undoes in one go; an unsettled one only previews
+				// and has nothing to record.
+				if (committed)
+					undo.BeginAction();
+				UserActionEnd end(*this, committed);
+				tool->OnOptionNumberChanged(*this, id, value, committed);
 			};
 		}
 
@@ -437,7 +457,7 @@ namespace spades {
 			// the bar's boxes, which answer for their own Escape through
 			// OptionBar but never see it once Escape has somewhere else to go.
 			if (transformPanel->IsTyping() || transformPanel->IsHolding() ||
-			    ui.GetOptionBar()->IsEditing())
+			    BarsEditing())
 				return EscapeLayer::Number;
 			if (ui.GetColorPicker()->GetEyedropperMode())
 				return EscapeLayer::Eyedropper;
@@ -469,8 +489,8 @@ namespace spades {
 		void VoxelEditor::Escape(EscapeLayer layer) {
 			switch (layer) {
 				case EscapeLayer::Number:
-					if (ui.GetOptionBar()->IsEditing()) {
-						ui.GetOptionBar()->EndEditing(false); // what was typed is given up
+					if (BarsEditing()) {
+						EndBarEdits(false); // what was typed is given up
 						break;
 					}
 					if (ITransformTarget* target = PanelTarget()) {
@@ -1181,9 +1201,12 @@ namespace spades {
 			DoPick();
 			if (!pickHit)
 				return false;
-			currentColor = document.Color(pickSolid.x, pickSolid.y, pickSolid.z);
+			// Into whatever the picker is setting: the brush, or the colour a
+			// tool has it set instead.
+			std::uint32_t& target = PickerColor();
+			target = document.Color(pickSolid.x, pickSolid.y, pickSolid.z);
 			ColorPicker& picker = *ui.GetColorPicker();
-			picker.SetColor(currentColor);
+			picker.SetColor(target);
 			picker.SetEyedropperMode(false); // a pick is one-shot
 			SetStatus("Picked colour");
 			return true;
@@ -2520,7 +2543,7 @@ namespace spades {
 			// still the one listening. Left to the bar, the edit would be dropped
 			// on the next rebuild with whatever it was previewing still showing.
 			SettlePanel();
-			ui.GetOptionBar()->EndEditing(true);
+			EndBarEdits(true);
 			// Leaving a tool ends what it had in progress: this is where a pending
 			// placement reaches the document.
 			if (VoxelTool* previous = ActiveTool())
@@ -2529,6 +2552,9 @@ namespace spades {
 			currentMode = mode;
 			if (VoxelTool* current = ActiveTool())
 				current->OnActivate(*this);
+			// The picker shows the colour it now sets, which may be another's.
+			if (ui.GetColorPicker()->IsOpen())
+				ui.GetColorPicker()->SetColor(PickerColor());
 		}
 
 		const std::vector<VoxelEditor::ModeInfo>& VoxelEditor::Modes() {
@@ -2566,11 +2592,30 @@ namespace spades {
 			return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
 		}
 
-		ToolOption* VoxelEditor::ActiveOption(const std::string& id, ToolOption::Type type) {
-			VoxelTool* tool = ActiveTool();
-			ToolOptions* options = tool ? tool->Options() : nullptr;
+		ToolOption* VoxelEditor::FindOption(VoxelTool* tool, const std::string& id,
+		                                    ToolOption::Type type) {
+			if (!tool)
+				return nullptr;
+			ToolOptions* options = tool->Options();
 			ToolOption* option = options ? options->Find(id) : nullptr;
+			if (!option) {
+				ToolOptions* commands = tool->StripCommands();
+				option = commands ? commands->Find(id) : nullptr;
+			}
 			return (option && option->type == type) ? option : nullptr;
+		}
+
+		int VoxelEditor::BarToolIndex() const {
+			if (currentMode != EditorMode::Edit || activeTool < 0 ||
+			    activeTool >= int(tools.size()))
+				return -1;
+			const int host = ToolIndex(tools[static_cast<size_t>(activeTool)].tool->StripOf());
+			return host >= 0 ? host : activeTool;
+		}
+
+		VoxelTool* VoxelEditor::BarTool() {
+			const int index = BarToolIndex();
+			return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
 		}
 
 		// A sub-tool's key is its own where it declares one, and otherwise its
@@ -2606,7 +2651,9 @@ namespace spades {
 			// A key a sub-tool declares as its own (Transform's T) is good from
 			// any tool; the digits, being only a place in the active tool's
 			// bar, are not.
-			VoxelTool* active = ActiveTool();
+			// The digits count along the bar that is showing, which a strip
+			// leaves to the tool it is the strip of.
+			VoxelTool* active = BarTool();
 			for (size_t i = 0; i < tools.size(); i++) {
 				VoxelTool& tool = *tools[i].tool;
 				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
@@ -2830,7 +2877,7 @@ namespace spades {
 					return;
 				}
 				if (down && onPanel) {
-					ui.GetOptionBar()->EndEditing(true);
+					EndBarEdits(true);
 					transformPanel->Press(*target, at);
 					return;
 				}
@@ -2849,6 +2896,8 @@ namespace spades {
 				// anywhere but on that bar, which answers for its own boxes.
 				if (at.y < kRibbonH + kToolbarH || at.y >= BarsHeight())
 					ui.GetOptionBar()->EndEditing(true);
+				if (!ui.GetContextStrip()->Contains(at))
+					ui.GetContextStrip()->EndEditing(true);
 
 				// A menu of the bar owns every press on itself and on its titles,
 				// and a press anywhere else puts it away before that press does
@@ -2895,6 +2944,8 @@ namespace spades {
 				// button or not, and never reaches the model behind it.
 				if (ui.GetContextStrip()->Contains(at)) {
 					ui.GetContextStrip()->Click(at);
+					if (ui.GetContextStrip()->IsEditing())
+						ReleaseHeldInput();
 					return;
 				}
 
@@ -2944,7 +2995,7 @@ namespace spades {
 				}
 				return true;
 			}
-			return ui.GetOptionBar()->KeyEvent(key);
+			return ui.GetOptionBar()->KeyEvent(key) || ui.GetContextStrip()->KeyEvent(key);
 		}
 
 		bool VoxelEditor::CommandKey(const std::string& key, bool down) {
@@ -3011,7 +3062,22 @@ namespace spades {
 			}
 		}
 
+		// The view is the host's to turn and to make an image of.
+		void VoxelEditor::LookIsometric(float elevation) { host.LookIsometric(elevation); }
+		void VoxelEditor::TurnView(int quarterTurns) { host.TurnView(quarterTurns); }
+		void VoxelEditor::SaveRender(std::uint32_t background, bool transparent) {
+			host.SaveRender(background, transparent);
+		}
+
+		bool VoxelEditor::PresentsRender() {
+			VoxelTool* tool = ActiveTool();
+			return tool && tool->PresentsRender();
+		}
+
 		void VoxelEditor::DrawScene() {
+			// An image of the model holds the model, which the host draws.
+			if (PresentsRender())
+				return;
 			// The images to model from, whatever the tool: they are depth tested,
 			// so the voxels in front of them hide them.
 			DrawReferenceImages();
@@ -3065,7 +3131,8 @@ namespace spades {
 				occluders.pendingAnchor = edit.placement.anchor;
 				occluders.pendingVersion = placementModelVersion;
 			}
-			overlayLines.Draw(*renderer, DocumentView(), occluders);
+			if (!PresentsRender())
+				overlayLines.Draw(*renderer, DocumentView(), occluders);
 
 			// The picker is laid out first: the text under the viewport keeps clear of it.
 			ColorPicker& picker = *ui.GetColorPicker();
@@ -3156,7 +3223,7 @@ namespace spades {
 			}
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
-			ui.GetToolbar()->SetColorSwatch(currentColor, ui.GetColorPicker()->IsOpen());
+			ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
 			ui.GetToolbar()->SetUndoButton(undo.CanUndo());
 			ui.GetToolbar()->SetRedoButton(undo.CanRedo());
 
@@ -3164,55 +3231,70 @@ namespace spades {
 			                      ui.GetMenuBar()->IsOpen(), sw);
 		}
 
+		namespace {
+			// A tool's option as the bar draws it.
+			OptionBar::Option BarOption(const ToolOption& op) {
+				OptionBar::Option opt;
+				opt.id = op.id;
+				opt.group = op.group;
+				opt.label = op.label;
+				// A type the bar does not know would be drawn as something the
+				// tool never asked for, so each one is named rather than
+				// defaulted.
+				switch (op.type) {
+					case ToolOption::Type::Label: opt.type = OptionBar::OptionType::Label; break;
+					case ToolOption::Type::Action: opt.type = OptionBar::OptionType::Action; break;
+					case ToolOption::Type::Number: opt.type = OptionBar::OptionType::Number; break;
+					case ToolOption::Type::Bool: opt.type = OptionBar::OptionType::Bool; break;
+				}
+				opt.bvalue = op.bvalue;
+				opt.enabled = op.enabled;
+				opt.value = op.value;
+				opt.step = op.step;
+				opt.decimals = op.decimals;
+				opt.hex = op.hex;
+				return opt;
+			}
+
+			void AppendBarOptions(std::vector<OptionBar::Option>& out, const ToolOptions* from) {
+				for (int i = 0; from && i < from->Count(); i++) {
+					if (from->At(i).visible)
+						out.push_back(BarOption(from->At(i)));
+				}
+			}
+		} // namespace
+
+		std::vector<OptionBar::SubToolButton> VoxelEditor::SubToolButtons(VoxelTool& tool) {
+			// Lit only while the tool is the one at work: a bar left standing
+			// under its strip shows what can be gone back to, not what is on.
+			const bool active = &tool == ActiveTool();
+			std::vector<OptionBar::SubToolButton> buttons;
+			for (int i = 0; i < tool.SubToolCount(); i++) {
+				OptionBar::SubToolButton btn;
+				btn.label = tool.SubToolLabel(i);
+				const std::string key = SubToolHotKey(tool, i);
+				btn.hotKey = KeyIsTaken(key) ? std::string() : key;
+				btn.group = tool.SubToolGroup(i);
+				btn.active = active && tool.ActiveSubTool() == i;
+				buttons.push_back(btn);
+			}
+			return buttons;
+		}
+
 		void VoxelEditor::DrawOptionBar(float sw) {
 			// With no tool active the bar is drawn empty, so it never keeps
 			// answering clicks on buttons that are no longer there.
-			VoxelTool* t = ActiveTool();
+			VoxelTool* t = BarTool();
 
 			// A single sub-tool is the tool itself, and a lone button that is
 			// always on would only be noise.
 			std::vector<OptionBar::SubToolButton> subTools;
-			// A strip's sub-tools are on the strip; the bar keeps their options.
-			if (t && t->SubToolCount() > 1 && t->StripOf().empty()) {
-				for (int i = 0; i < t->SubToolCount(); i++) {
-					OptionBar::SubToolButton btn;
-					btn.label = t->SubToolLabel(i);
-					const std::string key = SubToolHotKey(*t, i);
-					btn.hotKey = KeyIsTaken(key) ? std::string() : key;
-					btn.group = t->SubToolGroup(i);
-					btn.active = (t->ActiveSubTool() == i);
-					subTools.push_back(btn);
-				}
-			}
+			if (t && t->SubToolCount() > 1)
+				subTools = SubToolButtons(*t);
 			std::vector<OptionBar::Option> options;
-			if (t)
+			if (t) {
 				t->UpdateOptions(*this);
-			ToolOptions* opts = t ? t->Options() : nullptr;
-			if (opts) {
-				for (int i = 0; i < opts->Count(); i++) {
-					const ToolOption& op = opts->At(i);
-					if (!op.visible)
-						continue;
-					OptionBar::Option opt;
-					opt.id = op.id;
-					opt.group = op.group;
-					opt.label = op.label;
-					// A type the bar does not know would be drawn as something the
-					// tool never asked for, so each one is named rather than
-					// defaulted.
-					switch (op.type) {
-						case ToolOption::Type::Label: opt.type = OptionBar::OptionType::Label; break;
-						case ToolOption::Type::Action: opt.type = OptionBar::OptionType::Action; break;
-						case ToolOption::Type::Number: opt.type = OptionBar::OptionType::Number; break;
-						case ToolOption::Type::Bool: opt.type = OptionBar::OptionType::Bool; break;
-					}
-					opt.bvalue = op.bvalue;
-					opt.enabled = op.enabled;
-					opt.value = op.value;
-					opt.step = op.step;
-					opt.decimals = op.decimals;
-					options.push_back(opt);
-				}
+				AppendBarOptions(options, t->Options());
 			}
 			ui.GetOptionBar()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetOptionBar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
@@ -3221,39 +3303,18 @@ namespace spades {
 
 		void VoxelEditor::DrawContextStrip(float sw) {
 			VoxelTool* t = StripTool();
-			const bool active = t && t == ActiveTool();
 			std::vector<OptionBar::SubToolButton> subTools;
-			std::vector<OptionBar::Option> commands;
+			std::vector<OptionBar::Option> options;
 			if (t) {
-				for (int i = 0; i < t->SubToolCount(); i++) {
-					OptionBar::SubToolButton btn;
-					btn.label = t->SubToolLabel(i);
-					const std::string key = SubToolHotKey(*t, i);
-					btn.hotKey = KeyIsTaken(key) ? std::string() : key;
-					btn.group = t->SubToolGroup(i);
-					// None is lit while its tool is only on offer.
-					btn.active = active && t->ActiveSubTool() == i;
-					subTools.push_back(btn);
-				}
-				// The active tool's were brought up to date with its bar.
-				if (!active)
-					t->UpdateOptions(*this);
-				if (ToolOptions* opts = t->StripCommands()) {
-					for (int i = 0; i < opts->Count(); i++) {
-						const ToolOption& op = opts->At(i);
-						if (!op.visible || op.type != ToolOption::Type::Action)
-							continue;
-						OptionBar::Option opt;
-						opt.id = op.id;
-						opt.group = op.group;
-						opt.label = op.label;
-						opt.type = OptionBar::OptionType::Action;
-						opt.enabled = op.enabled;
-						commands.push_back(opt);
-					}
-				}
+				subTools = SubToolButtons(*t);
+				t->UpdateOptions(*this);
+				// Its commands, good at any time, then what the sub-tool at
+				// work is set by: nothing while the strip is only on offer.
+				AppendBarOptions(options, t->StripCommands());
+				if (t == ActiveTool())
+					AppendBarOptions(options, t->Options());
 			}
-			ui.GetContextStrip()->SetContent(t, std::move(subTools), std::move(commands));
+			ui.GetContextStrip()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetContextStrip()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                           ui.GetMenuBar()->IsOpen(), sw);
 		}

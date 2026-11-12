@@ -25,12 +25,12 @@
 namespace spades {
 	namespace gui {
 		// What is done with the voxels selected: Transform moves and turns
-		// them, Extrude and Pocket sweep them along an axis, Paint recolours
-		// them. None of them chooses a voxel, which is Select's alone to do; a
-		// click on nothing hands the editor back to it. It has no button on
-		// the toolbar: it is Select's strip, there while voxels are selected
-		// and gone when none are, with Cavity, the one of them that is a
-		// command rather than a way of working.
+		// them, Extrude and Pocket sweep them along an axis. None of them
+		// chooses a voxel, which is Select's alone to do; a click on nothing
+		// hands the editor back to it. It has no button on the toolbar: it is
+		// Select's strip, there while voxels are selected and gone when none
+		// are, with the commands on them: Fill, which paints them the brush
+		// colour, and Cavity.
 		class ModifyTool : public ContainerTool {
 		public:
 			ModifyTool();
@@ -44,8 +44,8 @@ namespace spades {
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
-			// The colour chosen is the active sub-tool's to answer for: Paint
-			// recolours the selection with it, the others leave it the brush's.
+			// A colour chosen on the picker recolours the selection, as it does
+			// while the voxels are being chosen.
 			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
 			                         bool committed) override;
 

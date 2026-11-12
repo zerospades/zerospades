@@ -32,6 +32,10 @@ namespace spades {
 			// that nothing pathological is ever parsed or drawn.
 			const std::size_t kMaxLength = 16;
 
+			bool IsHexChar(char c) {
+				return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+			}
+
 			bool IsNumberChar(char c) {
 				return (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.' || c == ',';
 			}
@@ -62,6 +66,35 @@ namespace spades {
 		}
 
 		NumberEntry::NumberEntry() : entry(kMaxLength) {}
+
+		std::string NumberEntry::FormatHex(float value) {
+			char buf[16];
+			std::snprintf(buf, sizeof(buf), "#%06X",
+			              unsigned(std::max(0.0F, std::min(16777215.0F, value))));
+			return buf;
+		}
+
+		bool NumberEntry::ParseHex(const std::string& text, float& out) {
+			std::string digits;
+			for (char c : text) {
+				if (c == '#' || c == ' ')
+					continue;
+				if (!IsHexChar(c))
+					return false;
+				digits += c;
+			}
+			if (digits.size() == 3) // the short form doubles each digit
+				digits = {digits[0], digits[0], digits[1], digits[1], digits[2], digits[2]};
+			if (digits.size() != 6)
+				return false;
+			out = float(std::strtoul(digits.c_str(), nullptr, 16));
+			return true;
+		}
+
+		void NumberEntry::BeginHex(float value) {
+			hex = true;
+			entry.Begin(FormatHex(value), true);
+		}
 
 		namespace {
 			// A recursive descent over: sum := product (('+'|'-') product)*,
@@ -174,6 +207,7 @@ namespace spades {
 		}
 
 		void NumberEntry::Begin(float value, int decimals) {
+			hex = false;
 			entry.Begin(Format(value, decimals), true);
 		}
 
@@ -189,7 +223,7 @@ namespace spades {
 				return;
 			std::string accepted;
 			for (char c : s)
-				if (IsNumberChar(c))
+				if (hex ? (IsHexChar(c) || c == '#') : IsNumberChar(c))
 					accepted += c;
 			if (!accepted.empty())
 				entry.Insert(accepted); // in place of the value, first time round
@@ -220,6 +254,8 @@ namespace spades {
 			entry.ToEnd(false);
 		}
 
-		bool NumberEntry::Value(float& out) const { return IsEditing() && Parse(Text(), out); }
+		bool NumberEntry::Value(float& out) const {
+			return IsEditing() && (hex ? ParseHex(Text(), out) : Parse(Text(), out));
+		}
 	} // namespace gui
 } // namespace spades

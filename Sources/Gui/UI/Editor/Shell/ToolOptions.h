@@ -52,6 +52,7 @@ namespace spades {
 			float value = 0.0F;      // Number value; the tool refreshes it via SetNumber
 			float step = 1.0F;       // what one press of a Number's arrows adds
 			int decimals = 1;        // decimal places a Number is written with
+			bool hex = false;        // a Number that is a colour, 0xRRGGBB, typed as #RRGGBB
 		};
 
 		// An ordered list of a tool's options.
@@ -92,6 +93,12 @@ namespace spades {
 				o.step = step;
 				o.decimals = decimals;
 				items.push_back(o);
+			}
+			// A colour typed in hex: a Number holding 0xRRGGBB, with no arrows.
+			void AddHex(const std::string& id, const std::string& label,
+			            const std::string& group = "") {
+				AddNumber(id, label, group, 0.0F, 0);
+				items.back().hex = true;
 			}
 			void SetNumber(const std::string& id, float value) {
 				if (ToolOption* o = Find(id))
