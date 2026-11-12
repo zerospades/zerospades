@@ -130,7 +130,7 @@ namespace spades {
 			smallGuiFont = Handle<ngclient::FTFont>::New(renderer, instance.guiFontSet, 12.0F, 12.0F).Cast<IFont>();
 
 			// bitmap fonts
-			smallFont = CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8Cell);
+			smallFont = CreateBitmapFont(renderer, fontdata::Build6x8Atlas(), fontdata::k6x8AtlasCell);
 		}
 
 		FontManager::~FontManager() {}

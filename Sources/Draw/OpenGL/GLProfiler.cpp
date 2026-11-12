@@ -55,7 +55,7 @@ namespace spades {
 				auto duration = chrono::high_resolution_clock::now() - startTimePoint;
 				return chrono::duration<double>(duration).count();
 			}
-			
+
 			// 16x16 grid of 6x10 cells: the 6x8 glyph on top, over a semi-transparent
 			// dark background that fills the whole cell.
 			Handle<Bitmap> BuildProfilerFontAtlas() {
@@ -71,8 +71,10 @@ namespace spades {
 					const int originY = (glyph / 16) * kCellH;
 					for (int y = 0; y < kCellH; y++) {
 						for (int x = 0; x < kCellW; x++) {
-							const bool set = y < kGlyphH &&
-								client::fontdata::IsFont6x8PixelSet(glyph, x, y);
+							// Same top padding as the small bitmap font, so the glyphs are not stuck to the top.
+							const int srcY = y - client::fontdata::k6x8TopPadding;
+							const bool set = srcY >= 0 && srcY < kGlyphH &&
+								client::fontdata::IsFont6x8PixelSet(glyph, x, srcY);
 							pixels[(originY + y) * (16 * kCellW) + originX + x] =
 								set ? 0xFFFFFFFFU : 0xCC000000U; // 0xCC = 80% alpha
 						}

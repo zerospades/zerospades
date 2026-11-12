@@ -11,6 +11,14 @@ namespace spades {
 			struct CellSize { int width, height; };
 			constexpr CellSize k6x8Cell{6, 8};
 
+			// Blank rows added above the 6x8 glyphs in the atlas. The glyphs sit at the top of their
+			// cell (capitals start on row 0 and row 7 is only used by descenders), so without the
+			// padding the text looks one pixel too high.
+			constexpr int k6x8TopPadding = 1;
+
+			// Cell of the atlas built by `Build6x8Atlas`.
+			constexpr CellSize k6x8AtlasCell{k6x8Cell.width, k6x8Cell.height + k6x8TopPadding};
+
 			// 6x8 font, adapted from VOXLAP5.C by Ken Silverman <https://advsys.net/ken/>
 			// https://github.com/Ericson2314/Voxlap/blob/no-asm/source/voxlap5.cpp#L350
 			inline constexpr uint64_t kFont6x8[] = {
@@ -63,13 +71,13 @@ namespace spades {
 				0x2A08080000003F40,0x0012241224000808,0x0000000609090600,0x0008000000001818,
 				0x02023E4030000000,0x0900000E010E0100,0x3C3C3C0000000A0D,0x000000000000003C,
 			};
-			
+
 			/** Whether pixel (x, y) of the CP437 glyph `glyph` is set in the 6x8 font. */
 			constexpr bool IsFont6x8PixelSet(int glyph, int x, int y) {
 				const int byteIndex = glyph * k6x8Cell.width + x;
 				return ((kFont6x8[byteIndex / 8] >> ((byteIndex % 8) * 8 + y)) & 1U) != 0;
 			}
-			
+
 			/**
 			 * Builds a 16x16 grid atlas of the 256 CP437 glyphs, laid out the way
 			 * `Quake3Font` expects. Set pixels are opaque white and the others are
@@ -98,7 +106,12 @@ namespace spades {
 				return bmp;
 			}
 
-			inline Handle<Bitmap> Build6x8Atlas() { return BuildCp437Atlas(k6x8Cell, IsFont6x8PixelSet); }
+			inline Handle<Bitmap> Build6x8Atlas() {
+				return BuildCp437Atlas(k6x8AtlasCell, [](int glyph, int x, int y) {
+					const int srcY = y - k6x8TopPadding;
+					return srcY >= 0 && IsFont6x8PixelSet(glyph, x, srcY);
+				});
+			}
 		} // namespace fontdata
 	} // namespace client
 } // namespace spades
