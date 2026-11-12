@@ -45,7 +45,7 @@ namespace spades {
 			Settings::ItemHandle cl_showStartupWindow;
 			bool advancedTabVisible = false;
 
-			void OnWebsitePressed(ui::UIElement&);
+			void OpenLink(const std::string& url);
 			void OnTabChanged(ui::UIElement&);
 			void OnBypassStartupWindowCheckChanged(ui::UIElement& sender);
 			void Start();

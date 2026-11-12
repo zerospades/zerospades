@@ -27,6 +27,7 @@
 #include <Client/IImage.h>
 #include <Client/IRenderer.h>
 #include <Core/Settings.h>
+#include <Core/ShellApi.h>
 #include <Core/Strings.h>
 #include <Gui/MainScreenHelper.h>
 #include <Gui/ModsScreenHelper.h>
@@ -48,6 +49,7 @@ namespace spades {
 	namespace gui {
 		using ui::Button;
 		using ui::Field;
+		using ui::IconButton;
 		using ui::Label;
 		using ui::ListView;
 		using ui::ListViewModel;
@@ -650,17 +652,9 @@ namespace spades {
 			}
 			{
 				Handle<Button> button = Handle<Button>::New(manager);
-				button->caption = _Tr("MainScreen", "Credits");
-				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 202.0F, footerPos, 100.0F, 30.0F));
-				button->activated = [this](UIElement& s) { OnCreditsPressed(s); };
-				AddChild(button.GetPointerOrNull());
-			}
-			{
-				Handle<Button> button = Handle<Button>::New(manager);
 				button->caption = _Tr("MainScreen", "Setup");
 				button->SetBounds(
-				    AABB2(contentsLeft + contentsWidth - 314.0F, footerPos, 110.0F, 30.0F));
+				    AABB2(contentsLeft + contentsWidth - 212.0F, footerPos, 110.0F, 30.0F));
 				button->activated = [this](UIElement& s) { OnSetupPressed(s); };
 				AddChild(button.GetPointerOrNull());
 			}
@@ -681,6 +675,47 @@ namespace spades {
 					modsNotice->SetBounds(strip);
 					AddChild(modsNotice.GetPointerOrNull());
 					notice->upToDateCovered = [modsNotice] { return modsNotice->IsShown(); };
+				}
+			}
+
+			// Link icons in the top left corner.
+			{
+				struct LinkInfo {
+					const char* icon;
+					const char* url;
+					std::string caption;
+				};
+				const LinkInfo links[] = {
+					{"Gfx/UI/IconWeb.png", "https://zerospades.github.io/",
+					 _Tr("StartupScreen", "Website")},
+					{"Gfx/UI/IconGithub.png", "https://github.com/siecvi/zerospades",
+					 _Tr("StartupScreen", "GitHub")},
+					{"Gfx/UI/IconDiscord.png", "https://discord.gg/t64rKedpAu",
+					 _Tr("StartupScreen", "Discord")},
+				};
+
+				const float iconButtonSize = 24.0F;
+				const float iconButtonGap = 8.0F;
+				float x = 12.0F;
+				for (const LinkInfo& link : links) {
+					Handle<IconButton> button = Handle<IconButton>::New(manager);
+					button->iconPath = link.icon;
+					button->caption = link.caption;
+					button->SetBounds(AABB2(x, 12.0F, iconButtonSize, iconButtonSize));
+					std::string url = link.url;
+					button->activated = [this, url](UIElement&) { OpenLink(url); };
+					AddChild(button.GetPointerOrNull());
+					x += iconButtonSize + iconButtonGap;
+				}
+
+				// Credits is not an external link: it opens a dialog.
+				{
+					Handle<IconButton> button = Handle<IconButton>::New(manager);
+					button->iconPath = "Gfx/UI/IconInfo.png";
+					button->caption = _Tr("MainScreen", "Credits");
+					button->SetBounds(AABB2(x, 12.0F, iconButtonSize, iconButtonSize));
+					button->activated = [this](UIElement& s) { OnCreditsPressed(s); };
+					AddChild(button.GetPointerOrNull());
 				}
 			}
 
@@ -1222,6 +1257,16 @@ namespace spades {
 			opt.showOverlay = true;
 			Handle<PreferenceView> al =
 			    Handle<PreferenceView>::New(this, opt, &ui->GetFontManager());
+			al->Run();
+		}
+
+		void MainScreenMainMenu::OpenLink(const std::string& url) {
+			if (OpenURLInBrowser(url))
+				return;
+
+			std::string msg =
+				_Tr("StartupScreen", "An unknown error has occurred while opening this url.");
+			Handle<AlertScreen> al = Handle<AlertScreen>::New(this, msg, 100.0F, true);
 			al->Run();
 		}
 

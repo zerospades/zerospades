@@ -23,6 +23,7 @@
 #include <Client/Fonts.h>
 #include <Client/IFont.h>
 #include <Core/Strings.h>
+#include <Core/ShellApi.h>
 #include <Gui/StartupScreenHelper.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Widgets/TabStrip.h>
@@ -32,7 +33,7 @@ namespace spades {
 		using ui::Button;
 		using ui::CheckBox;
 		using ui::SimpleButton;
-		using ui::LinkButton;
+		using ui::IconButton;
 		using ui::SimpleTabStrip;
 		using ui::UIElement;
 		using ui::UIManager;
@@ -57,16 +58,35 @@ namespace spades {
 				AddChild(button.GetPointerOrNull());
 			}
 			{
-				Handle<LinkButton> button = Handle<LinkButton>::New(manager);
-				button->caption = _Tr("StartupScreen", "Official Website");
-				float capSize = GetFont()->Measure(button->caption).x;
-				button->SetBounds(AABB2(
-					sw - 200.0F - (capSize + 20.0F) - 10.0F,
-					24.0F,
-					capSize + 20.0F, 24.0F
-				));
-				button->activated = [this](UIElement& s) { OnWebsitePressed(s); };
-				AddChild(button.GetPointerOrNull());
+				struct LinkInfo {
+					const char* icon;
+					const char* url;
+					std::string caption;
+				};
+				const LinkInfo links[] = {
+					{"Gfx/UI/IconWeb.png", "https://zerospades.github.io/",
+					 _Tr("StartupScreen", "Website")},
+					{"Gfx/UI/IconGithub.png", "https://github.com/siecvi/zerospades",
+					 _Tr("StartupScreen", "GitHub")},
+					{"Gfx/UI/IconDiscord.png", "https://discord.gg/t64rKedpAu",
+					 _Tr("StartupScreen", "Discord")},
+				};
+
+				// laid out left to right, so the group ends just before the Start button
+				const float iconButtonSize = 24.0F;
+				const float iconButtonGap = 8.0F;
+				const float numLinks = static_cast<float>(sizeof(links) / sizeof(links[0]));
+				float x = sw - 170.0F - 30.0F - (iconButtonSize * numLinks + iconButtonGap * (numLinks - 1.0F));
+				for (const LinkInfo& link : links) {
+					Handle<IconButton> button = Handle<IconButton>::New(manager);
+					button->iconPath = link.icon;
+					button->caption = link.caption;
+					button->SetBounds(AABB2(x, 24.0F, iconButtonSize, iconButtonSize));
+					std::string url = link.url;
+					button->activated = [this, url](UIElement&) { OpenLink(url); };
+					AddChild(button.GetPointerOrNull());
+					x += iconButtonSize + iconButtonGap;
+				}
 			}
 			{
 				Handle<CheckBox> button = Handle<CheckBox>::New(manager);
@@ -129,8 +149,8 @@ namespace spades {
 			LoadConfig();
 		}
 
-		void StartupScreenMainMenu::OnWebsitePressed(UIElement&) {
-			if (helper->OpenLinkInBrowser("https://zerospades.github.io/"))
+		void StartupScreenMainMenu::OpenLink(const std::string& url) {
+			if (OpenURLInBrowser(url))
 				return;
 
 			std::string msg =

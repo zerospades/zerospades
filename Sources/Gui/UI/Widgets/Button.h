@@ -67,10 +67,16 @@ namespace spades {
 				void Render() override;
 			};
 
-			/** Link-style button (no solid background, underlined on hover). */
-			class LinkButton : public SimpleButton {
+			/** Button that draws only an icon image (no frame), with a caption tooltip on hover. */
+			class IconButton : public ButtonBase {
 			public:
-				LinkButton(UIManager* manager) : SimpleButton(manager) {}
+				/** Path of the icon image, e.g. "Gfx/UI/IconGithub.png". */
+				std::string iconPath;
+
+				/** Size in pixels the icon is drawn at, centered in the button. */
+				float iconSize = 24.0F;
+
+				IconButton(UIManager* manager) : ButtonBase(manager) {}
 				void Render() override;
 			};
 		} // namespace ui

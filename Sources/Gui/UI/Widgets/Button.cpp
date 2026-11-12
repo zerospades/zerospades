@@ -21,6 +21,7 @@
 #include "Button.h"
 #include "DrawUtils.h"
 #include <Client/IFont.h>
+#include <Client/IImage.h>
 #include <Client/IRenderer.h>
 #include <Gui/UI/Framework/UIManager.h>
 
@@ -206,33 +207,45 @@ namespace spades {
 				}
 			}
 
-			void LinkButton::Render() {
+			void IconButton::Render() {
 				client::IRenderer& r = GetManager().GetRenderer();
 				Vector2 pos = GetScreenPosition();
 				Vector2 sz = size;
+				bool enabled = IsEnabled();
 
-				Vector4 color = hover 
-					? MakeVector4(0.5F, 0.75F, 1.0F, 1.0F) 
-					: MakeVector4(0.4F, 0.65F, 0.9F, 1.0F);
+				// icon only, hover and press feedback is done through its opacity
+				Handle<client::IImage> img = r.RegisterImage(iconPath.c_str());
+				if (img) {
+					float alpha = 0.7F;
+					if (!enabled)
+						alpha = 0.35F;
+					else if (pressed && hover)
+						alpha = 0.55F;
+					else if (hover)
+						alpha = 1.0F;
 
+					SetColorNP(r, MakeVector4(1.0F, 1.0F, 1.0F, alpha));
+					r.DrawImage(img,
+					            AABB2(pos.x + (sz.x - iconSize) * 0.5F,
+					                  pos.y + (sz.y - iconSize) * 0.5F, iconSize, iconSize),
+					            AABB2(0.0F, 0.0F, img->GetWidth(), img->GetHeight()));
+				}
+
+				// tooltip below the button, kept inside the screen
 				client::IFont* font = GetFont();
-				if (!font)
-					return;
+				if (hover && enabled && font && !caption.empty()) {
+					Vector2 txtSize = font->Measure(caption);
+					float maxX = GetManager().screenWidth - txtSize.x - 6.0F;
+					float tx = pos.x + (sz.x - txtSize.x) * 0.5F;
+					tx = (tx < 6.0F) ? 6.0F : (tx > maxX ? maxX : tx);
+					float ty = pos.y + sz.y;
 
-				pos += MakeVector2(4.0F, 4.0F);
-				sz -= MakeVector2(8.0F, 8.0F);
-
-				Vector2 txtSize = font->Measure(caption);
-				Vector2 txtPos  = pos + (sz - txtSize) * alignment;
-
-				font->DrawShadow(caption, txtPos, 1.0F, color,
-								 MakeVector4(0.0F, 0.0F, 0.0F, 0.35F * color.w));
-
-				if (IsEnabled()) {
-					float underlineY = txtPos.y + txtSize.y - 2.0F;
-					SetColorNP(r, MakeVector4(color.x, color.y, color.z, 0.8F));
-					r.DrawFilledRect(txtPos.x, underlineY,
-									 txtPos.x + txtSize.x, underlineY + 1.5F);
+					SetColorNP(r, MakeVector4(0.0F, 0.0F, 0.0F, 0.75F));
+					r.DrawFilledRect(tx - 4.0F, ty - 2.0F, tx + txtSize.x + 4.0F,
+					                 ty + txtSize.y + 2.0F);
+					font->DrawShadow(caption, MakeVector2(tx, ty), 1.0F,
+					                 MakeVector4(1.0F, 1.0F, 1.0F, 1.0F),
+					                 MakeVector4(0.0F, 0.0F, 0.0F, 0.4F));
 				}
 			}
 		} // namespace ui

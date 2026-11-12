@@ -187,6 +187,7 @@ namespace spades {
 			void OnQuitPressed(ui::UIElement& sender);
 			void OnCreditsPressed(ui::UIElement& sender);
 			void OnSetupPressed(ui::UIElement& sender);
+			void OpenLink(const std::string& url);
 			void Connect();
 
 		public:

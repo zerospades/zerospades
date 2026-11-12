@@ -684,15 +684,6 @@ namespace spades {
 			return ShowDirectoryInShell(path);
 		}
 
-		bool StartupScreenHelper::OpenLinkInBrowser(const std::string& url) {
-			if (url.empty()) {
-				SPLog("Cannot open this URL: empty.");
-				return false;
-			}
-
-			return OpenURLInBrowser(url);
-		}
-
 		void StartupScreenHelper::Start() {
 			if (scr == nullptr)
 				return;

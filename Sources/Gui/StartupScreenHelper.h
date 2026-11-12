@@ -114,7 +114,6 @@ namespace spades {
 			std::string GetOperatingSystemType();
 			bool BrowseUserDirectory();
 			bool BrowseDemosDirectory();
-			bool OpenLinkInBrowser(const std::string& url);
 
 			void Start();
 		};
