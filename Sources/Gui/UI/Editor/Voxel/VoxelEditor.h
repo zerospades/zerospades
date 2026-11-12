@@ -124,8 +124,8 @@ namespace spades {
 			void Redo();
 			/** Whether there is anything to undo or redo: what a menu row or a
 			 *  button offering it greys itself out by. */
-			bool CanUndo() const { return undo.CanUndo(); }
-			bool CanRedo() const { return undo.CanRedo(); }
+			bool CanUndo();
+			bool CanRedo();
 
 			/** The box of what the selection commands act on: the voxels waiting
 			 *  to be placed while there are some, else the selection. False when
@@ -394,6 +394,12 @@ namespace spades {
 			// to Edit mode: with a scene open, the reference images are the
 			// scene's, set up among its objects.
 			bool InObjectMode(int index) const;
+			/** Whether the registered tool works in Object mode and Edit mode
+			 *  alike, on whatever the view shows. */
+			bool InBothModes(int index) const;
+			/** Whether the registered tool has a button and a key in Object
+			 *  mode (`objectMode`) or in Edit mode. */
+			bool OfferedIn(int index, bool objectMode) const;
 			// Makes `index` (-1 for Object mode's own) the active Object mode tool.
 			void SetObjectModeTool(int index);
 			// The active tool: Edit mode's, or Object mode's; null in a mode with
@@ -409,9 +415,11 @@ namespace spades {
 			 *  active one, or the one it is the strip of, whose bar stays put
 			 *  while its strip is worked with. */
 			VoxelTool* BarTool();
-			int BarToolIndex() const;
-			/** Wires `bar`'s clicks to the tool `indexOf` names when they land. */
-			void WireBar(OptionBar& bar, std::function<int()> indexOf);
+			/** Where `tool` is among the registered tools; -1 for one of Object
+			 *  mode's own, or none. */
+			int RegisteredIndex(const VoxelTool* tool) const;
+			/** Wires `bar`'s clicks to the tool `toolOf` names when they land. */
+			void WireBar(OptionBar& bar, std::function<VoxelTool*()> toolOf);
 			/** The colour the picker and the swatch show and set: the brush's,
 			 *  unless the active tool has one of its own for them. */
 			std::uint32_t& PickerColor();

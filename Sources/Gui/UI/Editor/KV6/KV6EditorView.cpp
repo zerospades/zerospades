@@ -1061,22 +1061,29 @@ namespace spades {
 			file.items.push_back(MenuCommand(
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }));
 
+			// Undo and Redo step through the scene's history in Object mode and
+			// the voxels' in Edit mode; the rest of what is edited and selected
+			// here is voxels, which only Edit mode has. Objects are selected,
+			// copied and removed from the scene tree and the object's own menu.
+			const bool voxels = !ShowingObjects();
 			EditorMenuGroup edit;
 			edit.title = "Edit";
 			edit.items.push_back(
 			  MenuCommand("Undo", command([this] { editor->Undo(); }), editor->CanUndo(), "Ctrl+Z"));
 			edit.items.push_back(
 			  MenuCommand("Redo", command([this] { editor->Redo(); }), editor->CanRedo(), "Ctrl+Y"));
-			edit.items.push_back(MenuRule());
-			edit.items.push_back(MenuCommand("Cut", command([this] { editor->CutSelection(); }),
-			                                 selected, "Ctrl+X"));
-			edit.items.push_back(MenuCommand("Copy", command([this] { editor->CopySelection(); }),
-			                                 selected, "Ctrl+C"));
-			edit.items.push_back(MenuCommand("Paste", command([this] { editor->Paste(); }),
-			                                 editor->CanPaste(), "Ctrl+V"));
-			edit.items.push_back(MenuCommand("Delete",
-			                                 command([this] { editor->DeleteSelection(); }),
-			                                 selected, "Del"));
+			if (voxels) {
+				edit.items.push_back(MenuRule());
+				edit.items.push_back(MenuCommand(
+				  "Cut", command([this] { editor->CutSelection(); }), selected, "Ctrl+X"));
+				edit.items.push_back(MenuCommand(
+				  "Copy", command([this] { editor->CopySelection(); }), selected, "Ctrl+C"));
+				edit.items.push_back(MenuCommand("Paste", command([this] { editor->Paste(); }),
+				                                 editor->CanPaste(), "Ctrl+V"));
+				edit.items.push_back(MenuCommand("Delete",
+				                                 command([this] { editor->DeleteSelection(); }),
+				                                 selected, "Del"));
+			}
 
 			// Which voxels are selected, apart from what is done with them: the
 			// Select tool's bar has the same three.
@@ -1107,6 +1114,8 @@ namespace spades {
 			view.items.push_back(MenuCommand("Save Screenshot", [this] { wantScreenShot = true; },
 			                                 true, cg_keyScreenshot));
 
+			if (!voxels)
+				return {file, edit, view};
 			return {file, edit, select, view};
 		}
 
@@ -1700,7 +1709,7 @@ namespace spades {
 
 		void KV6EditorView::DrawSceneContents(bool modelOnly) {
 			if (ShowingObjects()) {
-				scene->Render(*renderer);
+				scene->Render(*renderer, modelOnly);
 			} else if (renderModel) {
 				client::ModelRenderParam param;
 				// Cancel the KV6 pivot so the model sits in the editor's grid space.

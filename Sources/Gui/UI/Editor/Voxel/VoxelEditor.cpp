@@ -318,8 +318,8 @@ namespace spades {
 			// The option bar's content belongs to the tool whose bar it is, the
 			// strip's to the tool it is the strip of; a click only counts while
 			// that tool still is the one, and goes to it whichever is active.
-			WireBar(*ui.GetOptionBar(), [this] { return BarToolIndex(); });
-			WireBar(*ui.GetContextStrip(), [this] { return StripToolIndex(); });
+			WireBar(*ui.GetOptionBar(), [this] { return BarTool(); });
+			WireBar(*ui.GetContextStrip(), [this] { return StripTool(); });
 
 			// The brush colour is the editor's, shared by every tool: its swatch
 			// sits on the main toolbar and opens or closes the picker, which
@@ -356,17 +356,16 @@ namespace spades {
 			return currentColor;
 		}
 
-		void VoxelEditor::WireBar(OptionBar& bar, std::function<int()> indexOf) {
-			auto toolOf = [this, indexOf]() -> VoxelTool* {
-				const int index = indexOf();
-				return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
-			};
+		void VoxelEditor::WireBar(OptionBar& bar, std::function<VoxelTool*()> toolOf) {
 			bar.CurrentOwner = [toolOf] { return static_cast<const void*>(toolOf()); };
-			bar.OnSubToolClicked = [this, indexOf](int sub) {
-				const int index = indexOf();
-				SetActiveTool(index); // says why not, when it has nothing to work on
-				if (index >= 0 && activeTool == index)
-					tools[static_cast<size_t>(index)].tool->SetSubTool(*this, sub);
+			bar.OnSubToolClicked = [this, toolOf](int sub) {
+				VoxelTool* tool = toolOf();
+				// A bar standing under its strip, or a strip only on offer,
+				// belongs to a tool that is not the one at work: it is made so.
+				if (tool && tool != ActiveTool())
+					SetActiveTool(RegisteredIndex(tool)); // says why not, when it cannot be
+				if (tool && tool == ActiveTool())
+					tool->SetSubTool(*this, sub);
 			};
 			bar.OnBoolToggled = [this, toolOf](const std::string& id) {
 				VoxelTool* tool = toolOf();
@@ -2259,6 +2258,17 @@ namespace spades {
 
 		// Undo and redo replay the one history, pending voxels included: a
 		// move or a turn is a step like any edit, so nothing is placed first.
+		// Object mode's history is the scene's, as Undo and Redo step through.
+		bool VoxelEditor::CanUndo() {
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
+			return objects ? objects->CanUndoObjects() : undo.CanUndo();
+		}
+
+		bool VoxelEditor::CanRedo() {
+			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
+			return objects ? objects->CanRedoObjects() : undo.CanRedo();
+		}
+
 		void VoxelEditor::Undo() {
 			// Object mode steps through the scene's own history of placements.
 			if (currentMode == EditorMode::Object) {
@@ -2592,7 +2602,7 @@ namespace spades {
 			// A tool belongs to one mode: in the other, its button is not shown
 			// and its hot key does nothing.
 			if (currentMode == EditorMode::Object) {
-				if (InObjectMode(index))
+				if (OfferedIn(index, true))
 					SetObjectModeTool(index);
 				return;
 			}
@@ -2610,10 +2620,21 @@ namespace spades {
 			       tools[std::size_t(index)].id == "reference";
 		}
 
+		bool VoxelEditor::InBothModes(int index) const {
+			// An image is made of whatever the view shows: the scene in Object
+			// mode, the object being edited in Edit mode.
+			return host.ObjectMode() && index >= 0 && index < int(tools.size()) &&
+			       tools[std::size_t(index)].id == "render";
+		}
+
+		bool VoxelEditor::OfferedIn(int index, bool objectMode) const {
+			return InBothModes(index) || InObjectMode(index) == objectMode;
+		}
+
 		void VoxelEditor::SetObjectModeTool(int index) {
-			if (index == objectModeTool || (index >= 0 && !InObjectMode(index)))
+			if (index == objectModeTool || (index >= 0 && !OfferedIn(index, true)))
 				return;
-			ui.GetOptionBar()->EndEditing(true);
+			EndBarEdits(true);
 			VoxelTool* previous = ActiveTool();
 			objectModeTool = index;
 			VoxelTool* current = ActiveTool();
@@ -2759,17 +2780,20 @@ namespace spades {
 			return (option && option->type == type) ? option : nullptr;
 		}
 
-		int VoxelEditor::BarToolIndex() const {
-			if (currentMode != EditorMode::Edit || activeTool < 0 ||
-			    activeTool >= int(tools.size()))
-				return -1;
-			const int host = ToolIndex(tools[static_cast<size_t>(activeTool)].tool->StripOf());
-			return host >= 0 ? host : activeTool;
+		int VoxelEditor::RegisteredIndex(const VoxelTool* tool) const {
+			for (size_t i = 0; i < tools.size(); i++) {
+				if (tools[i].tool.get() == tool)
+					return int(i);
+			}
+			return -1;
 		}
 
 		VoxelTool* VoxelEditor::BarTool() {
-			const int index = BarToolIndex();
-			return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
+			VoxelTool* active = ActiveTool();
+			if (!active || currentMode != EditorMode::Edit)
+				return active; // Object mode's tools have no strip to stand under
+			const int host = ToolIndex(active->StripOf());
+			return host >= 0 ? tools[static_cast<size_t>(host)].tool.get() : active;
 		}
 
 		// A sub-tool's key is its own where it declares one, and otherwise its
@@ -2806,26 +2830,35 @@ namespace spades {
 			}
 			for (size_t i = 0; i < tools.size(); i++) {
 				// Only the tools of the mode the editor is in.
-				if ((currentMode == EditorMode::Object) != InObjectMode(int(i)))
+				if (!OfferedIn(int(i), currentMode == EditorMode::Object))
 					continue;
 				if (!tools[i].hotKey.empty() && EqualsIgnoringCase(tools[i].hotKey, key)) {
 					SetActiveTool(int(i));
 					return true;
 				}
 			}
-			// A key a sub-tool declares as its own (Transform's T) is good from
-			// any tool; the digits, being only a place in the active tool's
-			// bar, are not.
-			// The digits count along the bar that is showing, which a strip
-			// leaves to the tool it is the strip of.
-			VoxelTool* active = BarTool();
-			for (size_t i = 0; i < tools.size(); i++) {
+			// The sub-tools of the bar that is showing, by the keys on their
+			// buttons: the digits count along it, and a strip leaves it to the
+			// tool it is the strip of, which a key on it goes back to.
+			if (VoxelTool* bar = BarTool()) {
+				for (int sub = 0; bar->SubToolCount() > 1 && sub < bar->SubToolCount(); sub++) {
+					if (!EqualsIgnoringCase(SubToolHotKey(*bar, sub), key))
+						continue;
+					if (bar != ActiveTool())
+						SetActiveTool(RegisteredIndex(bar));
+					if (bar == ActiveTool())
+						bar->SetSubTool(*this, sub);
+					return true;
+				}
+			}
+			// Then a key a sub-tool of another tool declares as its own
+			// (Transform's T), which is good from any tool of Edit mode; the
+			// digits, being only a place in a bar, are not.
+			for (size_t i = 0; currentMode == EditorMode::Edit && i < tools.size(); i++) {
 				VoxelTool& tool = *tools[i].tool;
 				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
-					const std::string subKey = SubToolHotKey(tool, sub);
 					auto* candidate = tool.SubTool(sub);
-					const bool own = candidate && !candidate->HotKey().empty();
-					if ((!own && &tool != active) || !EqualsIgnoringCase(subKey, key))
+					if (!candidate || !EqualsIgnoringCase(candidate->HotKey(), key))
 						continue;
 					SetActiveTool(int(i)); // says why not, when it has nothing to work on
 					if (activeTool == int(i))
@@ -2838,7 +2871,7 @@ namespace spades {
 
 		VoxelTool* VoxelEditor::ActiveTool() {
 			if (currentMode == EditorMode::Object && ObjectMode()) {
-				if (InObjectMode(objectModeTool))
+				if (objectModeTool >= 0 && OfferedIn(objectModeTool, true))
 					return tools[std::size_t(objectModeTool)].tool.get();
 				return objectTools[std::size_t(objectOwnTool)].tool.get();
 			}
@@ -3475,7 +3508,7 @@ namespace spades {
 			  (currentMode == EditorMode::Edit || objectTools) ? int(tools.size()) : 0;
 			for (int i = 0; i < toolCount; i++) {
 				// A strip has no button: the tool it is the strip of stands for it.
-				if (objectTools != InObjectMode(i) || !tools[i].tool->StripOf().empty())
+				if (!OfferedIn(i, objectTools) || !tools[i].tool->StripOf().empty())
 					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
@@ -3492,14 +3525,14 @@ namespace spades {
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
 			// The brush colour is what voxels are painted with: only Edit mode,
-			// which edits them, offers it.
-			if (currentMode == EditorMode::Edit)
+			// which edits them, offers it. A tool with a colour of its own for
+			// the picker has its swatch in either mode.
+			if (currentMode == EditorMode::Edit || &PickerColor() != &currentColor)
 				ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
 			else
 				ui.GetToolbar()->HideColorSwatch();
-			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
-			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
-			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
+			ui.GetToolbar()->SetUndoButton(CanUndo());
+			ui.GetToolbar()->SetRedoButton(CanRedo());
 
 			ui.GetToolbar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                      ui.GetMenuBar()->IsOpen(), sw);

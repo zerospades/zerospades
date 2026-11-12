@@ -1681,7 +1681,7 @@ namespace spades {
 			return found;
 		}
 
-		void KV6Scene::Render(client::IRenderer& renderer) {
+		void KV6Scene::Render(client::IRenderer& renderer, bool objectsOnly) {
 			if (previewing && previewModel) {
 				if (!previewRender)
 					previewRender = renderer.CreateModel(*previewModel);
@@ -1714,6 +1714,9 @@ namespace spades {
 				param.matrix = WorldMatrix(i) * Matrix4::Translate(o.model->GetOrigin() * -1.0F);
 				renderer.RenderModel(*e.renderModel, param);
 			}
+
+			if (objectsOnly)
+				return;
 
 			// The selected objects' volumes, outlined where they lie: the active
 			// one brighter, as its row is in the tree.
