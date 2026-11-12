@@ -417,12 +417,14 @@ namespace spades {
 			/**
 			 * Which cells of the volume the air outside the model reaches,
 			 * flooding in from past its sides: what tells a voxel on the
-			 * model's outside from one facing a cavity within it. One byte a
+			 * model's outside from one facing a cavity within it. A bit a
 			 * cell, indexed as Cell() does.
 			 */
-			std::vector<std::uint8_t> OutsideAir() const;
+			std::vector<bool> OutsideAir() const;
 			/** The index of `v` in a volume-sized array of the document's size. */
 			std::size_t Cell(const IntVector3& v) const;
+			/** The cell at `index`: the inverse of Cell(). */
+			IntVector3 CellAt(std::size_t index) const;
 			/** Whether `v` is a cell of the volume at all. */
 			bool InVolume(const IntVector3& v) const;
 

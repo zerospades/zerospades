@@ -824,21 +824,30 @@ namespace spades {
 			       std::size_t(size.x) * (std::size_t(v.y) + std::size_t(size.y) * std::size_t(v.z));
 		}
 
+		IntVector3 VoxelEditor::CellAt(std::size_t index) const {
+			const IntVector3 size = document.Size();
+			const std::size_t plane = std::size_t(size.x) * std::size_t(size.y);
+			return MakeIntVector3(int(index % std::size_t(size.x)),
+			                      int((index % plane) / std::size_t(size.x)), int(index / plane));
+		}
+
 		bool VoxelEditor::InVolume(const IntVector3& v) const {
 			return InBounds(v.x, v.y, v.z);
 		}
 
-		std::vector<std::uint8_t> VoxelEditor::OutsideAir() const {
+		std::vector<bool> VoxelEditor::OutsideAir() const {
 			const IntVector3 size = document.Size();
-			std::vector<std::uint8_t> outside(
-			  std::size_t(size.x) * std::size_t(size.y) * std::size_t(size.z), 0);
-			std::vector<IntVector3> queue;
+			// A bit a cell: these maps cover the whole volume, and a model may
+			// be large across even where it is shallow.
+			std::vector<bool> outside(
+			  std::size_t(size.x) * std::size_t(size.y) * std::size_t(size.z), false);
+			std::vector<std::uint32_t> queue; // cells to flood on from, by index
 			// Air at the volume's sides is outside air: past them is open space.
 			auto reach = [&](const IntVector3& v) {
 				if (!InVolume(v) || document.IsSolid(v.x, v.y, v.z) || outside[Cell(v)])
 					return;
-				outside[Cell(v)] = 1;
-				queue.push_back(v);
+				outside[Cell(v)] = true;
+				queue.push_back(std::uint32_t(Cell(v)));
 			};
 			for (int x = 0; x < size.x; x++)
 				for (int y = 0; y < size.y; y++) {
@@ -857,7 +866,7 @@ namespace spades {
 				}
 			// ...and so is whatever air it reaches from there, face by face.
 			for (std::size_t i = 0; i < queue.size(); i++) {
-				const IntVector3 at = queue[i];
+				const IntVector3 at = CellAt(queue[i]);
 				for (const IntVector3& step : kFaceNeighbours)
 					reach(at + step);
 			}
@@ -871,7 +880,7 @@ namespace spades {
 				return;
 			}
 
-			const std::vector<std::uint8_t> outside = OutsideAir();
+			const std::vector<bool> outside = OutsideAir();
 			auto openAt = [&](const IntVector3& v) {
 				// Past the volume is open space, and so is air the outside air
 				// reached. Air it did not reach is a cavity already within the
@@ -904,9 +913,11 @@ namespace spades {
 			// what lies within `thickness` of it, and everything deeper is what
 			// a cavity may take.
 			const IntVector3 size = document.Size();
+			// A byte a cell, being a count rather than a flag; the cells walked
+			// are kept as indices, which are a third the size of coordinates.
 			std::vector<std::uint8_t> depth(
 			  std::size_t(size.x) * std::size_t(size.y) * std::size_t(size.z), 0);
-			std::vector<IntVector3> queue;
+			std::vector<std::uint32_t> queue; // cells to walk on from, by index
 			for (int x = 0; x < size.x; x++)
 				for (int y = 0; y < size.y; y++)
 					for (int z = 0; z < size.z; z++) {
@@ -914,10 +925,10 @@ namespace spades {
 						if (!document.IsSolid(x, y, z) || !onSkin(v))
 							continue;
 						depth[Cell(v)] = 1;
-						queue.push_back(v);
+						queue.push_back(std::uint32_t(Cell(v)));
 					}
 			for (std::size_t i = 0; i < queue.size(); i++) {
-				const IntVector3 at = queue[i];
+				const IntVector3 at = CellAt(queue[i]);
 				const std::uint8_t next =
 				  std::uint8_t(std::min(254, int(depth[Cell(at)]) + 1)); // deep enough is deep enough
 				for (const IntVector3& step : kFaceNeighbours) {
@@ -925,7 +936,7 @@ namespace spades {
 					if (!InVolume(n) || !document.IsSolid(n.x, n.y, n.z) || depth[Cell(n)] != 0)
 						continue;
 					depth[Cell(n)] = next;
-					queue.push_back(n);
+					queue.push_back(std::uint32_t(Cell(n)));
 				}
 			}
 			auto isWall = [&](const IntVector3& v) {
@@ -937,30 +948,30 @@ namespace spades {
 			// the dig can reach is what it takes. It stops at the wall and never
 			// steps out into the open, so a cavity stays inside the solid the
 			// selection opened and the rest of the model is untouched.
-			std::vector<std::uint8_t> taken(depth.size(), 0);
+			std::vector<bool> taken(depth.size(), false);
 			std::vector<IntVector3> removing;
 			queue.clear();
 			edit.selection.ForEach([&](const IntVector3& v) {
-				taken[Cell(v)] = 1;
+				taken[Cell(v)] = true;
 				removing.push_back(v);
-				queue.push_back(v);
+				queue.push_back(std::uint32_t(Cell(v)));
 			});
 			const std::size_t mouth = removing.size();
 			for (std::size_t i = 0; i < queue.size(); i++) {
-				const IntVector3 at = queue[i];
+				const IntVector3 at = CellAt(queue[i]);
 				for (const IntVector3& step : kFaceNeighbours) {
 					const IntVector3 n = at + step;
 					if (!InVolume(n) || taken[Cell(n)] || openAt(n))
 						continue;
-					taken[Cell(n)] = 1;
+					taken[Cell(n)] = true;
 					if (!document.IsSolid(n.x, n.y, n.z)) {
-						queue.push_back(n); // a cavity already there: the dig joins it
+						queue.push_back(std::uint32_t(Cell(n))); // a cavity already there: the dig joins it
 						continue;
 					}
 					if (isWall(n))
 						continue; // the wall is what is left standing
 					removing.push_back(n);
-					queue.push_back(n);
+					queue.push_back(std::uint32_t(Cell(n)));
 				}
 			}
 			if (removing.size() == mouth) {
