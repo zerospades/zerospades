@@ -259,7 +259,7 @@ namespace spades {
 		public:
 			TransformSubTool();
 			const char* Label() const override { return "Transform"; }
-			// The key it was known by as a tool of its own.
+			// Its own, from whichever tool is active.
 			std::string HotKey() const override { return "T"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnDeactivate(IVoxelEditContext&) override;
@@ -300,8 +300,8 @@ namespace spades {
 		public:
 			explicit SweepSubTool(bool pocket);
 			const char* Label() const override { return pocket ? "Pocket" : "Extrude"; }
-			// Extrude keeps the key it was known by as a tool of its own; a
-			// pocket is a recess, which is the letter left for it.
+			// Their own, from whichever tool is active; a pocket is a recess,
+			// which is the letter left for it.
 			std::string HotKey() const override { return pocket ? "R" : "E"; }
 			std::string Hint(IVoxelEditContext&) override;
 			void DrawScene(IVoxelEditContext&) override;
@@ -320,6 +320,33 @@ namespace spades {
 			int axis = -1;  // the arrow being dragged, -1 between drags
 			int steps = 0;  // how far it has been dragged, in voxels
 			int StepsOf(const GizmoTransform& total) const;
+		};
+
+		/**
+		 * Recolours the selected voxels (Modify's "Paint"): with the brush
+		 * colour on a click or on Fill, and with each colour chosen on the
+		 * picker while it is active, live while it is being chosen. A waiting
+		 * paste or import is recoloured where it waits.
+		 */
+		class PaintSelectionSubTool : public VoxelTool {
+		public:
+			PaintSelectionSubTool();
+			const char* Label() const override { return "Paint"; }
+			// C for colour: P is the Paint tool's, which colours any voxel.
+			std::string HotKey() const override { return "C"; }
+			std::string Hint(IVoxelEditContext&) override;
+			// A press on a voxel paints the selection; one on nothing gives the
+			// selection up for Select.
+			void OnPointer(IVoxelEditContext&, const PointerInput&) override;
+			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+			                         bool committed) override;
+
+			ToolOptions* Options() override { return &options; }
+			void UpdateOptions(IVoxelEditContext& ed) override;
+			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
+
+		private:
+			ToolOptions options;
 		};
 
 		// Moves the model pivot with the gizmo, snapped as the Pivot tool sets it.

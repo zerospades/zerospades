@@ -41,8 +41,8 @@ namespace spades {
 		static const float kTbGap = 2.0F;
 		static const float kTbSep = 14.0F;
 		static const float kTbX0 = 12.0F;
-		static const float kBandY = kRibbonH + kToolbarH;
-		static const float kBtnY = kBandY + (kSubBarH - kTbH) * 0.5F;
+		// What a floating bar's panel keeps clear around its items.
+		static const float kFloatPad = 8.0F;
 		// A sub-tool button holds its label and, on its right, its key. Narrow
 		// ones (an axis letter) still read as buttons at the minimum.
 		static const float kSubBtnMin = 52.0F;
@@ -71,7 +71,17 @@ namespace spades {
 		static const float kNumberArrowHalfW = 3.5F;
 		static const float kNumberArrowHalfH = 2.0F;
 
-		OptionBar::OptionBar(client::IAudioDevice* audioDevice) : sounds(audioDevice) {}
+		OptionBar::OptionBar(client::IAudioDevice* audioDevice, int row, bool floating)
+		    : sounds(audioDevice),
+		      bandY(kRibbonH + kToolbarH + float(row) * kSubBarH),
+		      btnY(bandY + (kSubBarH - kTbH) * 0.5F),
+		      floating(floating) {}
+
+		bool OptionBar::Contains(const Vector2& p) const {
+			if (!floating)
+				return p.y >= bandY && p.y < bandY + kSubBarH;
+			return drawnExtent > 0.0F && OverlayInRect(p, 0.0F, bandY, drawnExtent, kSubBarH);
+		}
 
 		void OptionBar::SetContent(const void* newOwner, std::vector<SubToolButton> buttons,
 		                           std::vector<Option> newOptions) {
@@ -163,17 +173,17 @@ namespace spades {
 					continue;
 				const NumberSpans& ns = numberSpans[i];
 				const float half = kTbH * 0.5F;
-				if (OverlayInRect(p, ns.arrows.x, kBtnY, ns.arrows.width, half)) {
+				if (OverlayInRect(p, ns.arrows.x, btnY, ns.arrows.width, half)) {
 					StepNumber(i, options[i].step);
 					sounds.Activate();
 					return true;
 				}
-				if (OverlayInRect(p, ns.arrows.x, kBtnY + half, ns.arrows.width, half)) {
+				if (OverlayInRect(p, ns.arrows.x, btnY + half, ns.arrows.width, half)) {
 					StepNumber(i, -options[i].step);
 					sounds.Activate();
 					return true;
 				}
-				if (OverlayInRect(p, ns.box.x, kBtnY, ns.box.width, kTbH)) {
+				if (OverlayInRect(p, ns.box.x, btnY, ns.box.width, kTbH)) {
 					BeginEditing(i);
 					sounds.Activate();
 					return true;
@@ -184,7 +194,7 @@ namespace spades {
 			EndEditing(true);
 			for (size_t i = 0; i < subToolSpans.size() && i < subToolButtons.size(); i++) {
 				const Span& span = subToolSpans[i];
-				if (!OverlayInRect(p, span.x, kBtnY, span.width, kTbH))
+				if (!OverlayInRect(p, span.x, btnY, span.width, kTbH))
 					continue;
 				if (OnSubToolClicked)
 					OnSubToolClicked(int(i));
@@ -193,7 +203,7 @@ namespace spades {
 			}
 			for (size_t i = 0; i < optionSpans.size() && i < options.size(); i++) {
 				const Span& span = optionSpans[i];
-				if (!OverlayInRect(p, span.x, kBtnY, span.width, kTbH))
+				if (!OverlayInRect(p, span.x, btnY, span.width, kTbH))
 					continue;
 				const Option& op = options[i];
 				const std::function<void(const std::string&)>* handler = nullptr;
@@ -273,7 +283,7 @@ namespace spades {
 			if (index < 0 || size_t(index) >= numberSpans.size())
 				return AABB2();
 			const Span& box = numberSpans[size_t(index)].box;
-			return AABB2(box.x, kBtnY, box.width, kTbH);
+			return AABB2(box.x, btnY, box.width, kTbH);
 		}
 
 		void OptionBar::Draw(client::IRenderer& renderer, client::FontManager& fontManager,
@@ -291,9 +301,23 @@ namespace spades {
 			numberSpans.resize(options.size());
 			const int editingIndex = EditingIndex();
 
-			// Full-width sub-toolbar band background (always present)
-			OverlayColorNP(renderer, MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
-			OverlayFillRect(renderer, 0.0F, kBandY, screenWidth, kSubBarH);
+			if (floating) {
+				// Over the viewport, and only as wide as what it holds: sized
+				// by the frame before, which is what a click is tested against
+				// too. With nothing to hold there is no panel at all.
+				if (subToolButtons.empty() && options.empty()) {
+					drawnExtent = 0.0F;
+					return;
+				}
+				if (drawnExtent > 0.0F) {
+					OverlayColorNP(renderer, MakeVector4(0.08F, 0.08F, 0.10F, 0.92F));
+					OverlayFillRect(renderer, 0.0F, bandY, drawnExtent, kSubBarH);
+				}
+			} else {
+				// Full-width sub-toolbar band background (always present)
+				OverlayColorNP(renderer, MakeVector4(0.08F, 0.08F, 0.10F, 1.0F));
+				OverlayFillRect(renderer, 0.0F, bandY, screenWidth, kSubBarH);
+			}
 
 			// Items are placed left to right, `x` being where the last one ended:
 			// a gap parts items of one group, a separator line one group from the
@@ -310,14 +334,14 @@ namespace spades {
 					return;
 				}
 				OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-				OverlayFillRect(renderer, x + kTbSep * 0.5F, kBtnY + 2.0F, 1.0F, kTbH - 4.0F);
+				OverlayFillRect(renderer, x + kTbSep * 0.5F, btnY + 2.0F, 1.0F, kTbH - 4.0F);
 				x += kTbSep;
 			};
 			// Hover of an item this frame, sounding once as it starts.
 			auto hovered = [&](const Span& span, bool enabled, std::vector<bool>& previous,
 			                   size_t i) {
 				bool hover = !menuActive && enabled &&
-				             OverlayInRect(cursorPos, span.x, kBtnY, span.width, kTbH);
+				             OverlayInRect(cursorPos, span.x, btnY, span.width, kTbH);
 				previous[i] = sounds.HoverEdge(hover, previous[i]);
 				return hover;
 			};
@@ -336,7 +360,7 @@ namespace spades {
 				bool hover = hovered(span, true, previousSubToolHoverState, i);
 				Vector2 labelAlign =
 				  button.hotKey.empty() ? MakeVector2(0.5F, 0.5F) : MakeVector2(0.0F, 0.5F);
-				widgets::PaintButton(renderer, font, MakeVector2(span.x, kBtnY),
+				widgets::PaintButton(renderer, font, MakeVector2(span.x, btnY),
 				                     MakeVector2(span.width, kTbH), button.label, labelAlign,
 				                     button.hotKey, MakeVector2(1.0F, 0.5F), true, hover, false,
 				                     button.active, 1.0F);
@@ -349,7 +373,7 @@ namespace spades {
 				advance(startsGroup);
 				if (startsGroup && !op.group.empty()) {
 					Vector2 ts = font.Measure(op.group);
-					font.Draw(op.group, MakeVector2(x, kBtnY + (kTbH - ts.y) * 0.5F), 1.0F,
+					font.Draw(op.group, MakeVector2(x, btnY + (kTbH - ts.y) * 0.5F), 1.0F,
 					          groupColor);
 					x += ts.x + kGroupLabelGap;
 				}
@@ -374,7 +398,7 @@ namespace spades {
 				optionSpans.push_back(span);
 
 				if (op.type == OptionType::Label) {
-					font.Draw(op.label, MakeVector2(x, kBtnY + (kTbH - textSize.y) * 0.5F), 1.0F,
+					font.Draw(op.label, MakeVector2(x, btnY + (kTbH - textSize.y) * 0.5F), 1.0F,
 					          textColor);
 				} else if (op.type == OptionType::Number) {
 					DrawNumber(renderer, font, op, i, span, textSize, editingIndex == int(i),
@@ -383,13 +407,14 @@ namespace spades {
 					bool hover = hovered(span, op.enabled, previousOptionHoverState, i);
 					// An action holds no state, so it never draws as toggled.
 					bool toggled = (op.type == OptionType::Bool) && op.bvalue;
-					widgets::PaintButton(renderer, font, MakeVector2(x, kBtnY),
+					widgets::PaintButton(renderer, font, MakeVector2(x, btnY),
 					                     MakeVector2(width, kTbH), op.label,
 					                     MakeVector2(0.5F, 0.5F), "", MakeVector2(1.0F, 0.5F),
 					                     op.enabled, hover, false, toggled, 1.0F);
 				}
 				x += width;
 			}
+			drawnExtent = x + kFloatPad;
 		}
 		void OptionBar::DrawNumber(client::IRenderer& renderer, client::IFont& font,
 		                           const Option& op, size_t i, const Span& span,
@@ -402,7 +427,7 @@ namespace spades {
 
 			// The axis letter, then the box, then the two arrows sharing a column
 			// on its right.
-			font.Draw(op.label, MakeVector2(span.x, kBtnY + (kTbH - labelSize.y) * 0.5F), 1.0F,
+			font.Draw(op.label, MakeVector2(span.x, btnY + (kTbH - labelSize.y) * 0.5F), 1.0F,
 			          op.enabled ? labelColor : disabledColor);
 			const float boxX = span.x + labelSize.x + kNumberLabelGap;
 			const float arrowX = boxX + kNumberBoxW;
@@ -413,8 +438,8 @@ namespace spades {
 			ns.arrows = Span{arrowX, kNumberArrowW};
 
 			const bool boxHover = !menuActive && op.enabled &&
-			                      OverlayInRect(cursorPos, boxX, kBtnY, kNumberBoxW, kTbH);
-			widgets::PaintField(renderer, MakeVector2(boxX, kBtnY),
+			                      OverlayInRect(cursorPos, boxX, btnY, kNumberBoxW, kTbH);
+			widgets::PaintField(renderer, MakeVector2(boxX, btnY),
 			                    MakeVector2(kNumberBoxW, kTbH), isEditing, boxHover);
 
 			// While it is typed into the box shows the text as it stands, caret
@@ -422,13 +447,13 @@ namespace spades {
 			const std::string shown =
 			  isEditing ? entry.Text() : NumberEntry::Format(op.value, op.decimals);
 			const Vector2 shownSize = font.Measure(shown);
-			font.Draw(shown, MakeVector2(boxX + kNumberTextInset, kBtnY + (kTbH - shownSize.y) * 0.5F),
+			font.Draw(shown, MakeVector2(boxX + kNumberTextInset, btnY + (kTbH - shownSize.y) * 0.5F),
 			          1.0F, op.enabled ? valueColor : disabledColor);
 			if (isEditing) {
 				const float caretX =
 				  boxX + kNumberTextInset + font.Measure(shown.substr(0, size_t(entry.Caret()))).x;
 				OverlayColorNP(renderer, valueColor);
-				OverlayFillRect(renderer, caretX, kBtnY + 4.0F, 1.0F, kTbH - 8.0F);
+				OverlayFillRect(renderer, caretX, btnY + 4.0F, 1.0F, kTbH - 8.0F);
 			}
 
 			// Triangles rather than an image: the bar draws everything else from
@@ -445,12 +470,12 @@ namespace spades {
 				OverlayFillConvexPolygon(renderer, points, 3, c);
 			};
 			const bool upHover = !menuActive && op.enabled &&
-			                     OverlayInRect(cursorPos, arrowX, kBtnY, kNumberArrowW, half);
+			                     OverlayInRect(cursorPos, arrowX, btnY, kNumberArrowW, half);
 			const bool downHover =
 			  !menuActive && op.enabled &&
-			  OverlayInRect(cursorPos, arrowX, kBtnY + half, kNumberArrowW, half);
-			arrow(kBtnY + half * 0.5F, true, upHover);
-			arrow(kBtnY + half * 1.5F, false, downHover);
+			  OverlayInRect(cursorPos, arrowX, btnY + half, kNumberArrowW, half);
+			arrow(btnY + half * 0.5F, true, upHover);
+			arrow(btnY + half * 1.5F, false, downHover);
 		}
 	} // namespace gui
 } // namespace spades

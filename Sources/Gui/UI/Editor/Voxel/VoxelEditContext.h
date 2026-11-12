@@ -129,6 +129,8 @@ namespace spades {
 
 			// Add every solid voxel of the document to the selection.
 			virtual void SelectAll() = 0;
+			// Select the solid voxels that are not selected, and no others.
+			virtual void InvertSelection() = 0;
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
 			/**

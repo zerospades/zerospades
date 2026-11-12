@@ -26,10 +26,9 @@
 namespace spades {
 	namespace gui {
 		// Select voxels: Voxel (single), Box (box region), By Colour, Cylinder,
-		// Plane (a flat face), and on the screen Rect and Brush. Its bar holds
-		// the commands that act on the selection, clipboard included, and the
-		// screen selections' settings; the colour picker recolours what is
-		// selected.
+		// Plane (a flat face), and on the screen Rect and Brush. It only ever
+		// changes which voxels are selected -- its bar ends with All, None and
+		// Invert -- and what is then done with them is Modify's.
 		class SelectTool : public ContainerTool {
 		public:
 			SelectTool();
@@ -38,31 +37,14 @@ namespace spades {
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
-			// A colour chosen on the picker recolours the selection, live while
-			// it is being chosen.
-			void OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
-			                         bool committed) override;
-			std::string Hint(IVoxelEditContext& ed) override;
 			// A click on nothing selects nothing, whichever way of selecting is
 			// active, as in every modeller: but for a box or a cylinder being
 			// placed, whose next point may well be in empty space.
 			void OnPointer(IVoxelEditContext& ed, const PointerInput& e) override;
-			// Back to choosing voxels: the way of choosing last used, so a
-			// click on nothing under Transform or Extrude leaves the user where
-			// they were before they reached for it.
-			void SetSubTool(IVoxelEditContext& ed, int i) override;
-			void OnReturnToSelect(IVoxelEditContext& ed) override;
 
 		private:
 			ScreenSelectSettings screen; // Rect's and Brush's, shared by them
 			VoxelsOnScreen voxels;       // what they select
-			// The first sub-tool that acts on a selection rather than making
-			// one: the ones before it choose voxels, the ones from it on work
-			// on what was chosen.
-			int actingIndex = 0;
-			/** Whether the active sub-tool is one that chooses voxels. */
-			bool Selecting() const { return active < actingIndex; }
-			int lastSelecting = 0; // the way of choosing to go back to
 			// The press that may turn out a click on nothing.
 			bool pressOnNothing = false;
 			Vector2 pressAt = MakeVector2(0.0F, 0.0F);

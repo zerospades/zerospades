@@ -38,10 +38,18 @@ namespace spades {
 			// whose action has no inverse (recolouring) says no, and the editor
 			// then keeps the right button from all of its sub-tools.
 			virtual bool RightButtonInverts() const { return true; }
-			// The editor was asked to go back to choosing voxels (a click on
-			// nothing under a sub-tool that acts on a selection). A tool that
-			// both chooses and acts puts itself back to choosing here.
-			virtual void OnReturnToSelect(IVoxelEditContext&) {}
+			// Whether the tool has anything to work on. One that has not is
+			// greyed out on the toolbar, its keys do nothing, and the editor
+			// leaves it for Select should it stop having any while active.
+			virtual bool Available(const IVoxelEditContext&) const { return true; }
+			// The id of the tool this one is the strip of, for a tool that has
+			// no button of its own on the toolbar: its sub-tools are offered
+			// on a strip under that tool's bar instead, while it has anything
+			// to work on, and that tool's button stays lit while it is active.
+			virtual std::string StripOf() const { return std::string(); }
+			// The commands the strip offers beside the sub-tools, good whether
+			// or not the tool is the active one; null for none.
+			virtual ToolOptions* StripCommands() { return nullptr; }
 			// What this tool sets by number, which the editor's transform panel
 			// shows while it is active (Pivot's pivot); null for nothing.
 			virtual ITransformTarget* TransformTarget(IVoxelEditContext&) { return nullptr; }

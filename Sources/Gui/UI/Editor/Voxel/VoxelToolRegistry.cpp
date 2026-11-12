@@ -22,6 +22,7 @@
 
 #include "DrawTool.h"
 #include "MirrorTool.h"
+#include "ModifyTool.h"
 #include "PaintTool.h"
 #include "PivotTool.h"
 #include "ReferenceTool.h"
@@ -30,10 +31,12 @@
 namespace spades {
 	namespace gui {
 		namespace {
-			// Tools that edit the voxels or the selection, then tools that set
-			// the model up (its mirror planes, its pivot).
-			constexpr int kEditingGroup = 0;
-			constexpr int kSetupGroup = 1;
+			// Tools that say which voxels and what is done with them, tools that
+			// make and colour voxels, then tools that set the model up (its
+			// mirror planes, its pivot).
+			constexpr int kSelectionGroup = 0;
+			constexpr int kEditingGroup = 1;
+			constexpr int kSetupGroup = 2;
 
 			template <class T> VoxelToolRegistry::Factory Make() {
 				return [] { return std::unique_ptr<VoxelTool>(new T()); };
@@ -49,11 +52,11 @@ namespace spades {
 				// set-up ones last. Seeding here (rather than via static
 				// initialisers in each tool's TU) keeps the order deterministic.
 				// The keys lean on common editor conventions (Q select, B brush)
-				// and keep clear of the default WASD movement keys. What is done
-				// to a selection -- Transform, Extrude, Pocket -- needs one to
-				// work on, so it lives inside Select as a sub-tool and keeps its
-				// own key there (T, E, R).
-				registry.Register(Make<SelectTool>(), "select", kEditingGroup, "Q");
+				// and keep clear of the default WASD movement keys. Modify has
+				// neither a key nor a button: it is Select's strip, and each of
+				// its sub-tools has a key that works from any tool (T, E, R, C).
+				registry.Register(Make<SelectTool>(), "select", kSelectionGroup, "Q");
+				registry.Register(Make<ModifyTool>(), "modify", kSelectionGroup, "");
 				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B");
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
