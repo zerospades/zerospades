@@ -121,8 +121,10 @@ namespace spades {
 			options.SetEnabled(kFillSelectionOption, selected);
 			// Whether the selection is on the model's outside is the dig's own
 			// answer, which costs a walk of the volume: it is asked when the
-			// button is pressed, and refused there with the reason.
-			options.SetEnabled(kCavityOption, selected);
+			// button is pressed, and refused there with the reason. Voxels
+			// still waiting to be placed are not a selection to hollow out,
+			// though the count of what the commands act on includes them.
+			options.SetEnabled(kCavityOption, selected && !ed.HasPlacement());
 		}
 
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {

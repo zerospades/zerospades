@@ -42,6 +42,25 @@ namespace spades {
             bool checked = false;
         };
 
+        /** A command, with the key that does the same where it has one. */
+        inline EditorMenuItem MenuCommand(std::string caption, std::function<void()> run,
+                                          bool enabled = true,
+                                          std::string hotKey = std::string()) {
+            EditorMenuItem item;
+            item.caption = std::move(caption);
+            item.run = std::move(run);
+            item.enabled = enabled;
+            item.hotKey = std::move(hotKey);
+            return item;
+        }
+
+        /** A rule between two blocks of commands. */
+        inline EditorMenuItem MenuRule() {
+            EditorMenuItem item;
+            item.separator = true;
+            return item;
+        }
+
         /** One menu of a menu bar: its title and what it offers. */
         struct EditorMenuGroup {
             std::string title;

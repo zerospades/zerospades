@@ -410,7 +410,11 @@ namespace spades {
 		// --- Escape -----------------------------------------------------------
 
 		VoxelEditor::EscapeLayer VoxelEditor::NextEscape() {
-			if (transformPanel->IsTyping() || transformPanel->IsHolding())
+			// A number is a number wherever it is being typed: the panel's, and
+			// the bar's boxes, which answer for their own Escape through
+			// OptionBar but never see it once Escape has somewhere else to go.
+			if (transformPanel->IsTyping() || transformPanel->IsHolding() ||
+			    ui.GetOptionBar()->IsEditing())
 				return EscapeLayer::Number;
 			if (ui.GetColorPicker()->GetEyedropperMode())
 				return EscapeLayer::Eyedropper;
@@ -442,6 +446,10 @@ namespace spades {
 		void VoxelEditor::Escape(EscapeLayer layer) {
 			switch (layer) {
 				case EscapeLayer::Number:
+					if (ui.GetOptionBar()->IsEditing()) {
+						ui.GetOptionBar()->EndEditing(false); // what was typed is given up
+						break;
+					}
 					if (ITransformTarget* target = PanelTarget()) {
 						if (!transformPanel->CancelScrub(*target))
 							transformPanel->Key(*target, "Escape", TextEntry::Modifiers(), clock);
@@ -1684,7 +1692,7 @@ namespace spades {
 			PendingPlacement moved;
 			bool clamped = false;
 			if (!TransformedPlacement(selected, t, moved, clamped)) {
-				SetStatus(SizeLimitMessage(selected.Extent()));
+				SetStatus(SizeLimitMessage(moved.Extent()));
 				return;
 			}
 			if (clamped)
@@ -1840,7 +1848,7 @@ namespace spades {
 			PendingPlacement next;
 			bool clamped = false;
 			if (!TransformedPlacement(edit.placement, t, next, clamped)) {
-				SetStatus(SizeLimitMessage(edit.placement.Extent()));
+				SetStatus(SizeLimitMessage(next.Extent()));
 				return;
 			}
 			if (clamped)
@@ -2708,6 +2716,15 @@ namespace spades {
 		void VoxelEditor::ButtonEvent(PointerButton button, bool down) {
 			const Vector2& at = cursor.GetPosition();
 
+			// Every button is the open menu's while it is down. The left one
+			// has somewhere to land -- a command, a title -- and is answered
+			// below, where the pointer is; the others only put it away, and do
+			// nothing of what they would have done to the model behind it.
+			if (down && button != PointerButton::Left && ui.GetMenuBar()->IsOpen()) {
+				ui.GetMenuBar()->Close();
+				return;
+			}
+
 			// A release reaches the tool only when its press did: presses the
 			// picker, the bars, the host's widgets or colour sampling took are
 			// none of the tool's business, and start no user action to end.
@@ -2753,6 +2770,7 @@ namespace spades {
 				// all that press does.
 				if (ui.GetMenuBar()->IsOpen() && ui.GetMenuBar()->Click(at))
 					return;
+
 
 				// The open picker owns every press on its panel, gaps included, so
 				// nothing behind it is ever edited through it.
@@ -2924,12 +2942,8 @@ namespace spades {
 				if (!hint.empty())
 					line += ":  " + hint;
 			}
-			// What Escape does next, from the same list Escape acts on; with
-			// nothing in hand it does nothing, and says nothing.
-			const std::string backOut = EscapeLabel(NextEscape());
-			if (backOut.empty())
-				return line;
-			const std::string escape = "[Esc] " + backOut;
+			// What Escape does next, from the same list Escape acts on.
+			const std::string escape = "[Esc] " + EscapeLabel(NextEscape());
 			return line.empty() ? escape : line + kHintSeparator + escape;
 		}
 

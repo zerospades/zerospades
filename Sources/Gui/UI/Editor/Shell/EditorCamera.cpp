@@ -318,7 +318,13 @@ namespace spades {
 			sceneDef.viewportWidth = int(width);
 			sceneDef.viewportHeight = int(height);
 
-			view.eye = sceneDef.viewOrigin;
+			// A parallel view's box starts behind the eye, so what it draws from
+			// back there has to be pickable from back there too: its rays start
+			// where the box does. Along the line of sight is the one direction a
+			// parallel projection does not mind the eye moving in, so nothing
+			// else changes.
+			view.eye = sceneDef.viewOrigin +
+			           (orthogonal ? sceneDef.viewAxis[2] * sceneDef.zNear : MakeVector3(0, 0, 0));
 			view.right = sceneDef.viewAxis[0];
 			view.up = sceneDef.viewAxis[1];
 			view.forward = sceneDef.viewAxis[2];
