@@ -59,7 +59,6 @@ namespace spades {
 				asked = true;
 				menus = host.GetMenus();
 			}
-			barX = x;
 			barH = height;
 			titleX.clear();
 			titleW.clear();
@@ -151,12 +150,6 @@ namespace spades {
 				y += h;
 			}
 			return -1;
-		}
-
-		bool MenuBar::Contains(const Vector2& p) const {
-			if (TitleAt(p) >= 0)
-				return true;
-			return IsOpen() && OverlayInRect(p, menuX, menuY, menuW, menuH);
 		}
 
 		bool MenuBar::Click(const Vector2& p) {

@@ -66,9 +66,6 @@ namespace spades {
 			bool IsOpen() const { return open >= 0; }
 			void Close();
 
-			/** Whether `p` is on a title or on the open menu: a press there is
-			 *  the bar's, and nothing underneath may act on it. */
-			bool Contains(const Vector2& p) const;
 			/** Acts on a press at `p`; false when it was on nothing of ours. */
 			bool Click(const Vector2& p);
 			/** The pointer moved: a title hovered while a menu is open opens
@@ -93,7 +90,7 @@ namespace spades {
 			std::vector<EditorMenuGroup> menus; // as the host last gave them
 			bool asked = false;                 // whether it has ever been asked
 			std::vector<float> titleX, titleW;  // where Layout put each title
-			float barX = 0.0F, barH = 0.0F, width = 0.0F;
+			float barH = 0.0F, width = 0.0F;
 			std::vector<bool> titleHover;       // for the hover sound
 
 			// How large each menu's panel comes out, measured with the titles
