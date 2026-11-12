@@ -332,8 +332,9 @@ namespace spades {
 			void MarkSaved() { savedChangeCount = changeCount; }
 
 			// --- Drawing ------------------------------------------------------
-			/** Every shown object in place, and outlines round the selected ones. */
-			void Render(client::IRenderer& renderer);
+			/** Every shown object in place, and unless `objectsOnly`, as for an
+			 *  image of the scene, outlines round the selected ones. */
+			void Render(client::IRenderer& renderer, bool objectsOnly = false);
 			/** The render model of object `index` is stale (its voxels changed). */
 			void InvalidateModel(int index);
 

@@ -362,7 +362,7 @@ namespace spades {
 			for (int i = 0; i < toolCount; i++) {
 				// A strip has no button: the tool it is the strip of stands for
 				// it. A mode only offers its own tools.
-				if (objectTools != InObjectMode(i) || !tools[i].traits.stripOf.empty())
+				if (!OfferedIn(i, objectTools) || !tools[i].traits.stripOf.empty())
 					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
@@ -379,14 +379,14 @@ namespace spades {
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
 			// The brush colour is what voxels are painted with: only Edit mode,
-			// which edits them, offers it.
-			if (currentMode == EditorMode::Edit)
+			// which edits them, offers it. A tool with a colour of its own for
+			// the picker has its swatch in either mode.
+			if (currentMode == EditorMode::Edit || ToolColorOption())
 				ui.GetToolbar()->SetColorSwatch(PickedColor(), ui.GetColorPicker()->IsOpen());
 			else
 				ui.GetToolbar()->HideColorSwatch();
-			IObjectModeHost* objects = currentMode == EditorMode::Object ? ObjectMode() : nullptr;
-			ui.GetToolbar()->SetUndoButton(objects ? objects->CanUndoObjects() : undo.CanUndo());
-			ui.GetToolbar()->SetRedoButton(objects ? objects->CanRedoObjects() : undo.CanRedo());
+			ui.GetToolbar()->SetUndoButton(CanUndo());
+			ui.GetToolbar()->SetRedoButton(CanRedo());
 
 			ui.GetToolbar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                      ui.GetMenuBar()->IsOpen(), sw);
