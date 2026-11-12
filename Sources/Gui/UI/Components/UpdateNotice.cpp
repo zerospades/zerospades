@@ -50,6 +50,11 @@ namespace spades {
 
 			constexpr float kPromptHeight = 170.0F;
 
+			// Distance from the top and right edges of the screen to the up-to-date mark.
+			constexpr float kScreenMargin = 8.0F;
+
+			constexpr float kUpToDateFadeDuration = 0.5F;
+
 			/**
 			 * Opens the release page and, once the browser has it, runs `opened`
 			 * (which closes the application). If the browser could not be launched
@@ -74,6 +79,7 @@ namespace spades {
 		      releasePageOpened(std::move(releasePageOpened)) {
 			isMouseInteractive = false;
 			Refresh();
+			fadeInUpToDate = !upToDate;
 		}
 
 		void UpdateNotice::Refresh() {
@@ -106,25 +112,37 @@ namespace spades {
 				return;
 
 			client::IRenderer& r = GetManager().GetRenderer();
-			Vector2 pos = GetScreenPosition();
+
+			// fade in from the first frame the mark is drawn
+			float alpha = 1.0F;
+			if (fadeInUpToDate) {
+				if (upToDateSince < 0.0F)
+					upToDateSince = GetManager().time;
+				alpha = Clamp((GetManager().time - upToDateSince) / kUpToDateFadeDuration, 0.0F, 1.0F);
+			}
+			Vector4 color = kUpToDateColor;
+			color.w *= alpha;
 
 			std::string text =
 			  _Tr("MainScreen", "Up to date ({0})", ReleaseVersion::Current().ToString());
 			Vector2 txtSize = font->Measure(text);
+
+			// Anchored to the top right corner of the screen instead of the strip, so the
+			// margin stays the same whatever the width of the window.
 			Vector2 txtPos =
-			  MakeVector2(pos.x + size.x - txtSize.x, pos.y + (size.y - txtSize.y) * 0.5F);
-			font->DrawShadow(text, txtPos, 1.0F, kUpToDateColor,
-			                 MakeVector4(0.0F, 0.0F, 0.0F, 0.4F));
+			  MakeVector2(GetManager().screenWidth - kScreenMargin - txtSize.x, kScreenMargin);
+			font->DrawShadow(text, txtPos, 1.0F, color,
+							 MakeVector4(0.0F, 0.0F, 0.0F, 0.4F * alpha));
 
 			// A check mark drawn as two strokes, so it does not depend on the font
 			// carrying a check glyph.
 			const float s = kCheckMarkSize;
 			const float x = txtPos.x - kCheckMarkGap - s;
-			const float y = pos.y + (size.y - s) * 0.5F;
+			const float y = txtPos.y + (txtSize.y - s) * 0.5F;
 			const Vector2 start = MakeVector2(x, y + s * 0.55F);
 			const Vector2 corner = MakeVector2(x + s * 0.38F, y + s * 0.9F);
 			const Vector2 end = MakeVector2(x + s, y + s * 0.1F);
-			ui::SetColorNP(r, kUpToDateColor);
+			ui::SetColorNP(r, color);
 			r.DrawLine(start, corner, kCheckMarkThickness);
 			r.DrawLine(corner, end, kCheckMarkThickness);
 		}

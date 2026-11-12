@@ -45,6 +45,13 @@ namespace spades {
 		class UpdateNotice : public ui::ButtonBase {
 			const bool showUpToDate;
 			bool upToDate = false;
+
+			// Whether the up-to-date mark fades in. Only when the check had not answered yet when
+			// the notice was built: a rebuilt menu already knows the answer and shows it at once.
+			bool fadeInUpToDate = false;
+			// UIManager time at which the mark first drew, while it fades in.
+			float upToDateSince = -1.0F;
+
 			std::string releaseUrl;
 			std::function<void()> releasePageOpened;
 
