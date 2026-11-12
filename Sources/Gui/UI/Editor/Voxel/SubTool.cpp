@@ -840,6 +840,51 @@ namespace spades {
 			       ", a voxel per step" + kGizmoDragHint;
 		}
 
+		// --- PaintSelectionSubTool ---------------------------------------------
+
+		namespace {
+			const char* const kFillSelectionOption = "paint.fill";
+		}
+
+		PaintSelectionSubTool::PaintSelectionSubTool() {
+			options.AddAction(kFillSelectionOption, "Fill");
+		}
+
+		std::string PaintSelectionSubTool::Hint(IVoxelEditContext& ed) {
+			if (ed.SelectionCount() == 0)
+				return "select some voxels first";
+			return "[LMB] paint the selected voxels  |  the colour picker recolours them";
+		}
+
+		void PaintSelectionSubTool::OnPointer(IVoxelEditContext& ed, const PointerInput& e) {
+			if (!e.IsDown() || !e.IsLeft())
+				return;
+			ed.DoPick();
+			if (ed.HasPick())
+				ed.RecolorSelection(ed.CurrentColor()); // reports what it recoloured
+			else
+				ed.ReturnToSelect();
+		}
+
+		void PaintSelectionSubTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+		                                                bool committed) {
+			if (ed.SelectionCount() == 0)
+				return;
+			if (committed)
+				ed.RecolorSelection(color);
+			else
+				ed.PreviewRecolorSelection(color);
+		}
+
+		void PaintSelectionSubTool::UpdateOptions(IVoxelEditContext& ed) {
+			options.SetEnabled(kFillSelectionOption, ed.SelectionCount() > 0);
+		}
+
+		void PaintSelectionSubTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
+			if (id == kFillSelectionOption)
+				ed.RecolorSelection(ed.CurrentColor());
+		}
+
 		bool SweepSubTool::CurrentPose(IVoxelEditContext& ed, GizmoPose& pose) {
 			IntVector3 middle;
 			// On the voxels it sweeps, not on the centre turns go round: a sweep

@@ -78,7 +78,18 @@ namespace spades {
 				bool active = false;
 			};
 
-			OptionBar(client::IAudioDevice* audioDevice = nullptr);
+			/**
+			 * `row` is the band it takes under the toolbar, the first being the
+			 * option bar proper. A `floating` one is a panel over the viewport
+			 * rather than a band across the window: as wide as what it holds,
+			 * and not there at all while it holds nothing.
+			 */
+			OptionBar(client::IAudioDevice* audioDevice = nullptr, int row = 0,
+			          bool floating = false);
+
+			/** Whether `p` is on the bar as last drawn: a press there is the
+			 *  bar's, whether or not a button is under it. */
+			bool Contains(const Vector2& p) const;
 
 			/** Fills the bar with `owner`'s sub-tool buttons and options. */
 			void SetContent(const void* owner, std::vector<SubToolButton> subToolButtons,
@@ -143,6 +154,10 @@ namespace spades {
 			};
 
 			ui::FeedbackSounds sounds;
+			const float bandY; // top of its band
+			const float btnY;  // top of the buttons in it
+			const bool floating;
+			float drawnExtent = 0.0F; // where the last frame's items ended
 			const void* owner = nullptr;
 			std::vector<SubToolButton> subToolButtons;
 			std::vector<Option> options;

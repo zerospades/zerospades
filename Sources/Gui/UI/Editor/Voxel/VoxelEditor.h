@@ -139,6 +139,9 @@ namespace spades {
 			int ToolCount() const { return int(tools.size()); }
 			/** The label of tool `index`, as on its toolbar button. */
 			std::string ToolLabel(int index) const;
+			/** Whether the tool has anything to work on; selecting one that has
+			 *  not does nothing. */
+			bool ToolAvailable(int index) const;
 			/** Makes tool `index` the active one, as its toolbar button does. */
 			void SelectTool(int index);
 			/** The tool active in Edit mode, as SelectTool takes it. */
@@ -248,11 +251,11 @@ namespace spades {
 			std::vector<IntVector3> CellsOnScreen(const std::function<bool(const Vector2&)>& inside,
 			                                      bool through) const override;
 			void SelectAll() override;
+			void InvertSelection() override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
 			void SwitchTool(const std::string& id) override { pendingTool = id; }
 			void ReturnToSelect() override {
 				clearingSelection = true;
-				returningToSelect = true;
 				pendingTool = "select";
 			}
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
@@ -538,7 +541,6 @@ namespace spades {
 			// A switch a tool asked for (SwitchTool), made once its event is over.
 			std::string pendingTool;
 			bool clearingSelection = false; // ReturnToSelect's, before the switch
-			bool returningToSelect = false; // ... and after it, to the tool
 			void SwitchAsAsked();
 			/** What the active tool sets by number, or null. */
 			ITransformTarget* PanelTarget();
@@ -607,6 +609,12 @@ namespace spades {
 			std::string ToolHintLine();
 			void DrawToolbar(float sw);
 			void DrawOptionBar(float sw);
+			void DrawContextStrip(float sw);
+			/** The tool whose sub-tools the strip offers now: the strip of the
+			 *  active tool, or the active tool itself when it is one, as long
+			 *  as it has anything to work on. Null for no strip. */
+			VoxelTool* StripTool();
+			int StripToolIndex() const;
 		};
 	} // namespace gui
 } // namespace spades

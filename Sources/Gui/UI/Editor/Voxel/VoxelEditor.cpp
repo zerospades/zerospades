@@ -305,6 +305,29 @@ namespace spades {
 				ActiveTool()->OnOptionNumberChanged(*this, id, value, committed);
 			};
 
+			// The strip's content belongs to the tool it is the strip of. A
+			// press on one of its sub-tools goes to that tool, whichever was
+			// active; a command runs behind the active tool's back, as one
+			// from a menu does.
+			ui.GetContextStrip()->CurrentOwner = [this] {
+				return static_cast<const void*>(StripTool());
+			};
+			ui.GetContextStrip()->OnSubToolClicked = [this](int index) {
+				const int strip = StripToolIndex();
+				SetActiveTool(strip);
+				if (strip >= 0 && activeTool == strip)
+					tools[static_cast<size_t>(strip)].tool->SetSubTool(*this, index);
+			};
+			ui.GetContextStrip()->OnActionClicked = [this](const std::string& id) {
+				VoxelTool* tool = StripTool();
+				ToolOptions* commands = tool ? tool->StripCommands() : nullptr;
+				const ToolOption* command = commands ? commands->Find(id) : nullptr;
+				if (!command || !command->enabled)
+					return;
+				CancelToolInteraction();
+				tool->OnAction(*this, id);
+			};
+
 			// The brush colour is the editor's, shared by every tool: its swatch
 			// sits on the main toolbar and opens or closes the picker, which
 			// edits it and stays up across tool switches until closed.
@@ -1390,6 +1413,25 @@ namespace spades {
 			SetStatus("Selected " + std::to_string(SelectionCount()) + " voxels");
 		}
 
+		void VoxelEditor::InvertSelection() {
+			{
+				DocumentCommand command(*this);
+				VoxelUndoStack::Step step(undo, "Invert Selection");
+				// Built aside: what is selected now is what is being read.
+				const VoxelSelection before = edit.selection;
+				edit.selection.Clear();
+				const IntVector3 size = document.Size();
+				for (int x = 0; x < size.x; x++)
+					for (int y = 0; y < size.y; y++)
+						for (int z = 0; z < size.z; z++) {
+							const IntVector3 v = MakeIntVector3(x, y, z);
+							if (!before.Contains(v))
+								SelectIfSolid(v);
+						}
+			}
+			SetStatus("Selected " + std::to_string(SelectionCount()) + " voxels");
+		}
+
 		void VoxelEditor::SelectCells(const std::vector<IntVector3>& cells) {
 			DocumentCommand command(*this);
 			VoxelUndoStack::Step step(undo, "Select");
@@ -2449,14 +2491,23 @@ namespace spades {
 			return tools[static_cast<size_t>(index)].tool->Label();
 		}
 
+		bool VoxelEditor::ToolAvailable(int index) const {
+			return index >= 0 && index < int(tools.size()) &&
+			       tools[static_cast<size_t>(index)].tool->Available(*this);
+		}
+
 		void VoxelEditor::SelectTool(int index) {
 			SetMode(EditorMode::Edit);
 			SetActiveTool(index);
 		}
 
 		void VoxelEditor::SetActiveTool(int index) {
-			if (index >= 0 && index < int(tools.size()))
-				Activate(index, currentMode);
+			if (!ToolAvailable(index)) {
+				if (index >= 0 && index < int(tools.size()))
+					SetStatus("Select some voxels first");
+				return;
+			}
+			Activate(index, currentMode);
 		}
 
 		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
@@ -2496,6 +2547,25 @@ namespace spades {
 			return -1;
 		}
 
+		int VoxelEditor::StripToolIndex() const {
+			if (currentMode != EditorMode::Edit || activeTool < 0 ||
+			    activeTool >= int(tools.size()))
+				return -1;
+			const VoxelToolSlot& current = tools[static_cast<size_t>(activeTool)];
+			if (!current.tool->StripOf().empty())
+				return activeTool; // lit on its own strip, whatever is left to it
+			for (size_t i = 0; i < tools.size(); i++) {
+				if (tools[i].tool->StripOf() == current.id && ToolAvailable(int(i)))
+					return int(i);
+			}
+			return -1;
+		}
+
+		VoxelTool* VoxelEditor::StripTool() {
+			const int index = StripToolIndex();
+			return index < 0 ? nullptr : tools[static_cast<size_t>(index)].tool.get();
+		}
+
 		ToolOption* VoxelEditor::ActiveOption(const std::string& id, ToolOption::Type type) {
 			VoxelTool* tool = ActiveTool();
 			ToolOptions* options = tool ? tool->Options() : nullptr;
@@ -2513,6 +2583,9 @@ namespace spades {
 				if (!own.empty())
 					return own;
 			}
+			// A strip is not the bar the digits count along.
+			if (!tool.StripOf().empty())
+				return std::string();
 			return (index >= 0 && index < 9) ? std::to_string(index + 1) : std::string();
 		}
 
@@ -2530,12 +2603,21 @@ namespace spades {
 					return true;
 				}
 			}
-			VoxelTool* tool = ActiveTool();
-			if (!tool || tool->SubToolCount() < 2)
-				return false;
-			for (int sub = 0; sub < tool->SubToolCount(); sub++) {
-				if (EqualsIgnoringCase(SubToolHotKey(*tool, sub), key)) {
-					tool->SetSubTool(*this, sub);
+			// A key a sub-tool declares as its own (Transform's T) is good from
+			// any tool; the digits, being only a place in the active tool's
+			// bar, are not.
+			VoxelTool* active = ActiveTool();
+			for (size_t i = 0; i < tools.size(); i++) {
+				VoxelTool& tool = *tools[i].tool;
+				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
+					const std::string subKey = SubToolHotKey(tool, sub);
+					auto* candidate = tool.SubTool(sub);
+					const bool own = candidate && !candidate->HotKey().empty();
+					if ((!own && &tool != active) || !EqualsIgnoringCase(subKey, key))
+						continue;
+					SetActiveTool(int(i)); // says why not, when it has nothing to work on
+					if (activeTool == int(i))
+						tool.SetSubTool(*this, sub);
 					return true;
 				}
 			}
@@ -2596,13 +2678,6 @@ namespace spades {
 				}
 			}
 			SetActiveTool(ToolIndex(id));
-			// The tool asked for may be the one already active, with a sub-tool
-			// that acts on a selection: it goes back to choosing voxels.
-			if (returningToSelect) {
-				returningToSelect = false;
-				if (VoxelTool* t = ActiveTool())
-					t->OnReturnToSelect(*this);
-			}
 		}
 
 		void VoxelEditor::CancelToolInteraction() {
@@ -2660,7 +2735,7 @@ namespace spades {
 		}
 
 		bool VoxelEditor::IsEditShortcut(const std::string& key) {
-			for (const char* k : {"a", "c", "x", "v", "z", "y"}) {
+			for (const char* k : {"a", "i", "c", "x", "v", "z", "y"}) {
 				if (EqualsIgnoringCase(key, k))
 					return true;
 			}
@@ -2678,7 +2753,9 @@ namespace spades {
 					ClearSelection();
 				else
 					SelectAll();
-			} else if (EqualsIgnoringCase(key, "c"))
+			} else if (EqualsIgnoringCase(key, "i"))
+				InvertSelection();
+			else if (EqualsIgnoringCase(key, "c"))
 				CopySelection();
 			else if (EqualsIgnoringCase(key, "x"))
 				CutSelection();
@@ -2814,6 +2891,13 @@ namespace spades {
 					return;
 				}
 
+				// The strip floats over the viewport: a press on it is its own,
+				// button or not, and never reaches the model behind it.
+				if (ui.GetContextStrip()->Contains(at)) {
+					ui.GetContextStrip()->Click(at);
+					return;
+				}
+
 				if (host.ClickViewportWidget(at))
 					return;
 
@@ -2840,7 +2924,8 @@ namespace spades {
 					return;
 				}
 				// Not over the colour picker or the bars.
-				if (ui.GetColorPicker()->IsOverPicker(at) || at.y < BarsHeight())
+				if (ui.GetColorPicker()->IsOverPicker(at) || at.y < BarsHeight() ||
+				    ui.GetContextStrip()->Contains(at))
 					return;
 				rmbHeld = true;
 				DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Down));
@@ -2915,6 +3000,15 @@ namespace spades {
 			if (statusTimer > 0.0F)
 				statusTimer -= dt;
 			RefreshPlacementModel(); // what edits since the last frame left stale
+			// A tool left with nothing to work on -- the selection deleted,
+			// cleared or undone from under Modify -- hands over to Select.
+			// Never mid-press: the tool taking over would see a drag it never
+			// saw start.
+			if (!lmbHeld && !rmbHeld && !ToolAvailable(activeTool)) {
+				const int select = ToolIndex("select");
+				if (ToolAvailable(select))
+					SetActiveTool(select);
+			}
 		}
 
 		void VoxelEditor::DrawScene() {
@@ -2945,8 +3039,12 @@ namespace spades {
 			if (SamplingArmed()) {
 				line = "Pick colour:  click a voxel";
 			} else if (VoxelTool* tool = ActiveTool()) {
-				// A tool whose only sub-tool is itself goes by its own name alone.
-				line = tool->Label();
+				// A tool whose only sub-tool is itself goes by its own name alone,
+				// and a strip by the name of the tool it is the strip of: the one
+				// lit on the toolbar.
+				const int shownAs = ToolIndex(tool->StripOf());
+				line = shownAs >= 0 ? tools[static_cast<size_t>(shownAs)].tool->Label()
+				                    : tool->Label();
 				if (tool->SubToolCount() > 1)
 					line += std::string(" \xE2\x80\xBA ") + tool->SubToolLabel(tool->ActiveSubTool());
 				const std::string hint = tool->Hint(*this);
@@ -3015,6 +3113,7 @@ namespace spades {
 		void VoxelEditor::DrawBars(float sw) {
 			DrawToolbar(sw);
 			DrawOptionBar(sw);
+			DrawContextStrip(sw);
 		}
 
 		void VoxelEditor::DrawToolbar(float sw) {
@@ -3041,11 +3140,17 @@ namespace spades {
 			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
 			std::vector<Toolbar::ToolbarButton> toolButtons;
 			for (int i = 0; i < toolCount; i++) {
+				// A strip has no button: the tool it is the strip of stands for it.
+				if (!tools[i].tool->StripOf().empty())
+					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
 				btn.label = tools[i].tool->Label();
 				btn.hotKey = KeyIsTaken(tools[i].hotKey) ? std::string() : tools[i].hotKey;
-				btn.active = (activeTool == i);
+				btn.active = (activeTool == i) ||
+				             (activeTool >= 0 && activeTool < toolCount &&
+				              tools[activeTool].tool->StripOf() == tools[i].id);
+				btn.enabled = ToolAvailable(i);
 				btn.group = tools[i].group;
 				toolButtons.push_back(btn);
 			}
@@ -3067,7 +3172,8 @@ namespace spades {
 			// A single sub-tool is the tool itself, and a lone button that is
 			// always on would only be noise.
 			std::vector<OptionBar::SubToolButton> subTools;
-			if (t && t->SubToolCount() > 1) {
+			// A strip's sub-tools are on the strip; the bar keeps their options.
+			if (t && t->SubToolCount() > 1 && t->StripOf().empty()) {
 				for (int i = 0; i < t->SubToolCount(); i++) {
 					OptionBar::SubToolButton btn;
 					btn.label = t->SubToolLabel(i);
@@ -3111,6 +3217,45 @@ namespace spades {
 			ui.GetOptionBar()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetOptionBar()->Draw(*renderer, *fontManager, cursor.GetPosition(),
 			                        ui.GetMenuBar()->IsOpen(), sw);
+		}
+
+		void VoxelEditor::DrawContextStrip(float sw) {
+			VoxelTool* t = StripTool();
+			const bool active = t && t == ActiveTool();
+			std::vector<OptionBar::SubToolButton> subTools;
+			std::vector<OptionBar::Option> commands;
+			if (t) {
+				for (int i = 0; i < t->SubToolCount(); i++) {
+					OptionBar::SubToolButton btn;
+					btn.label = t->SubToolLabel(i);
+					const std::string key = SubToolHotKey(*t, i);
+					btn.hotKey = KeyIsTaken(key) ? std::string() : key;
+					btn.group = t->SubToolGroup(i);
+					// None is lit while its tool is only on offer.
+					btn.active = active && t->ActiveSubTool() == i;
+					subTools.push_back(btn);
+				}
+				// The active tool's were brought up to date with its bar.
+				if (!active)
+					t->UpdateOptions(*this);
+				if (ToolOptions* opts = t->StripCommands()) {
+					for (int i = 0; i < opts->Count(); i++) {
+						const ToolOption& op = opts->At(i);
+						if (!op.visible || op.type != ToolOption::Type::Action)
+							continue;
+						OptionBar::Option opt;
+						opt.id = op.id;
+						opt.group = op.group;
+						opt.label = op.label;
+						opt.type = OptionBar::OptionType::Action;
+						opt.enabled = op.enabled;
+						commands.push_back(opt);
+					}
+				}
+			}
+			ui.GetContextStrip()->SetContent(t, std::move(subTools), std::move(commands));
+			ui.GetContextStrip()->Draw(*renderer, *fontManager, cursor.GetPosition(),
+			                           ui.GetMenuBar()->IsOpen(), sw);
 		}
 
 		void VoxelEditor::DrawPanels() {

@@ -53,6 +53,9 @@ namespace spades {
 
 			std::unique_ptr<Toolbar> toolbar;
 			std::unique_ptr<OptionBar> optionBar;
+			// A second row of it, floating over the viewport: what an editor
+			// offers only while there is something for it to work on.
+			std::unique_ptr<OptionBar> contextStrip;
 			std::unique_ptr<ColorPicker> colorPicker;
 			std::unique_ptr<MenuBar> menuBar;
 
@@ -88,6 +91,7 @@ namespace spades {
 			// The components, for the view that lays them out and drives them
 			Toolbar* GetToolbar() { return toolbar.get(); }
 			OptionBar* GetOptionBar() { return optionBar.get(); }
+			OptionBar* GetContextStrip() { return contextStrip.get(); }
 			ColorPicker* GetColorPicker() { return colorPicker.get(); }
 			MenuBar* GetMenuBar() { return menuBar.get(); }
 			/** Hosts modal `spades::ui` dialogs (the file browser) over the editor. */

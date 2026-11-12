@@ -310,21 +310,27 @@ namespace spades {
 			edit.items.push_back(
 			  MenuCommand("Redo", command([this] { editor->Redo(); }), editor->CanRedo(), "Ctrl+Y"));
 			edit.items.push_back(MenuRule());
-			edit.items.push_back(
-			  MenuCommand("Select All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"));
-			edit.items.push_back(MenuCommand("Select None",
-			                                 command([this] { editor->ClearSelection(); }), selected,
-			                                 "Ctrl+Shift+A"));
-			edit.items.push_back(MenuCommand("Delete Selection",
-			                                 command([this] { editor->DeleteSelection(); }),
-			                                 selected, "Del"));
-			edit.items.push_back(MenuRule());
-			edit.items.push_back(MenuCommand("Copy", command([this] { editor->CopySelection(); }),
-			                                 selected, "Ctrl+C"));
 			edit.items.push_back(MenuCommand("Cut", command([this] { editor->CutSelection(); }),
 			                                 selected, "Ctrl+X"));
+			edit.items.push_back(MenuCommand("Copy", command([this] { editor->CopySelection(); }),
+			                                 selected, "Ctrl+C"));
 			edit.items.push_back(MenuCommand("Paste", command([this] { editor->Paste(); }),
 			                                 editor->CanPaste(), "Ctrl+V"));
+			edit.items.push_back(MenuCommand("Delete",
+			                                 command([this] { editor->DeleteSelection(); }),
+			                                 selected, "Del"));
+
+			// Which voxels are selected, apart from what is done with them: the
+			// Select tool's bar has the same three.
+			EditorMenuGroup select;
+			select.title = "Select";
+			select.items.push_back(
+			  MenuCommand("All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"));
+			select.items.push_back(MenuCommand("None",
+			                                   command([this] { editor->ClearSelection(); }),
+			                                   selected, "Ctrl+Shift+A"));
+			select.items.push_back(MenuCommand(
+			  "Invert", command([this] { editor->InvertSelection(); }), true, "Ctrl+I"));
 
 			// What the view does, which until now only its keys could ask for.
 			EditorMenuGroup view;
@@ -343,7 +349,7 @@ namespace spades {
 			view.items.push_back(MenuCommand("Save Screenshot", [this] { wantScreenShot = true; },
 			                                 true, cg_keyScreenshot));
 
-			return {file, edit, view};
+			return {file, edit, select, view};
 		}
 
 		void KV6EditorView::ShowMessage(const std::string& text) {

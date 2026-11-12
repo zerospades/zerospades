@@ -40,6 +40,7 @@ namespace spades {
 				                                          *cursor);
 				toolbar = std::make_unique<Toolbar>(_audioDevice);
 				optionBar = std::make_unique<OptionBar>(_audioDevice);
+				contextStrip = std::make_unique<OptionBar>(_audioDevice, 1, true);
 				colorPicker = std::make_unique<ColorPicker>();
 				menuBar = std::make_unique<MenuBar>(menuHost, _audioDevice);
 			} catch (const std::exception& ex) {
