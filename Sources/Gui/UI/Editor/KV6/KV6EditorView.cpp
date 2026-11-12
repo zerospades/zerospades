@@ -285,66 +285,63 @@ namespace spades {
 					run();
 				};
 			};
-			auto rule = [] { return EditorMenuItem{"", nullptr, true, "", true}; };
 			const bool selected = editor->SelectionCount() > 0;
 
 			EditorMenuGroup file;
 			file.title = "File";
+			file.items.push_back(MenuCommand("New Model", [this] { NewDocument(); }, true, "Ctrl+N"));
 			file.items.push_back(
-			  EditorMenuItem{"New Model", [this] { NewDocument(); }, true, "Ctrl+N"});
-			file.items.push_back(
-			  EditorMenuItem{"Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"});
+			  MenuCommand("Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"));
 			// Always available: a document with nowhere to go yet is asked where.
-			file.items.push_back(EditorMenuItem{"Save", [this] { Save(); }, true, "Ctrl+S"});
-			file.items.push_back(
-			  EditorMenuItem{"Save As...", [this] { OpenSaveAsDialog(); }, true});
+			file.items.push_back(MenuCommand("Save", [this] { Save(); }, true, "Ctrl+S"));
+			file.items.push_back(MenuCommand("Save As...", [this] { OpenSaveAsDialog(); }));
 			// The one command that edits the open document with a file:
 			// inserting a model is a paste that happens to come from disk.
 			file.items.push_back(
-			  EditorMenuItem{"Insert Model...", command([this] { OpenInsertDialog(); }), true});
-			file.items.push_back(rule());
-			file.items.push_back(EditorMenuItem{
-			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); },
-			  true});
+			  MenuCommand("Insert Model...", command([this] { OpenInsertDialog(); })));
+			file.items.push_back(MenuRule());
+			file.items.push_back(MenuCommand(
+			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }));
 
 			EditorMenuGroup edit;
 			edit.title = "Edit";
-			edit.items.push_back(EditorMenuItem{"Undo", command([this] { editor->Undo(); }),
-			                                    editor->CanUndo(), "Ctrl+Z"});
-			edit.items.push_back(EditorMenuItem{"Redo", command([this] { editor->Redo(); }),
-			                                    editor->CanRedo(), "Ctrl+Y"});
-			edit.items.push_back(rule());
-			edit.items.push_back(EditorMenuItem{
-			  "Select All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"});
-			edit.items.push_back(EditorMenuItem{
-			  "Select None", command([this] { editor->ClearSelection(); }), selected,
-			  "Ctrl+Shift+A"});
-			edit.items.push_back(EditorMenuItem{
-			  "Delete Selection", command([this] { editor->DeleteSelection(); }), selected, "Del"});
-			edit.items.push_back(rule());
-			edit.items.push_back(EditorMenuItem{
-			  "Copy", command([this] { editor->CopySelection(); }), selected, "Ctrl+C"});
 			edit.items.push_back(
-			  EditorMenuItem{"Cut", command([this] { editor->CutSelection(); }), selected, "Ctrl+X"});
-			edit.items.push_back(EditorMenuItem{"Paste", command([this] { editor->Paste(); }),
-			                                    editor->CanPaste(), "Ctrl+V"});
+			  MenuCommand("Undo", command([this] { editor->Undo(); }), editor->CanUndo(), "Ctrl+Z"));
+			edit.items.push_back(
+			  MenuCommand("Redo", command([this] { editor->Redo(); }), editor->CanRedo(), "Ctrl+Y"));
+			edit.items.push_back(MenuRule());
+			edit.items.push_back(
+			  MenuCommand("Select All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"));
+			edit.items.push_back(MenuCommand("Select None",
+			                                 command([this] { editor->ClearSelection(); }), selected,
+			                                 "Ctrl+Shift+A"));
+			edit.items.push_back(MenuCommand("Delete Selection",
+			                                 command([this] { editor->DeleteSelection(); }),
+			                                 selected, "Del"));
+			edit.items.push_back(MenuRule());
+			edit.items.push_back(MenuCommand("Copy", command([this] { editor->CopySelection(); }),
+			                                 selected, "Ctrl+C"));
+			edit.items.push_back(MenuCommand("Cut", command([this] { editor->CutSelection(); }),
+			                                 selected, "Ctrl+X"));
+			edit.items.push_back(MenuCommand("Paste", command([this] { editor->Paste(); }),
+			                                 editor->CanPaste(), "Ctrl+V"));
 
 			// What the view does, which until now only its keys could ask for.
 			EditorMenuGroup view;
 			view.title = "View";
 			view.items.push_back(
-			  EditorMenuItem{"Reset View", [this] { ResetView(); }, true, kHomeViewKey});
-			view.items.push_back(EditorMenuItem{"Frame Selection",
-			                                    [this] { ViewKey(kFrameSelectionKey); }, true,
-			                                    kFrameSelectionKey});
-			EditorMenuItem parallel{"Parallel Projection", [this] { ToggleProjection(); }, true,
-			                        kProjectionKey};
+			  MenuCommand("Reset View", [this] { ResetView(); }, true, kHomeViewKey));
+			view.items.push_back(MenuCommand("Frame Selection",
+			                                 [this] { ViewKey(kFrameSelectionKey); }, true,
+			                                 kFrameSelectionKey));
+			EditorMenuItem parallel = MenuCommand("Parallel Projection",
+			                                      [this] { ToggleProjection(); }, true,
+			                                      kProjectionKey);
 			parallel.checked = cam.IsOrthogonal();
 			view.items.push_back(parallel);
-			view.items.push_back(rule());
-			view.items.push_back(
-			  EditorMenuItem{"Save Screenshot", [this] { wantScreenShot = true; }, true,
-			                 cg_keyScreenshot});
+			view.items.push_back(MenuRule());
+			view.items.push_back(MenuCommand("Save Screenshot", [this] { wantScreenShot = true; },
+			                                 true, cg_keyScreenshot));
 
 			return {file, edit, view};
 		}
@@ -661,6 +658,16 @@ namespace spades {
 			// included: it is what Escape puts away first.
 			if (ui->GetMenuBar()->KeyEvent(key, down)) {
 				editor->ReleaseHeldInput();
+				return;
+			}
+			// A press of any button but the left one, while a menu of the bar is
+			// down, only puts the menu away: the middle button is handled here,
+			// before the editor sees it, and would otherwise grab the view from
+			// under a menu that was merely being read. The left button has
+			// somewhere to land and is answered where the pointer is.
+			if (down && key != "LeftMouseButton" &&
+			    key.find("MouseButton") != std::string::npos && ui->GetMenuBar()->IsOpen()) {
+				ui->GetMenuBar()->Close();
 				return;
 			}
 			// Escape backs out of whatever the editor has in hand -- a number
