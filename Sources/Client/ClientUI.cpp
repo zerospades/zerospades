@@ -24,14 +24,21 @@
 #include "ChatWindow.h"
 #include "ClientUI.h"
 #include "ClientUIHelper.h"
+#include "IAudioChunk.h"
 #include "NetClient.h"
+#include "RocketEntity.h"
+#include "World.h"
 #include <Client/Client.h>
 #include <Client/Fonts.h>
 #include <Core/Exception.h>
+#include <Core/Settings.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/InGame/ChatLogWindow.h>
 #include <Gui/UI/InGame/ChatWindow.h>
 #include <Gui/UI/InGame/ClientMenu.h>
+
+// Defined in Client_Update.cpp; read by the "/rocket" chat command below.
+SPADES_SETTING(cg_rpgRocket);
 
 namespace spades {
 	namespace client {
@@ -67,6 +74,50 @@ namespace spades {
 		void ClientUI::SendChat(const std::string& msg, bool isGlobal) {
 			if (!client)
 				return;
+
+			// "/rocket": local, client-side only command. Spawns a purely
+			// cosmetic test RocketEntity from the local player's eye and is
+			// never sent to the server. Gated by cg_rpgRocket (DEFINE lives
+			// in Client_Update.cpp); the RPG weapon will reuse this entity
+			// once it is integrated into the game.
+			if (msg == "/rocket") {
+				if (!cg_rpgRocket) {
+					RecordChatLog("/rocket is disabled (cg_rpgRocket is 0)",
+					              Vector4(1.0F, 0.8F, 0.3F, 1.0F));
+					return;
+				}
+
+				stmp::optional<Player&> maybePlayer;
+				if (client->world)
+					maybePlayer = client->world->GetLocalPlayer();
+
+				if (maybePlayer && maybePlayer->IsAlive()) {
+					Player& p = *maybePlayer;
+
+					// spawn slightly in front of the eye so the rocket
+					// doesn't start inside the player's own blocks
+					Vector3 muzzle = p.GetEye() + p.GetFront() * 1.2F;
+
+					// flight "woosh" (null chunk when muted: the loop
+					// simply never starts)
+					Handle<IAudioChunk> woosh;
+					if (!client->IsMuted())
+						woosh = client->audioDevice->RegisterSound(
+						  "Sounds/Misc/woosh.opus");
+
+					client->AddLocalEntity(stmp::make_unique<RocketEntity>(
+					  *client, client->audioDevice.GetPointerOrNull(),
+					  std::move(woosh), muzzle, p.GetFront()));
+
+					RecordChatLog("rocket launched",
+					              Vector4(0.6F, 1.0F, 0.6F, 1.0F));
+				} else {
+					RecordChatLog("rocket needs a living local player",
+					              Vector4(1.0F, 0.5F, 0.5F, 1.0F));
+				}
+				return;
+			}
+
 			client->activeNet->SendChat(msg, isGlobal);
 		}
 
