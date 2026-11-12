@@ -80,6 +80,7 @@ namespace spades {
 
 				int resultIdx = static_cast<int>(i);
 				button->activated = [this, resultIdx](UIElement&) { EndDialog(resultIdx); };
+				buttonWidgets.push_back(button.GetPointerOrNull());
 				AddChild(button.GetPointerOrNull());
 			}
 			{
@@ -103,6 +104,11 @@ namespace spades {
 		void MessageBoxScreen::OnClosed() {
 			if (closed)
 				closed(*this);
+		}
+
+		void MessageBoxScreen::SetButtonHotKeyText(size_t index, const std::string& text) {
+			if (index < buttonWidgets.size())
+				buttonWidgets[index]->hotKeyText = text;
 		}
 
 		void MessageBoxScreen::EndDialog(int result) {
@@ -145,7 +151,10 @@ namespace spades {
 		AlertScreen::AlertScreen(UIElement* owner, const std::string& text, float height,
 		                         bool showOverlay, bool allowLinks)
 		    : MessageBoxScreen(owner, text, {_Tr("MessageBox", "OK")}, height, showOverlay,
-		                       allowLinks) {}
+		                       allowLinks) {
+			// Enter and Escape both close it, one hint is enough
+			SetButtonHotKeyText(0, _Tr("Client", "[Enter]"));
+		}
 
 		void AlertScreen::HotKey(const std::string& key) {
 			if (IsEnabled() && (key == "Enter" || key == "Escape")) {
@@ -161,7 +170,10 @@ namespace spades {
 		                             bool showOverlay)
 		    : MessageBoxScreen(owner, text,
 		                       {_Tr("MessageBox", "OK"), _Tr("MessageBox", "Cancel")}, height,
-		                       showOverlay) {}
+		                       showOverlay) {
+			SetButtonHotKeyText(0, _Tr("Client", "[Enter]"));
+			SetButtonHotKeyText(1, _Tr("Client", "[Esc]"));
+		}
 
 		void ConfirmScreen::HotKey(const std::string& key) {
 			if (IsEnabled() && key == "Enter") {
