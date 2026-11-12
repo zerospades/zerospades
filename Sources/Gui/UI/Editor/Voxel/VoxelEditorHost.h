@@ -57,6 +57,19 @@ namespace spades {
 				(void)picked;
 			}
 
+			// The view is the host's: these are no-ops in one that cannot turn it
+			// or save an image of it.
+			/** As IVoxelEditContext::LookIsometric. */
+			virtual void LookIsometric(float elevation) { (void)elevation; }
+			/** As IVoxelEditContext::TurnView. */
+			virtual void TurnView(int quarterTurns) { (void)quarterTurns; }
+			/** As IVoxelEditContext::SaveRender; reports where through the
+			 *  editor's status line. */
+			virtual void SaveRender(std::uint32_t background, bool transparent) {
+				(void)background;
+				(void)transparent;
+			}
+
 			/** Keys the host acts on itself (the camera's, the screenshot key),
 			 *  which no tool may take as its hot key. */
 			virtual bool KeyIsReserved(const std::string& key) const = 0;

@@ -66,6 +66,7 @@ namespace spades {
 				float value = 0.0F;  // Number: what the box shows when it is not being typed into
 				float step = 1.0F;   // Number: what one press of its arrows adds
 				int decimals = 1;    // Number: decimal places it is written with
+				bool hex = false;    // Number: a colour, 0xRRGGBB, typed as #RRGGBB with no arrows
 			};
 
 			struct SubToolButton {

@@ -94,6 +94,20 @@ namespace spades {
 			options.SetEnabled(kSelectNoneOption, ed.SelectionCount() > 0);
 		}
 
+		void RecolourSelectionAsChosen(IVoxelEditContext& ed, std::uint32_t color, bool committed) {
+			if (ed.SelectionCount() == 0)
+				return;
+			if (committed)
+				ed.RecolorSelection(color);
+			else
+				ed.PreviewRecolorSelection(color);
+		}
+
+		void SelectTool::OnBrushColorChanged(IVoxelEditContext& ed, std::uint32_t color,
+		                                     bool committed) {
+			RecolourSelectionAsChosen(ed, color, committed);
+		}
+
 		// Each reports what it did, as it does from the menu and from its key.
 		void SelectTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
 			ContainerTool::OnAction(ed, id);

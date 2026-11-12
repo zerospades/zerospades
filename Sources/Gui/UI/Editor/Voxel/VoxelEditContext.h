@@ -148,6 +148,18 @@ namespace spades {
 			virtual void ReturnToSelect() = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
 
+			// --- The view, and images of it -------------------------------------
+			/** Turns the view to look down on the model from the nearest of its
+			 *  four corners, `elevation` radians above the horizon, in a
+			 *  parallel projection. */
+			virtual void LookIsometric(float elevation) = 0;
+			/** Turns the view round the model by quarter turns. */
+			virtual void TurnView(int quarterTurns) = 0;
+			/** Saves an image of the model alone, as the view shows it, on
+			 *  `background` (0x00BBGGRR) or with `transparent` on none at all;
+			 *  reports where. */
+			virtual void SaveRender(std::uint32_t background, bool transparent) = 0;
+
 			// --- Clipboard ----------------------------------------------------
 			// Copy and Cut take the selection, or a waiting paste or import while
 			// there is one, which they leave where it is rather than place. Each

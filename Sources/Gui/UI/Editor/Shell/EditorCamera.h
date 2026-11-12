@@ -103,6 +103,11 @@ namespace spades {
 			bool IsOrthogonal() const { return orthogonal; }
 			/** Turns smoothly to look at the orbited point from `dir`. */
 			void SnapToward(const Vector3& dir);
+			/** Turns smoothly to look down on the orbited point from the nearest
+			 *  of its four corners, `elevation` radians above the horizon. */
+			void TurnToCorner(float elevation);
+			/** Turns smoothly round the orbited point by quarter turns. */
+			void TurnQuarters(int quarterTurns);
 			/** Forgets held keys whose release a modal may swallow. */
 			void ReleaseHeld();
 

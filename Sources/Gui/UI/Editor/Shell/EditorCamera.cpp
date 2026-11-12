@@ -177,6 +177,24 @@ namespace spades {
 			TurnTo(ty, tp);
 		}
 
+		void EditorCamera::TurnToCorner(float elevation) {
+			// From where a turn in progress is heading, so a second press does
+			// not pick its corner from somewhere on the way.
+			const float heading = snapping ? targetYaw : yaw;
+			const float corner = std::floor(heading / kHalfPi) * kHalfPi + kQuarterPi;
+			TurnTo(corner, -elevation); // looking down is a negative pitch
+		}
+
+		void EditorCamera::TurnQuarters(int quarterTurns) {
+			const float heading = snapping ? targetYaw : yaw;
+			const float tilt = snapping ? targetPitch : pitch;
+			// Not by TurnTo, which takes the short way round: two presses in a
+			// row are half a turn, and must not come back the way they went.
+			targetYaw = heading + float(quarterTurns) * kHalfPi;
+			targetPitch = tilt;
+			snapping = true;
+		}
+
 		void EditorCamera::TurnTo(float ty, float tp) {
 			// Shortest angular path for yaw.
 			while (ty - yaw > kPi) ty -= kTwoPi;

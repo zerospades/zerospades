@@ -70,6 +70,14 @@ namespace spades {
 			 * that selected its text would.
 			 */
 			void Begin(float value, int decimals);
+			/** Writes a colour, 0xRRGGBB held as a number, as "#RRGGBB". */
+			static std::string FormatHex(float value);
+			/** Reads "#RRGGBB", "RRGGBB" or the short "RGB"; false for anything
+			 *  else. */
+			static bool ParseHex(const std::string& text, float& out);
+			/** As Begin, for a colour written in hex: it then takes hex digits
+			 *  and reads as ParseHex. */
+			void BeginHex(float value);
 			void End();
 			bool IsEditing() const { return entry.IsEditing(); }
 
@@ -93,6 +101,7 @@ namespace spades {
 			// Begun with all of it selected, so the first character typed
 			// replaces it; anything else lets the selection go first.
 			TextEntry entry;
+			bool hex = false;
 			void Settle();
 		};
 	} // namespace gui
