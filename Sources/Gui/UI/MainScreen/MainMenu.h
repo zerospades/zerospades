@@ -183,6 +183,7 @@ namespace spades {
 			void OnAddressChanged(ui::UIElement& sender);
 			void SetProtocolVersion(int ver);
 
+			void ConfirmQuit();
 			void OnQuitPressed(ui::UIElement& sender);
 			void OnCreditsPressed(ui::UIElement& sender);
 			void OnSetupPressed(ui::UIElement& sender);

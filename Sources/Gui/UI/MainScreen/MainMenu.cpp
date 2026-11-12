@@ -1168,7 +1168,7 @@ namespace spades {
 				loadingView->visible = false;
 				UpdateServerList();
 			}
-			
+
 			// A server on this machine answered: show it, even if the master list failed to load
 			if (!loading && helper->PollLanServers()) {
 				loaded = true;
@@ -1195,6 +1195,17 @@ namespace spades {
 			protocol3Button->toggled = (ver == 3);
 			protocol4Button->toggled = (ver == 4);
 			cg_protocolVersion = ver;
+		}
+
+		void MainScreenMainMenu::ConfirmQuit() {
+			Handle<ConfirmScreen> confirm = Handle<ConfirmScreen>::New(
+				this, _Tr("MainScreen", "Are you sure you want to quit?"), 120.0F, true);
+			confirm->closed = [this](UIElement& s) {
+				ConfirmScreen* cs = dynamic_cast<ConfirmScreen*>(&s);
+				if (cs && cs->GetResult())
+					ui->shouldExit = true;
+			};
+			confirm->Run();
 		}
 
 		void MainScreenMainMenu::OnQuitPressed(UIElement&) { ui->shouldExit = true; }
@@ -1234,7 +1245,7 @@ namespace spades {
 					Connect();
 				}
 			} else if (IsEnabled() && key == "Escape") {
-				ui->shouldExit = true;
+				ConfirmQuit();
 			} else {
 				UIElement::HotKey(key);
 			}
