@@ -35,7 +35,7 @@ namespace spades {
 		// Layout constants, beside the bars' shared ones
 		using namespace barlayout;
 		static const float kTbBtn = 84.0F;
-		// In a window too narrow for them the mode and tool buttons narrow, down
+		// In a window too narrow for them the tool buttons narrow, down
 		// to this, rather than run under Undo and Redo; one narrower than
 		// kTbBtnWithKey gives its hot key's place to its label.
 		static const float kTbBtnMin = 52.0F;
@@ -45,10 +45,6 @@ namespace spades {
 		static const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 
 		Toolbar::Toolbar(client::IAudioDevice* audioDevice) : sounds(audioDevice) {}
-
-		void Toolbar::SetModeButtons(const std::vector<ToolbarButton>& buttons) {
-			modeButtons = buttons;
-		}
 
 		void Toolbar::SetToolButtons(const std::vector<ToolbarButton>& buttons) {
 			toolButtons = buttons;
@@ -69,14 +65,13 @@ namespace spades {
 			const float undoX = screenWidth - 12.0F - 2.0F * kUndoBtnW - kTbGap;
 
 			// What the buttons do not take: the separators and the swatch. The
-			// first tool is set apart from the modes, every later one from its
+			// first tool starts the bar, every later one is set apart from its
 			// predecessor when it starts another group, and the swatch, which
 			// belongs to no one tool, from them all.
 			auto separatedTool = [&](int i) {
-				return (i == 0) ? !modeButtons.empty()
-				                : toolButtons[i].group != toolButtons[i - 1].group;
+				return i > 0 && toolButtons[i].group != toolButtons[i - 1].group;
 			};
-			const bool swatchSeparated = !modeButtons.empty() || !toolButtons.empty();
+			const bool swatchSeparated = !toolButtons.empty();
 			float fixed = 0.0F;
 			for (int i = 0; i < int(toolButtons.size()); i++)
 				fixed += separatedTool(i) ? kTbSep : 0.0F;
@@ -85,7 +80,7 @@ namespace spades {
 
 			// As wide as they are meant to be where there is room, and sharing
 			// what room there is where there is not.
-			const int buttons = int(modeButtons.size() + toolButtons.size());
+			const int buttons = int(toolButtons.size());
 			float width = kTbBtn;
 			if (buttons > 0) {
 				const float room = undoX - kTbSep - kTbX0 - fixed;
@@ -94,10 +89,6 @@ namespace spades {
 
 			std::vector<Slot> slots;
 			float x = kTbX0;
-			for (int i = 0; i < int(modeButtons.size()); i++) {
-				slots.push_back({Kind::Mode, i, x, width, false});
-				x += width + kTbGap;
-			}
 			for (int i = 0; i < int(toolButtons.size()); i++) {
 				const bool separator = separatedTool(i);
 				if (separator)
@@ -117,8 +108,6 @@ namespace spades {
 		}
 
 		Toolbar::ToolbarButton Toolbar::ButtonOf(const Slot& slot) const {
-			if (slot.kind == Kind::Mode)
-				return modeButtons[slot.index];
 			if (slot.kind == Kind::Tool)
 				return toolButtons[slot.index];
 			if (slot.kind == Kind::ColorSwatch) {
@@ -153,12 +142,6 @@ namespace spades {
 					return false; // greyed out: the click does nothing
 				// Ids are copied: a handler may change the buttons they belong to.
 				switch (slot.kind) {
-					case Kind::Mode:
-						if (OnModeClicked) {
-							const std::string id = modeButtons[slot.index].id;
-							OnModeClicked(id);
-						}
-						break;
 					case Kind::Tool:
 						if (OnToolClicked) {
 							const std::string id = toolButtons[slot.index].id;

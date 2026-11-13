@@ -261,14 +261,8 @@ namespace spades {
 		}
 
 		void VoxelEditor::WireUI() {
-			// Buttons report ids, resolved against the modes and tools as they are
-			// now; the toolbar only reports clicks on enabled buttons.
-			ui.GetToolbar()->OnModeClicked = [this](const std::string& id) {
-				for (const ModeInfo& info : Modes()) {
-					if (id == info.id && ModeSupported(info.mode))
-						SetMode(info.mode);
-				}
-			};
+			// Buttons report ids, resolved against the tools as they are now; the
+			// toolbar only reports clicks on enabled buttons.
 			ui.GetToolbar()->OnToolClicked = [this](const std::string& id) {
 				SetActiveTool(ToolIndex(id));
 			};
@@ -1667,7 +1661,6 @@ namespace spades {
 					VoxelTool* candidate = tool.SubTool(sub);
 					if (!candidate || !candidate->PositionsPlacement())
 						continue;
-					SetMode(EditorMode::Edit);
 					SetActiveTool(int(i));
 					tool.SetSubTool(*this, sub);
 					return true;
@@ -2376,10 +2369,6 @@ namespace spades {
 		bool VoxelEditor::MirrorEnabled(int axis) const {
 			if (axis < 0 || axis > 2)
 				return false;
-			// Mirroring is a modelling aid for Edit mode; it must not silently
-			// reshape anything while another mode is driving the document.
-			if (currentMode != EditorMode::Edit)
-				return false;
 			return edit.mirror.enabled[axis];
 		}
 
@@ -2511,10 +2500,7 @@ namespace spades {
 			       tools[static_cast<size_t>(index)].tool->Available(*this);
 		}
 
-		void VoxelEditor::SelectTool(int index) {
-			SetMode(EditorMode::Edit);
-			SetActiveTool(index);
-		}
+		void VoxelEditor::SelectTool(int index) { SetActiveTool(index); }
 
 		void VoxelEditor::SetActiveTool(int index) {
 			if (!ToolAvailable(index)) {
@@ -2522,13 +2508,11 @@ namespace spades {
 					SetStatus("Select some voxels first");
 				return;
 			}
-			Activate(index, currentMode);
+			Activate(index);
 		}
 
-		void VoxelEditor::SetMode(EditorMode mode) { Activate(activeTool, mode); }
-
-		void VoxelEditor::Activate(int toolIndex, EditorMode mode) {
-			if (toolIndex == activeTool && mode == currentMode)
+		void VoxelEditor::Activate(int toolIndex) {
+			if (toolIndex == activeTool)
 				return;
 			// A number being typed into the sub-toolbar, or the panel, belongs to
 			// the tool whose box it is: it is settled here, while that tool is
@@ -2541,20 +2525,11 @@ namespace spades {
 			if (VoxelTool* previous = ActiveTool())
 				previous->OnDeactivate(*this);
 			activeTool = toolIndex;
-			currentMode = mode;
 			if (VoxelTool* current = ActiveTool())
 				current->OnActivate(*this);
 			// The picker shows the colour it now sets, which may be another's.
 			if (ui.GetColorPicker()->IsOpen())
 				ui.GetColorPicker()->SetColor(PickerColor());
-		}
-
-		const std::vector<VoxelEditor::ModeInfo>& VoxelEditor::Modes() {
-			static const std::vector<ModeInfo> modes = {
-			  {EditorMode::Object, "object", "Object"},
-			  {EditorMode::Edit, "edit", "Edit"},
-			  {EditorMode::Animation, "animation", "Animation"}};
-			return modes;
 		}
 
 		int VoxelEditor::ToolIndex(const std::string& id) const {
@@ -2566,8 +2541,7 @@ namespace spades {
 		}
 
 		int VoxelEditor::StripToolIndex() const {
-			if (currentMode != EditorMode::Edit || activeTool < 0 ||
-			    activeTool >= int(tools.size()))
+			if (activeTool < 0 || activeTool >= int(tools.size()))
 				return -1;
 			const VoxelToolSlot& current = tools[static_cast<size_t>(activeTool)];
 			if (!current.traits.stripOf.empty())
@@ -2598,8 +2572,7 @@ namespace spades {
 		}
 
 		int VoxelEditor::BarToolIndex() const {
-			if (currentMode != EditorMode::Edit || activeTool < 0 ||
-			    activeTool >= int(tools.size()))
+			if (activeTool < 0 || activeTool >= int(tools.size()))
 				return -1;
 			const int host = ToolIndex(tools[static_cast<size_t>(activeTool)].traits.stripOf);
 			return host >= 0 ? host : activeTool;
@@ -2688,7 +2661,7 @@ namespace spades {
 		}
 
 		VoxelTool* VoxelEditor::ActiveTool() {
-			if (currentMode == EditorMode::Edit && activeTool >= 0 && activeTool < int(tools.size()))
+			if (activeTool >= 0 && activeTool < int(tools.size()))
 				return tools[activeTool].tool.get();
 			return nullptr;
 		}
@@ -3213,25 +3186,9 @@ namespace spades {
 		void VoxelEditor::DrawToolbar(float sw) {
 			screenWidth = sw; // for hit tests in ButtonEvent
 
-			// Mode buttons, for the modes this document has; a document with
-			// only one has nothing to switch between, and shows none.
-			std::vector<Toolbar::ToolbarButton> modeButtons;
-			for (const ModeInfo& info : Modes()) {
-				if (!ModeSupported(info.mode))
-					continue;
-				Toolbar::ToolbarButton btn;
-				btn.id = info.id;
-				btn.label = info.label;
-				btn.active = info.mode == currentMode;
-				modeButtons.push_back(btn);
-			}
-			if (modeButtons.size() < 2)
-				modeButtons.clear();
-			ui.GetToolbar()->SetModeButtons(modeButtons);
-
 			// Tool buttons. A hot key the editor already uses for something else
 			// never reaches the tool, so the button does not claim it.
-			int toolCount = (currentMode == EditorMode::Edit) ? int(tools.size()) : 0;
+			const int toolCount = int(tools.size());
 			std::vector<Toolbar::ToolbarButton> toolButtons;
 			for (int i = 0; i < toolCount; i++) {
 				// A strip has no button: the tool it is the strip of stands for it.

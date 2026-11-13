@@ -146,7 +146,7 @@ namespace spades {
 			bool ToolAvailable(int index) const;
 			/** Makes tool `index` the active one, as its toolbar button does. */
 			void SelectTool(int index);
-			/** The tool active in Edit mode, as SelectTool takes it. */
+			/** The active tool, as SelectTool takes it. */
 			int ActiveToolIndex() const { return activeTool; }
 
 			// --- Input, in the host's routing order ---------------------------
@@ -336,24 +336,10 @@ namespace spades {
 			// selection only ever holds solid voxels.
 			void WriteVoxel(int x, int y, int z, bool solid, std::uint32_t color);
 
-			// --- Mode (Blender-style) -----------------------------------------
-			// Voxels are only edited in Edit mode, the only one so far: Object
-			// and Animation arrive with .2kv6 scenes, and a mode the document
-			// cannot use is not shown.
-			enum class EditorMode { Object, Edit, Animation };
-			EditorMode currentMode = EditorMode::Edit;
-			static bool ModeSupported(EditorMode mode) { return mode == EditorMode::Edit; }
-			struct ModeInfo {
-				EditorMode mode;
-				const char* id;
-				const char* label;
-			};
-			static const std::vector<ModeInfo>& Modes();
-
 			// --- Tools --------------------------------------------------------
 			std::vector<VoxelToolSlot> tools;
 			int activeTool = 0;
-			VoxelTool* ActiveTool(); // active tool in Edit mode, else null
+			VoxelTool* ActiveTool(); // null for none
 			int ToolIndex(const std::string& id) const;
 			// The active tool's option `id` if it is of `type`, else null: where a
 			// click on the option bar lands.
@@ -373,10 +359,9 @@ namespace spades {
 			bool BarsEditing() const;
 			void EndBarEdits(bool commit);
 			void SetActiveTool(int index);
-			void SetMode(EditorMode mode);
 			// Deactivates the outgoing tool (where a pending placement lands) and
-			// activates tool `toolIndex` in `mode`.
-			void Activate(int toolIndex, EditorMode mode);
+			// activates tool `toolIndex`.
+			void Activate(int toolIndex);
 			// Keys 1-9 pick the active tool's sub-tools, in bar order.
 			std::string SubToolHotKey(VoxelTool& tool, int index);
 			/** Whether `tool` is registered as another's strip. */
