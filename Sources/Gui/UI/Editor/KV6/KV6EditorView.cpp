@@ -302,11 +302,11 @@ namespace spades {
 
 			EditorMenuGroup file;
 			file.title = "File";
-			file.items.push_back(MenuCommand("New Model", [this] { NewDocument(); }, true, "Ctrl+N"));
+			file.items.push_back(MenuCommand("New Model", [this] { NewDocument(); }, true, CommandShortcut("N")));
 			file.items.push_back(
-			  MenuCommand("Open Model...", [this] { OpenDocument(); }, true, "Ctrl+O"));
+			  MenuCommand("Open Model...", [this] { OpenDocument(); }, true, CommandShortcut("O")));
 			// Always available: a document with nowhere to go yet is asked where.
-			file.items.push_back(MenuCommand("Save", [this] { Save(); }, true, "Ctrl+S"));
+			file.items.push_back(MenuCommand("Save", [this] { Save(); }, true, CommandShortcut("S")));
 			file.items.push_back(MenuCommand("Save As...", [this] { OpenSaveAsDialog(); }));
 			// The one command that edits the open document with a file:
 			// inserting a model is a paste that happens to come from disk.
@@ -319,16 +319,16 @@ namespace spades {
 			EditorMenuGroup edit;
 			edit.title = "Edit";
 			edit.items.push_back(
-			  MenuCommand("Undo", command([this] { editor->Undo(); }), editor->CanUndo(), "Ctrl+Z"));
+			  MenuCommand("Undo", command([this] { editor->Undo(); }), editor->CanUndo(), CommandShortcut("Z")));
 			edit.items.push_back(
-			  MenuCommand("Redo", command([this] { editor->Redo(); }), editor->CanRedo(), "Ctrl+Y"));
+			  MenuCommand("Redo", command([this] { editor->Redo(); }), editor->CanRedo(), CommandShortcut("Y")));
 			edit.items.push_back(MenuRule());
 			edit.items.push_back(MenuCommand("Cut", command([this] { editor->CutSelection(); }),
-			                                 selected, "Ctrl+X"));
+			                                 selected, CommandShortcut("X")));
 			edit.items.push_back(MenuCommand("Copy", command([this] { editor->CopySelection(); }),
-			                                 selected, "Ctrl+C"));
+			                                 selected, CommandShortcut("C")));
 			edit.items.push_back(MenuCommand("Paste", command([this] { editor->Paste(); }),
-			                                 editor->CanPaste(), "Ctrl+V"));
+			                                 editor->CanPaste(), CommandShortcut("V")));
 			edit.items.push_back(MenuCommand("Delete",
 			                                 command([this] { editor->DeleteSelection(); }),
 			                                 selected, "Del"));
@@ -338,12 +338,12 @@ namespace spades {
 			EditorMenuGroup select;
 			select.title = "Select";
 			select.items.push_back(
-			  MenuCommand("All", command([this] { editor->SelectAll(); }), true, "Ctrl+A"));
+			  MenuCommand("All", command([this] { editor->SelectAll(); }), true, CommandShortcut("A")));
 			select.items.push_back(MenuCommand("None",
 			                                   command([this] { editor->ClearSelection(); }),
-			                                   selected, "Ctrl+Shift+A"));
+			                                   selected, CommandShortcut("Shift+A")));
 			select.items.push_back(MenuCommand(
-			  "Invert", command([this] { editor->InvertSelection(); }), true, "Ctrl+I"));
+			  "Invert", command([this] { editor->InvertSelection(); }), true, CommandShortcut("I")));
 
 			// What the view does, which until now only its keys could ask for.
 			EditorMenuGroup view;
@@ -606,7 +606,7 @@ namespace spades {
 			font.Draw(name + "   (" + std::to_string(document.VoxelCount()) + " voxels)",
 			          MakeVector2(namesAt, 5.0F), 0.85F, MakeVector4(0.75F, 0.75F, 0.78F, 1.0F));
 
-			std::string save = "[Ctrl+S] save";
+			std::string save = "[" + CommandShortcut("S") + "] save";
 			Vector2 cs = font.Measure(save);
 			font.Draw(save, MakeVector2(sw - 12.0F - cs.x * 0.8F, 5.0F), 0.8F,
 			          MakeVector4(0.6F, 0.6F, 0.63F, 1.0F));
@@ -716,7 +716,7 @@ namespace spades {
 			    editor->OptionBarKey(key))
 				return;
 
-			if (down && editor->IsCtrlHeld() &&
+			if (down && editor->IsCommandHeld() &&
 			    (IsFileShortcut(key) || VoxelEditor::IsEditShortcut(key))) {
 				// Ctrl is also the default descend key (cg_keyCrouch), so the view
 				// has been sinking since Ctrl went down: undo that drift and stop

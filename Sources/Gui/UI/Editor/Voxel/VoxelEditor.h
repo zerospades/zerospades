@@ -153,9 +153,10 @@ namespace spades {
 			/** Every key, even while a modal has the keyboard, so no modifier
 			 *  stays "held" after a release it swallowed. */
 			void TrackModifiers(const std::string& key, bool down);
-			/** Whether Ctrl+`key` is one of the editor's shortcuts. */
+			/** Whether `key`, with the command modifier held (IsCommandHeld), is
+			 *  one of the editor's shortcuts. */
 			static bool IsEditShortcut(const std::string& key);
-			/** Runs Ctrl+`key`, a shortcut per IsEditShortcut. */
+			/** Runs the shortcut `key` is, per IsEditShortcut. */
 			void RunEditShortcut(const std::string& key);
 			/** The cursor moved by `delta`: the picker and the active tool follow. */
 			void PointerMoved(const Vector2& delta);
@@ -186,6 +187,9 @@ namespace spades {
 			 *  its back (a host shortcut, a dialog taking the input). */
 			void CancelToolInteraction();
 			bool IsCtrlHeld() const { return ctrlHeld; }
+			/** Whether the modifier of a command's shortcut is held: Ctrl, or
+			 *  on macOS Cmd as well (see MetaIsCommandModifier). */
+			bool IsCommandHeld() const;
 			bool IsShiftHeld() const { return shiftHeld; }
 			/** Backs out of the top of the Escape chain; false with nothing to
 			 *  back out of (the host then opens its menu). */

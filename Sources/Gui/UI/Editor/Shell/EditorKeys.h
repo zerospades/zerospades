@@ -30,5 +30,16 @@ namespace spades {
 		 * aliases), so the editors honour the player's bindings.
 		 */
 		bool EditorKeyMatches(const std::string& binding, const std::string& key);
+
+		/**
+		 * Whether the Meta key is the one commands' shortcuts are held with:
+		 * on macOS, where it is Cmd and Cmd+S is how anything is saved. Ctrl
+		 * is that key everywhere, macOS included, so nothing learnt on one
+		 * system stops working on another.
+		 */
+		bool MetaIsCommandModifier();
+		/** A command's shortcut as the system's users know it: "Cmd+S" on
+		 *  macOS, "Ctrl+S" elsewhere, for `keys` "S". */
+		std::string CommandShortcut(const std::string& keys);
 	} // namespace gui
 } // namespace spades

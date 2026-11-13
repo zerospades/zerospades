@@ -32,5 +32,17 @@ namespace spades {
 				return key == " ";
 			return EqualsIgnoringCase(binding, key);
 		}
+
+		bool MetaIsCommandModifier() {
+#ifdef __APPLE__
+			return true;
+#else
+			return false;
+#endif
+		}
+
+		std::string CommandShortcut(const std::string& keys) {
+			return std::string(MetaIsCommandModifier() ? "Cmd+" : "Ctrl+") + keys;
+		}
 	} // namespace gui
 } // namespace spades
