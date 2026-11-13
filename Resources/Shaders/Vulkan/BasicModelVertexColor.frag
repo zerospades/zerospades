@@ -79,6 +79,12 @@ void main() {
 	vec3 diffuse = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO,
 	                                SceneAmbientOcclusion()) + sun;
 
+	// Omnidirectional: every face reaches full albedo, so one colour stays one
+	// colour whichever way its faces point. The model's own ambient occlusion is
+	// kept, being a soft corner cue rather than the hard per-face step the sun
+	// term creates (GL OptimizedVoxelModel.fs flatLighting).
+	diffuse = mix(diffuse, vec3(detailAO), sceneView.options.z);
+
 	fragColor = vec4(vertexColor * diffuse, 1.0);
 	fragColor.xyz += vertexColor * EvaluateDynamicLights(worldPosition, nrm);
 

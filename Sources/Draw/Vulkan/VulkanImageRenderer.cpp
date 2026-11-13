@@ -449,6 +449,31 @@ namespace spades {
 			indices.push_back(idx + 3);
 		}
 
+		void VulkanImageRenderer::AddShadedTriangle(const Vector2& p1, const Vector2& p2,
+		                                            const Vector2& p3, const Vector4& c1,
+		                                            const Vector4& c2, const Vector4& c3) {
+			const uint32_t idx = static_cast<uint32_t>(vertices.size());
+
+			const Vector2* p[3] = {&p1, &p2, &p3};
+			const Vector4* c[3] = {&c1, &c2, &c3};
+			for (int i = 0; i < 3; i++) {
+				ImageVertex v;
+				v.x = p[i]->x;
+				v.y = p[i]->y;
+				v.u = 0.0F;
+				v.v = 0.0F;
+				v.r = c[i]->x;
+				v.g = c[i]->y;
+				v.b = c[i]->z;
+				v.a = c[i]->w;
+				vertices.push_back(v);
+			}
+
+			indices.push_back(idx);
+			indices.push_back(idx + 1);
+			indices.push_back(idx + 2);
+		}
+
 		void VulkanImageRenderer::AddTriangle(float dx1, float dy1, float dx2, float dy2, float dx3,
 		                                      float dy3, float r, float g, float b, float a) {
 			ImageVertex v;

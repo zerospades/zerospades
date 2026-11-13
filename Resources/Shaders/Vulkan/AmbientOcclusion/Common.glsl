@@ -28,9 +28,12 @@
 const float kBackgroundDepth = 0.999999;
 
 /** The distance along the view of a depth buffer value `depth`, as the scene's
- * projection (`SceneDefinition::ToVulkanProjectionMatrix`) maps it to [0, 1] */
-float LinearDepth(float depth, vec2 zNearFar) {
-	return zNearFar.x * zNearFar.y / mix(zNearFar.y, zNearFar.x, depth);
+ * projection (`SceneDefinition::ToVulkanProjectionMatrix`) maps it to [0, 1]:
+ * a frustum (`perspective` 1) writes the reciprocal of the depth, the box of a
+ * parallel projection (`perspective` 0) the depth itself. */
+float LinearDepth(float depth, vec2 zNearFar, float perspective) {
+	return mix(mix(zNearFar.x, zNearFar.y, depth),
+	           zNearFar.x * zNearFar.y / mix(zNearFar.y, zNearFar.x, depth), perspective);
 }
 
 /** The depth texel `texel` of `depthTexture`, held to its edges */

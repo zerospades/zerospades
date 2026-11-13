@@ -128,7 +128,11 @@ void main() {
 	const float ssao = SceneAmbientOcclusion();
 	fragColor = vec4(vertexColor, 1.0);
 	vec3 diffuseShading = MapAmbientLight(radiosityTextureCoord, aoCoord, nrm, detailAO, ssao);
-	float shadowing = shadow * (0.6 * sceneSunSky.sunlight);
+	// Omnidirectional (GL OptimizedVoxelModelPhys.fs flatLighting): drop the
+	// sun so the two shading branches below fall away, leaving every face at
+	// full albedo.
+	float flatLighting = sceneView.options.z;
+	float shadowing = shadow * (0.6 * sceneSunSky.sunlight) * (1.0 - flatLighting);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 
@@ -141,7 +145,8 @@ void main() {
 
 	// Fresnel
 	float fresnel2 = 1.0 - dotNV;
-	float fresnel = 0.03 + 0.1 * fresnel2 * fresnel2;
+	// Reflections are directional too, so they are faded out along with the sun.
+	float fresnel = (0.03 + 0.1 * fresnel2 * fresnel2) * (1.0 - flatLighting);
 
 	// What the map and the sky reflect towards the eye
 	// (GL OptimizedVoxelModelPhys.fs EvaluateDirectionalAmbientLight)
@@ -157,6 +162,8 @@ void main() {
 		float sunSpecularShading = CookTorrance(eyeVec, viewSpaceLight, viewSpaceNormal);
 		fragColor.xyz += sunSpecularShading * shadowing;
 	}
+
+	diffuseShading = mix(diffuseShading, vec3(detailAO), flatLighting);
 
 	// Blend diffuse and specular with Fresnel
 	fragColor.xyz = mix(diffuseShading * fragColor.xyz, specularShading, fresnel);

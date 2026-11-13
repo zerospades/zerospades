@@ -139,6 +139,7 @@ namespace spades {
 			Store(out.sunDirection, parameters.sunDirection, 0.0F);
 			out.options[0] = parameters.ambientOcclusion ? 1.0F : 0.0F;
 			out.options[1] = view == View::Mirror ? 1.0F : 0.0F;
+			out.options[2] = parameters.flatModelLighting ? 1.0F : 0.0F;
 
 			auto* mapped = static_cast<std::uint8_t*>(slots[frameSlot].buffer->Map());
 			std::memcpy(mapped + stride * static_cast<std::uint32_t>(view), &out, sizeof(out));

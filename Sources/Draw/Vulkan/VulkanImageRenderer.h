@@ -145,6 +145,9 @@ namespace spades {
 			// the only caller draws with the white image.
 			void AddTriangle(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3,
 			                 float r, float g, float b, float a);
+			/** A triangle with one alpha-premultiplied colour per vertex. */
+			void AddShadedTriangle(const Vector2& p1, const Vector2& p2, const Vector2& p3,
+			                       const Vector4& c1, const Vector4& c2, const Vector4& c3);
 			// Quad with a two-colour gradient. `horizontal` fades left-to-right
 			// instead of top-to-bottom; vertices are in TL, TR, BR, BL order.
 			void AddGradient(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3,

@@ -649,12 +649,44 @@ namespace spades {
 			projectionViewMatrix = projectionMatrix * viewMatrix;
 		}
 
+		// The outline pass runs when the settings ask for it or the scene does,
+		// as in GL: the model editor's flat lighting drops the shading that
+		// conveys depth, and a silhouette gives it back.
+		bool VulkanRenderer::OutlinesWanted() const {
+			return (int)r_outlines != 0 || sceneDef.forceOutlines;
+		}
+
+		// Whether the scene draws the water surface and the mirrored scene that
+		// feeds it; a scene may leave them out (SceneDefinition::skipWater).
+		bool VulkanRenderer::WaterWanted(int level) {
+			return (int)settings.r_water >= level && !sceneDef.skipWater;
+		}
+
 		void VulkanRenderer::BuildFrustrum() {
 			// near/far planes
 			frustrum[0] = Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin, sceneDef.viewAxis[2]);
 			frustrum[1] = frustrum[0].Flipped();
 			frustrum[0].w -= sceneDef.zNear;
 			frustrum[1].w += sceneDef.zFar;
+
+			if (sceneDef.orthogonal) {
+				// A box, not a pyramid: the sides are parallel to the line of
+				// sight and stand half the view's height and width out from it.
+				const float halfHeight = sceneDef.orthoHeight * 0.5F;
+				const float halfWidth =
+				  halfHeight * (std::tan(sceneDef.fovX * 0.5F) / std::tan(sceneDef.fovY * 0.5F));
+				const Vector3& side = sceneDef.viewAxis[0];
+				const Vector3& up = sceneDef.viewAxis[1];
+				frustrum[2] = Plane3::PlaneWithPointOnPlane(
+				  sceneDef.viewOrigin - side * halfWidth, side);
+				frustrum[3] = Plane3::PlaneWithPointOnPlane(
+				  sceneDef.viewOrigin + side * halfWidth, -side);
+				frustrum[4] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - up * halfHeight, up);
+				frustrum[5] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + up * halfHeight, -up);
+				return;
+			}
 
 			// side planes
 			float cx = cosf(sceneDef.fovX * 0.5F);
@@ -979,6 +1011,7 @@ namespace spades {
 			// The water's reflection keeps what lies above the water plane at 63.
 			parameters.mirrorClipZ = renderingMirror ? 63.0F : 1.0e9F;
 			parameters.sunDirection = GetSunDirection();
+			parameters.flatModelLighting = sceneDef.flatModelLighting;
 			parameters.ambientOcclusion =
 			  ambientOcclusion &&
 			  ambientOcclusion->HasView(renderingMirror ? VulkanSceneView::View::Mirror
@@ -1258,6 +1291,23 @@ namespace spades {
 				glareRenderer->Add(*vkImage, param);
 		}
 
+		void VulkanRenderer::AddImagePlane(client::IImage& img, Vector3 origin, Vector3 axisU,
+		                                   Vector3 axisV) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			VulkanImage* vkImage = nullptr;
+			if (VulkanImageWrapper* wrapper = dynamic_cast<VulkanImageWrapper*>(&img))
+				vkImage = wrapper->GetVulkanImage();
+			else
+				vkImage = dynamic_cast<VulkanImage*>(&img);
+
+			if (vkImage && longSpriteRenderer)
+				longSpriteRenderer->AddPlane(vkImage, origin, axisU, axisV,
+				                             drawColorAlphaPremultiplied);
+		}
+
 		void VulkanRenderer::AddLongSprite(client::IImage& img, Vector3 p1, Vector3 p2, float radius) {
 			SPADES_MARK_FUNCTION();
 			EnsureInitialized();
@@ -1519,6 +1569,23 @@ namespace spades {
 
 			imageRenderer->AddTriangle(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y, col.x, col.y, col.z,
 			                           col.w);
+		}
+
+		void VulkanRenderer::DrawShadedTriangle(const Vector2& v0, const Vector2& v1,
+		                                        const Vector2& v2, const Vector4& c0,
+		                                        const Vector4& c1, const Vector4& c2) {
+			SPADES_MARK_FUNCTION();
+
+			EnsureSceneNotStarted();
+
+			VulkanImage* img = whiteImage.GetPointerOrNull();
+			if (!img || !imageRenderer)
+				return;
+
+			// The colours arrive alpha-premultiplied and the draw colour is not
+			// used, as in GLRenderer.
+			imageRenderer->SetImage(img);
+			imageRenderer->AddShadedTriangle(v0, v1, v2, c0, c1, c2);
 		}
 
 		void VulkanRenderer::DrawFilledRectFade(float x0, float y0, float x1, float y1,
@@ -1924,6 +1991,16 @@ namespace spades {
 			return static_cast<float>(device->ScreenHeight());
 		}
 
+		// The swapchain's pixels per unit of the 2D layer. The Vulkan window is
+		// not a high-DPI one yet (see TODO.md), so the two are the same size and
+		// this is 1; it follows the swapchain the day they differ.
+		float VulkanRenderer::ScreenPixelRatio() {
+			const float units = ScreenWidth();
+			if (units <= 0.0F)
+				return 1.0F;
+			return static_cast<float>(device->GetSwapchainExtent().width) / units;
+		}
+
 		client::RendererInfo VulkanRenderer::GetRendererInfo() {
 			VkPhysicalDeviceProperties props;
 			vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
@@ -2115,7 +2192,7 @@ namespace spades {
 				waterRenderer->UploadWaveTextures(commandBuffer);
 				// Counted only for the reflections, which ask for it
 				waterRenderer->BeginOcclusionQueryFrame(
-				  commandBuffer, (int)r_occlusionQuery && (int)settings.r_water >= 2);
+				  commandBuffer, (int)r_occlusionQuery && WaterWanted(2));
 			}
 
 
@@ -2182,7 +2259,7 @@ namespace spades {
 		}
 
 		// Render mirror pass for water reflections (r_water >= 2)
-		if (sceneUsedInThisFrame && framebufferManager && waterRenderer && (int)settings.r_water >= 2) {
+		if (sceneUsedInThisFrame && framebufferManager && waterRenderer && WaterWanted(2)) {
 			renderingMirror = true;
 
 			// Save original matrices
@@ -2421,7 +2498,7 @@ namespace spades {
 			// after water). Drawn here in the order particles -> long sprites -> debug.
 			// When the water pass will run, defer them to it (same render pass, the
 			// pipelines are render-pass-compatible); otherwise draw them here.
-			const bool willRenderWater = (int)settings.r_water > 0 && waterRenderer && framebufferManager;
+			const bool willRenderWater = WaterWanted(1) && waterRenderer && framebufferManager;
 
 			if (!willRenderWater) {
 				// Ahead of the transparent overlays, as in GL, so smoke and tracers
@@ -2470,7 +2547,7 @@ namespace spades {
 				depthResolveFilter->Resolve(commandBuffer, offscreenDepth.GetPointerOrNull(),
 					framebufferManager->GetResolvedDepthImage().GetPointerOrNull());
 				// The outlines' stencil too, final as the depth is
-				if ((int)r_outlines)
+				if (OutlinesWanted())
 					depthResolveFilter->ResolveStencil(
 					  commandBuffer, offscreenDepth.GetPointerOrNull(),
 					  framebufferManager->GetResolvedStencilImage().GetPointerOrNull());
@@ -2523,7 +2600,7 @@ namespace spades {
 			// and so is the stencil the outlines read
 			if (!msaaScene) {
 				framebufferManager->CopySceneDepthForSampling(commandBuffer);
-				if ((int)r_outlines)
+				if (OutlinesWanted())
 					framebufferManager->CopySceneStencilForSampling(commandBuffer);
 			}
 
@@ -2542,7 +2619,7 @@ namespace spades {
 			// (see CopySceneForWaterSampling / ResolveMirrorColor
 			// and the GetWater*() accessors), and refraction depth reuses the scene's
 			// resolved depth.
-			bool waterEnabled = (int)settings.r_water > 0 && waterRenderer;
+			bool waterEnabled = WaterWanted(1) && waterRenderer;
 
 			// Copy scene to screen copy images for water refraction sampling
 			// (water renders to the same framebuffer, so it can't sample from it directly)
@@ -2869,7 +2946,7 @@ namespace spades {
 			// offscreen depth attachment that the fog / soft-particle path already
 			// transitions to SHADER_READ_ONLY above; takes its own distance fade so
 			// it works whether or not the fog filter is enabled / correct.
-			if ((int)r_outlines && cavityOutlineFilter && currentInput && currentOutput) {
+			if (OutlinesWanted() && cavityOutlineFilter && currentInput && currentOutput) {
 				cavityOutlineFilter->Filter(commandBuffer, currentInput, currentOutput);
 				advanceChain();
 			}
@@ -3684,9 +3761,14 @@ namespace spades {
 			// into the offscreen scene pass.
 			multisampling.rasterizationSamples = device->GetSampleCount();
 
+			// Tested against the scene's depth and writing none, as GL draws
+			// them: what stands in front of a line hides it. The model editor's
+			// ground grid and axes are debug lines, and would otherwise show
+			// through the model.
 			VkPipelineDepthStencilStateCreateInfo depthStencil{};
 			depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-			depthStencil.depthTestEnable = VK_FALSE;
+			depthStencil.depthTestEnable = VK_TRUE;
+			depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 			depthStencil.depthWriteEnable = VK_FALSE;
 			depthStencil.stencilTestEnable = VK_FALSE;
 

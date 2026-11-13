@@ -79,6 +79,21 @@ namespace spades {
 			float r = near * std::tan(this->fovX * 0.5F);
 			float c = far - near;
 
+			if (orthogonal) {
+				// As ToOpenGLProjectionMatrix's box, its depth running from 0 at
+				// the near plane to 1 at the far one.
+				const float halfHeight = std::max(orthoHeight * 0.5F, 1.0e-4F);
+				const float halfWidth = halfHeight * (r / t);
+				Matrix4 ortho;
+				std::fill(ortho.m, ortho.m + 16, 0.0F);
+				ortho.m[0] = 1.0F / halfWidth;
+				ortho.m[5] = 1.0F / halfHeight;
+				ortho.m[10] = -1.0F / c;
+				ortho.m[14] = -near / c;
+				ortho.m[15] = 1.0F;
+				return ortho;
+			}
+
 			Matrix4 mat;
 			mat.m[0] = 2.0F * near / (2.0F * r);
 			mat.m[1] = 0.0F;

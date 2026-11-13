@@ -288,8 +288,13 @@ namespace spades {
 			spr.end = p2;
 			spr.radius = rad;
 
-			// Same linearization as GLLongSpriteRenderer::Add; see the note in
-			// VulkanSpriteRenderer::Add for why it is unconditional here.
+			spr.color = PassColor(color);
+			sprites.push_back(spr);
+		}
+
+		Vector4 VulkanLongSpriteRenderer::PassColor(Vector4 color) {
+			// Same linearization as GLLongSpriteRenderer::PassColor; see the note
+			// in VulkanSpriteRenderer::Add for why it is unconditional here.
 			if (color.x > color.w || color.y > color.w || color.z > color.w) {
 				// emissive material
 				color.x *= color.x;
@@ -302,14 +307,25 @@ namespace spades {
 				color.y *= color.y * rcp;
 				color.z *= color.z * rcp;
 			}
+			return color;
+		}
 
-			spr.color = color;
-			sprites.push_back(spr);
+		void VulkanLongSpriteRenderer::AddPlane(VulkanImage* img, Vector3 origin, Vector3 axisU,
+		                                        Vector3 axisV, Vector4 color) {
+			SPADES_MARK_FUNCTION_DEBUG();
+			Plane plane;
+			plane.image = img;
+			plane.origin = origin;
+			plane.axisU = axisU;
+			plane.axisV = axisV;
+			plane.color = PassColor(color);
+			planes.push_back(plane);
 		}
 
 		void VulkanLongSpriteRenderer::Clear() {
 			SPADES_MARK_FUNCTION();
 			sprites.clear();
+			planes.clear();
 		}
 
 		VkDescriptorSet VulkanLongSpriteRenderer::GetImageSet(FrameResources& frame,
@@ -544,6 +560,37 @@ namespace spades {
 					indices.push_back(idx + 4 + 3);
 					indices.push_back(idx + 4 + 2);
 				}
+			}
+
+			// The planes after the sprites, as GL draws them. The GPU clips a plane
+			// against the view itself: unlike a long sprite, nothing of it is
+			// built in screen space. The pipeline culls nothing, so one winding
+			// shows from either side.
+			for (const Plane& plane : planes) {
+				if (batches.empty() || batches.back().image != plane.image)
+					batches.push_back({plane.image, static_cast<std::uint32_t>(indices.size()), 0});
+
+				Vertex v;
+				v.pad = 0;
+				v.r = plane.color.x;
+				v.g = plane.color.y;
+				v.b = plane.color.z;
+				v.a = plane.color.w;
+				const std::uint32_t idx = static_cast<std::uint32_t>(vertices.size());
+				v = plane.origin;
+				v.u = 0; v.v = 0;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisU;
+				v.u = 1; v.v = 0;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisV;
+				v.u = 0; v.v = 1;
+				vertices.push_back(v);
+				v = plane.origin + plane.axisU + plane.axisV;
+				v.u = 1; v.v = 1;
+				vertices.push_back(v);
+				for (std::uint32_t i : {0u, 1u, 2u, 1u, 3u, 2u})
+					indices.push_back(idx + i);
 			}
 
 			// The runs' ends: each one's indices run up to where the next's begin.

@@ -45,12 +45,14 @@ namespace spades {
 				float tanHalfFov[2];
 				float sampleRadius;
 				std::int32_t scale;
+				float perspective;
 			};
 			// AmbientOcclusion/Blur.comp's
 			struct BlurParams {
 				float zNearFar[2];
 				std::int32_t axis[2];
 				std::int32_t sourceScale;
+				float perspective;
 			};
 
 			constexpr std::uint32_t kGroupSize = 8; // both shaders' local size
@@ -439,6 +441,7 @@ namespace spades {
 			}
 
 			const float zNearFar[2] = {sceneDef.zNear, sceneDef.zFar};
+			const float perspective = sceneDef.orthogonal ? 0.0F : 1.0F;
 			const std::vector<Pass>& passes = resources.passes[frameSlot];
 
 			// The evaluation
@@ -452,8 +455,19 @@ namespace spades {
 				EvaluateParams params{};
 				params.zNearFar[0] = zNearFar[0];
 				params.zNearFar[1] = zNearFar[1];
-				params.tanHalfFov[0] = std::tan(sceneDef.fovX * 0.5F);
-				params.tanHalfFov[1] = std::tan(sceneDef.fovY * 0.5F);
+				// How far across the view reaches: per unit of depth in a
+				// perspective view, and outright in a parallel one, as GL's
+				// SSAO filter takes it.
+				if (sceneDef.orthogonal) {
+					const float halfHeight = sceneDef.orthoHeight * 0.5F;
+					params.tanHalfFov[0] = halfHeight * (std::tan(sceneDef.fovX * 0.5F) /
+					                                     std::tan(sceneDef.fovY * 0.5F));
+					params.tanHalfFov[1] = halfHeight;
+				} else {
+					params.tanHalfFov[0] = std::tan(sceneDef.fovX * 0.5F);
+					params.tanHalfFov[1] = std::tan(sceneDef.fovY * 0.5F);
+				}
+				params.perspective = perspective;
 				params.sampleRadius = kernel * static_cast<float>(resources.scale);
 				params.scale = resources.scale;
 
@@ -470,6 +484,7 @@ namespace spades {
 				const Pass& pass = passes[i];
 				ComputeToCompute(commandBuffer);
 				BlurParams params{};
+				params.perspective = perspective;
 				params.zNearFar[0] = zNearFar[0];
 				params.zNearFar[1] = zNearFar[1];
 				params.axis[0] = pass.axis == 0 ? 1 : 0;

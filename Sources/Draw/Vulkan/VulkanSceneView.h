@@ -67,6 +67,9 @@ namespace spades {
 				/** Whether the view's ambient occlusion (`SetAmbientOcclusion`) is to be
 				 * read this frame */
 				bool ambientOcclusion;
+				/** Models lit from every direction at once, not by the sun
+				 * (`SceneDefinition::flatModelLighting`) */
+				bool flatModelLighting = false;
 			};
 
 			VulkanSceneView(VulkanRenderer&, std::size_t framesInFlight);

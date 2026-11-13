@@ -61,17 +61,20 @@ namespace spades {
 
 		class VulkanOptimizedVoxelModel : public VulkanModel {
 			struct Vertex {
-				uint8_t x, y, z;
-				uint8_t aoX;          // 2D AO atlas coord (tile_x*16 + corner)
+				// 16 bits each, so a model may be longer than 255 voxels on any
+				// axis, as in GL; 8-bit positions wrapped there. Read as a uvec3:
+				// the fourth component only keeps the attribute a format every
+				// device takes for vertices.
+				uint16_t x, y, z;
+				uint16_t positionPadding;
 
 				// color
 				uint8_t colorR, colorG, colorB;
-				uint8_t aoY;          // 2D AO atlas coord (tile_y*16 + corner)
+				uint8_t aoX;          // 2D AO atlas coord (tile_x*16 + corner)
 
 				// normal
 				int8_t nx, ny, nz;
-
-				uint8_t padding;
+				uint8_t aoY;          // 2D AO atlas coord (tile_y*16 + corner)
 			};
 
 			// Shared pipeline cache across all model instances
