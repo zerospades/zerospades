@@ -147,6 +147,10 @@ namespace spades {
 			void BuildProjectionMatrix();
 			void BuildView();
 			void BuildFrustrum();
+			/** How far the view reaches from its middle, across and up: per unit
+			 * of depth in a perspective view (the tangents of half the fields of
+			 * view), and outright in a parallel one. */
+			Vector2 ViewHalfExtent() const;
 
 			void EnsureInitialized();
 			void EnsureSceneStarted();
