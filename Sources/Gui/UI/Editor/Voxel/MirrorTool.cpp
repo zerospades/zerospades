@@ -38,12 +38,12 @@ namespace spades {
 			options.AddBool(kAxisOption[2], "Z", "Mirror");
 		}
 
-		void SyncMirrorToggles(ToolOptions& options, IVoxelEditContext& ed) {
+		void SyncMirrorToggles(ToolOptions& options, IVoxelMirror& ed) {
 			for (int a = 0; a < 3; a++)
 				options.SetBool(kAxisOption[a], ed.MirrorEnabled(a));
 		}
 
-		bool ApplyMirrorToggle(IVoxelEditContext& ed, const std::string& id, bool value) {
+		bool ApplyMirrorToggle(IVoxelMirror& ed, const std::string& id, bool value) {
 			for (int a = 0; a < 3; a++) {
 				if (id == kAxisOption[a]) {
 					ed.SetMirrorEnabled(a, value);

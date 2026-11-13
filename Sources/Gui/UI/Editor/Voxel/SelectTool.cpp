@@ -94,7 +94,7 @@ namespace spades {
 			options.SetEnabled(kSelectNoneOption, ed.SelectionCount() > 0);
 		}
 
-		void RecolourSelectionAsChosen(IVoxelEditContext& ed, std::uint32_t color, bool committed) {
+		void RecolourSelectionAsChosen(IVoxelSelection& ed, std::uint32_t color, bool committed) {
 			if (ed.SelectionCount() == 0)
 				return;
 			if (committed)

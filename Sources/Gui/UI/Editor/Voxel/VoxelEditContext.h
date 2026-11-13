@@ -52,15 +52,11 @@ namespace spades {
 			bool IsIdentity() const { return !Turns() && shift == IntVector3::Make(0, 0, 0); }
 		};
 
-		/**
-		 * The seam a voxel editor's tools operate through: the document's cells,
-		 * the selection, the clipboard, mirroring, moving voxels and the pivot,
-		 * on top of what every editor offers (IEditorContext). Coordinates are
-		 * the document's voxel indices.
-		 */
-		class IVoxelEditContext : public IEditorContext {
+		/** What the cursor aims at: the voxel under it, and where its ray meets a plane. */
+		class IVoxelPicking {
 		public:
-			// --- Picking (cursor ray vs. the model) ---------------------------
+			virtual ~IVoxelPicking() {}
+
 			// Recompute the pick under the cursor; call before reading the rest.
 			virtual void DoPick() = 0;
 			virtual bool HasPick() const = 0;
@@ -72,8 +68,13 @@ namespace spades {
 			// (planePoint, normal). Lets tools place points in empty space.
 			virtual bool RayPlaneCell(const Vector3& planePoint, const Vector3& normal,
 			                          IntVector3& out) = 0;
+		};
 
-			// --- Document -----------------------------------------------------
+		/** The document's cells, and the brush colour they are filled and painted with. */
+		class IVoxelCells {
+		public:
+			virtual ~IVoxelCells() {}
+
 			virtual uint32_t CurrentColor() const = 0;
 			virtual Vector4 ColorToVec(uint32_t c) const = 0;
 			// Place a voxel of `color` at each of `cells`, growing the volume to fit.
@@ -88,8 +89,13 @@ namespace spades {
 			// no tool has to handle it.
 			virtual void PlaceCube() = 0;
 			virtual void DeleteCube() = 0;
+		};
 
-			// --- Selection (a set of solid-voxel coords, shared across tools) ---
+		/** The selection: a set of solid voxels, shared across tools. */
+		class IVoxelSelection {
+		public:
+			virtual ~IVoxelSelection() {}
+
 			virtual bool IsSelected(int x, int y, int z) const = 0;
 			virtual void ClearSelection() = 0;
 			// Removes the selected voxels from the model, or drops a waiting paste
@@ -133,22 +139,14 @@ namespace spades {
 			virtual void InvertSelection() = 0;
 			// Add / remove the solid voxels among `cells`.
 			virtual void SelectCells(const std::vector<IntVector3>& cells) = 0;
-			/**
-			 * Makes the tool registered as `id` the active one, once the active
-			 * tool is done with its event, as part of the same user action: a
-			 * tool hands over to another without being switched from inside
-			 * itself.
-			 */
-			virtual void SwitchTool(const std::string& id) = 0;
-			/**
-			 * Gives the selection up and switches to Select: what a click on
-			 * nothing does in a tool that works on the selection, and can do
-			 * nothing without one. Done once the tool's event is over.
-			 */
-			virtual void ReturnToSelect() = 0;
 			virtual void DeselectCells(const std::vector<IntVector3>& cells) = 0;
+		};
 
-			// --- The view, and images of it -------------------------------------
+		/** The view of the document, and images made of it. */
+		class IVoxelView {
+		public:
+			virtual ~IVoxelView() {}
+
 			/** Turns the view to look down on the model from the nearest of its
 			 *  four corners, `elevation` radians above the horizon, in a
 			 *  parallel projection. */
@@ -159,8 +157,13 @@ namespace spades {
 			 *  `background` (0x00BBGGRR) or with `transparent` on none at all;
 			 *  reports where. */
 			virtual void SaveRender(std::uint32_t background, bool transparent) = 0;
+		};
 
-			// --- Clipboard ----------------------------------------------------
+		/** Copying, cutting and pasting the selection. */
+		class IVoxelClipboard {
+		public:
+			virtual ~IVoxelClipboard() {}
+
 			// Copy and Cut take the selection, or a waiting paste or import while
 			// there is one, which they leave where it is rather than place. Each
 			// reports what it did, or why not, on the status line.
@@ -170,12 +173,23 @@ namespace spades {
 			// Starts placing the clipboard's voxels in the Transform tool.
 			virtual void Paste() = 0;
 			virtual bool CanPaste() const = 0;
+		};
 
-			// --- Cell outlines (3D wireframe previews) ---------------------------
+		/** Wireframe previews drawn in the document. */
+		class IVoxelOutlines {
+		public:
+			virtual ~IVoxelOutlines() {}
+
 			virtual void DrawCellOutline(int x, int y, int z, const Vector4& color) = 0;
 			virtual void DrawBoxOutline(const IntVector3& lo, const IntVector3& hi,
 			                            const Vector4& color) = 0;
-			// --- Mirror modelling ---------------------------------------------
+		};
+
+		/** Mirror modelling: which axes reflect an edit, and across what plane. */
+		class IVoxelMirror {
+		public:
+			virtual ~IVoxelMirror() {}
+
 			// Which axes reflect, and the plane each reflects across (in voxel
 			// coordinates). Held by the editor rather than by a tool, so an edit
 			// mirrors whichever tool made it.
@@ -198,8 +212,13 @@ namespace spades {
 			virtual void DrawCellOutlineMirrored(int x, int y, int z, const Vector4& color) = 0;
 			virtual void DrawBoxOutlineMirrored(const IntVector3& lo, const IntVector3& hi,
 			                                    const Vector4& color) = 0;
+		};
 
-			// --- Moving voxels ------------------------------------------------
+		/** Moving voxels: the selection, or a paste or an import waiting to be placed. */
+		class IVoxelPlacement {
+		public:
+			virtual ~IVoxelPlacement() {}
+
 			// Moving or turning the selection writes it straight into the
 			// document, one undo step per drag, key or typed value; the moved
 			// voxels replace what they land on and stay selected.
@@ -250,8 +269,13 @@ namespace spades {
 			/** Outlines the waiting voxels (or the selection) as they would land after `t`. */
 			virtual void DrawPlacementTransformed(const PlacementTransform& t,
 			                                      const Vector4& color) = 0;
+		};
 
-			// --- Pivot --------------------------------------------------------
+		/** The model's pivot. */
+		class IVoxelPivot {
+		public:
+			virtual ~IVoxelPivot() {}
+
 			// The model's pivot point (in editor grid coordinates). Moving it keeps
 			// the voxels fixed; the pivot marker follows and it is written to the
 			// file on save. The mirror planes start here but do not follow (see
@@ -270,8 +294,13 @@ namespace spades {
 			virtual void PreviewPivot(const Vector3& pivot) = 0;
 			/** The pivot, as the transform panel sets it by number. */
 			virtual ITransformTarget& PivotTransform() = 0;
+		};
 
-			// --- Sweeping the selection (Extrude, Pocket) ----------------------
+		/** Reshaping the model from the selection: sweeping it along an axis, hollowing out behind it. */
+		class IVoxelShaping {
+		public:
+			virtual ~IVoxelShaping() {}
+
 			/**
 			 * The cells sweeping each selected voxel `steps` voxels along `axis`
 			 * (the sign is the direction) would change, mirror images aside: the
@@ -301,8 +330,13 @@ namespace spades {
 			 * The selection then moves to where the sweep ends, so sweeps chain.
 			 */
 			virtual void SweepSelection(int axis, int steps, bool pocket) = 0;
+		};
 
-			// --- Reference images ---------------------------------------------
+		/** The images to model from, across each axis. */
+		class IVoxelReferences {
+		public:
+			virtual ~IVoxelReferences() {}
+
 			// An image across each axis (0 = x, 1 = y, 2 = z) to model from,
 			// drawn in the document whatever the tool. A setting of the editor:
 			// changing one is no undo step, and none is saved with the document.
@@ -311,6 +345,40 @@ namespace spades {
 			 *  document and set behind it. */
 			virtual void LoadReferenceImage(int axis) = 0;
 			virtual void ClearReferenceImage(int axis) = 0;
+		};
+
+		/**
+		 * The seam a voxel editor's tools operate through: everything above, by
+		 * concern, on top of what every editor offers (IEditorContext). A tool
+		 * is handed the whole of it; a helper that needs one concern asks for
+		 * that one alone. Coordinates are the document's voxel indices.
+		 */
+		class IVoxelEditContext : public IEditorContext,
+		                          public IVoxelPicking,
+		                          public IVoxelCells,
+		                          public IVoxelSelection,
+		                          public IVoxelView,
+		                          public IVoxelClipboard,
+		                          public IVoxelOutlines,
+		                          public IVoxelMirror,
+		                          public IVoxelPlacement,
+		                          public IVoxelPivot,
+		                          public IVoxelShaping,
+		                          public IVoxelReferences {
+		public:
+			/**
+			 * Makes the tool registered as `id` the active one, once the active
+			 * tool is done with its event, as part of the same user action: a
+			 * tool hands over to another without being switched from inside
+			 * itself.
+			 */
+			virtual void SwitchTool(const std::string& id) = 0;
+			/**
+			 * Gives the selection up and switches to Select: what a click on
+			 * nothing does in a tool that works on the selection, and can do
+			 * nothing without one. Done once the tool's event is over.
+			 */
+			virtual void ReturnToSelect() = 0;
 		};
 	} // namespace gui
 } // namespace spades
