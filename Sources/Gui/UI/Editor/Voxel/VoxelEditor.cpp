@@ -52,7 +52,6 @@
 #include <Gui/UI/Editor/Shell/EditorKeys.h>
 #include <Gui/UI/Editor/Shell/EditorUI.h>
 
-#include "DrawTool.h"
 #include "SubTool.h"
 #include "VoxelDocument.h"
 #include "VoxelEditorHost.h"
@@ -194,15 +193,8 @@ namespace spades {
 				                           }),
 				            tools.end());
 			}
-			// Open on Draw, so the user can start at once; found by type, so no
-			// button label decides it.
-			activeTool = 0;
-			for (size_t i = 0; i < tools.size(); i++) {
-				if (dynamic_cast<DrawTool*>(tools[i].tool.get())) {
-					activeTool = int(i);
-					break;
-				}
-			}
+			// Open on the tool registered for it, or the first.
+			activeTool = std::max(0, ToolWithRole(ToolRole::Initial));
 			WireUI();
 		}
 
@@ -1668,12 +1660,13 @@ namespace spades {
 		}
 
 		bool VoxelEditor::ActivateTransformTool() {
-			// Matched by type rather than by label, so neither renaming a button nor
-			// another sub-tool taking the same label can send a placement elsewhere.
+			// Found by what it says it does, so neither renaming a button nor
+			// another sub-tool taking its label can send a placement elsewhere.
 			for (size_t i = 0; i < tools.size(); i++) {
 				VoxelTool& tool = *tools[i].tool;
 				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
-					if (!dynamic_cast<TransformSubTool*>(tool.SubTool(sub)))
+					VoxelTool* candidate = tool.SubTool(sub);
+					if (!candidate || !candidate->PositionsPlacement())
 						continue;
 					SetMode(EditorMode::Edit);
 					SetActiveTool(int(i));
@@ -2578,10 +2571,10 @@ namespace spades {
 			    activeTool >= int(tools.size()))
 				return -1;
 			const VoxelToolSlot& current = tools[static_cast<size_t>(activeTool)];
-			if (!current.tool->StripOf().empty())
+			if (!current.traits.stripOf.empty())
 				return activeTool; // lit on its own strip, whatever is left to it
 			for (size_t i = 0; i < tools.size(); i++) {
-				if (tools[i].tool->StripOf() == current.id && ToolAvailable(int(i)))
+				if (tools[i].traits.stripOf == current.id && ToolAvailable(int(i)))
 					return int(i);
 			}
 			return -1;
@@ -2609,7 +2602,7 @@ namespace spades {
 			if (currentMode != EditorMode::Edit || activeTool < 0 ||
 			    activeTool >= int(tools.size()))
 				return -1;
-			const int host = ToolIndex(tools[static_cast<size_t>(activeTool)].tool->StripOf());
+			const int host = ToolIndex(tools[static_cast<size_t>(activeTool)].traits.stripOf);
 			return host >= 0 ? host : activeTool;
 		}
 
@@ -2629,9 +2622,33 @@ namespace spades {
 					return own;
 			}
 			// A strip is not the bar the digits count along.
-			if (!tool.StripOf().empty())
+			if (IsStrip(tool))
 				return std::string();
 			return (index >= 0 && index < 9) ? std::to_string(index + 1) : std::string();
+		}
+
+		bool VoxelEditor::IsStrip(const VoxelTool& tool) const {
+			for (const VoxelToolSlot& slot : tools) {
+				if (slot.tool.get() == &tool)
+					return !slot.traits.stripOf.empty();
+			}
+			return false;
+		}
+
+		int VoxelEditor::ToolWithRole(ToolRole role) const {
+			for (size_t i = 0; i < tools.size(); i++) {
+				if (tools[i].traits.role == role)
+					return int(i);
+			}
+			return -1;
+		}
+
+		void VoxelEditor::ReturnToSelect() {
+			const int selection = ToolWithRole(ToolRole::Selection);
+			if (selection < 0)
+				return; // an editor offering no way of choosing has nowhere to go back to
+			clearingSelection = true;
+			pendingTool = tools[static_cast<size_t>(selection)].id;
 		}
 
 		bool VoxelEditor::KeyIsTaken(const std::string& key) const {
@@ -3056,9 +3073,9 @@ namespace spades {
 			// Never mid-press: the tool taking over would see a drag it never
 			// saw start.
 			if (!lmbHeld && !rmbHeld && !ToolAvailable(activeTool)) {
-				const int select = ToolIndex("select");
-				if (ToolAvailable(select))
-					SetActiveTool(select);
+				const int selection = ToolWithRole(ToolRole::Selection);
+				if (ToolAvailable(selection))
+					SetActiveTool(selection);
 			}
 		}
 
@@ -3108,7 +3125,9 @@ namespace spades {
 				// A tool whose only sub-tool is itself goes by its own name alone,
 				// and a strip by the name of the tool it is the strip of: the one
 				// lit on the toolbar.
-				const int shownAs = ToolIndex(tool->StripOf());
+				const int shownAs = (activeTool >= 0 && activeTool < int(tools.size()))
+				                      ? ToolIndex(tools[static_cast<size_t>(activeTool)].traits.stripOf)
+				                      : -1;
 				line = shownAs >= 0 ? tools[static_cast<size_t>(shownAs)].tool->Label()
 				                    : tool->Label();
 				if (tool->SubToolCount() > 1)
@@ -3208,7 +3227,7 @@ namespace spades {
 			std::vector<Toolbar::ToolbarButton> toolButtons;
 			for (int i = 0; i < toolCount; i++) {
 				// A strip has no button: the tool it is the strip of stands for it.
-				if (!tools[i].tool->StripOf().empty())
+				if (!tools[i].traits.stripOf.empty())
 					continue;
 				Toolbar::ToolbarButton btn;
 				btn.id = tools[i].id;
@@ -3216,7 +3235,7 @@ namespace spades {
 				btn.hotKey = KeyIsTaken(tools[i].hotKey) ? std::string() : tools[i].hotKey;
 				btn.active = (activeTool == i) ||
 				             (activeTool >= 0 && activeTool < toolCount &&
-				              tools[activeTool].tool->StripOf() == tools[i].id);
+				              tools[activeTool].traits.stripOf == tools[i].id);
 				btn.enabled = ToolAvailable(i);
 				btn.group = tools[i].group;
 				toolButtons.push_back(btn);

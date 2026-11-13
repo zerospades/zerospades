@@ -38,17 +38,18 @@ namespace spades {
 			// whose action has no inverse (recolouring) says no, and the editor
 			// then keeps the right button from all of its sub-tools.
 			virtual bool RightButtonInverts() const { return true; }
+			// A voxel tool's sub-tools are voxel tools.
+			VoxelTool* SubTool(int) override { return nullptr; }
+			// Whether this is where voxels waiting to be placed (a paste, an
+			// import) are positioned: the editor goes to it when some arrive.
+			virtual bool PositionsPlacement() const { return false; }
 			// Whether the tool has anything to work on. One that has not is
 			// greyed out on the toolbar, its keys do nothing, and the editor
 			// leaves it for Select should it stop having any while active.
 			virtual bool Available(const IVoxelEditContext&) const { return true; }
-			// The id of the tool this one is the strip of, for a tool that has
-			// no button of its own on the toolbar: its sub-tools are offered
-			// on a strip under that tool's bar instead, while it has anything
-			// to work on, and that tool's button stays lit while it is active.
-			virtual std::string StripOf() const { return std::string(); }
-			// The commands the strip offers beside the sub-tools, good whether
-			// or not the tool is the active one; null for none.
+			// For a tool registered as another's strip (ToolTraits::stripOf): the
+			// commands the strip offers beside the sub-tools, good whether or
+			// not the tool is the active one; null for none.
 			virtual ToolOptions* StripCommands() { return nullptr; }
 			// Whether the view is an image being made rather than a model being
 			// worked on: the editor and its host then draw the model alone,

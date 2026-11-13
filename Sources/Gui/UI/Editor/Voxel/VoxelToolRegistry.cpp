@@ -41,6 +41,8 @@ namespace spades {
 			// And what makes something of the model without changing it.
 			constexpr int kOutputGroup = 3;
 
+			const char* const kSelectId = "select";
+
 			template <class T> VoxelToolRegistry::Factory Make() {
 				return [] { return std::unique_ptr<VoxelTool>(new T()); };
 			}
@@ -57,10 +59,14 @@ namespace spades {
 				// The keys lean on common editor conventions (Q select, B brush)
 				// and keep clear of the default WASD movement keys. Modify has
 				// neither a key nor a button: it is Select's strip, and each of
-				// its sub-tools has a key that works from any tool (T, E, R, C).
-				registry.Register(Make<SelectTool>(), "select", kSelectionGroup, "Q");
-				registry.Register(Make<ModifyTool>(), "modify", kSelectionGroup, "");
-				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B");
+				// its sub-tools has a key that works from any tool (T, E, R).
+				registry.Register(Make<SelectTool>(), kSelectId, kSelectionGroup, "Q",
+				                  {ToolRole::Selection, std::string()});
+				registry.Register(Make<ModifyTool>(), "modify", kSelectionGroup, "",
+				                  {ToolRole::None, kSelectId});
+				// Open on Draw, so the user can start at once.
+				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B",
+				                  {ToolRole::Initial, std::string()});
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
