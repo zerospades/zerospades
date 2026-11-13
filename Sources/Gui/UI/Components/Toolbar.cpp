@@ -20,6 +20,8 @@
 
 #include "Toolbar.h"
 
+#include "BarLayout.h"
+
 #include <algorithm>
 
 #include <Gui/OverlayPaint.h>
@@ -30,21 +32,16 @@
 
 namespace spades {
 	namespace gui {
-		// Layout constants
-		static const float kRibbonH = 24.0F;
-		static const float kToolbarH = 32.0F;
+		// Layout constants, beside the bars' shared ones
+		using namespace barlayout;
 		static const float kTbBtn = 84.0F;
 		// In a window too narrow for them the mode and tool buttons narrow, down
 		// to this, rather than run under Undo and Redo; one narrower than
 		// kTbBtnWithKey gives its hot key's place to its label.
 		static const float kTbBtnMin = 52.0F;
 		static const float kTbBtnWithKey = 72.0F;
-		static const float kTbH = 24.0F;
-		static const float kTbGap = 2.0F;
-		static const float kTbSep = 14.0F;
 		static const float kUndoBtnW = 50.0F;
 		static const float kSwatchW = 40.0F;
-		static const float kTbX0 = 12.0F;
 		static const float kTbY = kRibbonH + (kToolbarH - kTbH) * 0.5F;
 
 		Toolbar::Toolbar(client::IAudioDevice* audioDevice) : sounds(audioDevice) {}
