@@ -231,6 +231,20 @@ namespace spades {
 			/** Finalizes a scene. 2D drawing follows. */
 			virtual void EndScene() = 0;
 
+			/**
+			 * Finalizes a scene as EndScene does and hands back the picture of
+			 * it: the scene alone, as the renderer draws it, on the fog colour
+			 * wherever it drew nothing, and with none of the 2D layer over it.
+			 *
+			 * For whoever wants an image of a scene rather than a screenshot of
+			 * the window (`ReadBitmap`). The frame under way is spent on it:
+			 * nothing drawn before it in the frame is shown, and what follows
+			 * starts a frame afresh, so it is called before anything of the
+			 * frame to be shown is drawn. How a backend finishes a frame and
+			 * reads it back is its own business, and stays behind this.
+			 */
+			virtual Handle<Bitmap> EndSceneToBitmap() = 0;
+
 			virtual void MultiplyScreenColor(Vector3) = 0;
 
 			/** Sets color for image drawing. Deprecated because

@@ -835,16 +835,12 @@ namespace spades {
 			// The model alone, twice, on two backgrounds: what differs between
 			// the two pictures is background and what does not is the model,
 			// whatever the renderer's filters did to either (see LiftSubject).
-			// Each is a whole frame, finished and read back before the frame
-			// the user sees is begun: `FrameDone` is what makes the read-back
-			// a complete image, as for a screenshot.
+			// Each is a frame of its own, ahead of the one the user sees.
 			auto picture = [&](const Vector3& fog) {
 				renderer->SetFogColor(fog);
 				renderer->StartScene(sceneDef);
 				DrawSceneContents(true);
-				renderer->EndScene();
-				renderer->FrameDone();
-				return renderer->ReadBitmap();
+				return renderer->EndSceneToBitmap();
 			};
 			// No fog near enough to reach the model, or it would take on each
 			// background's colour with distance and read as part of it.

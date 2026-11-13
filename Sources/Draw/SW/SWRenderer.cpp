@@ -916,6 +916,13 @@ namespace spades {
 			return c;
 		}
 
+		Handle<Bitmap> SWRenderer::EndSceneToBitmap() {
+			// The scene is rasterized straight into the frame, over whatever it
+			// held, so the frame is the picture.
+			EndScene();
+			return ReadBitmap();
+		}
+
 		void SWRenderer::EndScene() {
 			EnsureInitialized();
 			EnsureSceneStarted();
