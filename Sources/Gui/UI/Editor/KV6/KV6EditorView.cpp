@@ -289,7 +289,7 @@ namespace spades {
 			});
 		}
 
-		std::vector<EditorMenuGroup> KV6EditorView::GetMenus() {
+		std::vector<MenuBarGroup> KV6EditorView::GetMenus() {
 			// A command edits behind whatever the active tool had in progress,
 			// as a shortcut does, so that is abandoned before it runs.
 			auto command = [this](std::function<void()> run) {
@@ -300,7 +300,7 @@ namespace spades {
 			};
 			const bool selected = editor->SelectionCount() > 0;
 
-			EditorMenuGroup file;
+			MenuBarGroup file;
 			file.title = "File";
 			file.items.push_back(MenuCommand("New Model", [this] { NewDocument(); }, true, CommandShortcut("N")));
 			file.items.push_back(
@@ -316,7 +316,7 @@ namespace spades {
 			file.items.push_back(MenuCommand(
 			  "Exit to Menu", [this] { ConfirmDiscardChanges([this] { wantsClose = true; }); }));
 
-			EditorMenuGroup edit;
+			MenuBarGroup edit;
 			edit.title = "Edit";
 			edit.items.push_back(
 			  MenuCommand("Undo", command([this] { editor->Undo(); }), editor->CanUndo(), CommandShortcut("Z")));
@@ -335,7 +335,7 @@ namespace spades {
 
 			// Which voxels are selected, apart from what is done with them: the
 			// Select tool's bar has the same three.
-			EditorMenuGroup select;
+			MenuBarGroup select;
 			select.title = "Select";
 			select.items.push_back(
 			  MenuCommand("All", command([this] { editor->SelectAll(); }), true, CommandShortcut("A")));
@@ -346,14 +346,14 @@ namespace spades {
 			  "Invert", command([this] { editor->InvertSelection(); }), true, CommandShortcut("I")));
 
 			// What the view does, which until now only its keys could ask for.
-			EditorMenuGroup view;
+			MenuBarGroup view;
 			view.title = "View";
 			view.items.push_back(
 			  MenuCommand("Reset View", [this] { ResetView(); }, true, kHomeViewKey));
 			view.items.push_back(MenuCommand("Frame Selection",
 			                                 [this] { ViewKey(kFrameSelectionKey); }, true,
 			                                 kFrameSelectionKey));
-			EditorMenuItem parallel = MenuCommand("Parallel Projection",
+			MenuBarItem parallel = MenuCommand("Parallel Projection",
 			                                      [this] { ToggleProjection(); }, true,
 			                                      kProjectionKey);
 			parallel.checked = cam.IsOrthogonal();

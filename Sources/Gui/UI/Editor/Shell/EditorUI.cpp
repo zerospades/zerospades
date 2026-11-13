@@ -31,9 +31,8 @@
 namespace spades {
 	namespace gui {
 		EditorUI::EditorUI(client::IRenderer* _renderer, client::IAudioDevice* _audioDevice,
-		                   client::FontManager* _fontManager, IEditorMenuHost& menuHost,
-		                   SoftwareCursor* cursor)
-		    : renderer(_renderer), audioDevice(_audioDevice), fontManager(_fontManager) {
+		                   client::FontManager* _fontManager, IMenuBarHost& menuHost,
+		                   SoftwareCursor* cursor) {
 			SPADES_MARK_FUNCTION();
 			try {
 				overlay = std::make_unique<UIOverlayHost>(*_renderer, _audioDevice, *_fontManager,
@@ -50,40 +49,5 @@ namespace spades {
 		}
 
 		EditorUI::~EditorUI() {}
-
-		ui::UIManager& EditorUI::GetUIManager() { return overlay->GetUIManager(); }
-
-		void EditorUI::MouseEvent(float x, float y) {
-			// Mouse events are not handled by EditorUI; the editor view routes them
-		}
-
-		void EditorUI::WheelEvent(float x, float y) {
-			// Wheel events are not handled by EditorUI; the editor view routes them
-		}
-
-		void EditorUI::KeyEvent(const std::string& key, bool down) {
-			// Key events are not handled by EditorUI; the editor view routes them
-		}
-
-		void EditorUI::TextInputEvent(const std::string& text) {
-			// Text input events are not handled by EditorUI; the editor view routes them
-		}
-
-		bool EditorUI::AcceptsTextInput() {
-			return false;
-		}
-
-		AABB2 EditorUI::GetTextInputRect() {
-			return AABB2();
-		}
-
-		void EditorUI::RunFrame(float dt) {
-			// UI components don't have per-frame updates needed yet
-		}
-
-		void EditorUI::Closing() {
-			SPADES_MARK_FUNCTION();
-			shouldClose = true;
-		}
 	} // namespace gui
 } // namespace spades

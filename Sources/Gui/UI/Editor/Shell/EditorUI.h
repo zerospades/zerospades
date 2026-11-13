@@ -26,14 +26,14 @@
 #include <Client/IAudioDevice.h>
 #include <Client/IRenderer.h>
 #include <Core/Math.h>
-#include <Gui/UI/Framework/IGameModeUI.h>
+#include <Core/RefCountedObject.h>
 #include <Gui/UI/Framework/UIManager.h>
 
 namespace spades {
 	namespace gui {
 		class ColorPicker;
 		class MenuBar;
-		class IEditorMenuHost;
+		class IMenuBarHost;
 		class OptionBar;
 		class SoftwareCursor;
 		class Toolbar;
@@ -45,10 +45,7 @@ namespace spades {
 		 * (the file browser) are shown in. It only owns them; the view lays them
 		 * out, draws them and routes input to them.
 		 */
-		class EditorUI : public IGameModeUI {
-			Handle<client::IRenderer> renderer;
-			Handle<client::IAudioDevice> audioDevice;
-			Handle<client::FontManager> fontManager;
+		class EditorUI : public RefCountedObject {
 			std::unique_ptr<UIOverlayHost> overlay;
 
 			std::unique_ptr<Toolbar> toolbar;
@@ -59,34 +56,14 @@ namespace spades {
 			std::unique_ptr<ColorPicker> colorPicker;
 			std::unique_ptr<MenuBar> menuBar;
 
-			bool shouldClose = false;
-
 		protected:
 			~EditorUI();
 
 		public:
 			/** `menuHost` supplies the menu bar's menus; it must outlive this. */
 			EditorUI(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
-			         client::FontManager* fontManager, IEditorMenuHost& menuHost,
+			         client::FontManager* fontManager, IMenuBarHost& menuHost,
 			         SoftwareCursor* cursor);
-
-			// IGameModeUI implementation
-			client::IRenderer* GetRenderer() override { return &*renderer; }
-			client::IAudioDevice* GetAudioDevice() override { return &*audioDevice; }
-			client::FontManager& GetFontManager() override { return *fontManager; }
-			ui::UIManager& GetUIManager() override;
-
-			void MouseEvent(float x, float y) override;
-			void WheelEvent(float x, float y) override;
-			void KeyEvent(const std::string& key, bool down) override;
-			void TextInputEvent(const std::string& text) override;
-			bool AcceptsTextInput() override;
-			AABB2 GetTextInputRect() override;
-			bool NeedsAbsoluteMouseCoordinate() override { return false; }
-
-			void RunFrame(float dt) override;
-			void Closing() override;
-			bool WantsToClose() override { return shouldClose; }
 
 			// The components, for the view that lays them out and drives them
 			Toolbar* GetToolbar() { return toolbar.get(); }
