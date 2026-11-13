@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+#include <Core/Math.h>
+
 #include "GLProgram.h"
 #include "GLProgramAttribute.h"
 #include "GLProgramUniform.h"
@@ -35,9 +37,6 @@ namespace spades {
 			GLRenderer& renderer;
 			IGLDevice& device;
 			GLImage* image;
-
-			float invScreenWidthFactored;
-			float invScreenHeightFactored;
 
 			GLProgram* program;
 
@@ -71,6 +70,10 @@ namespace spades {
 
 			void AddTriangle(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3,
                  float r, float g, float b, float a);
+
+			/** A triangle with one alpha-premultiplied colour per vertex. */
+			void AddShadedTriangle(const Vector2& p1, const Vector2& p2, const Vector2& p3,
+			                       const Vector4& c1, const Vector4& c2, const Vector4& c3);
 
 			void AddGradient(float dx1, float dy1, float dx2, float dy2,
                  float dx3, float dy3, float dx4, float dy4,

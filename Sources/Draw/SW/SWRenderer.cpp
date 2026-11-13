@@ -45,6 +45,13 @@ SPADES_SETTING(r_dlights);
 
 namespace spades {
 	namespace draw {
+		namespace {
+			// The depth of a pixel nothing has been drawn on: further than
+			// anything a scene holds, so whatever is drawn there is nearer, and
+			// fog, which goes by the depth, leaves it the fog's own colour.
+			constexpr float kNothingDrawnDepth = 1.0e10F;
+		} // namespace
+
 		SWRenderer::SWRenderer(Handle<SWPort> _port, SWFeatureLevel level)
 		    : featureLevel(level),
 		      port(std::move(_port)),
@@ -201,6 +208,25 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			projectionMatrix = sceneDef.ToOpenGLProjectionMatrix();
+			if (sceneDef.orthogonal) {
+				// Everything drawn here takes its depth from the projected Z and
+				// tests it as a distance along the view, which a frustum's is
+				// near enough and a box's, running from -1 to 1, is not. Make it
+				// that distance outright: the view looks down its own -Z.
+				projectionMatrix.m[2] = 0.0F;
+				projectionMatrix.m[6] = 0.0F;
+				projectionMatrix.m[10] = -1.0F;
+				projectionMatrix.m[14] = 0.0F;
+			}
+		}
+
+		Vector2 SWRenderer::ViewHalfExtent() const {
+			const float tanX = tanf(sceneDef.fovX * 0.5F);
+			const float tanY = tanf(sceneDef.fovY * 0.5F);
+			if (!sceneDef.orthogonal)
+				return MakeVector2(tanX, tanY);
+			const float halfHeight = sceneDef.orthoHeight * 0.5F;
+			return MakeVector2(halfHeight * (tanX / tanY), halfHeight);
 		}
 
 		void SWRenderer::BuildView() {
@@ -215,6 +241,22 @@ namespace spades {
 			frustrum[1] = frustrum[0].Flipped();
 			frustrum[0].w -= sceneDef.zNear;
 			frustrum[1].w += sceneDef.zFar;
+
+			if (sceneDef.orthogonal) {
+				// A box, not a pyramid: the sides are parallel to the line of
+				// sight and stand half the view's height and width out from it.
+				const Vector2 half = ViewHalfExtent();
+				const Vector3& side = sceneDef.viewAxis[0];
+				const Vector3& up = sceneDef.viewAxis[1];
+				frustrum[2] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - side * half.x, side);
+				frustrum[3] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + side * half.x, -side);
+				frustrum[4] = Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - up * half.y, up);
+				frustrum[5] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + up * half.y, -up);
+				return;
+			}
 
 			float xCos = cosf(sceneDef.fovX * 0.5F);
 			float xSin = sinf(sceneDef.fovX * 0.5F);
@@ -235,8 +277,12 @@ namespace spades {
 			int fw = this->fb->GetWidth();
 			int fh = this->fb->GetHeight();
 
-			float fovX = tanf(sceneDef.fovX * 0.5F);
-			float fovY = tanf(sceneDef.fovY * 0.5F);
+			// Across the view per unit of depth in a perspective view, and
+			// outright in a parallel one, where nothing spreads with distance.
+			const Vector2 half = ViewHalfExtent();
+			const bool spreads = !sceneDef.orthogonal;
+			float fovX = half.x;
+			float fovY = half.y;
 
 			float dvx = -fovX * 2.0F / static_cast<float>(fw);
 			float dvy = -fovY * 2.0F / static_cast<float>(fh);
@@ -297,8 +343,8 @@ namespace spades {
 						Vector3 pos;
 
 						pos.z = *db2;
-						pos.x = vx2 * pos.z;
-						pos.y = vy * pos.z;
+						pos.x = spreads ? vx2 * pos.z : vx2;
+						pos.y = spreads ? vy * pos.z : vy;
 
 						pos -= lightCenter;
 
@@ -417,8 +463,14 @@ namespace spades {
 					float vx = fovX;
 
 					for (int x = 0; x < fw; x += 4) {
-						float depthScale = (1.0F + vx * vx + vy * vy);
-						depthScale *= fastRSqrt(depthScale) * scale;
+						// The distance from the eye, which the depth along the view
+						// is short of off the view's middle; in a parallel
+						// projection there is no eye, and the depth is the distance.
+						float depthScale = scale;
+						if (!sceneDef.orthogonal) {
+							depthScale = (1.0F + vx * vx + vy * vy);
+							depthScale *= fastRSqrt(depthScale) * scale;
+						}
 						auto* fb2 = fb + x;
 						auto* db2 = db + x;
 						for (int by = 0; by < 4; by++) {
@@ -497,8 +549,14 @@ namespace spades {
 					float vx = fovX;
 
 					for (int x = 0; x < fw; x += 4) {
-						float depthScale = (1.0F + vx * vx + vy * vy);
-						depthScale *= fastRSqrt(depthScale) * scale;
+						// The distance from the eye, which the depth along the view
+						// is short of off the view's middle; in a parallel
+						// projection there is no eye, and the depth is the distance.
+						float depthScale = scale;
+						if (!sceneDef.orthogonal) {
+							depthScale = (1.0F + vx * vx + vy * vy);
+							depthScale *= fastRSqrt(depthScale) * scale;
+						}
 						auto depthScale4 = _mm_set1_ps(depthScale);
 
 						auto* fb2 = fb + x;
@@ -641,6 +699,13 @@ namespace spades {
 				light.minY = 0;
 				light.maxX = fb->GetWidth();
 				light.maxY = fb->GetHeight();
+			} else if (sceneDef.orthogonal) {
+				// The bounds below are a cone's from the eye, which a parallel
+				// view has none of: the whole screen, tested pixel by pixel.
+				light.minX = 0;
+				light.minY = 0;
+				light.maxX = fb->GetWidth();
+				light.maxY = fb->GetHeight();
 			} else if (Vector3::Dot(diff, sceneDef.viewAxis[2]) < 0.0F) {
 				// view plane cull
 				return;
@@ -750,10 +815,6 @@ namespace spades {
 		}
 
 		float SWRenderer::GetGlareVisibility(const Vector4& clip) {
-			// Without the world, nothing was drawn to be in front of it.
-			if (sceneDef.skipWorld)
-				return 1.0F;
-
 			const int fw = fb->GetWidth();
 			const int fh = fb->GetHeight();
 
@@ -827,6 +888,21 @@ namespace spades {
 			glares.clear();
 		}
 
+		void SWRenderer::AddImagePlane(client::IImage& image, Vector3 origin, Vector3 axisU,
+		                               Vector3 axisV) {
+			SPADES_MARK_FUNCTION();
+			EnsureInitialized();
+			EnsureSceneStarted();
+
+			planes.push_back(Plane());
+			auto& plane = planes.back();
+			plane.img = dynamic_cast<SWImage&>(image);
+			plane.origin = origin;
+			plane.axisU = axisU;
+			plane.axisV = axisV;
+			plane.color = drawColorAlphaPremultiplied;
+		}
+
 		static uint32_t ConvertColor32(Vector4 col) {
 			auto convertColor = [](float f) {
 				int i = static_cast<int>(f * 255.0F + 0.5F);
@@ -840,6 +916,13 @@ namespace spades {
 			return c;
 		}
 
+		Handle<Bitmap> SWRenderer::EndSceneToBitmap() {
+			// The scene is rasterized straight into the frame, over whatever it
+			// held, so the frame is the picture.
+			EndScene();
+			return ReadBitmap();
+		}
+
 		void SWRenderer::EndScene() {
 			EnsureInitialized();
 			EnsureSceneStarted();
@@ -849,15 +932,19 @@ namespace spades {
 			std::fill(px, px + fb->GetWidth() * fb->GetHeight(),
 				ConvertColor32(MakeVector4(fogColor.x, fogColor.y, fogColor.z, 1.0F)));
 
-			if (!sceneDef.skipWorld) {
-				// draw map
-				if (mapRenderer) {
-					// flat map renderer sends 'Update RLE' to map renderer.
-					// rendering map before this leads to the corrupted renderer image.
-					flatMapRenderer->Update();
-					mapRenderer->Render(sceneDef, *fb, depthBuffer.data());
-				}
+			// The map, which fills the depth buffer; where there is none to draw --
+			// a scene of models alone, as the model editor's -- nothing is nearer
+			// than anything yet.
+			if (!sceneDef.skipWorld && mapRenderer) {
+				// flat map renderer sends 'Update RLE' to map renderer.
+				// rendering map before this leads to the corrupted renderer image.
+				flatMapRenderer->Update();
+				mapRenderer->Render(sceneDef, *fb, depthBuffer.data());
+			} else {
+				std::fill(depthBuffer.begin(), depthBuffer.end(), kNothingDrawnDepth);
+			}
 
+			{
 				// draw models
 				for (const auto& m : models)
 					modelRenderer->Render(*m.model, m.param);
@@ -922,8 +1009,36 @@ namespace spades {
 						imageRenderer->DrawPolygon(spr.img.GetPointerOrNull(), v1, v2, v3);
 					}
 					sprites.clear();
+
+					// Image planes take the sprites' way: corners in the world,
+					// depth tested against what was drawn.
+					for (const auto& plane : planes) {
+						auto at = [&](float u, float v) {
+							const Vector3 p = plane.origin + plane.axisU * u + plane.axisV * v;
+							return MakeVector4(p.x, p.y, p.z, 1.0F);
+						};
+						const Vector2 uvMax = plane.img->GetUVScale();
+						SWImageRenderer::Vertex v1, v2, v3;
+						v1.color = v2.color = v3.color = plane.color;
+						v1.uv = MakeVector2(0, 0);
+						v1.position = at(0, 0);
+						v2.uv = MakeVector2(uvMax.x, 0);
+						v2.position = at(1, 0);
+						v3.uv = MakeVector2(0, uvMax.y);
+						v3.position = at(0, 1);
+						imageRenderer->DrawPolygon(plane.img.GetPointerOrNull(), v1, v2, v3);
+						v1.uv = MakeVector2(uvMax.x, 0);
+						v1.position = at(1, 0);
+						v2.uv = MakeVector2(uvMax.x, uvMax.y);
+						v2.position = at(1, 1);
+						v3.uv = MakeVector2(0, uvMax.y);
+						v3.position = at(0, 1);
+						imageRenderer->DrawPolygon(plane.img.GetPointerOrNull(), v1, v2, v3);
+					}
 				}
 			}
+			// Kept for one scene only, whether or not it drew the world.
+			planes.clear();
 
 			// render debug lines
 			{
@@ -931,14 +1046,28 @@ namespace spades {
 				float ch = fb->GetHeight() * 0.5F;
 				for (size_t i = 0; i < debugLines.size(); i++) {
 					auto& l = debugLines[i];
-					auto v1 = projectionViewMatrix * l.v1;
-					auto v2 = projectionViewMatrix * l.v2;
-					if (v1.z < 0.001f || v2.z < 0.001f)
-						continue;
 
 					// SWRenderer's depth value is based on view Z coord
-					float d1 = Vector3::Dot(l.v1 - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
-					float d2 = Vector3::Dot(l.v2 - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+					Vector3 a = l.v1, b = l.v2;
+					float d1 = Vector3::Dot(a - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+					float d2 = Vector3::Dot(b - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+
+					// A line reaching behind the view is cut where it comes into it,
+					// not left out: the ground grid of an editor is made of lines
+					// far longer than the view is deep.
+					const float nearest = std::max(sceneDef.zNear, 0.001F);
+					if (d1 < nearest && d2 < nearest)
+						continue;
+					if (d1 < nearest) {
+						a += (b - a) * ((nearest - d1) / (d2 - d1));
+						d1 = nearest;
+					} else if (d2 < nearest) {
+						b += (a - b) * ((nearest - d2) / (d1 - d2));
+						d2 = nearest;
+					}
+
+					auto v1 = projectionViewMatrix * a;
+					auto v2 = projectionViewMatrix * b;
 					d1 = fastRcp(d1);
 					d2 = fastRcp(d2);
 
@@ -962,8 +1091,7 @@ namespace spades {
 					if (x1 == x2 && y1 == y2) {
 						if (x1 >= 0 && y1 >= 0 && x1 < fw && y1 < fh) {
 							d1 = fastRcp(d1);
-							// skip depth check if world rendering is skipped
-							if (sceneDef.skipWorld || d1 < db[x1 + y1 * fw])
+							if (d1 < db[x1 + y1 * fw])
 								fb[x1 + y1 * fw] = col;
 						}
 						continue;
@@ -996,7 +1124,7 @@ namespace spades {
 							if (cy >= 0 && cy < fh) {
 								float d = fastRcp(depth);
 								// skip depth check if world rendering is skipped
-								if (sceneDef.skipWorld || d < db[fw * cy])
+								if (d < db[fw * cy])
 									fb[fw * cy] = col;
 							}
 							fract += dy;
@@ -1035,7 +1163,7 @@ namespace spades {
 							if (cx >= 0 && cx < fw) {
 								float d = fastRcp(depth);
 								// skip depth check if world rendering is skipped
-								if (sceneDef.skipWorld || d < db[cx])
+								if (d < db[cx])
 									fb[cx] = col;
 							}
 							fract += dx;
@@ -1187,6 +1315,26 @@ namespace spades {
 
 			SWImageRenderer::Vertex vtx0, vtx1, vtx2;
 			vtx0.color = vtx1.color = vtx2.color = col;
+			vtx0.position = MakeVector4(v0.x, v0.y, 1.0F, 1.0F);
+			vtx1.position = MakeVector4(v1.x, v1.y, 1.0F, 1.0F);
+			vtx2.position = MakeVector4(v2.x, v2.y, 1.0F, 1.0F);
+			vtx0.uv = vtx1.uv = vtx2.uv = MakeVector2(0.0F, 0.0F);
+
+			imageRenderer->DrawPolygon(whiteImage.GetPointerOrNull(), vtx0, vtx1, vtx2);
+		}
+		void SWRenderer::DrawShadedTriangle(const Vector2& v0, const Vector2& v1,
+		                                    const Vector2& v2, const Vector4& c0,
+		                                    const Vector4& c1, const Vector4& c2) {
+			SPADES_MARK_FUNCTION();
+
+			EnsureValid();
+			EnsureSceneNotStarted();
+
+			imageRenderer->SetShaderType(SWImageRenderer::ShaderType::Image);
+
+			// The rasterizer takes one colour per polygon, so use the average.
+			SWImageRenderer::Vertex vtx0, vtx1, vtx2;
+			vtx0.color = vtx1.color = vtx2.color = (c0 + c1 + c2) * (1.0F / 3.0F);
 			vtx0.position = MakeVector4(v0.x, v0.y, 1.0F, 1.0F);
 			vtx1.position = MakeVector4(v1.x, v1.y, 1.0F, 1.0F);
 			vtx2.position = MakeVector4(v2.x, v2.y, 1.0F, 1.0F);

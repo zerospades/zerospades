@@ -82,6 +82,36 @@ namespace spades {
 			ctx.ExecuteChecked();
 		}
 
+		ScriptIViewToolSkin2::ScriptIViewToolSkin2(asIScriptObject* obj) : obj(obj) {}
+
+		bool ScriptIViewToolSkin2::ImplementsInterface() {
+			return obj && obj->GetObjectType()->Implements(
+			                obj->GetEngine()->GetTypeInfoByName("IViewToolSkin2"));
+		}
+
+		void ScriptIViewToolSkin2::SetLeftHanded(bool v) {
+			SPADES_MARK_FUNCTION_DEBUG();
+			static ScriptFunction func("IViewToolSkin2", "void set_LeftHanded(bool)");
+			ScriptContextHandle ctx = func.Prepare();
+			int r;
+			r = ctx->SetObject((void*)obj);
+			ScriptManager::CheckError(r);
+			r = ctx->SetArgByte(0, v ? 1 : 0);
+			ScriptManager::CheckError(r);
+			ctx.ExecuteChecked();
+		}
+
+		Vector3 ScriptIViewToolSkin2::GetCaseEjectDirection() {
+			SPADES_MARK_FUNCTION_DEBUG();
+			static ScriptFunction func("IViewToolSkin2", "Vector3 get_CaseEjectDirection()");
+			ScriptContextHandle ctx = func.Prepare();
+			int r;
+			r = ctx->SetObject((void*)obj);
+			ScriptManager::CheckError(r);
+			ctx.ExecuteChecked();
+			return *reinterpret_cast<Vector3*>(ctx->GetReturnObject());
+		}
+
 		class IViewToolSkinRegistrar : public ScriptObjectRegistrar {
 		public:
 			IViewToolSkinRegistrar() : ScriptObjectRegistrar("IViewToolSkin") {}
@@ -92,6 +122,8 @@ namespace spades {
 				switch (phase) {
 					case PhaseObjectType:
 						r = eng->RegisterInterface("IViewToolSkin");
+						manager->CheckError(r);
+						r = eng->RegisterInterface("IViewToolSkin2");
 						manager->CheckError(r);
 						break;
 					case PhaseObjectMember:
@@ -104,6 +136,11 @@ namespace spades {
 						r = eng->RegisterInterfaceMethod("IViewToolSkin", "Vector3 get_RightHandPosition()");
 						manager->CheckError(r);
 						r = eng->RegisterInterfaceMethod("IViewToolSkin", "void Draw2D()");
+						manager->CheckError(r);
+						r = eng->RegisterInterfaceMethod("IViewToolSkin2", "void set_LeftHanded(bool)");
+						manager->CheckError(r);
+						r = eng->RegisterInterfaceMethod("IViewToolSkin2",
+						                                 "Vector3 get_CaseEjectDirection()");
 						manager->CheckError(r);
 						break;
 					default: break;
