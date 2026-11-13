@@ -39,6 +39,7 @@
 #include <Core/Settings.h>
 #include <Core/VoxelModel.h>
 #include <Gui/OverlayPaint.h>
+#include <Gui/UI/Components/BarLayout.h>
 #include <Gui/UI/Components/ColorPicker.h>
 #include <Gui/UI/Components/MenuBar.h>
 #include <Gui/UI/Components/Gizmo/GizmoCanvas.h>
@@ -70,9 +71,7 @@ namespace spades {
 			// Top UI bands (full width): the host's title ribbon, the toolbar and
 			// the option bar (the active tool's sub-tools). The viewport starts
 			// below them.
-			const float kRibbonH = 24.0F;
-			const float kToolbarH = 32.0F;
-			const float kSubBarH = 28.0F;
+			using namespace barlayout;
 			const float kBarsH = kRibbonH + kToolbarH + kSubBarH;
 
 			// Parts of a hint or help line; a line only ever breaks between them.

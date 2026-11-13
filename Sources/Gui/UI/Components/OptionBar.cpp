@@ -20,6 +20,8 @@
 
 #include "OptionBar.h"
 
+#include "BarLayout.h"
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -33,14 +35,8 @@
 
 namespace spades {
 	namespace gui {
-		// Layout constants
-		static const float kRibbonH = 24.0F;
-		static const float kToolbarH = 32.0F;
-		static const float kSubBarH = 28.0F;
-		static const float kTbH = 24.0F;
-		static const float kTbGap = 2.0F;
-		static const float kTbSep = 14.0F;
-		static const float kTbX0 = 12.0F;
+		// Layout constants, beside the bars' shared ones
+		using namespace barlayout;
 		// What a floating bar's panel keeps clear around its items.
 		static const float kFloatPad = 8.0F;
 		// A bar holding more than fits is scrolled: by the wheel, or by the
