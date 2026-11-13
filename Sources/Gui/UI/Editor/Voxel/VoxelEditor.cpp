@@ -2798,6 +2798,10 @@ namespace spades {
 				metaHeld = down;
 		}
 
+		bool VoxelEditor::IsCommandHeld() const {
+			return ctrlHeld || (MetaIsCommandModifier() && metaHeld);
+		}
+
 		bool VoxelEditor::IsEditShortcut(const std::string& key) {
 			for (const char* k : {"a", "i", "c", "x", "v", "z", "y"}) {
 				if (EqualsIgnoringCase(key, k))
@@ -3028,7 +3032,7 @@ namespace spades {
 		void VoxelEditor::ToolKey(const std::string& key, bool down) {
 			// Tool and sub-tool keys, shown on their buttons. Plain keys only, so
 			// a chord never switches tools.
-			if (down && !ctrlHeld && !altHeld && SwitchByHotKey(key))
+			if (down && !IsCommandHeld() && !altHeld && SwitchByHotKey(key))
 				return;
 
 			// Remaining keys go to the active tool (e.g. Select's [L]).
@@ -3169,8 +3173,8 @@ namespace spades {
 				help += (help.empty() ? std::string() : kHintSeparator) + part;
 			};
 			add("[Alt+LMB] pick colour");
-			add("[Ctrl+Z/Y] undo/redo");
-			add("[Ctrl+C/X/V] copy/cut/paste");
+			add("[" + CommandShortcut("Z/Y") + "] undo/redo");
+			add("[" + CommandShortcut("C/X/V") + "] copy/cut/paste");
 			const std::string deleteKey = cg_keyDelete;
 			if (!deleteKey.empty())
 				add("[" + deleteKey + "] delete selection");
