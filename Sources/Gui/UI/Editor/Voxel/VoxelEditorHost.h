@@ -70,6 +70,11 @@ namespace spades {
 				(void)transparent;
 			}
 
+			/** Where a bar floating over the top of the view must end, for a
+			 *  screen `screenWidth` wide: short of whatever the host stands in
+			 *  the view's top right corner (a navigation cube). */
+			virtual float ViewTopRightLimit(float screenWidth) const { return screenWidth; }
+
 			/** Keys the host acts on itself (the camera's, the screenshot key),
 			 *  which no tool may take as its hot key. */
 			virtual bool KeyIsReserved(const std::string& key) const = 0;

@@ -20,6 +20,8 @@
 
 #include "Toolbar.h"
 
+#include <algorithm>
+
 #include <Gui/OverlayPaint.h>
 #include <Gui/UIWidgetPainter.h>
 #include <Client/IRenderer.h>
@@ -32,6 +34,11 @@ namespace spades {
 		static const float kRibbonH = 24.0F;
 		static const float kToolbarH = 32.0F;
 		static const float kTbBtn = 84.0F;
+		// In a window too narrow for them the mode and tool buttons narrow, down
+		// to this, rather than run under Undo and Redo; one narrower than
+		// kTbBtnWithKey gives its hot key's place to its label.
+		static const float kTbBtnMin = 52.0F;
+		static const float kTbBtnWithKey = 72.0F;
 		static const float kTbH = 24.0F;
 		static const float kTbGap = 2.0F;
 		static const float kTbSep = 14.0F;
@@ -61,32 +68,52 @@ namespace spades {
 		}
 
 		std::vector<Toolbar::Slot> Toolbar::Layout(float screenWidth) const {
+			// Undo / Redo on the right edge
+			const float undoX = screenWidth - 12.0F - 2.0F * kUndoBtnW - kTbGap;
+
+			// What the buttons do not take: the separators and the swatch. The
+			// first tool is set apart from the modes, every later one from its
+			// predecessor when it starts another group, and the swatch, which
+			// belongs to no one tool, from them all.
+			auto separatedTool = [&](int i) {
+				return (i == 0) ? !modeButtons.empty()
+				                : toolButtons[i].group != toolButtons[i - 1].group;
+			};
+			const bool swatchSeparated = !modeButtons.empty() || !toolButtons.empty();
+			float fixed = 0.0F;
+			for (int i = 0; i < int(toolButtons.size()); i++)
+				fixed += separatedTool(i) ? kTbSep : 0.0F;
+			if (hasSwatch)
+				fixed += (swatchSeparated ? kTbSep : 0.0F) + kSwatchW + kTbGap;
+
+			// As wide as they are meant to be where there is room, and sharing
+			// what room there is where there is not.
+			const int buttons = int(modeButtons.size() + toolButtons.size());
+			float width = kTbBtn;
+			if (buttons > 0) {
+				const float room = undoX - kTbSep - kTbX0 - fixed;
+				width = std::max(kTbBtnMin, std::min(kTbBtn, room / float(buttons) - kTbGap));
+			}
+
 			std::vector<Slot> slots;
 			float x = kTbX0;
 			for (int i = 0; i < int(modeButtons.size()); i++) {
-				slots.push_back({Kind::Mode, i, x, kTbBtn, false});
-				x += kTbBtn + kTbGap;
+				slots.push_back({Kind::Mode, i, x, width, false});
+				x += width + kTbGap;
 			}
 			for (int i = 0; i < int(toolButtons.size()); i++) {
-				// The first tool is set apart from the modes, and every later one
-				// from its predecessor when it starts another group.
-				bool separator = (i == 0) ? !modeButtons.empty()
-				                          : toolButtons[i].group != toolButtons[i - 1].group;
+				const bool separator = separatedTool(i);
 				if (separator)
 					x += kTbSep;
-				slots.push_back({Kind::Tool, i, x, kTbBtn, separator});
-				x += kTbBtn + kTbGap;
+				slots.push_back({Kind::Tool, i, x, width, separator});
+				x += width + kTbGap;
 			}
 			if (hasSwatch) {
-				// Its own group: it belongs to no one tool.
-				const bool separator = !modeButtons.empty() || !toolButtons.empty();
-				if (separator)
+				if (swatchSeparated)
 					x += kTbSep;
-				slots.push_back({Kind::ColorSwatch, -1, x, kSwatchW, separator});
+				slots.push_back({Kind::ColorSwatch, -1, x, kSwatchW, swatchSeparated});
 				x += kSwatchW + kTbGap;
 			}
-			// Undo / Redo on the right edge
-			float undoX = screenWidth - 12.0F - 2.0F * kUndoBtnW - kTbGap;
 			slots.push_back({Kind::Undo, -1, undoX, kUndoBtnW, false});
 			slots.push_back({Kind::Redo, -1, undoX + kUndoBtnW + kTbGap, kUndoBtnW, false});
 			return slots;
@@ -188,12 +215,16 @@ namespace spades {
 					continue;
 				}
 
-				// A hot key takes the right edge, so the label moves left to make room.
+				// A hot key takes the right edge, so the label moves left to make
+				// room; a button narrowed for a small window shows the label alone.
+				const bool isHistory = slot.kind == Kind::Undo || slot.kind == Kind::Redo;
+				const std::string hotKey =
+				  (isHistory || slot.width >= kTbBtnWithKey) ? button.hotKey : std::string();
 				Vector2 labelAlign =
-				  button.hotKey.empty() ? MakeVector2(0.5F, 0.5F) : MakeVector2(0.0F, 0.5F);
+				  hotKey.empty() ? MakeVector2(0.5F, 0.5F) : MakeVector2(0.0F, 0.5F);
 				widgets::PaintButton(renderer, font, MakeVector2(slot.x, kTbY),
 				                     MakeVector2(slot.width, kTbH), button.label, labelAlign,
-				                     button.hotKey, MakeVector2(1.0F, 0.5F), button.enabled, hover,
+				                     hotKey, MakeVector2(1.0F, 0.5F), button.enabled, hover,
 				                     false, button.active, 1.0F);
 			}
 		}
