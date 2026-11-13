@@ -99,6 +99,7 @@ namespace spades {
 			// Open on the tool registered for it, or the first.
 			activeTool = std::max(0, ToolWithRole(ToolRole::Initial));
 			WireUI();
+			BuildPointerLayers();
 		}
 
 		VoxelEditor::~VoxelEditor() { SPADES_MARK_FUNCTION(); }

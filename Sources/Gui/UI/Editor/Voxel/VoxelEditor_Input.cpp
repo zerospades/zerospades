@@ -201,138 +201,190 @@ namespace spades {
 		}
 
 		void VoxelEditor::ButtonEvent(PointerButton button, bool down) {
-			const Vector2& at = cursor.GetPosition();
+			if (down)
+				OfferPress(pointerLayers, button, cursor.GetPosition());
+			else
+				OfferRelease(pointerLayers, button);
+		}
+
+		// What a press of a mouse button may land on, topmost first. A release
+		// reaches the tool only when its press did: presses the picker, the
+		// bars, the host's widgets or colour sampling took are none of the
+		// tool's business, and start no user action to end.
+		void VoxelEditor::BuildPointerLayers() {
+			const PointerButton left = PointerButton::Left;
+			const PointerButton right = PointerButton::Right;
+			auto onPanel = [this](const Vector2& at) { return PanelTarget() && OnPanel(at); };
 
 			// Every button is the open menu's while it is down. The left one
 			// has somewhere to land -- a command, a title -- and is answered
-			// below, where the pointer is; the others only put it away, and do
-			// nothing of what they would have done to the model behind it.
-			if (down && button != PointerButton::Left && ui.GetMenuBar()->IsOpen()) {
-				ui.GetMenuBar()->Close();
-				return;
-			}
+			// further down, where the pointer is; the others only put it away,
+			// and do nothing of what they would have done to the model behind.
+			pointerLayers.push_back(
+			  {"an open menu, any button but the left",
+			   [this, left](PointerButton button, const Vector2&) {
+				   if (button == left || !ui.GetMenuBar()->IsOpen())
+					   return false;
+				   ui.GetMenuBar()->Close();
+				   return true;
+			   },
+			   nullptr});
 
-			// A release reaches the tool only when its press did: presses the
-			// picker, the bars, the host's widgets or colour sampling took are
-			// none of the tool's business, and start no user action to end.
-			ITransformTarget* target = PanelTarget();
-			const bool onPanel = target && OnPanel(at);
-			// A number being typed is settled by a press anywhere but on its
-			// panel, which answers for its own fields.
-			if (down && !onPanel)
-				SettlePanel();
+			// Not a place a press lands on, but what any press does first: a
+			// number being typed is settled by a press anywhere but on what it
+			// is typed into, which answers for its own boxes.
+			pointerLayers.push_back(
+			  {"settling what is being typed",
+			   [this, left, onPanel](PointerButton button, const Vector2& at) {
+				   const bool panel = onPanel(at);
+				   if (!panel)
+					   SettlePanel();
+				   if (button != left)
+					   return false;
+				   if (panel || at.y < kRibbonH + kToolbarH || at.y >= BarsHeight())
+					   ui.GetOptionBar()->EndEditing(true);
+				   if (panel || !ui.GetContextStrip()->Contains(at))
+					   ui.GetContextStrip()->EndEditing(true);
+				   return false;
+			   },
+			   nullptr});
 
-			if (button == PointerButton::Left) {
-				if (!down && transformPanel->IsHolding()) {
-					if (target)
-						transformPanel->Release(*target, clock);
-					return;
-				}
-				if (down && onPanel) {
-					EndBarEdits(true);
-					transformPanel->Press(*target, at);
-					return;
-				}
-				if (!down) {
-					ui.GetColorPicker()->MouseUp();
-					if (pickerHeld)
-						EndPickerPress(true);
-					if (lmbHeld) {
-						lmbHeld = false;
-						DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Up));
-					}
-					return;
-				}
+			pointerLayers.push_back(
+			  {"the transform panel",
+			   [this, left, onPanel](PointerButton button, const Vector2& at) {
+				   if (!onPanel(at))
+					   return false;
+				   if (button == left)
+					   transformPanel->Press(*PanelTarget(), at);
+				   return true; // the other buttons have nothing to do on it
+			   },
+			   [this, left](PointerButton button) {
+				   if (button != left || !transformPanel->IsHolding())
+					   return false;
+				   if (ITransformTarget* target = PanelTarget())
+					   transformPanel->Release(*target, clock);
+				   return true;
+			   }});
 
-				// A number being typed into the sub-toolbar is settled by a press
-				// anywhere but on that bar, which answers for its own boxes.
-				if (at.y < kRibbonH + kToolbarH || at.y >= BarsHeight())
-					ui.GetOptionBar()->EndEditing(true);
-				if (!ui.GetContextStrip()->Contains(at))
-					ui.GetContextStrip()->EndEditing(true);
+			// A menu of the bar owns every press while it is down: on itself
+			// it picks a command, and anywhere else it closes and that is all
+			// that press does.
+			pointerLayers.push_back(
+			  {"an open menu",
+			   [this, left](PointerButton button, const Vector2& at) {
+				   return button == left && ui.GetMenuBar()->IsOpen() &&
+				          ui.GetMenuBar()->Click(at);
+			   },
+			   nullptr});
 
-				// A menu of the bar owns every press on itself and on its titles,
-				// and a press anywhere else puts it away before that press does
-				// whatever it does.
-				// A menu of the bar owns every press while it is down: on itself
-				// it picks a command, and anywhere else it closes and that is
-				// all that press does.
-				if (ui.GetMenuBar()->IsOpen() && ui.GetMenuBar()->Click(at))
-					return;
+			// The open picker owns every press on its panel, gaps included, so
+			// nothing behind it is ever edited through it.
+			pointerLayers.push_back(
+			  {"the colour picker",
+			   [this, left](PointerButton button, const Vector2& at) {
+				   if (!ui.GetColorPicker()->IsOverPicker(at))
+					   return false;
+				   if (button == left) {
+					   // The press is one user action, ended by its release, so a
+					   // drag across the colours undoes as one step, whatever it
+					   // recoloured.
+					   if (!rmbHeld)
+						   undo.BeginAction();
+					   pickerHeld = true;
+					   pickerChangedColor = false;
+					   ui.GetColorPicker()->MouseDown(at);
+				   }
+				   return true;
+			   },
+			   [this, left](PointerButton button) {
+				   if (button != left)
+					   return false;
+				   ui.GetColorPicker()->MouseUp();
+				   if (pickerHeld)
+					   EndPickerPress(true);
+				   return false;
+			   }});
 
+			// Over the bars, a click belongs to whichever button is under it
+			// (the callbacks wired in WireUI act on it), or to nothing.
+			pointerLayers.push_back(
+			  {"the bars",
+			   [this, left](PointerButton button, const Vector2& at) {
+				   if (at.y >= BarsHeight())
+					   return false;
+				   if (button != left)
+					   return true;
+				   if (ui.GetMenuBar()->Click(at)) {
+					   // A menu taking the keyboard means nothing may stay held
+					   // from before it was opened.
+					   ReleaseHeldInput();
+					   return true;
+				   }
+				   if (!ui.GetToolbar()->Click(at, screenWidth))
+					   ui.GetOptionBar()->Click(at);
+				   // Typing into a box means the keyboard is the box's now, so
+				   // nothing may stay held from before it was clicked.
+				   if (ui.GetOptionBar()->IsEditing())
+					   ReleaseHeldInput();
+				   return true;
+			   },
+			   nullptr});
 
-				// The open picker owns every press on its panel, gaps included, so
-				// nothing behind it is ever edited through it.
-				if (ui.GetColorPicker()->IsOverPicker(at)) {
-					// The press is one user action, ended by its release, so a drag
-					// across the colours undoes as one step, whatever it recoloured.
-					if (!rmbHeld)
-						undo.BeginAction();
-					pickerHeld = true;
-					pickerChangedColor = false;
-					ui.GetColorPicker()->MouseDown(at);
-					return;
-				}
+			// The strip floats over the viewport: a press on it is its own,
+			// button or not, and never reaches the model behind it.
+			pointerLayers.push_back(
+			  {"the strip",
+			   [this, left](PointerButton button, const Vector2& at) {
+				   if (!ui.GetContextStrip()->Contains(at))
+					   return false;
+				   if (button == left) {
+					   ui.GetContextStrip()->Click(at);
+					   if (ui.GetContextStrip()->IsEditing())
+						   ReleaseHeldInput();
+				   }
+				   return true;
+			   },
+			   nullptr});
 
-				// Over the bars, a click belongs to whichever button is under it
-				// (the callbacks wired in WireUI act on it), or to nothing.
-				if (at.y < BarsHeight()) {
-					if (ui.GetMenuBar()->Click(at)) {
-						// A menu taking the keyboard means nothing may stay held
-						// from before it was opened.
-						ReleaseHeldInput();
-						return;
-					}
-					if (!ui.GetToolbar()->Click(at, screenWidth))
-						ui.GetOptionBar()->Click(at);
-					// Typing into a box means the keyboard is the box's now, so
-					// nothing may stay held from before it was clicked.
-					if (ui.GetOptionBar()->IsEditing())
-						ReleaseHeldInput();
-					return;
-				}
+			pointerLayers.push_back(
+			  {"the host's widgets on the view",
+			   [this, left](PointerButton button, const Vector2& at) {
+				   return button == left && host.ClickViewportWidget(at);
+			   },
+			   nullptr});
 
-				// The strip floats over the viewport: a press on it is its own,
-				// button or not, and never reaches the model behind it.
-				if (ui.GetContextStrip()->Contains(at)) {
-					ui.GetContextStrip()->Click(at);
-					if (ui.GetContextStrip()->IsEditing())
-						ReleaseHeldInput();
-					return;
-				}
+			// Sampling a colour works the same in every tool, which never sees
+			// the click.
+			pointerLayers.push_back(
+			  {"sampling a colour",
+			   [this, left](PointerButton button, const Vector2&) {
+				   if (button != left || !SamplingArmed())
+					   return false;
+				   SampleColor();
+				   return true;
+			   },
+			   nullptr});
 
-				if (host.ClickViewportWidget(at))
-					return;
-
-				// Sampling a colour works the same in every tool, which never sees
-				// the click.
-				if (SamplingArmed()) {
-					SampleColor();
-					return;
-				}
-
-				lmbHeld = true;
-				DispatchPointer(MakePointer(PointerButton::Left, PointerPhase::Down));
-				return;
-			}
-
-			if (button == PointerButton::Right) {
-				if (down && onPanel)
-					return; // nothing to do on it
-				if (!down) {
-					if (rmbHeld) {
-						rmbHeld = false;
-						DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Up));
-					}
-					return;
-				}
-				// Not over the colour picker or the bars.
-				if (ui.GetColorPicker()->IsOverPicker(at) || at.y < BarsHeight() ||
-				    ui.GetContextStrip()->Contains(at))
-					return;
-				rmbHeld = true;
-				DispatchPointer(MakePointer(PointerButton::Right, PointerPhase::Down));
-			}
+			pointerLayers.push_back(
+			  {"the active tool",
+			   [this, left, right](PointerButton button, const Vector2&) {
+				   if (button == left)
+					   lmbHeld = true;
+				   else if (button == right)
+					   rmbHeld = true;
+				   else
+					   return false;
+				   DispatchPointer(MakePointer(button, PointerPhase::Down));
+				   return true;
+			   },
+			   [this, left, right](PointerButton button) {
+				   bool& held = button == left ? lmbHeld : rmbHeld;
+				   if ((button != left && button != right) || !held)
+					   return false;
+				   held = false;
+				   DispatchPointer(MakePointer(button, PointerPhase::Up));
+				   return true;
+			   }});
 		}
 
 		bool VoxelEditor::WheelOverBars(float delta) {

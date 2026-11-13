@@ -29,6 +29,7 @@
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+#include <Gui/UI/Editor/Shell/InputLayers.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 #include <Gui/UI/Editor/Shell/ToolOptions.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
@@ -353,6 +354,10 @@ namespace spades {
 			int BarToolIndex() const;
 			/** Wires `bar`'s clicks to the tool `indexOf` names when they land. */
 			void WireBar(OptionBar& bar, std::function<int()> indexOf);
+			/** What a press of a mouse button may land on, topmost first (see
+			 *  InputLayers.h); built once, by BuildPointerLayers. */
+			std::vector<PointerLayer> pointerLayers;
+			void BuildPointerLayers();
 			/** The colour the picker and the swatch show and set: the brush's,
 			 *  unless the active tool has one of its own for them. */
 			/** The colour the picker and the swatch show: the active tool's

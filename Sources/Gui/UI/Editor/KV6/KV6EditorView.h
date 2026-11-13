@@ -33,6 +33,7 @@
 #include <Core/RefCountedObject.h>
 #include <Gui/DocumentTypes.h>
 #include <Gui/UI/Components/MenuBarItems.h>
+#include <Gui/UI/Editor/Shell/InputLayers.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/UI/Editor/Shell/EditorCamera.h>
@@ -152,6 +153,14 @@ namespace spades {
 			// Home flies back to the view the model opened with, F frames the
 			// selection (or the model); true when `key` was one of them.
 			bool ViewKey(const std::string& key);
+			// What a key goes to, topmost first (see InputLayers.h); built once.
+			std::vector<KeyLayer> keyLayers;
+			void BuildKeyLayers();
+			// A command's shortcut, the modifier for one being held; false for
+			// a key that is none.
+			bool CommandShortcutKey(const std::string& key);
+			// The mouse's buttons, which arrive as keys; false for any other.
+			bool MouseButtonKey(const std::string& key, bool down);
 			// The camera's scene for the full screen, lit and outlined for editing.
 			client::SceneDefinition SetupScene(float width, float height);
 
