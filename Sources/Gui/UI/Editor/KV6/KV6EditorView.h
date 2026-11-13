@@ -32,7 +32,7 @@
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 #include <Gui/DocumentTypes.h>
-#include <Gui/UI/Components/EditorMenu.h>
+#include <Gui/UI/Components/MenuBarItems.h>
 #include <Gui/UI/Components/FileBrowser/FileBrowserTypes.h>
 #include <Gui/UI/Components/SoftwareCursor.h>
 #include <Gui/UI/Editor/Shell/EditorCamera.h>
@@ -62,7 +62,7 @@ namespace spades {
 		 * insert). It consumes relative mouse motion and draws a software cursor
 		 * for the 2D UI (which may be shared across views).
 		 */
-		class KV6EditorView : public View, public IVoxelEditorHost, public IEditorMenuHost {
+		class KV6EditorView : public View, public IVoxelEditorHost, public IMenuBarHost {
 		public:
 			KV6EditorView(client::IRenderer* renderer, client::IAudioDevice* audioDevice,
 			              client::FontManager* fontManager, SoftwareCursor* cursor,
@@ -169,11 +169,11 @@ namespace spades {
 			// The keys the view handles itself, for the help line.
 			std::string HelpLine() const;
 
-			// --- IEditorMenuHost ---
+			// --- IMenuBarHost ---
 			/** File, Edit and View, for the bar along the ribbon: everything
 			 *  this editor can be told to do that is a command rather than a
 			 *  way of working, with the key that does the same beside it. */
-			std::vector<EditorMenuGroup> GetMenus() override;
+			std::vector<MenuBarGroup> GetMenus() override;
 
 			// --- Document commands behind the menu items ---
 			std::string GetDocumentExtension() const { return DefaultExtension(DocumentKind::Model); }

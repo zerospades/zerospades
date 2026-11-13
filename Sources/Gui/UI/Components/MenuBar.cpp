@@ -48,7 +48,7 @@ namespace spades {
 			constexpr float kTickSize = 3.0F;
 		} // namespace
 
-		MenuBar::MenuBar(IEditorMenuHost& host, client::IAudioDevice* audioDevice)
+		MenuBar::MenuBar(IMenuBarHost& host, client::IAudioDevice* audioDevice)
 		    : host(host), sounds(audioDevice) {}
 
 		float MenuBar::Layout(client::IFont& font, float x, float height) {
@@ -63,7 +63,7 @@ namespace spades {
 			titleX.clear();
 			titleW.clear();
 			float at = x;
-			for (const EditorMenuGroup& menu : menus) {
+			for (const MenuBarGroup& menu : menus) {
 				const float w = font.Measure(menu.title).x * kTitleScale + kTitlePad * 2.0F;
 				titleX.push_back(at);
 				titleW.push_back(w);
@@ -79,7 +79,7 @@ namespace spades {
 			for (std::size_t i = 0; i < menus.size(); i++) {
 				float widest = kMenuMinW;
 				float tall = kMenuPadY * 2.0F;
-				for (const EditorMenuItem& item : menus[i].items) {
+				for (const MenuBarItem& item : menus[i].items) {
 					tall += item.separator ? kRuleH : kRowH;
 					if (item.separator)
 						continue;
@@ -142,7 +142,7 @@ namespace spades {
 			if (!IsOpen() || !OverlayInRect(p, menuX, menuY, menuW, menuH))
 				return -1;
 			float y = menuY + kMenuPadY;
-			const std::vector<EditorMenuItem>& items = menus[std::size_t(open)].items;
+			const std::vector<MenuBarItem>& items = menus[std::size_t(open)].items;
 			for (std::size_t i = 0; i < items.size(); i++) {
 				const float h = items[i].separator ? kRuleH : kRowH;
 				if (!items[i].separator && p.y >= y && p.y < y + h)
@@ -203,7 +203,7 @@ namespace spades {
 		}
 
 		int MenuBar::Step(int from, int by) const {
-			const std::vector<EditorMenuItem>& items = menus[std::size_t(open)].items;
+			const std::vector<MenuBarItem>& items = menus[std::size_t(open)].items;
 			const int count = int(items.size());
 			if (count == 0)
 				return -1;
@@ -292,10 +292,10 @@ namespace spades {
 				selected = under;
 
 			EditorTheme::PaintPanel(renderer, menuX, menuY, menuW, menuH);
-			const std::vector<EditorMenuItem>& items = menus[std::size_t(open)].items;
+			const std::vector<MenuBarItem>& items = menus[std::size_t(open)].items;
 			float y = menuY + kMenuPadY;
 			for (std::size_t i = 0; i < items.size(); i++) {
-				const EditorMenuItem& item = items[i];
+				const MenuBarItem& item = items[i];
 				if (item.separator) {
 					OverlayColorNP(renderer, EditorTheme::Separator());
 					OverlayFillRect(renderer, menuX + kRowPadX * 0.5F, y + (kRuleH - 1.0F) * 0.5F,

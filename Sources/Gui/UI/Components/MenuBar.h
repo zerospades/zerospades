@@ -26,7 +26,7 @@
 #include <Core/Math.h>
 #include <Gui/UI/Framework/FeedbackSounds.h>
 
-#include "EditorMenu.h"
+#include "MenuBarItems.h"
 
 namespace spades {
 	namespace client {
@@ -56,7 +56,7 @@ namespace spades {
 		 */
 		class MenuBar {
 		public:
-			MenuBar(IEditorMenuHost& host, client::IAudioDevice* audioDevice = nullptr);
+			MenuBar(IMenuBarHost& host, client::IAudioDevice* audioDevice = nullptr);
 
 			/** Places the titles from `x` along a ribbon `height` tall, and
 			 *  answers how wide they came to: what the ribbon may use next. */
@@ -84,10 +84,10 @@ namespace spades {
 			                  const Vector2& cursor);
 
 		private:
-			IEditorMenuHost& host;
+			IMenuBarHost& host;
 			ui::FeedbackSounds sounds;
 
-			std::vector<EditorMenuGroup> menus; // as the host last gave them
+			std::vector<MenuBarGroup> menus; // as the host last gave them
 			bool asked = false;                 // whether it has ever been asked
 			std::vector<float> titleX, titleW;  // where Layout put each title
 			float barH = 0.0F, width = 0.0F;
