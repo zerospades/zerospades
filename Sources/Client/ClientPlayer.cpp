@@ -233,6 +233,10 @@ namespace spades {
 			}
 
 			void EndScene() { OnProhibitedAction(); }
+			Handle<Bitmap> EndSceneToBitmap() {
+				OnProhibitedAction();
+				return {};
+			}
 
 			void MultiplyScreenColor(Vector3) { OnProhibitedAction(); }
 

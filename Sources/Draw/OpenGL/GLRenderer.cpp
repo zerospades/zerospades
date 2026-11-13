@@ -915,6 +915,14 @@ namespace spades {
 			device->Enable(IGLDevice::CullFace, false);
 		}
 
+		Handle<Bitmap> GLRenderer::EndSceneToBitmap() {
+			// The scene is drawn into the frame as any is; finishing the frame
+			// brings it, filtered, to where `ReadBitmap` reads from.
+			EndScene();
+			FrameDone();
+			return ReadBitmap();
+		}
+
 		void GLRenderer::EndScene() {
 			SPADES_MARK_FUNCTION();
 

@@ -249,6 +249,7 @@ namespace spades {
 			                   Vector3 axisV) override;
 
 			void EndScene() override;
+			Handle<Bitmap> EndSceneToBitmap() override;
 
 			void MultiplyScreenColor(Vector3) override;
 
