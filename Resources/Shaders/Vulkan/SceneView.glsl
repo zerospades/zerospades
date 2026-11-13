@@ -37,7 +37,9 @@ layout(set = 3, binding = 0, std140) uniform SceneView {
 	// xyz: towards the sun
 	vec4 sunDirection;
 	// x: 1 where the view's screen-space ambient occlusion (r_ssao) is to be read,
-	// 0 where there is none; y: 1 in the water's reflection, 0 in the main view
+	// 0 where there is none; y: 1 in the water's reflection, 0 in the main view;
+	// z: 1 where models are lit from every direction at once (the model editor,
+	// SceneDefinition::flatModelLighting), 0 where the sun lights them
 	vec4 options;
 } sceneView;
 

@@ -61,7 +61,7 @@ layout(set = 0, binding = 2) uniform usampler2D stencilTexture;
 const uint kStencilBitNoOutline = 2u;
 
 layout(push_constant) uniform Params {
-    vec4 invViewport;            // xy = 1/screen, zw reserved
+    vec4 invViewport;            // xy = 1/screen, z = 1 in a parallel projection, w reserved
     vec4 zNearFarFogStrength;    // x = zNear, y = zFar, z = fogDistance, w = strength
     vec4 thresholds;             // x = relative threshold (fraction of centre depth)
 } pc;
@@ -69,8 +69,10 @@ layout(push_constant) uniform Params {
 float linearise(float z) {
     float n = pc.zNearFarFogStrength.x;
     float f = pc.zNearFarFogStrength.y;
-    // Vulkan: ndc.z = z ∈ [0,1]. Inverse of the standard z-mapping.
-    return (n * f) / (f - z * (f - n));
+    // Vulkan: ndc.z = z ∈ [0,1]. Inverse of the standard z-mapping: a frustum
+    // writes the reciprocal of the depth, the box of a parallel projection
+    // (SceneDefinition::orthogonal) the depth itself.
+    return mix((n * f) / (f - z * (f - n)), mix(n, f, z), pc.invViewport.z);
 }
 
 void main() {

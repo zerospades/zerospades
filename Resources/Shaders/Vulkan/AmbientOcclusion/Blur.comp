@@ -40,6 +40,8 @@ layout(push_constant) uniform Params {
 	ivec2 axis;
 	// Depth texels per source texel: 1 or 2
 	int sourceScale;
+	// 1 for a perspective view, 0 for a parallel one
+	float perspective;
 } params;
 
 void main() {
@@ -77,8 +79,8 @@ void main() {
 		sourceTexel = clamp(sourceTexel, ivec2(0), sourceLast);
 
 		float offset = float(dot(depthTexel - p, params.axis));
-		float planeDistance = LinearDepth(centerRaw + slope * offset, params.zNearFar);
-		float tapDistance = LinearDepth(DepthTexel(depthTexture, depthTexel), params.zNearFar);
+		float planeDistance = LinearDepth(centerRaw + slope * offset, params.zNearFar, params.perspective);
+		float tapDistance = LinearDepth(DepthTexel(depthTexture, depthTexel), params.zNearFar, params.perspective);
 
 		float depthDifference = (tapDistance - planeDistance) * 8.0;
 		float weight = exp2(-depthDifference * depthDifference - offset * offset * 0.2);

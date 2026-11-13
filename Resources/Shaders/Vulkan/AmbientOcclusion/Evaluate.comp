@@ -40,12 +40,16 @@ layout(set = 0, binding = 1, r32f) uniform writeonly image2D occlusion;
 
 layout(push_constant) uniform Params {
 	vec2 zNearFar;
-	// tan of the half field of view, horizontally and vertically
+	// tan of the half field of view, horizontally and vertically; in a parallel
+	// projection, half the view's width and height
 	vec2 tanHalfFov;
 	// The taps' first step, in depth texels (GL: 0.18% of the smaller side)
 	float sampleRadius;
 	// Depth texels per occlusion texel: 1 or 2
 	int scale;
+	// 1 for a perspective view, 0 for a parallel one, where `tanHalfFov` is the
+	// view's own half-extent: nothing spreads with distance there
+	float perspective;
 } params;
 
 // GL's 4x4 dither pattern (Gfx/DitherPattern4x4.png), by row
@@ -64,11 +68,11 @@ float Dither(ivec2 p) {
 vec3 ViewPosition(vec2 texel, float distance) {
 	vec2 uv = texel / vec2(textureSize(depthTexture, 0));
 	vec2 ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-	return vec3(ndc * params.tanHalfFov * distance, -distance);
+	return vec3(ndc * params.tanHalfFov * mix(1.0, distance, params.perspective), -distance);
 }
 
 vec3 ViewPositionAt(ivec2 texel) {
-	float distance = LinearDepth(DepthTexel(depthTexture, texel), params.zNearFar);
+	float distance = LinearDepth(DepthTexel(depthTexture, texel), params.zNearFar, params.perspective);
 	return ViewPosition(vec2(texel) + 0.5, distance);
 }
 
@@ -92,7 +96,7 @@ void main() {
 		imageStore(occlusion, p, vec4(1.0));
 		return;
 	}
-	float originDistance = LinearDepth(originRaw, params.zNearFar);
+	float originDistance = LinearDepth(originRaw, params.zNearFar, params.perspective);
 	vec3 originPosition = ViewPosition(vec2(origin) + 0.5, originDistance);
 
 	vec3 normal = normalize(cross(SurfaceStep(origin, ivec2(1, 0), originPosition),
@@ -120,7 +124,7 @@ void main() {
 		vec2 tap = vec2(origin) + 0.5 + sampleDir * (sampleDistance * params.sampleRadius);
 		// A little behind what is there, as GL's
 		float tapDistance =
-		  LinearDepth(DepthTexel(depthTexture, ivec2(floor(tap))), params.zNearFar) + 0.1;
+		  LinearDepth(DepthTexel(depthTexture, ivec2(floor(tap))), params.zNearFar, params.perspective) + 0.1;
 		vec3 toTap = normalize(ViewPosition(tap, tapDistance) - originPosition);
 		float cosHorizon = dot(toTap, normal);
 		float depthDecay = exp2(-2.0 * abs(tapDistance - originDistance));

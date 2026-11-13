@@ -91,9 +91,20 @@ namespace spades {
 				std::vector<Handle<VulkanImage>> images;
 			};
 
+			/** An image laid flat (see `IRenderer::AddImagePlane`) */
+			struct Plane {
+				VulkanImage* image;
+				Vector3 origin, axisU, axisV;
+				Vector4 color;
+			};
+
 			VulkanRenderer& renderer;
 			Handle<gui::SDLVulkanDevice> device;
 			std::vector<Sprite> sprites;
+			std::vector<Plane> planes;
+
+			/** The colour as this pass blends it, linear as GL's is in HDR */
+			static Vector4 PassColor(Vector4 color);
 
 			// Built anew every frame, kept not to allocate them again
 			std::vector<Vertex> vertices;
@@ -130,6 +141,11 @@ namespace spades {
 			}
 
 			void Add(VulkanImage* img, Vector3 p1, Vector3 p2, float rad, Vector4 color);
+			/** An image laid flat in the scene, drawn with the long sprites as GL
+			 * draws it: the same program takes world-space corners, in the same
+			 * blended, depth-tested pass. */
+			void AddPlane(VulkanImage* img, Vector3 origin, Vector3 axisU, Vector3 axisV,
+			              Vector4 color);
 			void Clear();
 
 			/** Records the sprites added since the last `Clear` into the render pass

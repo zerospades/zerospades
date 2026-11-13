@@ -43,7 +43,7 @@ namespace spades {
 		// Push constants. Matches CavityOutline.vk.fs layout exactly.
 		// 16 + 16 + 16 = 48 bytes (three vec4 slots).
 		struct CavityPushConstants {
-			float invViewport[4];           // [0..15]  xy = 1/screen, zw reserved
+			float invViewport[4];           // [0..15]  xy = 1/screen, z = parallel projection
 			float zNearFarFogStrength[4];   // [16..31] x=zNear, y=zFar, z=fogDistance, w=strength
 			float thresholds[4];            // [32..47] x=relative depth threshold
 		};
@@ -355,7 +355,8 @@ namespace spades {
 
 			pc.invViewport[0] = 1.0F / static_cast<float>(rw);
 			pc.invViewport[1] = 1.0F / static_cast<float>(rh);
-			pc.invViewport[2] = 0.0F;
+			// How the depth is to be read back: see `linearise` in the shader
+			pc.invViewport[2] = def.orthogonal ? 1.0F : 0.0F;
 			pc.invViewport[3] = 0.0F;
 
 			pc.zNearFarFogStrength[0] = def.zNear;
