@@ -25,13 +25,15 @@
 
 namespace spades {
 	namespace gui {
+		class IVoxelSelection;
+
 		// Select voxels: Voxel (single), Box (box region), By Colour, Cylinder,
 		// Plane (a flat face), and on the screen Rect and Brush. It only ever
 		// changes which voxels are selected -- its bar ends with All, None and
 		// Invert -- and what is then done with them is Modify's.
 		/** What a colour chosen on the picker does while voxels are selected:
 		 *  recolours them, shown as it is chosen and kept once it is. */
-		void RecolourSelectionAsChosen(IVoxelEditContext& ed, std::uint32_t color, bool committed);
+		void RecolourSelectionAsChosen(IVoxelSelection& ed, std::uint32_t color, bool committed);
 
 		class SelectTool : public ContainerTool {
 		public:

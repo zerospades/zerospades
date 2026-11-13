@@ -19,6 +19,7 @@
  */
 
 #include "BrushTool.h"
+#include "VoxelEditContext.h"
 #include "MirrorTool.h"
 
 namespace spades {

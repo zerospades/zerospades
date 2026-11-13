@@ -24,6 +24,8 @@
 
 namespace spades {
 	namespace gui {
+		class IVoxelMirror;
+
 		/**
 		 * The X/Y/Z mirror toggles, grouped under "Mirror".
 		 *
@@ -32,9 +34,9 @@ namespace spades {
 		 * mirror state: sync them in UpdateOptions and route their clicks here.
 		 */
 		void AddMirrorToggles(ToolOptions& options);
-		void SyncMirrorToggles(ToolOptions& options, IVoxelEditContext& ed);
+		void SyncMirrorToggles(ToolOptions& options, IVoxelMirror& ed);
 		/** Applies a clicked toggle to the editor; false if `id` is not one of them. */
-		bool ApplyMirrorToggle(IVoxelEditContext& ed, const std::string& id, bool value);
+		bool ApplyMirrorToggle(IVoxelMirror& ed, const std::string& id, bool value);
 
 		/**
 		 * The UI over the editor's mirror state: which axes reflect, and where the
