@@ -103,6 +103,15 @@ namespace spades {
 			 * including the ones over the viewport.
 			 */
 			bool Click(const Vector2& p);
+			/**
+			 * A turn of the wheel over the bar scrolls it, where it holds more
+			 * than fits its width; false when `p` is not on it or everything
+			 * fits, and the wheel is someone else's.
+			 */
+			bool Wheel(const Vector2& p, float delta);
+			/** `screenWidth` is where the bar ends on the right: the window's
+			 *  edge, or short of it for a bar with something standing beside
+			 *  it. What does not fit is scrolled to (see Wheel). */
 			void Draw(client::IRenderer& renderer, client::FontManager& fontManager,
 			         const Vector2& cursorPos, bool menuActive, float screenWidth);
 
@@ -149,6 +158,8 @@ namespace spades {
 			// Where a Number option's parts went, so a click can tell the box
 			// from the arrows. Both arrows share one column, splitting the bar's
 			// button height between them.
+			Span scrollArrows[2] = {{0.0F, 0.0F}, {0.0F, 0.0F}};
+
 			struct NumberSpans {
 				Span box{0.0F, 0.0F};
 				Span arrows{0.0F, 0.0F};
@@ -159,6 +170,12 @@ namespace spades {
 			const float btnY;  // top of the buttons in it
 			const bool floating;
 			float drawnExtent = 0.0F; // where the last frame's items ended
+			// Scrolling, for a bar holding more than fits: how far, the width
+			// of what it holds and of what shows as last drawn, and where the
+			// arrow at either end went (no width for none).
+			float scrollX = 0.0F;
+			float contentWidth = 0.0F;
+			float visibleWidth = 0.0F;
 			const void* owner = nullptr;
 			std::vector<SubToolButton> subToolButtons;
 			std::vector<Option> options;

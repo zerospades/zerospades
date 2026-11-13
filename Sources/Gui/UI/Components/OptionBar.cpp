@@ -43,6 +43,10 @@ namespace spades {
 		static const float kTbX0 = 12.0F;
 		// What a floating bar's panel keeps clear around its items.
 		static const float kFloatPad = 8.0F;
+		// A bar holding more than fits is scrolled: by the wheel, or by the
+		// arrow it shows at either end that has more beyond it.
+		static const float kScrollArrowW = 18.0F;
+		static const float kWheelStep = 48.0F;
 		// A sub-tool button holds its label and, on its right, its key. Narrow
 		// ones (an axis letter) still read as buttons at the minimum.
 		static const float kSubBtnMin = 52.0F;
@@ -78,6 +82,13 @@ namespace spades {
 		      bandY(kRibbonH + kToolbarH + float(row) * kSubBarH),
 		      btnY(bandY + (kSubBarH - kTbH) * 0.5F),
 		      floating(floating) {}
+
+		bool OptionBar::Wheel(const Vector2& p, float delta) {
+			if (!Contains(p) || contentWidth <= visibleWidth)
+				return false;
+			scrollX -= delta * kWheelStep; // held to the content when next drawn
+			return true;
+		}
 
 		bool OptionBar::Contains(const Vector2& p) const {
 			if (!floating)
@@ -169,6 +180,16 @@ namespace spades {
 				// edit belongs to that owner too, so it goes with it.
 				EndEditing(true);
 				return false;
+			}
+			// The arrows of a bar holding more than fits, a page at a time.
+			for (int end = 0; end < 2; end++) {
+				const Span& arrow = scrollArrows[end];
+				if (arrow.width > 0.0F && OverlayInRect(p, arrow.x, btnY, arrow.width, kTbH)) {
+					EndEditing(true);
+					scrollX += (end == 0 ? -0.6F : 0.6F) * visibleWidth;
+					sounds.Activate();
+					return true;
+				}
 			}
 			// A press on a number box or its arrows, before anything else: the
 			// box sits inside an option's span, so the generic pass below would
@@ -324,10 +345,32 @@ namespace spades {
 				OverlayFillRect(renderer, 0.0F, bandY, screenWidth, kSubBarH);
 			}
 
+			// A bar holding more than its width is scrolled rather than run off
+			// the window, or under what stands beside it: only what fits whole
+			// between its two ends is drawn, and so can be pressed. The width of
+			// what it holds is the frame before's, as the layout is made while
+			// drawing; it settles in a frame.
+			const float rightLimit = screenWidth;
+			visibleWidth = std::max(0.0F, rightLimit - 2.0F * kTbX0);
+			scrollX = std::max(0.0F, std::min(scrollX, contentWidth - visibleWidth));
+			const bool moreLeft = scrollX > 0.0F;
+			const bool moreRight = contentWidth - scrollX > visibleWidth + 0.5F;
+			const float fitLeft = kTbX0 + (moreLeft ? kScrollArrowW + kTbGap : 0.0F);
+			const float fitRight =
+			  rightLimit - kTbX0 - (moreRight ? kScrollArrowW + kTbGap : 0.0F);
+			auto fits = [&](float at, float width) {
+				return at >= fitLeft - 0.5F && at + width <= fitRight + 0.5F;
+			};
+			// What does not fit keeps its place in the lists with no width, so
+			// it is neither hovered nor pressed.
+			auto placed = [&](const Span& span) {
+				return fits(span.x, span.width) ? span : Span{span.x, 0.0F};
+			};
+
 			// Items are placed left to right, `x` being where the last one ended:
 			// a gap parts items of one group, a separator line one group from the
 			// next. Nothing precedes the first item.
-			float x = kTbX0;
+			float x = kTbX0 - scrollX;
 			bool placedAny = false;
 			auto advance = [&](bool newGroup) {
 				if (!placedAny) {
@@ -338,14 +381,16 @@ namespace spades {
 					x += kTbGap;
 					return;
 				}
-				OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
-				OverlayFillRect(renderer, x + kTbSep * 0.5F, btnY + 2.0F, 1.0F, kTbH - 4.0F);
+				if (fits(x, kTbSep)) {
+					OverlayColorNP(renderer, MakeVector4(0.5F, 0.5F, 0.5F, 0.4F));
+					OverlayFillRect(renderer, x + kTbSep * 0.5F, btnY + 2.0F, 1.0F, kTbH - 4.0F);
+				}
 				x += kTbSep;
 			};
 			// Hover of an item this frame, sounding once as it starts.
 			auto hovered = [&](const Span& span, bool enabled, std::vector<bool>& previous,
 			                   size_t i) {
-				bool hover = !menuActive && enabled &&
+				bool hover = !menuActive && enabled && span.width > 0.0F &&
 				             OverlayInRect(cursorPos, span.x, btnY, span.width, kTbH);
 				previous[i] = sounds.HoverEdge(hover, previous[i]);
 				return hover;
@@ -361,14 +406,15 @@ namespace spades {
 				  button.hotKey.empty() ? 0.0F : font.Measure(button.hotKey).x + kSubBtnKeyGap;
 				const Span span{x, std::max(kSubBtnMin, font.Measure(button.label).x + keyWidth +
 				                                          kButtonTextInset)};
-				subToolSpans.push_back(span);
-				bool hover = hovered(span, true, previousSubToolHoverState, i);
+				subToolSpans.push_back(placed(span));
+				bool hover = hovered(subToolSpans.back(), true, previousSubToolHoverState, i);
 				Vector2 labelAlign =
 				  button.hotKey.empty() ? MakeVector2(0.5F, 0.5F) : MakeVector2(0.0F, 0.5F);
-				widgets::PaintButton(renderer, font, MakeVector2(span.x, btnY),
-				                     MakeVector2(span.width, kTbH), button.label, labelAlign,
-				                     button.hotKey, MakeVector2(1.0F, 0.5F), true, hover, false,
-				                     button.active, 1.0F);
+				if (fits(span.x, span.width))
+					widgets::PaintButton(renderer, font, MakeVector2(span.x, btnY),
+					                     MakeVector2(span.width, kTbH), button.label, labelAlign,
+					                     button.hotKey, MakeVector2(1.0F, 0.5F), true, hover,
+					                     false, button.active, 1.0F);
 				x += span.width;
 			}
 
@@ -378,8 +424,9 @@ namespace spades {
 				advance(startsGroup);
 				if (startsGroup && !op.group.empty()) {
 					Vector2 ts = font.Measure(op.group);
-					font.Draw(op.group, MakeVector2(x, btnY + (kTbH - ts.y) * 0.5F), 1.0F,
-					          groupColor);
+					if (fits(x, ts.x))
+						font.Draw(op.group, MakeVector2(x, btnY + (kTbH - ts.y) * 0.5F), 1.0F,
+						          groupColor);
 					x += ts.x + kGroupLabelGap;
 				}
 
@@ -401,9 +448,11 @@ namespace spades {
 						break;
 				}
 				const Span span{x, width};
-				optionSpans.push_back(span);
+				optionSpans.push_back(placed(span));
 
-				if (op.type == OptionType::Label) {
+				if (!fits(span.x, span.width)) {
+					// Left out whole: its number box keeps no place to press either.
+				} else if (op.type == OptionType::Label) {
 					font.Draw(op.label, MakeVector2(x, btnY + (kTbH - textSize.y) * 0.5F), 1.0F,
 					          textColor);
 				} else if (op.type == OptionType::Number) {
@@ -420,7 +469,26 @@ namespace spades {
 				}
 				x += width;
 			}
-			drawnExtent = x + kFloatPad;
+			contentWidth = x + scrollX - kTbX0;
+			drawnExtent = std::min(x + kFloatPad, rightLimit);
+			if (moreLeft || moreRight)
+				drawnExtent = rightLimit;
+
+			// The arrows, at whichever end has more beyond it.
+			scrollArrows[0] = Span{kTbX0, moreLeft ? kScrollArrowW : 0.0F};
+			scrollArrows[1] = Span{rightLimit - kTbX0 - kScrollArrowW, moreRight ? kScrollArrowW : 0.0F};
+			const char* const glyphs[2] = {"<", ">"};
+			for (int end = 0; end < 2; end++) {
+				const Span& arrow = scrollArrows[end];
+				if (arrow.width <= 0.0F)
+					continue;
+				const bool hover = !menuActive &&
+				                   OverlayInRect(cursorPos, arrow.x, btnY, arrow.width, kTbH);
+				widgets::PaintButton(renderer, font, MakeVector2(arrow.x, btnY),
+				                     MakeVector2(arrow.width, kTbH), glyphs[end],
+				                     MakeVector2(0.5F, 0.5F), "", MakeVector2(1.0F, 0.5F), true,
+				                     hover, false, false, 1.0F);
+			}
 		}
 		void OptionBar::DrawNumber(client::IRenderer& renderer, client::IFont& font,
 		                           const Option& op, size_t i, const Span& span,

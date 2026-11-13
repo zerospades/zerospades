@@ -3004,6 +3004,11 @@ namespace spades {
 			}
 		}
 
+		bool VoxelEditor::WheelOverBars(float delta) {
+			const Vector2& at = cursor.GetPosition();
+			return ui.GetOptionBar()->Wheel(at, delta) || ui.GetContextStrip()->Wheel(at, delta);
+		}
+
 		bool VoxelEditor::OptionBarKey(const std::string& key) {
 			if (transformPanel->IsTyping()) {
 				if (ITransformTarget* target = PanelTarget()) {
@@ -3339,7 +3344,7 @@ namespace spades {
 			}
 			ui.GetContextStrip()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetContextStrip()->Draw(*renderer, *fontManager, cursor.GetPosition(),
-			                           ui.GetMenuBar()->IsOpen(), sw);
+			                           ui.GetMenuBar()->IsOpen(), host.ViewTopRightLimit(sw));
 		}
 
 		void VoxelEditor::DrawPanels() {

@@ -165,6 +165,9 @@ namespace spades {
 			/** A key typed into a number (a box of the option bar, a field of
 			 *  the transform panel); true if taken. */
 			bool OptionBarKey(const std::string& key);
+			/** A turn of the wheel with the pointer over a bar holding more
+			 *  than fits scrolls that bar; false leaves the wheel to the host. */
+			bool WheelOverBars(float delta);
 			/** Whether a number is being typed: it then has the keyboard, its
 			 *  Ctrl shortcuts included. */
 			bool IsTyping() const;

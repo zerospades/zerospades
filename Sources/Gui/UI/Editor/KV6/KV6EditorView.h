@@ -89,6 +89,7 @@ namespace spades {
 			void DocumentReframed(const Vector3& shift) override { cam.Shift(shift); }
 			void ReleaseHeldKeys() override { cam.ReleaseHeld(); }
 			void LookIsometric(float elevation) override;
+			float ViewTopRightLimit(float screenWidth) const override;
 			void TurnView(int quarterTurns) override { cam.TurnQuarters(quarterTurns); }
 			void SaveRender(std::uint32_t background, bool transparent) override {
 				wantRender = true;

@@ -504,6 +504,11 @@ namespace spades {
 			cam.TurnToCorner(elevation);
 		}
 
+		float KV6EditorView::ViewTopRightLimit(float screenWidth) const {
+			// The navigation cube's left edge.
+			return screenWidth - kNaviCubeMargin - kNaviCubeBox;
+		}
+
 		bool KV6EditorView::KeyIsReserved(const std::string& key) const {
 			return BoundToKeySetting(key) || EqualsIgnoringCase(key, kHomeViewKey) ||
 			       EqualsIgnoringCase(key, kFrameSelectionKey) ||
@@ -667,6 +672,8 @@ namespace spades {
 			if (ui->GetOverlay()->WheelEvent(x, y))
 				return;
 			if (ui->GetMenuBar()->IsOpen())
+				return;
+			if (editor->WheelOverBars(y))
 				return;
 			cam.Zoom(y);
 		}
