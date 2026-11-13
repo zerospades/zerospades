@@ -39,7 +39,6 @@ namespace spades {
 			// Only with voxels to work on: selected ones, or a paste or an
 			// import waiting to be placed.
 			bool Available(const IVoxelEditContext& ed) const override;
-			std::string StripOf() const override { return "select"; }
 			ToolOptions* StripCommands() override { return &commands; }
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;

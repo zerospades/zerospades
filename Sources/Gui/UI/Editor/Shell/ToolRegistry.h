@@ -28,6 +28,31 @@
 
 namespace spades {
 	namespace gui {
+		/**
+		 * What an editor relies on one of its tools for, whichever tool that
+		 * is: the editor asks for the tool with a role, and never names one.
+		 */
+		enum class ToolRole {
+			None,
+			/** The tool an editor opens on. */
+			Initial,
+			/** The tool that chooses what the others work on: the one a tool
+			 *  left with nothing to work on hands over to. */
+			Selection
+		};
+
+		/** What a registration says of a tool beyond its button. */
+		struct ToolTraits {
+			ToolRole role = ToolRole::None;
+			/**
+			 * The id of the tool this one is the strip of, for a tool with no
+			 * button of its own: its sub-tools are offered on a strip under
+			 * that tool's bar instead, while it has anything to work on, and
+			 * that tool's button stays lit while it is active.
+			 */
+			std::string stripOf;
+		};
+
 		/** A tool as the editor holds it: the instance, and its toolbar button's place. */
 		template <class Tool> struct BasicToolSlot {
 			std::unique_ptr<Tool> tool;
@@ -37,6 +62,7 @@ namespace spades {
 			int group = 0;
 			// The key that activates the tool; empty for none.
 			std::string hotKey;
+			ToolTraits traits;
 		};
 
 		/**
@@ -56,8 +82,9 @@ namespace spades {
 			using Slot = BasicToolSlot<Tool>;
 
 			// Append a tool factory; registration order is toolbar order.
-			void Register(Factory f, const std::string& id, int group, const std::string& hotKey) {
-				entries.push_back({std::move(f), id, group, hotKey});
+			void Register(Factory f, const std::string& id, int group, const std::string& hotKey,
+			              ToolTraits traits = ToolTraits()) {
+				entries.push_back({std::move(f), id, group, hotKey, std::move(traits)});
 			}
 
 			// Instantiate every registered tool into `out` (cleared first).
@@ -70,6 +97,7 @@ namespace spades {
 					slot.id = entry.id;
 					slot.group = entry.group;
 					slot.hotKey = entry.hotKey;
+					slot.traits = entry.traits;
 					out.push_back(std::move(slot));
 				}
 			}
@@ -80,6 +108,7 @@ namespace spades {
 				std::string id;
 				int group;
 				std::string hotKey;
+				ToolTraits traits;
 			};
 			std::vector<Entry> entries;
 		};

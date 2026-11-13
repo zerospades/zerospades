@@ -261,6 +261,7 @@ namespace spades {
 			const char* Label() const override { return "Transform"; }
 			// Its own, from whichever tool is active.
 			std::string HotKey() const override { return "T"; }
+			bool PositionsPlacement() const override { return true; }
 			std::string Hint(IVoxelEditContext&) override;
 			void OnDeactivate(IVoxelEditContext&) override;
 			void OnPointer(IVoxelEditContext&, const PointerInput&) override;

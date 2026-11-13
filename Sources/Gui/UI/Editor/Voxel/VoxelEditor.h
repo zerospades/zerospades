@@ -263,10 +263,7 @@ namespace spades {
 			void SaveRender(std::uint32_t background, bool transparent) override;
 			void SelectCells(const std::vector<IntVector3>& cells) override;
 			void SwitchTool(const std::string& id) override { pendingTool = id; }
-			void ReturnToSelect() override {
-				clearingSelection = true;
-				pendingTool = "select";
-			}
+			void ReturnToSelect() override;
 			void DeselectCells(const std::vector<IntVector3>& cells) override;
 			void CopySelection() override;
 			bool CutSelection() override;
@@ -375,6 +372,11 @@ namespace spades {
 			void Activate(int toolIndex, EditorMode mode);
 			// Keys 1-9 pick the active tool's sub-tools, in bar order.
 			std::string SubToolHotKey(VoxelTool& tool, int index);
+			/** Whether `tool` is registered as another's strip. */
+			bool IsStrip(const VoxelTool& tool) const;
+			/** The tool registered with `role`, or -1: how the editor finds a
+			 *  tool it relies on without naming it. */
+			int ToolWithRole(ToolRole role) const;
 			bool SwitchByHotKey(const std::string& key);
 			// Whether a key already does something (the host's keys, delete), so
 			// it cannot serve as a tool's hot key.
