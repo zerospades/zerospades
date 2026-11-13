@@ -36,10 +36,10 @@ namespace spades {
 			ModifyTool();
 			const char* Label() const override { return "Modify"; }
 
-			// Only with voxels to work on: selected ones, or a paste or an
-			// import waiting to be placed.
-			bool Available(const IVoxelEditContext& ed) const override;
-			ToolOptions* StripCommands() override { return &commands; }
+			// Voxels arriving to be placed are Transform's to position, whichever
+			// of the others was at work.
+			void OnActivate(IVoxelEditContext& ed) override;
+			void OnDocumentChanged(IVoxelEditContext& ed) override;
 			// Commands with nothing to act on are greyed out.
 			void UpdateOptions(IVoxelEditContext& ed) override;
 			void OnAction(IVoxelEditContext& ed, const std::string& id) override;
@@ -49,7 +49,7 @@ namespace spades {
 			                         bool committed) override;
 
 		private:
-			ToolOptions commands; // the strip's, apart from the bar's options
+			void TakePlacement(IVoxelEditContext& ed);
 		};
 	} // namespace gui
 } // namespace spades

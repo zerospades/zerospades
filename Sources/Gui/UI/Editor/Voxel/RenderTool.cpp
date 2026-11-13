@@ -35,6 +35,7 @@ namespace spades {
 			const char* const kGreenOption = "render.green";
 			const char* const kBlueOption = "render.blue";
 			const char* const kHexOption = "render.hex";
+			const char* const kBackgroundOption = "render.background";
 			const char* const kTransparentOption = "render.transparent";
 			const char* const kSaveOption = "render.save";
 			const char* const kViewGroup = "View";
@@ -68,6 +69,8 @@ namespace spades {
 			options.AddHex(kHexOption, "Hex", kBackgroundGroup);
 			options.AddBool(kTransparentOption, "Transparent", kBackgroundGroup);
 			options.AddAction(kSaveOption, "Render", kImageGroup);
+			// What the picker sets while this tool is active.
+			options.AddColor(kBackgroundOption);
 		}
 
 		std::string RenderTool::Hint(IVoxelEditContext&) {
@@ -89,6 +92,7 @@ namespace spades {
 			                                    (Channel(background, kGreenShift) << 8) |
 			                                    Channel(background, kBlueShift)));
 			options.SetBool(kTransparentOption, transparent);
+			options.SetColor(kBackgroundOption, background);
 		}
 
 		void RenderTool::OnAction(IVoxelEditContext& ed, const std::string& id) {
@@ -103,6 +107,12 @@ namespace spades {
 			} else if (id == kSaveOption) {
 				ed.SaveRender(background, transparent); // reports where it went
 			}
+		}
+
+		void RenderTool::OnOptionColorChanged(IVoxelEditContext&, const std::string& id,
+		                                      std::uint32_t color) {
+			if (id == kBackgroundOption)
+				background = color & 0xFFFFFF;
 		}
 
 		void RenderTool::OnOptionToggled(IVoxelEditContext&, const std::string& id, bool value) {

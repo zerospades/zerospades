@@ -32,19 +32,37 @@ namespace spades {
 			// set it can go on the bar the day one is wanted; until then the
 			// thinnest wall is the one a model this size is hollowed to.
 			constexpr int kCavityThickness = 1;
+			// Transform's place among the sub-tools.
+			constexpr int kTransform = 0;
 		} // namespace
 
 		ModifyTool::ModifyTool() {
-			AddSub(std::unique_ptr<VoxelTool>(new TransformSubTool()));
+			AddSub(std::unique_ptr<VoxelTool>(new TransformSubTool())); // kTransform
 			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(false)));
 			AddSub(std::unique_ptr<VoxelTool>(new SweepSubTool(true)));
 
-			commands.AddAction(kFillOption, "Fill");
-			commands.AddAction(kCavityOption, "Cavity");
+			// Its commands stand on the strip while it is only on offer.
+			options.AddAction(kFillOption, "Fill");
+			options.SetStanding(kFillOption);
+			options.AddAction(kCavityOption, "Cavity");
+			options.SetStanding(kCavityOption);
 		}
 
-		bool ModifyTool::Available(const IVoxelEditContext& ed) const {
-			return ed.SelectionCount() > 0; // a waiting placement counts
+		void ModifyTool::TakePlacement(IVoxelEditContext& ed) {
+			if (ed.HasPlacement() && active != kTransform)
+				SetSubTool(ed, kTransform);
+		}
+
+		void ModifyTool::OnActivate(IVoxelEditContext& ed) {
+			// Before the sub-tool it was left on is activated for nothing.
+			if (ed.HasPlacement())
+				active = kTransform;
+			ContainerTool::OnActivate(ed);
+		}
+
+		void ModifyTool::OnDocumentChanged(IVoxelEditContext& ed) {
+			ContainerTool::OnDocumentChanged(ed);
+			TakePlacement(ed);
 		}
 
 		void ModifyTool::UpdateOptions(IVoxelEditContext& ed) {
@@ -54,8 +72,8 @@ namespace spades {
 			// button is pressed, and refused there with the reason. Voxels
 			// still waiting to be placed are not a selection to hollow out,
 			// though the count of what the commands act on includes them.
-			commands.SetEnabled(kFillOption, ed.SelectionCount() > 0);
-			commands.SetEnabled(kCavityOption, ed.SelectionCount() > 0 && !ed.HasPlacement());
+			options.SetEnabled(kFillOption, ed.SelectionCount() > 0);
+			options.SetEnabled(kCavityOption, ed.SelectionCount() > 0 && !ed.HasPlacement());
 		}
 
 		void ModifyTool::OnAction(IVoxelEditContext& ed, const std::string& id) {

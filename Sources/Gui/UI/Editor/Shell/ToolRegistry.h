@@ -38,7 +38,10 @@ namespace spades {
 			Initial,
 			/** The tool that chooses what the others work on: the one a tool
 			 *  left with nothing to work on hands over to. */
-			Selection
+			Selection,
+			/** The tool where what arrives to be placed (a paste, an import)
+			 *  is positioned: the editor goes to it when something does. */
+			Placement
 		};
 
 		/** What a registration says of a tool beyond its button. */
@@ -51,6 +54,19 @@ namespace spades {
 			 * that tool's button stays lit while it is active.
 			 */
 			std::string stripOf;
+			/**
+			 * Works on what the Selection tool chose, and has nothing to work
+			 * on with nothing chosen: it is then greyed out, its keys do
+			 * nothing, and the editor leaves it for the Selection tool should
+			 * that come about while it is active.
+			 */
+			bool needsSelection = false;
+			/**
+			 * Makes an image of the document rather than working on it: while
+			 * it is active the editor and its host draw the document alone,
+			 * with nothing of what they draw to work by.
+			 */
+			bool presents = false;
 		};
 
 		/** A tool as the editor holds it: the instance, and its toolbar button's place. */

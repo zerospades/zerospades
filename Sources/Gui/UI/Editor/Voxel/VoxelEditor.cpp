@@ -283,7 +283,7 @@ namespace spades {
 				if (picker.IsOpen()) {
 					picker.Close();
 				} else {
-					picker.SetColor(PickerColor());
+					picker.SetColor(PickedColor());
 					picker.Open();
 				}
 			};
@@ -292,22 +292,36 @@ namespace spades {
 			ui.GetColorPicker()->OnColorChanged = [this](std::uint32_t c) {
 				// A tool with a colour of its own for the picker has it set
 				// and that is all: the brush, and what follows it, stay put.
-				std::uint32_t& target = PickerColor();
-				target = c;
-				if (&target != &currentColor)
+				if (SetToolColor(c))
 					return;
+				currentColor = c;
 				if (pickerHeld)
 					pickerChangedColor = true;
 				BrushColorChanged(!pickerHeld);
 			};
 		}
 
-		std::uint32_t& VoxelEditor::PickerColor() {
-			if (VoxelTool* t = ActiveTool()) {
-				if (std::uint32_t* own = t->PickerColor())
-					return *own;
-			}
-			return currentColor;
+		const ToolOption* VoxelEditor::ToolColorOption() {
+			VoxelTool* tool = ActiveTool();
+			ToolOptions* options = tool ? tool->Options() : nullptr;
+			if (!options)
+				return nullptr;
+			tool->UpdateOptions(*this); // as the tool holds it now
+			return options->First(ToolOption::Type::Color);
+		}
+
+		std::uint32_t VoxelEditor::PickedColor() {
+			const ToolOption* own = ToolColorOption();
+			return own ? own->color : currentColor;
+		}
+
+		bool VoxelEditor::SetToolColor(std::uint32_t color) {
+			const ToolOption* own = ToolColorOption();
+			if (!own)
+				return false;
+			const std::string id = own->id; // the handler may rebuild the options
+			ActiveTool()->OnOptionColorChanged(*this, id, color);
+			return true;
 		}
 
 		void VoxelEditor::WireBar(OptionBar& bar, std::function<int()> indexOf) {
@@ -1188,10 +1202,11 @@ namespace spades {
 				return false;
 			// Into whatever the picker is setting: the brush, or the colour a
 			// tool has it set instead.
-			std::uint32_t& target = PickerColor();
-			target = document.Color(pickSolid.x, pickSolid.y, pickSolid.z);
+			const std::uint32_t picked = document.Color(pickSolid.x, pickSolid.y, pickSolid.z);
+			if (!SetToolColor(picked))
+				currentColor = picked;
 			ColorPicker& picker = *ui.GetColorPicker();
-			picker.SetColor(target);
+			picker.SetColor(picked);
 			picker.SetEyedropperMode(false); // a pick is one-shot
 			SetStatus("Picked colour");
 			return true;
@@ -1645,28 +1660,24 @@ namespace spades {
 			}
 
 			// Positioning a placement is what the Transform tool is for, so go there.
-			if (!ActivateTransformTool()) {
+			if (!ActivatePlacementTool()) {
 				SetStatus(label + ": could not open the Transform tool");
 				return;
 			}
 			SetStatus(label + ": position it with the gizmo, then click away to place it");
 		}
 
-		bool VoxelEditor::ActivateTransformTool() {
-			// Found by what it says it does, so neither renaming a button nor
-			// another sub-tool taking its label can send a placement elsewhere.
-			for (size_t i = 0; i < tools.size(); i++) {
-				VoxelTool& tool = *tools[i].tool;
-				for (int sub = 0; sub < tool.SubToolCount(); sub++) {
-					VoxelTool* candidate = tool.SubTool(sub);
-					if (!candidate || !candidate->PositionsPlacement())
-						continue;
-					SetActiveTool(int(i));
-					tool.SetSubTool(*this, sub);
-					return true;
-				}
-			}
-			return false;
+		bool VoxelEditor::ActivatePlacementTool() {
+			const int index = ToolWithRole(ToolRole::Placement);
+			if (index < 0)
+				return false;
+			SetActiveTool(index);
+			if (activeTool != index)
+				return false;
+			// Already there or just arrived, the tool is told what waits: which
+			// of its sub-tools positions it is its own to know.
+			tools[static_cast<size_t>(index)].tool->OnDocumentChanged(*this);
+			return true;
 		}
 
 		void VoxelEditor::InsertModel(const VoxelModel& imported) {
@@ -2233,7 +2244,7 @@ namespace spades {
 			// the selection the replay restored starts again from its box.
 			movedMiddle.valid = false;
 			if (edit.placing)
-				ActivateTransformTool();
+				ActivatePlacementTool();
 			NotifyDocumentChanged();
 		}
 
@@ -2496,8 +2507,11 @@ namespace spades {
 		}
 
 		bool VoxelEditor::ToolAvailable(int index) const {
-			return index >= 0 && index < int(tools.size()) &&
-			       tools[static_cast<size_t>(index)].tool->Available(*this);
+			if (index < 0 || index >= int(tools.size()))
+				return false;
+			// What the commands act on: the selection, or voxels waiting to be
+			// placed while there are some.
+			return !tools[static_cast<size_t>(index)].traits.needsSelection || SelectionCount() > 0;
 		}
 
 		void VoxelEditor::SelectTool(int index) { SetActiveTool(index); }
@@ -2529,7 +2543,7 @@ namespace spades {
 				current->OnActivate(*this);
 			// The picker shows the colour it now sets, which may be another's.
 			if (ui.GetColorPicker()->IsOpen())
-				ui.GetColorPicker()->SetColor(PickerColor());
+				ui.GetColorPicker()->SetColor(PickedColor());
 		}
 
 		int VoxelEditor::ToolIndex(const std::string& id) const {
@@ -2564,10 +2578,6 @@ namespace spades {
 				return nullptr;
 			ToolOptions* options = tool->Options();
 			ToolOption* option = options ? options->Find(id) : nullptr;
-			if (!option) {
-				ToolOptions* commands = tool->StripCommands();
-				option = commands ? commands->Find(id) : nullptr;
-			}
 			return (option && option->type == type) ? option : nullptr;
 		}
 
@@ -3068,8 +3078,8 @@ namespace spades {
 		}
 
 		bool VoxelEditor::PresentsRender() {
-			VoxelTool* tool = ActiveTool();
-			return tool && tool->PresentsRender();
+			return activeTool >= 0 && activeTool < int(tools.size()) &&
+			       tools[static_cast<size_t>(activeTool)].traits.presents;
 		}
 
 		void VoxelEditor::DrawScene() {
@@ -3207,7 +3217,7 @@ namespace spades {
 			}
 			ui.GetToolbar()->SetToolButtons(toolButtons);
 
-			ui.GetToolbar()->SetColorSwatch(PickerColor(), ui.GetColorPicker()->IsOpen());
+			ui.GetToolbar()->SetColorSwatch(PickedColor(), ui.GetColorPicker()->IsOpen());
 			ui.GetToolbar()->SetUndoButton(undo.CanUndo());
 			ui.GetToolbar()->SetRedoButton(undo.CanRedo());
 
@@ -3230,6 +3240,7 @@ namespace spades {
 					case ToolOption::Type::Action: opt.type = OptionBar::OptionType::Action; break;
 					case ToolOption::Type::Number: opt.type = OptionBar::OptionType::Number; break;
 					case ToolOption::Type::Bool: opt.type = OptionBar::OptionType::Bool; break;
+					case ToolOption::Type::Color: break; // not shown: see AppendBarOptions
 				}
 				opt.bvalue = op.bvalue;
 				opt.enabled = op.enabled;
@@ -3240,10 +3251,17 @@ namespace spades {
 				return opt;
 			}
 
-			void AppendBarOptions(std::vector<OptionBar::Option>& out, const ToolOptions* from) {
+			// `from`'s options as a bar shows them: the visible ones, of them
+			// only the standing ones where `standingOnly`, and never a colour,
+			// which the toolbar's swatch stands for.
+			void AppendBarOptions(std::vector<OptionBar::Option>& out, const ToolOptions* from,
+			                      bool standingOnly = false) {
 				for (int i = 0; from && i < from->Count(); i++) {
-					if (from->At(i).visible)
-						out.push_back(BarOption(from->At(i)));
+					const ToolOption& op = from->At(i);
+					if (!op.visible || op.type == ToolOption::Type::Color ||
+					    (standingOnly && !op.standing))
+						continue;
+					out.push_back(BarOption(op));
 				}
 			}
 		} // namespace
@@ -3305,11 +3323,9 @@ namespace spades {
 				subTools = SubToolButtons(*t, t == ActiveTool(),
 				                          [&](int i) { return ShownSubToolKey(*t, i); });
 				t->UpdateOptions(*this);
-				// Its commands, good at any time, then what the sub-tool at
-				// work is set by: nothing while the strip is only on offer.
-				AppendBarOptions(options, t->StripCommands());
-				if (t == ActiveTool())
-					AppendBarOptions(options, t->Options());
+				// Its standing commands, good at any time, and while it is at
+				// work what its sub-tool is set by as well.
+				AppendBarOptions(options, t->Options(), t != ActiveTool());
 			}
 			ui.GetContextStrip()->SetContent(t, std::move(subTools), std::move(options));
 			ui.GetContextStrip()->Draw(*renderer, *fontManager, cursor.GetPosition(),

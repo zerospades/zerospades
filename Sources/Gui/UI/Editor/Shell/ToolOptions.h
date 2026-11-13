@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,11 @@ namespace spades {
 				Bool,  // a toggle button; value lives in `bvalue`
 				Label, // a read-only text readout; the tool updates `label` each frame
 				Action, // a one-shot button; clicking calls EditorTool::OnAction(id)
+				// A colour the editor's picker sets while the tool is active, in
+				// place of the brush colour, the toolbar's swatch showing it; it
+				// takes no place on the bar. Reported through
+				// EditorTool::OnOptionColorChanged. A tool has one at most.
+				Color,
 				// An editable number: a box that can be typed into, with arrows
 				// stepping it by `step`. Reported through
 				// EditorTool::OnOptionNumberChanged, while it is being typed and
@@ -53,6 +59,11 @@ namespace spades {
 			float step = 1.0F;       // what one press of a Number's arrows adds
 			int decimals = 1;        // decimal places a Number is written with
 			bool hex = false;        // a Number that is a colour, 0xRRGGBB, typed as #RRGGBB
+			std::uint32_t color = 0; // Color value, 0x00BBGGRR; the tool refreshes it via SetColor
+			// Offered wherever the tool's options are, whether or not the tool is
+			// the active one: a command of a strip (see ToolTraits::stripOf),
+			// which shows on it while the strip is only on offer.
+			bool standing = false;
 		};
 
 		// An ordered list of a tool's options.
@@ -99,6 +110,29 @@ namespace spades {
 			            const std::string& group = "") {
 				AddNumber(id, label, group, 0.0F, 0);
 				items.back().hex = true;
+			}
+			// The colour the picker sets while the tool is active (see Type::Color).
+			void AddColor(const std::string& id) {
+				ToolOption o;
+				o.id = id;
+				o.type = ToolOption::Type::Color;
+				items.push_back(o);
+			}
+			void SetColor(const std::string& id, std::uint32_t color) {
+				if (ToolOption* o = Find(id))
+					o->color = color;
+			}
+			/** Makes `id` a standing option (see ToolOption::standing). */
+			void SetStanding(const std::string& id) {
+				if (ToolOption* o = Find(id))
+					o->standing = true;
+			}
+			/** The option of `type` that comes first, or null. */
+			const ToolOption* First(ToolOption::Type type) const {
+				for (const ToolOption& o : items)
+					if (o.type == type)
+						return &o;
+				return nullptr;
 			}
 			void SetNumber(const std::string& id, float value) {
 				if (ToolOption* o = Find(id))

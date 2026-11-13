@@ -204,7 +204,7 @@ namespace spades {
 			 *  preview; inside the host's scene. */
 			void DrawScene();
 			/** Whether the active tool shows the view as an image being made
-			 *  (see VoxelTool::PresentsRender): the host then leaves out what
+			 *  (see ToolTraits::presents): the host then leaves out what
 			 *  it draws to work by, as DrawScene and DrawViewportOverlays do. */
 			bool PresentsRender();
 			/** Over the finished scene: the overlay lines, then the hint lines
@@ -355,7 +355,14 @@ namespace spades {
 			void WireBar(OptionBar& bar, std::function<int()> indexOf);
 			/** The colour the picker and the swatch show and set: the brush's,
 			 *  unless the active tool has one of its own for them. */
-			std::uint32_t& PickerColor();
+			/** The colour the picker and the swatch show: the active tool's
+			 *  own for them where it has one (a ToolOption of type Color),
+			 *  else the brush's. */
+			std::uint32_t PickedColor();
+			/** Sets the active tool's own colour for the picker; false when it
+			 *  has none, and the colour is the brush's to take. */
+			bool SetToolColor(std::uint32_t color);
+			const ToolOption* ToolColorOption();
 			bool BarsEditing() const;
 			void EndBarEdits(bool commit);
 			void SetActiveTool(int index);
@@ -427,7 +434,7 @@ namespace spades {
 			int EraseSelection(const std::string& label);
 			void StartPlacement(std::vector<ClipVoxel> voxels, const std::string& label,
 			                    const IntVector3& anchor);
-			bool ActivateTransformTool();
+			bool ActivatePlacementTool();
 
 			int documentCommandDepth = 0;
 			void NotifyDocumentChanged();

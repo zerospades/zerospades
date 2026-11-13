@@ -105,6 +105,14 @@ namespace spades {
 				(void)committed;
 			}
 
+			// A ToolOption of type Color was set on the editor's picker, to
+			// `color` (0x00BBGGRR).
+			virtual void OnOptionColorChanged(Context&, const std::string& id,
+			                                  std::uint32_t color) {
+				(void)id;
+				(void)color;
+			}
+
 			// A ToolOption of type Action was clicked; `id` is that option's id.
 			virtual void OnAction(Context&, const std::string& id) { (void)id; }
 

@@ -60,20 +60,29 @@ namespace spades {
 				// and keep clear of the default WASD movement keys. Modify has
 				// neither a key nor a button: it is Select's strip, and each of
 				// its sub-tools has a key that works from any tool (T, E, R).
-				registry.Register(Make<SelectTool>(), kSelectId, kSelectionGroup, "Q",
-				                  {ToolRole::Selection, std::string()});
-				registry.Register(Make<ModifyTool>(), "modify", kSelectionGroup, "",
-				                  {ToolRole::None, kSelectId});
+				ToolTraits selects;
+				selects.role = ToolRole::Selection;
+				registry.Register(Make<SelectTool>(), kSelectId, kSelectionGroup, "Q", selects);
+				// What is done with the voxels chosen, and where ones arriving to
+				// be placed are positioned.
+				ToolTraits modifies;
+				modifies.role = ToolRole::Placement;
+				modifies.stripOf = kSelectId;
+				modifies.needsSelection = true;
+				registry.Register(Make<ModifyTool>(), "modify", kSelectionGroup, "", modifies);
 				// Open on Draw, so the user can start at once.
-				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B",
-				                  {ToolRole::Initial, std::string()});
+				ToolTraits opens;
+				opens.role = ToolRole::Initial;
+				registry.Register(Make<DrawTool>(), "draw", kEditingGroup, "B", opens);
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
 				// The images to model from, across each axis.
 				registry.Register(Make<ReferenceTool>(), "reference", kSetupGroup, "I");
 				// An image of the model, from where the camera stands.
-				registry.Register(Make<RenderTool>(), "render", kOutputGroup, "");
+				ToolTraits renders;
+				renders.presents = true;
+				registry.Register(Make<RenderTool>(), "render", kOutputGroup, "", renders);
 			}
 			return registry;
 		}
