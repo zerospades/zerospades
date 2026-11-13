@@ -37,6 +37,7 @@
 #include "Weapon.h"
 #include "World.h"
 #include "NetClient.h"
+#include "PlayerModels.h"
 #include <Core/Bitmap.h>
 #include <Core/Settings.h>
 #include <ScriptBindings/IBlockSkin.h>
@@ -223,6 +224,14 @@ namespace spades {
 				if (CheckVisibility(AABB3(param.origin, param.origin)))
 					base->AddGlare(image, param);
 			}
+			void AddImagePlane(IImage& image, Vector3 origin, Vector3 axisU, Vector3 axisV) {
+				AABB3 bounds(origin, origin);
+				bounds += origin + axisU;
+				bounds += origin + axisV;
+				bounds += origin + axisU + axisV;
+				if (CheckVisibility(bounds))
+					base->AddImagePlane(image, origin, axisU, axisV);
+			}
 
 			void EndScene() { OnProhibitedAction(); }
 
@@ -240,6 +249,14 @@ namespace spades {
 			void DrawFilledTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2) {
 				if (allowDepthHack)
 					base->DrawFilledTriangle(v0, v1, v2);
+				else
+					OnProhibitedAction();
+			}
+
+			void DrawShadedTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2,
+			                        const Vector4& c0, const Vector4& c1, const Vector4& c2) {
+				if (allowDepthHack)
+					base->DrawShadedTriangle(v0, v1, v2, c0, c1, c2);
 				else
 					OnProhibitedAction();
 			}
@@ -304,6 +321,7 @@ namespace spades {
 
 			float ScreenWidth() { return base->ScreenWidth(); }
 			float ScreenHeight() { return base->ScreenHeight(); }
+			float ScreenPixelRatio() { return base->ScreenPixelRatio(); }
 
 			bool IsRendererSW() const { return base->IsRendererSW(); }
 		};
@@ -878,10 +896,17 @@ namespace spades {
 
 			float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
 			bool leftHanded = weapSide < 0.0F;
+			// A skin handling left-handedness itself (IViewToolSkin2) is told the
+			// side and left alone; any other is mirrored whole when left-handed.
+			ScriptIViewToolSkin2 handedSkin(curSkin);
+			const bool skinHandlesSide = handedSkin.ImplementsInterface();
+			if (skinHandlesSide)
+				handedSkin.SetLeftHanded(leftHanded);
+			const bool mirrored = leftHanded && !skinHandlesSide;
 
 			// view weapon
 			Vector3 viewWeaponSway = viewWeaponOffset;
-			viewWeaponSway.x *= leftHanded ? -1.0F : 1.0F;
+			viewWeaponSway.x *= mirrored ? -1.0F : 1.0F;
 
 			// Moving this to the scripting environment means
 			// breaking compatibility with existing scripts.
@@ -1107,24 +1132,18 @@ namespace spades {
 				* Matrix4::Translate(0.0F, 1.0F, -torsoPosZ);
 
 			// Legs and Torso
+			PlayerModels& models = client.GetPlayerModels();
+			// A part of the set, at the matrix the game puts its joint at.
+			auto drawPart = [&](const char* name, const Matrix4& joint) {
+				const PlayerPart part = models.Get(modelPath, name);
+				param.matrix = joint * part.local;
+				renderer.RenderModel(*part.model, param);
+			};
+
 			if (!cg_hideBody) {
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
-				param.matrix = legLeft * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegRightCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
-				param.matrix = legRight * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "TorsoCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
-				param.matrix = torso * scaler;
-				renderer.RenderModel(*model, param);
+				drawPart(inp.crouch ? "LegCrouch" : "Leg", legLeft * scaler);
+				drawPart(inp.crouch ? "LegRightCrouch" : "LegRight", legRight * scaler);
+				drawPart(inp.crouch ? "TorsoCrouch" : "Torso", torso * scaler);
 			}
 
 			// Arms
@@ -1133,7 +1152,7 @@ namespace spades {
 				Vector3 shoulders[] = {{0.4F, 0.0F, 0.25F}, {-0.4F, 0.0F, 0.25F}};
 				Vector3 benddirs[] = {{0.5F, 0.2F, 0.0F}, {-0.5F, 0.2F, 0.0F}};
 
-				if (leftHanded) {
+				if (mirrored) {
 					std::swap(hands[0], hands[1]);
 					hands[0].x = -hands[0].x;
 					hands[1].x = -hands[1].x;
@@ -1146,10 +1165,10 @@ namespace spades {
 				const float leftHandSqr = hands[0].GetSquaredLength();
 				const float rightHandSqr = hands[1].GetSquaredLength();
 				if (leftHandSqr > 0.01F || rightHandSqr > 0.01F) {
-					Handle<IModel> armModel = renderer.RegisterModel((modelPath + "Arm.kv6").c_str());
-					Handle<IModel> upperModel = renderer.RegisterModel((modelPath + "UpperArm.kv6").c_str());
-					Handle<IModel> armRightModel = renderer.RegisterModel((modelPath + "ArmRight.kv6").c_str());
-					Handle<IModel> upperRightModel = renderer.RegisterModel((modelPath + "UpperArmRight.kv6").c_str());
+					const PlayerPart armModel = models.Get(modelPath, "Arm");
+					const PlayerPart upperModel = models.Get(modelPath, "UpperArm");
+					const PlayerPart armRightModel = models.Get(modelPath, "ArmRight");
+					const PlayerPart upperRightModel = models.Get(modelPath, "UpperArmRight");
 
 					// manual adjustment
 					Vector3 trans = MakeVector3(0, 0, 0);
@@ -1172,7 +1191,7 @@ namespace spades {
 						axes[1] = Vector3::Cross(axes[2], MakeVector3(0, 0, 1)).Normalize();
 						axes[0] = Vector3::Cross(axes[1], axes[2]).Normalize();
 						Matrix4 mat = Matrix4::FromAxis(axes[0], axes[1], axes[2], v2);
-						if (leftHanded)
+						if (mirrored)
 							mat = Matrix4::Scale(-1, 1, 1) * mat;
 						return eyeMatrix * mat * armsScale;
 					};
@@ -1190,15 +1209,17 @@ namespace spades {
 						const float bendlen = sqrtf(std::max(armlenSqr - distSqr * 0.25F, 0.0F));
 						const Vector3 elbow = ((hand + shoulder) * 0.5F) + (bend * bendlen);
 
-						const bool isLeftArm = leftHanded ? (i != 0) : (i == 0);
+						const bool isLeftArm = mirrored ? (i != 0) : (i == 0);
 
 						// draw arm
-						param.matrix = getArmMatrix(hand, elbow);
-						renderer.RenderModel(isLeftArm ? *armModel : *armRightModel, param);
+						const PlayerPart& fore = isLeftArm ? armModel : armRightModel;
+						param.matrix = getArmMatrix(hand, elbow) * fore.local;
+						renderer.RenderModel(*fore.model, param);
 
 						// draw upper arm
-						param.matrix = getArmMatrix(elbow, shoulder);
-						renderer.RenderModel(isLeftArm ? *upperModel : *upperRightModel, param);
+						const PlayerPart& upper = isLeftArm ? upperModel : upperRightModel;
+						param.matrix = getArmMatrix(elbow, shoulder) * upper.local;
+						renderer.RenderModel(*upper.model, param);
 					};
 
 					if (leftHandSqr > 0.01F)
@@ -1230,11 +1251,11 @@ namespace spades {
 
 			if (!p.IsAlive()) {
 				if (!cg_ragdoll) {
-					model = renderer.RegisterModel((modelPath + "Dead.kv6").c_str());
+					const PlayerPart dead = client.GetPlayerModels().Get(modelPath, "Dead");
 					param.matrix = Matrix4::FromAxis(-right, front2D, -up, p.GetEye());
 					param.matrix = param.matrix * Matrix4::Translate(0.0F, 0.0F, -0.1F);
-					param.matrix = param.matrix * Matrix4::Scale(0.1F);
-					renderer.RenderModel(*model, param);
+					param.matrix = param.matrix * Matrix4::Scale(0.1F) * dead.local;
+					renderer.RenderModel(*dead.model, param);
 				}
 
 				return;
@@ -1354,49 +1375,37 @@ namespace spades {
 				* Matrix4::Translate(0.0F, 0.0F, armsPosZ)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
 
+			PlayerModels& models = client.GetPlayerModels();
+			// A part of the set, at the matrix the game puts its joint at.
+			auto drawPart = [&](const PlayerPart& part, const Matrix4& joint) {
+				param.matrix = joint * part.local;
+				renderer.RenderModel(*part.model, param);
+			};
+
 			// Legs
-			{
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Leg.kv6").c_str());
-
-				param.matrix = legLeft * scaler;
-				renderer.RenderModel(*model, param);
-
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "LegRightCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "LegRight.kv6").c_str());
-
-				param.matrix = legRight * scaler;
-				renderer.RenderModel(*model, param);
-			}
+			drawPart(models.Get(modelPath, inp.crouch ? "LegCrouch" : "Leg"), legLeft * scaler);
+			drawPart(models.Get(modelPath, inp.crouch ? "LegRightCrouch" : "LegRight"),
+			         legRight * scaler);
 
 			// Torso
-			{
-				model = inp.crouch
-					? renderer.RegisterModel((modelPath + "TorsoCrouch.kv6").c_str())
-					: renderer.RegisterModel((modelPath + "Torso.kv6").c_str());
-
-				param.matrix = torso * scaler;
-				renderer.RenderModel(*model, param);
-			}
+			drawPart(models.Get(modelPath, inp.crouch ? "TorsoCrouch" : "Torso"), torso * scaler);
 
 			// Arms
+			drawPart(models.Get(modelPath, "Arms"), arms * scaler);
+
+			// Head: at Christmas, a set's own hat over it; a set without one
+			// shows the classic hatted head in its place.
 			{
-				model = renderer.RegisterModel((modelPath + "Arms.kv6").c_str());
-
-				param.matrix = arms * scaler;
-				renderer.RenderModel(*model, param);
-			}
-
-			// Head
-			{
-				model = client.isChristmasOn
-					? renderer.RegisterModel("Models/Player/XmasHat.kv6")
-					: renderer.RegisterModel((modelPath + "Head.kv6").c_str());
-
-				param.matrix = head * scaler;
-				renderer.RenderModel(*model, param);
+				const PlayerPart hat = client.isChristmasOn ? models.Hat(modelPath) : PlayerPart();
+				if (client.isChristmasOn && !hat) {
+					model = renderer.RegisterModel("Models/Player/XmasHat.kv6");
+					param.matrix = head * scaler;
+					renderer.RenderModel(*model, param);
+				} else {
+					drawPart(models.Get(modelPath, "Head"), head * scaler);
+					if (hat)
+						drawPart(hat, head * scaler);
+				}
 			}
 
 			// Headlamp, shown while the flashlight is lit
@@ -1779,16 +1788,32 @@ namespace spades {
 			}
 
 			if (model) {
-				float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
-				bool leftHanded = weapSide < 0.0F;
-
-				Vector3 origin = ShouldRenderInThirdPersonView()
+				const bool thirdPerson = ShouldRenderInThirdPersonView();
+				Vector3 origin = thirdPerson
 					? GetCaseEjectPosition()
 					: GetCaseEjectPositionInFirstPersonView();
 
-				float casingSide = leftHanded ? -1.0F : 1.0F;
+				// A skin handling its handedness (IViewToolSkin2) is never mirrored
+				// and may say where its brass flies.
+				ScriptIViewToolSkin2 handedSkin(weaponViewSkin);
+				const bool skinHandlesSide = !thirdPerson && handedSkin.ImplementsInterface();
+
+				// Out to the right, or to the left for a left-handed player's own
+				// mirrored gun; another player's gun is held as its skin shows it,
+				// whatever this player's handedness.
+				float weapSide = Clamp((float)cg_viewWeaponSide, -1.0F, 1.0F);
+				bool mirrored = weapSide < 0.0F && !thirdPerson && !skinHandlesSide;
+				float casingSide = mirrored ? -1.0F : 1.0F;
 				Vector3 o = p.GetFront();
 				Vector3 vel = o * 0.5F + p.GetRight() * casingSide + p.GetUp() * 0.2F;
+
+				if (skinHandlesSide) {
+					const Vector3 dir = handedSkin.GetCaseEjectDirection();
+					if (dir.GetSquaredLength() > 1.0e-8F) {
+						const Matrix4 eye = GetEyeMatrix();
+						vel = (eye * dir).GetXYZ() - eye.GetOrigin();
+					}
+				}
 
 				if (weaponType == SHOTGUN_WEAPON)
 					vel *= 0.5F;

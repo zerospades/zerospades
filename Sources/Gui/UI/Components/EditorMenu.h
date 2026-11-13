@@ -22,71 +22,61 @@
 
 #include <functional>
 #include <string>
-
-#include <Core/Math.h>
-#include <Core/RefCountedObject.h>
-#include "IModalMenu.h"
+#include <vector>
 
 namespace spades {
-    namespace client {
-        class IRenderer;
-        class FontManager;
-        class IAudioDevice;
-    } // namespace client
     namespace gui {
-        class SoftwareCursor;
+        /** One row of an editor's menu, supplied by the host. */
+        struct EditorMenuItem {
+            std::string caption;
+            std::function<void()> run;
+            /** False draws the row greyed out and ignores clicks on it. */
+            bool enabled = true;
+            /** The key that does the same, shown on the row's right: a menu is
+             *  where a key is learned. Empty for a command with no key. */
+            std::string hotKey;
+            /** A rule between two blocks of commands rather than a command: it
+             *  is not picked, clicked or stepped onto. */
+            bool separator = false;
+            /** Ticked: a command that turns something on shows whether it is. */
+            bool checked = false;
+        };
+
+        /** A command, with the key that does the same where it has one. */
+        inline EditorMenuItem MenuCommand(std::string caption, std::function<void()> run,
+                                          bool enabled = true,
+                                          std::string hotKey = std::string()) {
+            EditorMenuItem item;
+            item.caption = std::move(caption);
+            item.run = std::move(run);
+            item.enabled = enabled;
+            item.hotKey = std::move(hotKey);
+            return item;
+        }
+
+        /** A rule between two blocks of commands. */
+        inline EditorMenuItem MenuRule() {
+            EditorMenuItem item;
+            item.separator = true;
+            return item;
+        }
+
+        /** One menu of a menu bar: its title and what it offers. */
+        struct EditorMenuGroup {
+            std::string title;
+            std::vector<EditorMenuItem> items;
+        };
 
         class IEditorMenuHost {
         public:
             virtual ~IEditorMenuHost() = default;
-            virtual std::string GetMenuTitle() = 0;
-            virtual std::string GetDocumentPath() = 0;
-            virtual std::string GetDocumentExtension() = 0;
-            virtual void SaveDocument(const std::string& path) = 0;
-            virtual void RequestClose() = 0;
-            virtual bool OnMenuEscape() { return false; }
+            /**
+             * The menus of the editor's menu bar, rebuilt whenever one is
+             * opened so that what it offers, what is greyed out and what is
+             * ticked are as they stand at that moment.
+             */
+            virtual std::vector<EditorMenuGroup> GetMenus() = 0;
         };
 
-        class EditorMenu : public IModalMenu {
-        public:
-            EditorMenu(IEditorMenuHost& host, client::IRenderer& renderer,
-                      client::FontManager& fontManager, SoftwareCursor& cursor,
-                      client::IAudioDevice* audioDevice);
-
-            // IModalMenu implementation
-            bool IsActive() const override { return menuOpen || promptOpen; }
-            void Open() override;
-            void Close() override;
-            bool KeyEvent(const std::string& key, bool down) override;
-            void TextInputEvent(const std::string& text) override;
-            bool AcceptsTextInput() const override { return promptOpen; }
-            void Draw() override;
-
-            // EditorMenu-specific
-            void OpenTextPrompt(const std::string& title, const std::string& initial,
-                                std::function<void(const std::string&)> onSubmit);
-            AABB2 GetTextInputRect() const;
-
-        private:
-            IEditorMenuHost& host;
-            Handle<client::IRenderer> renderer;
-            Handle<client::FontManager> fontManager;
-            SoftwareCursor& cursor;
-            Handle<client::IAudioDevice> audioDevice;
-
-            bool menuOpen = false;
-            int selectedItem = 0;
-            int prevSelectedItem = -1;
-
-            bool promptOpen = false;
-            std::string promptTitle;
-            std::string promptText;
-            std::function<void(const std::string&)> promptSubmit;
-
-            void DrawMenu(float sw, float sh);
-            void DrawPrompt(float sw, float sh);
-            void SubmitPrompt();
-            int MenuButtonAt(const Vector2& p) const;
-        };
     } // namespace gui
 } // namespace spades

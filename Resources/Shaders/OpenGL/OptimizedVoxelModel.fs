@@ -28,6 +28,10 @@ uniform vec3 fogColor;
 uniform vec3 customColor;
 uniform float modelOpacity;
 
+// 1.0 lights the model from every direction at once (the model editor), 0.0
+// keeps the sun. See SceneDefinition::flatModelLighting.
+uniform float flatLighting;
+
 vec3 EvaluateSunLight();
 vec3 EvaluateAmbientLight(float detailAmbientOcclusion);
 
@@ -59,7 +63,12 @@ void main() {
 	float ao = texture2D(ambientOcclusionTexture, ambientOcclusionCoord).x;
 	vec3 diffuseShading = EvaluateAmbientLight(ao);
 	diffuseShading += vec3(flatShading) * EvaluateSunLight();
-	
+
+	// Omnidirectional: every face reaches full albedo, so one colour stays one
+	// colour whichever way its faces point. Ambient occlusion is kept, being a
+	// soft corner cue rather than the hard per-face step the sun term creates.
+	diffuseShading = mix(diffuseShading, vec3(ao), flatLighting);
+
 	// apply diffuse shading
 	if (!isEmissive)
 		gl_FragColor.xyz *= diffuseShading;
