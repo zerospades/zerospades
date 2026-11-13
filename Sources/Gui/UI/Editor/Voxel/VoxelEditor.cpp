@@ -3291,22 +3291,33 @@ namespace spades {
 			}
 		} // namespace
 
-		std::vector<OptionBar::SubToolButton> VoxelEditor::SubToolButtons(VoxelTool& tool) {
-			// Lit only while the tool is the one at work: a bar left standing
-			// under its strip shows what can be gone back to, not what is on.
-			const bool active = &tool == ActiveTool();
-			std::vector<OptionBar::SubToolButton> buttons;
-			for (int i = 0; i < tool.SubToolCount(); i++) {
-				OptionBar::SubToolButton btn;
-				btn.label = tool.SubToolLabel(i);
-				const std::string key = SubToolHotKey(tool, i);
-				btn.hotKey = KeyIsTaken(key) ? std::string() : key;
-				btn.group = tool.SubToolGroup(i);
-				btn.active = active && tool.ActiveSubTool() == i;
-				buttons.push_back(btn);
-			}
-			return buttons;
+		std::string VoxelEditor::ShownSubToolKey(VoxelTool& tool, int index) {
+			// A key the editor already uses for something else never reaches
+			// the sub-tool, so its button does not claim it.
+			const std::string key = SubToolHotKey(tool, index);
+			return KeyIsTaken(key) ? std::string() : key;
 		}
+
+		namespace {
+			// A tool's sub-tools as a bar's buttons, each with the key
+			// `keyOf` gives it. Lit only while the tool is the one at work
+			// (`atWork`): a bar left standing under its strip shows what can be
+			// gone back to, not what is on.
+			std::vector<OptionBar::SubToolButton>
+			SubToolButtons(VoxelTool& tool, bool atWork,
+			               const std::function<std::string(int)>& keyOf) {
+				std::vector<OptionBar::SubToolButton> buttons;
+				for (int i = 0; i < tool.SubToolCount(); i++) {
+					OptionBar::SubToolButton btn;
+					btn.label = tool.SubToolLabel(i);
+					btn.hotKey = keyOf(i);
+					btn.group = tool.SubToolGroup(i);
+					btn.active = atWork && tool.ActiveSubTool() == i;
+					buttons.push_back(btn);
+				}
+				return buttons;
+			}
+		} // namespace
 
 		void VoxelEditor::DrawOptionBar(float sw) {
 			// With no tool active the bar is drawn empty, so it never keeps
@@ -3317,7 +3328,8 @@ namespace spades {
 			// always on would only be noise.
 			std::vector<OptionBar::SubToolButton> subTools;
 			if (t && t->SubToolCount() > 1)
-				subTools = SubToolButtons(*t);
+				subTools = SubToolButtons(*t, t == ActiveTool(),
+				                          [&](int i) { return ShownSubToolKey(*t, i); });
 			std::vector<OptionBar::Option> options;
 			if (t) {
 				t->UpdateOptions(*this);
@@ -3333,7 +3345,8 @@ namespace spades {
 			std::vector<OptionBar::SubToolButton> subTools;
 			std::vector<OptionBar::Option> options;
 			if (t) {
-				subTools = SubToolButtons(*t);
+				subTools = SubToolButtons(*t, t == ActiveTool(),
+				                          [&](int i) { return ShownSubToolKey(*t, i); });
 				t->UpdateOptions(*this);
 				// Its commands, good at any time, then what the sub-tool at
 				// work is set by: nothing while the strip is only on offer.

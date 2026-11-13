@@ -29,7 +29,6 @@
 
 #include <Core/Math.h>
 #include <Core/RefCountedObject.h>
-#include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Editor/Shell/ToolEvent.h>
 #include <Gui/UI/Editor/Shell/ToolOptions.h>
 #include <Gui/UI/Editor/Voxel/VoxelEditContext.h>
@@ -46,6 +45,7 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		class EditorUI;
+		class OptionBar;
 		class ITransformTarget;
 		class TransformPanel;
 		class IVoxelDocument;
@@ -642,7 +642,9 @@ namespace spades {
 			void DrawToolbar(float sw);
 			void DrawOptionBar(float sw);
 			void DrawContextStrip(float sw);
-			std::vector<OptionBar::SubToolButton> SubToolButtons(VoxelTool& tool);
+			/** The key shown on `tool`'s sub-tool `index`'s button: none where
+			 *  the editor has taken the key for something else. */
+			std::string ShownSubToolKey(VoxelTool& tool, int index);
 			/** The tool whose sub-tools the strip offers now: the strip of the
 			 *  active tool, or the active tool itself when it is one, as long
 			 *  as it has anything to work on. Null for no strip. */
