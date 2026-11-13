@@ -40,25 +40,6 @@ namespace spades {
 			virtual bool RightButtonInverts() const { return true; }
 			// A voxel tool's sub-tools are voxel tools.
 			VoxelTool* SubTool(int) override { return nullptr; }
-			// Whether this is where voxels waiting to be placed (a paste, an
-			// import) are positioned: the editor goes to it when some arrive.
-			virtual bool PositionsPlacement() const { return false; }
-			// Whether the tool has anything to work on. One that has not is
-			// greyed out on the toolbar, its keys do nothing, and the editor
-			// leaves it for Select should it stop having any while active.
-			virtual bool Available(const IVoxelEditContext&) const { return true; }
-			// For a tool registered as another's strip (ToolTraits::stripOf): the
-			// commands the strip offers beside the sub-tools, good whether or
-			// not the tool is the active one; null for none.
-			virtual ToolOptions* StripCommands() { return nullptr; }
-			// Whether the view is an image being made rather than a model being
-			// worked on: the editor and its host then draw the model alone,
-			// with nothing of what they draw to work by.
-			virtual bool PresentsRender() const { return false; }
-			// The colour the picker and the toolbar's swatch show and set while
-			// this tool is active, 0x00BBGGRR, in place of the brush colour;
-			// null leaves them the brush's.
-			virtual std::uint32_t* PickerColor() { return nullptr; }
 			// What this tool sets by number, which the editor's transform panel
 			// shows while it is active (Pivot's pivot); null for nothing.
 			virtual ITransformTarget* TransformTarget(IVoxelEditContext&) { return nullptr; }

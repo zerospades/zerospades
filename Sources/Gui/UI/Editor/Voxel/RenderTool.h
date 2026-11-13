@@ -52,8 +52,8 @@ namespace spades {
 			void OnOptionNumberChanged(IVoxelEditContext& ed, const std::string& id, float value,
 			                           bool committed) override;
 
-			bool PresentsRender() const override { return true; }
-			std::uint32_t* PickerColor() override { return &background; }
+			void OnOptionColorChanged(IVoxelEditContext& ed, const std::string& id,
+			                          std::uint32_t color) override;
 
 		private:
 			ToolOptions options;
