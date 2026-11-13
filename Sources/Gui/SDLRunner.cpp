@@ -615,7 +615,10 @@ namespace spades {
 							SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
 						break;
 					case RendererType::Vulkan:
-						sdlFlags = SDL_WINDOW_VULKAN;
+						// High-DPI as GL: the swapchain takes the drawable's
+						// pixels (SDL_Vulkan_GetDrawableSize) while the window,
+						// the 2D layer and the mouse stay in window units.
+						sdlFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI;
 						break;
 					case RendererType::SW: sdlFlags = 0; break;
 				}

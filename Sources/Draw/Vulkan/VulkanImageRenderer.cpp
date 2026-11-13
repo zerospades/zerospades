@@ -358,19 +358,22 @@ namespace spades {
 
 			FinishCurrentBatch();
 
-			// Screen coordinates map 1:1 onto framebuffer pixels here: the
-			// vertex shader divides by the swapchain extent and the viewport is
+			// `rect` is in 2D units (window units), the scissor in framebuffer
+			// pixels, which are more on a high-DPI display. The viewport is
 			// Y-flipped, so screen (0, 0) is the top-left pixel, same as the
-			// scissor's origin. Clamp to the surface, as Vulkan rejects a
+			// scissor's origin. Rounded outwards, so the clip never eats a
+			// partial pixel, and clamped to the surface, as Vulkan rejects a
 			// scissor reaching outside the framebuffer.
 			const VkRect2D full = FullScissor();
 			const float maxX = static_cast<float>(full.extent.width);
 			const float maxY = static_cast<float>(full.extent.height);
+			const float sx = maxX / std::max(1.0F, renderer.ScreenWidth());
+			const float sy = maxY / std::max(1.0F, renderer.ScreenHeight());
 
-			float x0 = Clamp(floorf(rect.GetMinX()), 0.0f, maxX);
-			float y0 = Clamp(floorf(rect.GetMinY()), 0.0f, maxY);
-			float x1 = Clamp(ceilf(rect.GetMaxX()), x0, maxX);
-			float y1 = Clamp(ceilf(rect.GetMaxY()), y0, maxY);
+			float x0 = Clamp(floorf(rect.GetMinX() * sx), 0.0f, maxX);
+			float y0 = Clamp(floorf(rect.GetMinY() * sy), 0.0f, maxY);
+			float x1 = Clamp(ceilf(rect.GetMaxX() * sx), x0, maxX);
+			float y1 = Clamp(ceilf(rect.GetMaxY() * sy), y0, maxY);
 
 			VkRect2D scissor{};
 			scissor.offset = {static_cast<int32_t>(x0), static_cast<int32_t>(y0)};
@@ -713,12 +716,14 @@ namespace spades {
 		// Bind pipeline once (all batches use the same pipeline)
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-		// Use the actual swapchain extent as the authoritative UI surface size.
-		// renderer.ScreenWidth()/ScreenHeight() may be stale after a swapchain resize
-		// and may differ from the physical pixel size on HiDPI displays.
+		// Vertices are in 2D units (window units), not framebuffer pixels, so a
+		// high-DPI swapchain draws the same layout with more pixels, as GL does.
+		// The viewport covers the whole swapchain image; both sizes are re-read
+		// when the swapchain is made again, so they follow the window across
+		// resizes and displays of different densities.
 		VkExtent2D uiExtent = device->GetSwapchainExtent();
-		float invUIWidth  =  2.0f / static_cast<float>(uiExtent.width);
-		float invUIHeight = -2.0f / static_cast<float>(uiExtent.height);
+		float invUIWidth  =  2.0f / std::max(1.0f, renderer.ScreenWidth());
+		float invUIHeight = -2.0f / std::max(1.0f, renderer.ScreenHeight());
 
 		VkViewport viewport{};
 		viewport.x = 0.0f;

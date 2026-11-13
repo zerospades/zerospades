@@ -594,11 +594,13 @@ namespace spades {
 	}
 
 	VkExtent2D VulkanRenderer::DesiredRenderExtent() const {
-		// As GL: the window's size scaled by r_scale, kept within [0.2, 1], and
-		// at least a pixel either way
+		// As GL: the framebuffer's size in pixels, which on a high-DPI display is
+		// more than the window's in its own units, scaled by r_scale, kept within
+		// [0.2, 1], and at least a pixel either way
 		const float scale = std::max(0.2F, std::min(1.0F, static_cast<float>(r_scale)));
-		const int width = std::max(1, static_cast<int>(device->ScreenWidth() * scale));
-		const int height = std::max(1, static_cast<int>(device->ScreenHeight() * scale));
+		const VkExtent2D pixels = device->GetSwapchainExtent();
+		const int width = std::max(1, static_cast<int>(pixels.width * scale));
+		const int height = std::max(1, static_cast<int>(pixels.height * scale));
 		return VkExtent2D{static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 	}
 
@@ -1991,9 +1993,9 @@ namespace spades {
 			return static_cast<float>(device->ScreenHeight());
 		}
 
-		// The swapchain's pixels per unit of the 2D layer. The Vulkan window is
-		// not a high-DPI one yet (see TODO.md), so the two are the same size and
-		// this is 1; it follows the swapchain the day they differ.
+		// The swapchain's pixels per unit of the 2D layer: above 1 on a high-DPI
+		// display, where text and anything else sized in device pixels asks for
+		// it to stay sharp.
 		float VulkanRenderer::ScreenPixelRatio() {
 			const float units = ScreenWidth();
 			if (units <= 0.0F)
@@ -2028,7 +2030,9 @@ namespace spades {
 			}
 
 			// Only worth reporting when the scene is rendered at a scale other than 1.
-			if (renderWidth != device->ScreenWidth() || renderHeight != device->ScreenHeight()) {
+			const VkExtent2D pixels = device->GetSwapchainExtent();
+			if (static_cast<uint32_t>(renderWidth) != pixels.width ||
+			    static_cast<uint32_t>(renderHeight) != pixels.height) {
 				info.renderWidth = renderWidth;
 				info.renderHeight = renderHeight;
 			}
