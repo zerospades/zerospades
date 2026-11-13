@@ -1039,14 +1039,28 @@ namespace spades {
 				float ch = fb->GetHeight() * 0.5F;
 				for (size_t i = 0; i < debugLines.size(); i++) {
 					auto& l = debugLines[i];
-					auto v1 = projectionViewMatrix * l.v1;
-					auto v2 = projectionViewMatrix * l.v2;
-					if (v1.z < 0.001f || v2.z < 0.001f)
-						continue;
 
 					// SWRenderer's depth value is based on view Z coord
-					float d1 = Vector3::Dot(l.v1 - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
-					float d2 = Vector3::Dot(l.v2 - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+					Vector3 a = l.v1, b = l.v2;
+					float d1 = Vector3::Dot(a - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+					float d2 = Vector3::Dot(b - sceneDef.viewOrigin, sceneDef.viewAxis[2]);
+
+					// A line reaching behind the view is cut where it comes into it,
+					// not left out: the ground grid of an editor is made of lines
+					// far longer than the view is deep.
+					const float nearest = std::max(sceneDef.zNear, 0.001F);
+					if (d1 < nearest && d2 < nearest)
+						continue;
+					if (d1 < nearest) {
+						a += (b - a) * ((nearest - d1) / (d2 - d1));
+						d1 = nearest;
+					} else if (d2 < nearest) {
+						b += (a - b) * ((nearest - d2) / (d1 - d2));
+						d2 = nearest;
+					}
+
+					auto v1 = projectionViewMatrix * a;
+					auto v2 = projectionViewMatrix * b;
 					d1 = fastRcp(d1);
 					d2 = fastRcp(d2);
 
