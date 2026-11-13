@@ -164,6 +164,7 @@ namespace spades {
 			                           &*fontManager, *this, softwareCursor);
 			editor = std::make_unique<VoxelEditor>(document, *this, *renderer, *fontManager, *ui,
 			                                       *softwareCursor, VoxelEditor::Config());
+			BuildKeyLayers();
 
 			// The editor always opens with a document. A file the player asked to
 			// create is started under its name; one that exists but cannot be read
@@ -684,70 +685,134 @@ namespace spades {
 			editor->TrackModifiers(key, down);
 			cam.TrackModifiers(key, down);
 
+			OfferKey(keyLayers, key, down);
+		}
+
+		// What a key, or a mouse button, which arrives as one, goes to: topmost
+		// first, the first to take it having it.
+		void KV6EditorView::BuildKeyLayers() {
+			auto isMouseButton = [](const std::string& key) {
+				return key.find("MouseButton") != std::string::npos;
+			};
+
 			// A modal dialog (file browser) owns every key while it is up.
-			if (ui->GetOverlay()->KeyEvent(key, down))
-				return;
+			keyLayers.push_back({"a dialog", [this](const std::string& key, bool down) {
+				                     return ui->GetOverlay()->KeyEvent(key, down);
+			                     }});
 
 			// A menu of the bar owns the keyboard while it is down, Escape
 			// included: it is what Escape puts away first.
-			if (ui->GetMenuBar()->KeyEvent(key, down)) {
-				editor->ReleaseHeldInput();
-				return;
-			}
+			keyLayers.push_back({"an open menu", [this](const std::string& key, bool down) {
+				                     if (!ui->GetMenuBar()->KeyEvent(key, down))
+					                     return false;
+				                     editor->ReleaseHeldInput();
+				                     return true;
+			                     }});
+
 			// A press of any button but the left one, while a menu of the bar is
 			// down, only puts the menu away: the middle button is handled here,
 			// before the editor sees it, and would otherwise grab the view from
 			// under a menu that was merely being read. The left button has
 			// somewhere to land and is answered where the pointer is.
-			if (down && key != "LeftMouseButton" &&
-			    key.find("MouseButton") != std::string::npos && ui->GetMenuBar()->IsOpen()) {
-				ui->GetMenuBar()->Close();
-				return;
-			}
+			keyLayers.push_back(
+			  {"an open menu, any button but the left",
+			   [this, isMouseButton](const std::string& key, bool down) {
+				   if (!down || key == "LeftMouseButton" || !isMouseButton(key) ||
+				       !ui->GetMenuBar()->IsOpen())
+					   return false;
+				   ui->GetMenuBar()->Close();
+				   return true;
+			   }});
+
 			// Escape backs out of whatever the editor has in hand -- a number
 			// being typed, a box half drawn, the selection -- one layer at a
 			// time. With nothing left to back out of it leaves the editor,
 			// asking about unsaved work first; everything else the editor can
 			// be told to do is on the menu bar, in sight.
-			if (down && key == "Escape") {
-				if (!editor->EscapeOnce()) {
-					editor->ReleaseHeldInput();
-					ConfirmDiscardChanges([this] { wantsClose = true; });
-				}
-				return;
-			}
+			keyLayers.push_back({"Escape", [this](const std::string& key, bool down) {
+				                     if (!down || key != "Escape")
+					                     return false;
+				                     if (!editor->EscapeOnce()) {
+					                     editor->ReleaseHeldInput();
+					                     ConfirmDiscardChanges([this] { wantsClose = true; });
+				                     }
+				                     return true;
+			                     }});
 
 			// A number being typed has the keyboard, its Ctrl shortcuts too:
 			// Ctrl+Z undoes what was typed, not the document.
-			if (down && editor->IsTyping() && key.find("MouseButton") == std::string::npos &&
-			    editor->OptionBarKey(key))
-				return;
+			keyLayers.push_back(
+			  {"a number being typed, before the shortcuts",
+			   [this, isMouseButton](const std::string& key, bool down) {
+				   return down && editor->IsTyping() && !isMouseButton(key) &&
+				          editor->OptionBarKey(key);
+			   }});
 
-			if (down && editor->IsCommandHeld() &&
-			    (IsFileShortcut(key) || VoxelEditor::IsEditShortcut(key))) {
-				// Ctrl is also the default descend key (cg_keyCrouch), so the view
-				// has been sinking since Ctrl went down: undo that drift and stop
-				// descending for the rest of this press.
-				cam.CancelCtrlDescent();
-				if (VoxelEditor::IsEditShortcut(key)) {
-					editor->RunEditShortcut(key);
-					return;
-				}
-				// The document commands the menu offers, reachable without it: the
-				// menu is where they are found, not where they have to be used.
-				editor->CancelToolInteraction();
-				if (EqualsIgnoringCase(key, "s")) {
-					if (editor->IsShiftHeld())
-						OpenSaveAsDialog();
-					else
-						Save();
-				} else if (EqualsIgnoringCase(key, "n"))
-					NewDocument();
-				else if (EqualsIgnoringCase(key, "o"))
-					OpenDocument();
-				return;
+			keyLayers.push_back({"the commands' shortcuts", [this](const std::string& key, bool down) {
+				                     return down && CommandShortcutKey(key);
+			                     }});
+
+			keyLayers.push_back({"the mouse buttons", [this](const std::string& key, bool down) {
+				                     return MouseButtonKey(key, down);
+			                     }});
+
+			// A box being typed into owns the keyboard, so none of what follows
+			// runs: a letter would otherwise fly the camera or switch tools.
+			// Releases still fall through, or a key held from before the box was
+			// clicked would never be let go.
+			keyLayers.push_back({"a number being typed", [this](const std::string& key, bool down) {
+				                     return down && editor->OptionBarKey(key);
+			                     }});
+
+			keyLayers.push_back({"the screenshot key", [this](const std::string& key, bool down) {
+				                     if (!down || !EditorKeyMatches(cg_keyScreenshot, key))
+					                     return false;
+				                     wantScreenShot = true;
+				                     return true;
+			                     }});
+			keyLayers.push_back({"the editor's command keys", [this](const std::string& key, bool down) {
+				                     return editor->CommandKey(key, down);
+			                     }});
+			keyLayers.push_back({"the camera's movement", [this](const std::string& key, bool down) {
+				                     return cam.MovementKey(key, down, globalTime);
+			                     }});
+			keyLayers.push_back({"the view's keys", [this](const std::string& key, bool down) {
+				                     return down && !editor->IsCtrlHeld() && ViewKey(key);
+			                     }});
+			keyLayers.push_back({"the tools", [this](const std::string& key, bool down) {
+				                     editor->ToolKey(key, down);
+				                     return true;
+			                     }});
+		}
+
+		bool KV6EditorView::CommandShortcutKey(const std::string& key) {
+			if (!editor->IsCommandHeld() ||
+			    !(IsFileShortcut(key) || VoxelEditor::IsEditShortcut(key)))
+				return false;
+			// Ctrl is also the default descend key (cg_keyCrouch), so the view
+			// has been sinking since Ctrl went down: undo that drift and stop
+			// descending for the rest of this press.
+			cam.CancelCtrlDescent();
+			if (VoxelEditor::IsEditShortcut(key)) {
+				editor->RunEditShortcut(key);
+				return true;
 			}
+			// The document commands the menu offers, reachable without it: the
+			// menu is where they are found, not where they have to be used.
+			editor->CancelToolInteraction();
+			if (EqualsIgnoringCase(key, "s")) {
+				if (editor->IsShiftHeld())
+					OpenSaveAsDialog();
+				else
+					Save();
+			} else if (EqualsIgnoringCase(key, "n"))
+				NewDocument();
+			else if (EqualsIgnoringCase(key, "o"))
+				OpenDocument();
+			return true;
+		}
 
+		bool KV6EditorView::MouseButtonKey(const std::string& key, bool down) {
 			if (key == "MiddleMouseButton") {
 				// Turning and panning go round the voxel under the cursor, wherever
 				// flying has left the orbited point.
@@ -760,35 +825,17 @@ namespace spades {
 					}
 				}
 				cam.SetLooking(down);
-				return;
+				return true;
 			}
 			if (key == "LeftMouseButton") {
 				editor->ButtonEvent(PointerButton::Left, down);
-				return;
+				return true;
 			}
 			if (key == "RightMouseButton") {
 				editor->ButtonEvent(PointerButton::Right, down);
-				return;
+				return true;
 			}
-
-			// A box being typed into owns the keyboard, so none of what follows
-			// runs: a letter would otherwise fly the camera or switch tools.
-			// Releases still fall through, or a key held from before the box was
-			// clicked would never be let go.
-			if (down && editor->OptionBarKey(key))
-				return;
-
-			if (down && EditorKeyMatches(cg_keyScreenshot, key)) {
-				wantScreenShot = true;
-				return;
-			}
-			if (editor->CommandKey(key, down))
-				return;
-			if (cam.MovementKey(key, down, globalTime))
-				return;
-			if (down && !editor->IsCtrlHeld() && ViewKey(key))
-				return;
-			editor->ToolKey(key, down);
+			return false;
 		}
 
 		void KV6EditorView::TextInputEvent(const std::string& text) {
