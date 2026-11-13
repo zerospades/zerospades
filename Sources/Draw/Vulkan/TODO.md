@@ -18,33 +18,20 @@ Open work only; what is done is in the git history. The GL renderer in
       sampled through `sceneDepthSampleImage` (a D32 image read through `sampler2D`
       returned 0 on MoltenVK), then drop the workaround once Fog2 matches.
 
-## Renderer contract from `autodetect-screen-res` (UI scale, high DPI)
+## Renderer contract of the UI scale / high-DPI work
 
-That branch scales the UI with the window and renders high-DPI windows at full
-resolution. Once it lands, Vulkan must follow the same `IRenderer` contract the GL
-renderer does there:
+The 2D layer is in window units and the swapchain in pixels, as in GL: the
+window is a high-DPI one, `ScreenPixelRatio()` is the swapchain's pixels per
+window unit, clip rectangles are converted for the scissor, and both sizes are
+re-read whenever the swapchain is made again. What is left of that contract:
 
-- [ ] **2D in window units, framebuffer in pixels** — `ScreenWidth`/`ScreenHeight`
-      return the window size (`SDL_GetWindowSize`, points on a high-DPI display), the
-      units of mouse input; the swapchain stays at `SDL_Vulkan_GetDrawableSize`.
-      `VulkanImageRenderer` currently projects 2D through the swapchain extent
-      (pixels): project through `ScreenWidth`/`ScreenHeight` instead, with the
-      viewport still covering the whole swapchain image. Convert clip rects
-      (`BeginClippingRect`) to pixels for the scissor; full-screen 2D blits keep a
-      pixel viewport and a quad in 2D units.
-- [ ] **`ScreenPixelRatio()`** — swapchain pixels per window unit. FTFont, the pie
-      menu's anti-aliasing and the crosshair size themselves with it (through
-      `ScaledRenderer`, which multiplies in the UI scale).
-- [ ] **High-DPI window** — `SDLRunner` adds `SDL_WINDOW_ALLOW_HIGHDPI` for GL only;
-      add it for `RendererType::Vulkan` (the macOS bundle already declares
-      `NSHighResolutionCapable`).
-- [ ] **Resizes and density changes** — the game window is now resizable and may
-      open maximized, so its size changes right after creation; it can also move to a
-      display of another density. Re-read both sizes and recreate the swapchain on
-      every change (`RecreateSwapchainDependencies`), before the next frame's 2D.
-- [ ] **`CreateImageWithoutMipmaps`** — an image created with `mipLevels = 1` (the
-      6x8 pixel font's enlarged atlases); the default falls back to `CreateImage`,
-      whose mip chain blurs that font at fractional scales.
+- [ ] **`CreateImageWithoutMipmaps`**, once `IRenderer` has it: an image created
+      with `mipLevels = 1` (the 6x8 pixel font's enlarged atlases); the default
+      falls back to `CreateImage`, whose mip chain blurs that font at fractional
+      scales.
+- [ ] **Screenshots hold the scene only** — `ReadBitmap` reads the scene's
+      resolved colour image, so a screenshot leaves out the 2D layer GL's
+      includes (the model editor's bars, the HUD).
 
 ## Unscheduled ideas
 
