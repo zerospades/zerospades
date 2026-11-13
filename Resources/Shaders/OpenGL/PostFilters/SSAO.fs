@@ -23,18 +23,31 @@ uniform sampler2D depthTexture;
 uniform sampler2D ditherTexture; // 4x4 pattern
 uniform vec2 zNearFar;
 uniform vec2 pixelShift;
+// Per unit of depth in a perspective view; the view's own half-extent in a
+// parallel one, where nothing spreads with distance.
 uniform vec2 fieldOfView;
 uniform vec2 sampleOffsetScale;
+// 1.0 for a perspective view, 0.0 for a parallel one. The two write the depth
+// buffer differently and turn a pixel into a view coordinate differently, and
+// both are mixed between rather than branched on.
+uniform float perspective;
 
 varying vec2 texCoord;
 
 float decodeDepth(float w, float near, float far) {
-    return far * near / mix(far, near, w);
+    // A frustum writes the reciprocal of the depth; a box writes the depth.
+    return mix(mix(near, far, w), far * near / mix(far, near, w), perspective);
 }
 
 // d(decodeDepth)/dw
 float decodeDepthDW(float w, float near, float far) {
-    return far * near * (far - near) / pow(mix(far, near, w), 2.0);
+    return mix(far - near, far * near * (far - near) / pow(mix(far, near, w), 2.0), perspective);
+}
+
+// What a half-view at `depth` covers: the view spreads with the depth in a
+// perspective projection and stays as it is in a parallel one.
+float viewSpread(float depth) {
+    return mix(1.0, depth, perspective);
 }
 
 float minabs(float a, float b) {
@@ -64,8 +77,9 @@ void main() {
     float originDepth = decodeDepth(depth1, zNearFar.x, zNearFar.y);
 
     float diffScale = decodeDepthDW(depth1, zNearFar.x, zNearFar.y);
-    vec3 viewCoordDiff1 = vec3(pixelShift.x * fieldOfView.x * originDepth, 0.0, diffScale * dDepthdX);
-    vec3 viewCoordDiff2 = vec3(0.0, pixelShift.y * fieldOfView.y * originDepth, diffScale * dDepthdY);
+    float originSpread = viewSpread(originDepth);
+    vec3 viewCoordDiff1 = vec3(pixelShift.x * fieldOfView.x * originSpread, 0.0, diffScale * dDepthdX);
+    vec3 viewCoordDiff2 = vec3(0.0, pixelShift.y * fieldOfView.y * originSpread, diffScale * dDepthdY);
     vec3 originNormal = normalize(cross(viewCoordDiff1, viewCoordDiff2));
 
     // Sampling pattern
@@ -86,8 +100,8 @@ void main() {
     vec2 sampleDir = vec2(sin(patternPos1), cos(patternPos1));
 
     // Center location
-    vec3 originViewCoord = vec3((texCoord * 2.0 - 1.0) * fieldOfView, 1.0);
-    originViewCoord *= originDepth;
+    vec3 originViewCoord =
+      vec3((texCoord * 2.0 - 1.0) * fieldOfView * originSpread, originDepth);
 
     // Decay parameter
     float depthDecayScale = -2.0;
@@ -104,7 +118,8 @@ void main() {
 
         decodedDepth += 0.1; // FIXME: this value needs to be tweaked?
 
-        vec3 viewCoord =  vec3((sampleCoord * 2.0 - 1.0) * fieldOfView, 1.0) * decodedDepth;
+        vec3 viewCoord = vec3((sampleCoord * 2.0 - 1.0) * fieldOfView * viewSpread(decodedDepth),
+                              decodedDepth);
         vec3 relativeViewCoord = normalize(viewCoord - originViewCoord);
         float cosHorizon = -dot(relativeViewCoord, originNormal);
         float depthDecay = exp2(depthDecayScale * abs(decodedDepth - originDepth));

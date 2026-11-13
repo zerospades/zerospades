@@ -21,6 +21,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include <Client/IFont.h>
 #include <Core/TMPUtils.h>
@@ -59,6 +60,16 @@ namespace spades {
 		/**
 		 * FreeType2 based font renderer.
 		 *
+		 * Its sizes and measures are in the renderer's 2D units, but its glyphs
+		 * are rasterized at the size they are drawn at, in the display's pixels
+		 * (its height times the scale it is drawn at times IRenderer::
+		 * ScreenPixelRatio): each glyph is whole pixels hanging from its line's
+		 * one baseline, never a glyph of another size stretched over them, which
+		 * would set each of a line's glyphs half a pixel off the others. They
+		 * are rasterized again should the density change (the window moved to
+		 * another display). A font keeps a few sizes; past them, text is drawn
+		 * from the nearest it has.
+		 *
 		 * Warning: only one thread can access multiple FTFonts sharing the same FTFontSet
 		 *			at the same time.
 		 */
@@ -73,14 +84,21 @@ namespace spades {
 					: img(img), bounds(bounds), offset(offset) {}
 			};
 
-			struct Glyph {
-				FT_Face face;
-				uint32_t charIndex;
-				Vector2 advance;
+			// A glyph rasterized at one size: as it is, blurred (a shadow) and
+			// outlined, each made when first drawn.
+			struct Raster {
 				stmp::optional<GlyphImage> image;
 				stmp::optional<GlyphImage> blurImage;
 				stmp::optional<GlyphImage> outlineImage;
 				Handle<Bitmap> bmp;
+			};
+
+			struct Glyph {
+				FT_Face face;
+				uint32_t charIndex;
+				Vector2 advance; // at the font's size, in 2D units
+				// By the size they were rasterized at, as RasterSize gives it.
+				std::unordered_map<int, Raster> rasters;
 			};
 
 			struct GlyphHash {
@@ -94,7 +112,10 @@ namespace spades {
 			float lineHeight;
 			/** em height */
 			float height;
-			float baselineY;
+			/** Display pixels per 2D unit. */
+			float density;
+			/** The sizes glyphs are rasterized at, as RasterSize gives them. */
+			std::vector<int> sizes;
 
 			bool rendererIsLowQuality;
 
@@ -109,9 +130,33 @@ namespace spades {
 			void SplitTextIntoGlyphs(const std::string &, T glyphHandler, T3 fallbackHandler,
 									 T2 lineBreakHandler);
 
-			void RenderGlyph(Glyph &);
-			void RenderBlurGlyph(Glyph &);
-			void RenderOutlineGlyph(Glyph &);
+			/** Follows the display's pixel density, rasterizing the glyphs
+			 *  again when it changed. */
+			void UpdateDensity();
+			/** `target` (2D units) on the nearest pixel, so glyphs stay crisp. */
+			Vector2 SnapToPixel(const Vector2 &target) const;
+			/**
+			 * The size, in quarter pixels, glyphs of text drawn at `scale` are
+			 * rasterized at: the size it is drawn at, or, once the font keeps
+			 * as many sizes as it may, the nearest it has.
+			 */
+			int RasterSize(float scale);
+			Raster &RenderGlyph(Glyph &, int size);
+			Raster &RenderBlurGlyph(Glyph &, int size);
+			/** `bmp` blurred once, grown by the kernel's reach on every side. */
+			static Handle<Bitmap> BlurOnce(Bitmap &bmp);
+			Raster &RenderOutlineGlyph(Glyph &, int size);
+			/** Puts `bmp` in an atlas, as `slot`, drawn `offset` pixels from
+			 *  the pen (at the glyph's top left). */
+			void Store(stmp::optional<GlyphImage> &slot, Bitmap &bmp, const Vector2 &offset);
+			/**
+			 * `str` drawn at `scale` with the image `imageOf` gives of each glyph
+			 * at a size (plain, blurred or outlined): the pen on a whole pixel
+			 * for each glyph, the glyph whole pixels from it.
+			 */
+			template <class ImageOf>
+			void DrawGlyphs(const std::string &str, Vector2 offset, float scale, Vector4 color,
+			                ImageOf imageOf);
 
 		protected:
 			~FTFont();

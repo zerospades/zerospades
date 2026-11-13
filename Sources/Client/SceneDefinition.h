@@ -28,15 +28,36 @@ namespace spades {
 			int viewportLeft, viewportTop;
 			int viewportWidth, viewportHeight;
 			float fovX, fovY;
+			// A parallel projection instead, taking in `orthoHeight` world
+			// units from the top of the viewport to the bottom at every depth;
+			// the field of view still gives the viewport's shape, so the width
+			// taken in is that height times its ratio. The editors offer it;
+			// the game is always a perspective view.
+			bool orthogonal;
+			float orthoHeight;
 			Vector3 viewOrigin;
 			Vector3 viewAxis[3];
 			float zNear, zFar;
 			bool skipWorld;
+			/** Draw the world's terrain but not its water surface, nor the mirrored
+			 *  scene that feeds it (the model editor wants voxels under the model,
+			 *  not the map's sea). */
+			bool skipWater;
 
 			/** Whether the frame may draw models flagged `xray` through the world. The
 			 * renderer skips the whole pass when this is clear, so it has to be set on
 			 * any frame where a model asks to be revealed. */
 			bool allowPlayerXRay;
+
+			/** Light models from every direction at once instead of from the sun.
+			 *  A voxel has only six face normals, so a directional term splits one
+			 *  flat colour into a handful of visibly different shades; the model
+			 *  editor wants the voxel's own colour on screen. Ambient occlusion
+			 *  still applies, so corners keep a soft shape cue. */
+			bool flatModelLighting;
+			/** Draw the outline pass whatever `r_outlines` says. Flat lighting drops
+			 *  the shading that conveys depth, and a silhouette gives it back. */
+			bool forceOutlines;
 
 			float depthOfFieldFocalLength;
 			float depthOfFieldNearBlurStrength;
@@ -65,6 +86,8 @@ namespace spades {
 				viewportLeft = viewportTop = 0;
 				viewportWidth = viewportHeight = 0;
 				fovX = fovY = 0.0F;
+				orthogonal = false;
+				orthoHeight = 0.0F;
 				viewOrigin = MakeVector3(0, 0, 0);
 				viewAxis[0] = MakeVector3(1, 0, 0);
 				viewAxis[1] = MakeVector3(0, 1, 0);
@@ -72,6 +95,9 @@ namespace spades {
 				zNear = zFar = 0.0F;
 				skipWorld = false;
 				allowPlayerXRay = false;
+				skipWater = false;
+				flatModelLighting = false;
+				forceOutlines = false;
 				depthOfFieldFocalLength = 0.0F;
 				depthOfFieldNearBlurStrength = 1.0F;
 				depthOfFieldFarBlurStrength = 0.0F;
@@ -86,6 +112,7 @@ namespace spades {
 			}
 
 			Matrix4 ToOpenGLProjectionMatrix() const;
+			Matrix4 ToVulkanProjectionMatrix() const;
 			Matrix4 ToViewMatrix() const;
 		};
 	} // namespace client

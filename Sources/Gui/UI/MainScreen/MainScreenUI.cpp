@@ -108,6 +108,11 @@ namespace spades {
 			mainMenu->SetState(state);
 		}
 
+		void MainScreenUI::OnReturnedToMenu() {
+			if (mainMenu)
+				mainMenu->RefreshVisibleTab();
+		}
+
 		void MainScreenUI::SetupRenderer() {
 			// load map
 			std::unique_ptr<IStream> stream{FileManager::OpenForReading("Maps/Title.vxl")};

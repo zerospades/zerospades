@@ -24,9 +24,20 @@
 
 #include "SDLRunner.h"
 
+#include <Client/ScreenShot.h>
 #include <Gui/Utils/DisplayUtils.h>
+
+#include "AutomationOptions.h"
+
 #include <Gui/Utils/Icon.h>
+#ifdef USE_OPENGL
 #include "SDLGLDevice.h"
+#include <Draw/OpenGL/GLRenderer.h>
+#endif
+#ifdef USE_VULKAN
+#include "SDLVulkanDevice.h"
+#include <Draw/Vulkan/VulkanRenderer.h>
+#endif
 #include <Audio/ALDevice.h>
 #include <Audio/NullDevice.h>
 #include <Client/Client.h>
@@ -37,7 +48,6 @@
 #include <Core/IStream.h>
 #include <Core/Math.h>
 #include <Core/Settings.h>
-#include <Draw/OpenGL/GLRenderer.h>
 #include <Draw/SW/SWPort.h>
 #include <Draw/SW/SWRenderer.h>
 #include <ZeroSpades.h>
@@ -48,6 +58,7 @@ DEFINE_SPADES_SETTING(r_fullscreen, "0");
 DEFINE_SPADES_SETTING(r_vsync, "1");
 DEFINE_SPADES_SETTING(r_allowSoftwareRendering, "0");
 DEFINE_SPADES_SETTING(r_renderer, "gl");
+DEFINE_SPADES_SETTING(r_vulkan, "0");
 DEFINE_SPADES_SETTING(s_audioDriver, "openal");
 DEFINE_SPADES_SETTING(cl_fps, "0");
 
@@ -166,6 +177,10 @@ namespace spades {
 					break;
 				case SDL_KEYUP: view.KeyEvent(TranslateKey(event.key.keysym), false); break;
 				case SDL_TEXTINPUT: view.TextInputEvent(event.text.text); break;
+				// A file is opened with this program at startup, not by dropping it on
+				// a running one. The name still has to be released: SDL allocated it
+				// for a receiver, and here there is none.
+				case SDL_DROPFILE: SDL_free(event.drop.file); break;
 				case SDL_TEXTEDITING:
 					view.TextEditingEvent(event.edit.text, event.edit.start, event.edit.length);
 					break;
@@ -200,6 +215,8 @@ namespace spades {
 			{
 				Handle<View> view(CreateView(renderer, audio), false);
 				Uint32 ot = SDL_GetTicks();
+				const Uint32 startTicks = ot;
+				bool quitAfterFrame = false;
 
 				bool running = true;
 				bool lastShift = false;
@@ -239,9 +256,30 @@ namespace spades {
 						// (closing a subview, restoring renderer state) — that work must
 						// never run between drawing the frame and swapping it.
 						renderer->FrameDone();
+
+						// --screenshot-quit: the frame drawn that long after the start
+						// is saved, and the program quits.
+						const float screenshotAfter = Automation().screenshotQuitAfter;
+						if (screenshotAfter >= 0.0F &&
+						    float(SDL_GetTicks() - startTicks) / 1000.0F >= screenshotAfter) {
+							try {
+								SPLog("Screenshot taken before quitting: %s",
+								      client::SaveScreenShot(*renderer).c_str());
+							} catch (const std::exception& ex) {
+								SPLog("[!] Screenshot before quitting failed: %s", ex.what());
+							}
+							quitAfterFrame = true;
+						}
+
 						renderer->Flip();
 
 						view->RunFrameLate((float)dt / 1000.0F);
+					}
+
+					if (quitAfterFrame) {
+						view->Closing();
+						SPLog("Quitting after the screenshot (--screenshot-quit)");
+						break;
 					}
 
 					if (view->WantsToBeClosed()) {
@@ -348,12 +386,21 @@ namespace spades {
 		}
 
 		auto SDLRunner::GetRendererType() -> RendererType {
+#ifdef USE_VULKAN
+			if ((bool)r_vulkan)
+				return RendererType::Vulkan;
+#endif
 			if (EqualsIgnoringCase(r_renderer, "gl"))
 				return RendererType::GL;
+			else if (EqualsIgnoringCase(r_renderer, "vulkan"))
+				return RendererType::Vulkan;
 			else if (EqualsIgnoringCase(r_renderer, "sw"))
 				return RendererType::SW;
-			else
-				SPRaise("Unknown renderer name: %s", r_renderer.CString());
+			else {
+				SPLog("Unrecognized renderer '%s', falling back to software renderer.", r_renderer.CString());
+				r_renderer = "sw";
+				return RendererType::SW;
+			}
 		}
 
 		class SDLSWPort : public draw::SWPort, public Disposable {
@@ -444,6 +491,7 @@ namespace spades {
 		std::tuple<Handle<client::IRenderer>, Handle<Disposable>>
 		SDLRunner::CreateRenderer(SDL_Window* wnd, RendererType type) {
 			switch (type) {
+#ifdef USE_OPENGL
 				case RendererType::GL: {
 					auto glDevice = Handle<SDLGLDevice>::New(wnd).Cast<draw::IGLDevice>();
 					auto dummy = Handle<Disposable>::New(); // FIXME
@@ -451,6 +499,16 @@ namespace spades {
 					  Handle<draw::GLRenderer>::New(std::move(glDevice)).Cast<client::IRenderer>(),
 					  std::move(dummy));
 				}
+#endif
+#ifdef USE_VULKAN
+				case RendererType::Vulkan: {
+					auto vulkanDevice = Handle<SDLVulkanDevice>::New(wnd);
+					auto dummy = Handle<Disposable>::New(); // FIXME
+					return std::make_tuple(
+					  Handle<draw::VulkanRenderer>::New(std::move(vulkanDevice)).Cast<client::IRenderer>(),
+					  std::move(dummy));
+				}
+#endif
 				case RendererType::SW: {
 					auto port = Handle<SDLSWPort>::New(wnd).Cast<draw::SWPort>();
 					return std::make_tuple(
@@ -544,12 +602,23 @@ namespace spades {
 				Uint32 sdlFlags = 0;
 				switch (rtype) {
 					case RendererType::GL:
-						sdlFlags = SDL_WINDOW_OPENGL;
+						// High-DPI: the window keeps its size in window units (layout and
+						// mouse input are unchanged) while the GL framebuffer gets every
+						// pixel the display has. The GL renderer reads both sizes from
+						// SDLGLDevice. The SW renderer blits a window surface sized in
+						// window units, so it stays out of this.
+						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 						if (!r_allowSoftwareRendering)
 							SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+						break;
+					case RendererType::Vulkan:
+						// High-DPI as GL: the swapchain takes the drawable's
+						// pixels (SDL_Vulkan_GetDrawableSize) while the window,
+						// the 2D layer and the mouse stay in window units.
+						sdlFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_ALLOW_HIGHDPI;
 						break;
 					case RendererType::SW: sdlFlags = 0; break;
 				}

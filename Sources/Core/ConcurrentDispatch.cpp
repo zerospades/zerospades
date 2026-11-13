@@ -88,11 +88,16 @@ namespace spades {
 		bool released;
 
 		SyncQueueEntry(ConcurrentDispatch *disp)
-		    : doneCond(SDL_CreateCond()),
-		      doneMutex(SDL_CreateMutex()),
-		      dispatch(disp),
+		    : dispatch(disp),
 		      done(false),
-		      released(false) {}
+		      released(false) {
+			doneCond = SDL_CreateCond();
+			doneMutex = SDL_CreateMutex();
+			if (!doneCond || !doneMutex) {
+				const char* sdlError = SDL_GetError();
+				SPRaise("Failed to create synchronization primitives: %s", sdlError ? sdlError : "unknown error");
+			}
+		}
 		~SyncQueueEntry() {
 			SDL_DestroyCond(doneCond);
 			SDL_DestroyMutex(doneMutex);
@@ -103,28 +108,37 @@ namespace spades {
 		}
 
 		void Done() {
-			SDL_LockMutex(doneMutex);
-			done = true;
-			SDL_CondBroadcast(doneCond);
-			if (released) {
-				delete this;
+			if (SDL_LockMutex(doneMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Done(): %s", SDL_GetError());
 				return;
 			}
+			done = true;
+			SDL_CondBroadcast(doneCond);
+			bool shouldDelete = released;
 			SDL_UnlockMutex(doneMutex);
+			if (shouldDelete) {
+				delete this;
+			}
 		}
 
 		void Release() {
-			SDL_LockMutex(doneMutex);
-			released = true;
-			if (done) {
-				delete this;
+			if (SDL_LockMutex(doneMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Release(): %s", SDL_GetError());
 				return;
 			}
+			released = true;
+			bool shouldDelete = done;
 			SDL_UnlockMutex(doneMutex);
+			if (shouldDelete) {
+				delete this;
+			}
 		}
 
 		void Join() {
-			SDL_LockMutex(doneMutex);
+			if (SDL_LockMutex(doneMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Join(): %s", SDL_GetError());
+				return;
+			}
 			while (!done) {
 				SDL_CondWait(doneCond, doneMutex);
 			}
@@ -142,6 +156,10 @@ namespace spades {
 		SynchronizedQueue() {
 			pushMutex = SDL_CreateMutex();
 			pushCond = SDL_CreateCond();
+			if (!pushMutex || !pushCond) {
+				const char* sdlError = SDL_GetError();
+				SPRaise("Failed to create queue synchronization primitives: %s", sdlError ? sdlError : "unknown error");
+			}
 		}
 		~SynchronizedQueue() {
 			SDL_DestroyMutex(pushMutex);
@@ -149,7 +167,10 @@ namespace spades {
 		}
 
 		void Push(SyncQueueEntry *entry) {
-			SDL_LockMutex(pushMutex);
+			if (SDL_LockMutex(pushMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Push(): %s", SDL_GetError());
+				SPRaise("Failed to lock mutex in Push");
+			}
 			try {
 				entries.push_back(entry);
 			} catch (...) {
@@ -161,7 +182,10 @@ namespace spades {
 		}
 
 		SyncQueueEntry *Wait() {
-			SDL_LockMutex(pushMutex);
+			if (SDL_LockMutex(pushMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Wait(): %s", SDL_GetError());
+				SPRaise("Failed to lock mutex in Wait");
+			}
 			while (entries.empty()) {
 				SDL_CondWait(pushCond, pushMutex);
 			}
@@ -174,7 +198,10 @@ namespace spades {
 		}
 
 		SyncQueueEntry *Poll() {
-			SDL_LockMutex(pushMutex);
+			if (SDL_LockMutex(pushMutex) != 0) {
+				SPLog("Warning: SDL_LockMutex failed in Poll(): %s", SDL_GetError());
+				return NULL;
+			}
 			if (!entries.empty()) {
 				SyncQueueEntry *ent = entries.front();
 				entries.pop_front();
