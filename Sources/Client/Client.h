@@ -520,7 +520,7 @@ namespace spades {
 			void Bleed(Vector3, bool bounce = false);
 			void EmitBlockFragments(Vector3, IntVector3 color);
 			void EmitBlockDestroyFragments(IntVector3 pos);
-			void GrenadeExplosion(Vector3);
+			void GrenadeExplosion(Vector3, int ownerId = -1);
 			void GrenadeExplosionUnderwater(Vector3);
 			void MuzzleFire(Vector3, bool smoke = true);
 			void BulletHitWaterSurface(Vector3);

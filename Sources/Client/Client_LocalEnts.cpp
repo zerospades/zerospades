@@ -36,6 +36,8 @@
 #include "Corpse.h"
 #include "ILocalEntity.h"
 #include "ParticleSpriteEntity.h"
+#include "ColoredSmokeGrenadeEntity.h"
+#include "SmokeGrenadeEntity.h"
 #include "SmokeSpriteEntity.h"
 
 #include "GameMap.h"
@@ -52,6 +54,22 @@ DEFINE_SPADES_SETTING(cg_waterImpact, "1");
 
 DEFINE_SPADES_SETTING(cg_corpseSoftLimit, "6");
 DEFINE_SPADES_SETTING(cg_corpseHardLimit, "16");
+
+// smoke-grenade re-skin (fork feature): replaces the classic grenade
+// explosion with a 10 s dense light-gray smoke screen + a 10 s
+// "pssshhh" sample. Hook in Client::GrenadeExplosion below.
+// NOTE: DEFINE_SPADES_SETTING of the same name must exist exactly
+// ONCE in the whole project (duplicate = linker error). If you
+// declared cg_smokeGrenade elsewhere, remove that occurrence.
+// `cg_smokeGrenade 0` in the console restores the classic explosion
+// without a rebuild.
+DEFINE_SPADES_SETTING(cg_smokeGrenade, "1");
+
+// Second smoke-grenade mode, selected live in the console:
+//   0 = thick light-gray cloud (SmokeGrenadeEntity, default)
+//   1 = thin column colored with the thrower's TEAM color
+//       (ColoredSmokeGrenadeEntity, color resolved in the hook)
+DEFINE_SPADES_SETTING(cg_smokeGrenadeStyle, "0");
 
 SPADES_SETTING(cg_manualFocus);
 DEFINE_SPADES_SETTING(cg_autoFocusSpeed, "0.4");
@@ -378,11 +396,47 @@ namespace spades {
 			grenadeVibrationSlow = std::min(grenadeVibrationSlow + strength * 5.0F, 0.4F);
 		}
 
-		void Client::GrenadeExplosion(spades::Vector3 pos) {
+		void Client::GrenadeExplosion(spades::Vector3 pos, int ownerId) {
 			// distance cull
 			float dist = (pos - lastSceneDef.viewOrigin).GetLength();
 			if (dist > FOG_DISTANCE + 16.0F)
 				return;
+
+			// --- smoke-grenade re-skin (fork feature) ------------------
+			// Replace the classic explosion visuals with a 10 s
+			// light-gray smoke screen + the 10 s "pssshhh" sample.
+			// Server-side damage is unchanged (still a classic grenade
+			// for the server). Classic effects (flash, camera kick,
+			// fragments) are skipped entirely.
+			// ownerId (>= 0, or -1 when unknown) lets the colored mode
+			// resolve the thrower's TEAM color. The color is resolved
+			// AFTER the distance cull: off-screen explosions cost
+			// nothing.
+			if (cg_smokeGrenade) {
+				Handle<IAudioChunk> chunk;
+				if (!IsMuted())
+					chunk = audioDevice->RegisterSound(
+					  "Sounds/Weapons/Grenade/Smoke.opus");
+
+				std::unique_ptr<ILocalEntity> emitter;
+				if ((int)cg_smokeGrenadeStyle == 1) {
+					// thin column colored with the thrower's team color
+					Vector4 col = MakeVector4(0.95f, 0.4f, 0.15f, 0.9f); // fallback
+					auto owner = (ownerId >= 0)
+					  ? world->GetPlayer(ownerId) : stmp::optional<Player&>{};
+					if (owner)
+						col = ConvertColorRGBA(
+						  world->GetTeamColor(owner->GetTeamId()));
+					emitter = stmp::make_unique<ColoredSmokeGrenadeEntity>(
+					  *this, audioDevice.GetPointerOrNull(), chunk, pos, col);
+				} else {
+					// thick light-gray cloud (default mode)
+					emitter = stmp::make_unique<SmokeGrenadeEntity>(
+					  *this, audioDevice.GetPointerOrNull(), chunk, pos);
+				}
+				localEntities.emplace_back(std::move(emitter));
+				return;
+			}
 
 			DynamicLightParam l;
 			l.type = DynamicLightTypePoint;

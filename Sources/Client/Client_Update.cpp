@@ -1830,7 +1830,7 @@ namespace spades {
 					audioDevice->Play(c.GetPointerOrNull(), origin, param);
 				}
 			} else {
-				GrenadeExplosion(origin);
+				GrenadeExplosion(origin, g.GetOwnerId());
 
 				if (!IsMuted()) {
 					Handle<IAudioChunk> c, cs;
