@@ -45,6 +45,13 @@ SPADES_SETTING(r_dlights);
 
 namespace spades {
 	namespace draw {
+		namespace {
+			// The depth of a pixel nothing has been drawn on: further than
+			// anything a scene holds, so whatever is drawn there is nearer, and
+			// fog, which goes by the depth, leaves it the fog's own colour.
+			constexpr float kNothingDrawnDepth = 1.0e10F;
+		} // namespace
+
 		SWRenderer::SWRenderer(Handle<SWPort> _port, SWFeatureLevel level)
 		    : featureLevel(level),
 		      port(std::move(_port)),
@@ -201,6 +208,25 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			projectionMatrix = sceneDef.ToOpenGLProjectionMatrix();
+			if (sceneDef.orthogonal) {
+				// Everything drawn here takes its depth from the projected Z and
+				// tests it as a distance along the view, which a frustum's is
+				// near enough and a box's, running from -1 to 1, is not. Make it
+				// that distance outright: the view looks down its own -Z.
+				projectionMatrix.m[2] = 0.0F;
+				projectionMatrix.m[6] = 0.0F;
+				projectionMatrix.m[10] = -1.0F;
+				projectionMatrix.m[14] = 0.0F;
+			}
+		}
+
+		Vector2 SWRenderer::ViewHalfExtent() const {
+			const float tanX = tanf(sceneDef.fovX * 0.5F);
+			const float tanY = tanf(sceneDef.fovY * 0.5F);
+			if (!sceneDef.orthogonal)
+				return MakeVector2(tanX, tanY);
+			const float halfHeight = sceneDef.orthoHeight * 0.5F;
+			return MakeVector2(halfHeight * (tanX / tanY), halfHeight);
 		}
 
 		void SWRenderer::BuildView() {
@@ -215,6 +241,22 @@ namespace spades {
 			frustrum[1] = frustrum[0].Flipped();
 			frustrum[0].w -= sceneDef.zNear;
 			frustrum[1].w += sceneDef.zFar;
+
+			if (sceneDef.orthogonal) {
+				// A box, not a pyramid: the sides are parallel to the line of
+				// sight and stand half the view's height and width out from it.
+				const Vector2 half = ViewHalfExtent();
+				const Vector3& side = sceneDef.viewAxis[0];
+				const Vector3& up = sceneDef.viewAxis[1];
+				frustrum[2] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - side * half.x, side);
+				frustrum[3] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + side * half.x, -side);
+				frustrum[4] = Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin - up * half.y, up);
+				frustrum[5] =
+				  Plane3::PlaneWithPointOnPlane(sceneDef.viewOrigin + up * half.y, -up);
+				return;
+			}
 
 			float xCos = cosf(sceneDef.fovX * 0.5F);
 			float xSin = sinf(sceneDef.fovX * 0.5F);
@@ -235,8 +277,12 @@ namespace spades {
 			int fw = this->fb->GetWidth();
 			int fh = this->fb->GetHeight();
 
-			float fovX = tanf(sceneDef.fovX * 0.5F);
-			float fovY = tanf(sceneDef.fovY * 0.5F);
+			// Across the view per unit of depth in a perspective view, and
+			// outright in a parallel one, where nothing spreads with distance.
+			const Vector2 half = ViewHalfExtent();
+			const bool spreads = !sceneDef.orthogonal;
+			float fovX = half.x;
+			float fovY = half.y;
 
 			float dvx = -fovX * 2.0F / static_cast<float>(fw);
 			float dvy = -fovY * 2.0F / static_cast<float>(fh);
@@ -297,8 +343,8 @@ namespace spades {
 						Vector3 pos;
 
 						pos.z = *db2;
-						pos.x = vx2 * pos.z;
-						pos.y = vy * pos.z;
+						pos.x = spreads ? vx2 * pos.z : vx2;
+						pos.y = spreads ? vy * pos.z : vy;
 
 						pos -= lightCenter;
 
@@ -417,8 +463,14 @@ namespace spades {
 					float vx = fovX;
 
 					for (int x = 0; x < fw; x += 4) {
-						float depthScale = (1.0F + vx * vx + vy * vy);
-						depthScale *= fastRSqrt(depthScale) * scale;
+						// The distance from the eye, which the depth along the view
+						// is short of off the view's middle; in a parallel
+						// projection there is no eye, and the depth is the distance.
+						float depthScale = scale;
+						if (!sceneDef.orthogonal) {
+							depthScale = (1.0F + vx * vx + vy * vy);
+							depthScale *= fastRSqrt(depthScale) * scale;
+						}
 						auto* fb2 = fb + x;
 						auto* db2 = db + x;
 						for (int by = 0; by < 4; by++) {
@@ -497,8 +549,14 @@ namespace spades {
 					float vx = fovX;
 
 					for (int x = 0; x < fw; x += 4) {
-						float depthScale = (1.0F + vx * vx + vy * vy);
-						depthScale *= fastRSqrt(depthScale) * scale;
+						// The distance from the eye, which the depth along the view
+						// is short of off the view's middle; in a parallel
+						// projection there is no eye, and the depth is the distance.
+						float depthScale = scale;
+						if (!sceneDef.orthogonal) {
+							depthScale = (1.0F + vx * vx + vy * vy);
+							depthScale *= fastRSqrt(depthScale) * scale;
+						}
 						auto depthScale4 = _mm_set1_ps(depthScale);
 
 						auto* fb2 = fb + x;
@@ -641,6 +699,13 @@ namespace spades {
 				light.minY = 0;
 				light.maxX = fb->GetWidth();
 				light.maxY = fb->GetHeight();
+			} else if (sceneDef.orthogonal) {
+				// The bounds below are a cone's from the eye, which a parallel
+				// view has none of: the whole screen, tested pixel by pixel.
+				light.minX = 0;
+				light.minY = 0;
+				light.maxX = fb->GetWidth();
+				light.maxY = fb->GetHeight();
 			} else if (Vector3::Dot(diff, sceneDef.viewAxis[2]) < 0.0F) {
 				// view plane cull
 				return;
@@ -750,10 +815,6 @@ namespace spades {
 		}
 
 		float SWRenderer::GetGlareVisibility(const Vector4& clip) {
-			// Without the world, nothing was drawn to be in front of it.
-			if (sceneDef.skipWorld)
-				return 1.0F;
-
 			const int fw = fb->GetWidth();
 			const int fh = fb->GetHeight();
 
@@ -864,15 +925,19 @@ namespace spades {
 			std::fill(px, px + fb->GetWidth() * fb->GetHeight(),
 				ConvertColor32(MakeVector4(fogColor.x, fogColor.y, fogColor.z, 1.0F)));
 
-			if (!sceneDef.skipWorld) {
-				// draw map
-				if (mapRenderer) {
-					// flat map renderer sends 'Update RLE' to map renderer.
-					// rendering map before this leads to the corrupted renderer image.
-					flatMapRenderer->Update();
-					mapRenderer->Render(sceneDef, *fb, depthBuffer.data());
-				}
+			// The map, which fills the depth buffer; where there is none to draw --
+			// a scene of models alone, as the model editor's -- nothing is nearer
+			// than anything yet.
+			if (!sceneDef.skipWorld && mapRenderer) {
+				// flat map renderer sends 'Update RLE' to map renderer.
+				// rendering map before this leads to the corrupted renderer image.
+				flatMapRenderer->Update();
+				mapRenderer->Render(sceneDef, *fb, depthBuffer.data());
+			} else {
+				std::fill(depthBuffer.begin(), depthBuffer.end(), kNothingDrawnDepth);
+			}
 
+			{
 				// draw models
 				for (const auto& m : models)
 					modelRenderer->Render(*m.model, m.param);
@@ -1005,8 +1070,7 @@ namespace spades {
 					if (x1 == x2 && y1 == y2) {
 						if (x1 >= 0 && y1 >= 0 && x1 < fw && y1 < fh) {
 							d1 = fastRcp(d1);
-							// skip depth check if world rendering is skipped
-							if (sceneDef.skipWorld || d1 < db[x1 + y1 * fw])
+							if (d1 < db[x1 + y1 * fw])
 								fb[x1 + y1 * fw] = col;
 						}
 						continue;
@@ -1039,7 +1103,7 @@ namespace spades {
 							if (cy >= 0 && cy < fh) {
 								float d = fastRcp(depth);
 								// skip depth check if world rendering is skipped
-								if (sceneDef.skipWorld || d < db[fw * cy])
+								if (d < db[fw * cy])
 									fb[fw * cy] = col;
 							}
 							fract += dy;
@@ -1078,7 +1142,7 @@ namespace spades {
 							if (cx >= 0 && cx < fw) {
 								float d = fastRcp(depth);
 								// skip depth check if world rendering is skipped
-								if (sceneDef.skipWorld || d < db[cx])
+								if (d < db[cx])
 									fb[cx] = col;
 							}
 							fract += dx;
