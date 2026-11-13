@@ -36,8 +36,7 @@ namespace spades {
 	} // namespace client
 	namespace gui {
 		/**
-		 * Unified top toolbar: modes on the left, a separator, then the tools
-		 * available in the current mode, optionally a colour swatch (the colour
+		 * Unified top toolbar: the tools on the left, optionally a colour swatch (the colour
 		 * the tools draw with, whichever is active), then undo/redo buttons on
 		 * the right.
 		 *
@@ -63,7 +62,6 @@ namespace spades {
 
 			Toolbar(client::IAudioDevice* audioDevice = nullptr);
 
-			void SetModeButtons(const std::vector<ToolbarButton>& buttons);
 			void SetToolButtons(const std::vector<ToolbarButton>& buttons);
 			void SetUndoButton(bool enabled);
 			void SetRedoButton(bool enabled);
@@ -80,14 +78,13 @@ namespace spades {
 			         const Vector2& cursorPos, bool menuActive, float screenWidth);
 
 			// Called with the clicked button's id.
-			std::function<void(const std::string& id)> OnModeClicked;
 			std::function<void(const std::string& id)> OnToolClicked;
 			std::function<void()> OnUndoClicked;
 			std::function<void()> OnRedoClicked;
 			std::function<void()> OnColorSwatchClicked;
 
 		private:
-			enum class Kind { Mode, Tool, ColorSwatch, Undo, Redo };
+			enum class Kind { Tool, ColorSwatch, Undo, Redo };
 
 			// One button placed on the bar; `index` is into its kind's list.
 			struct Slot {
@@ -98,7 +95,6 @@ namespace spades {
 			};
 
 			ui::FeedbackSounds sounds;
-			std::vector<ToolbarButton> modeButtons;
 			std::vector<ToolbarButton> toolButtons;
 			bool undoEnabled = false;
 			bool redoEnabled = false;
