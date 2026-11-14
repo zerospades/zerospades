@@ -1,5 +1,6 @@
-#: Sources/Gui/UI/Components/LimboMenu.cpp:66 Sources/Client/Client.cpp:185
-#: Sources/Client/Client.cpp:1326 Sources/Client/Client_NetHandler.cpp:411
+#: Sources/Client/Client.cpp:184 Sources/Client/Client.cpp:1326
+#: Sources/Client/Client_NetHandler.cpp:417
+#: Sources/Gui/UI/Components/LimboMenu.cpp:66
 msgctxt "Client"
 msgid "Spectator"
 msgstr ""
@@ -20,14 +21,14 @@ msgctxt "Client"
 msgid "Saving map failed: "
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:599
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:694 Sources/Client/Client.cpp:1323
+#: Sources/Client/Client.cpp:1323 Sources/Gui/UI/InGame/ChatWindow.cpp:599
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:694
 msgctxt "Client"
 msgid "Global"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:609
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:704 Sources/Client/Client.cpp:1323
+#: Sources/Client/Client.cpp:1323 Sources/Gui/UI/InGame/ChatWindow.cpp:609
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:704
 msgctxt "Client"
 msgid "Team"
 msgstr ""
@@ -47,17 +48,17 @@ msgctxt "Client"
 msgid "[Global]"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1395
+#: Sources/Client/Client.cpp:1400
 msgctxt "Client"
 msgid "The server"
 msgstr ""
 
-#: Sources/Client/Client.cpp:1510
+#: Sources/Client/Client.cpp:1515
 msgctxt "Client"
 msgid "This server does not allow team pings."
 msgstr ""
 
-#: Sources/Client/Client.cpp:1576
+#: Sources/Client/Client.cpp:1581
 msgctxt "Client"
 msgid "[PM] "
 msgstr ""
@@ -72,285 +73,277 @@ msgctxt "Client"
 msgid "Set the block color (all values 0-255)"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:135
+#: Sources/Client/Client_DebugScreen.cpp:359
+#: Sources/Client/Client_Draw.cpp:2321
+msgctxt "Client"
+msgid "N"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:359
+#: Sources/Client/Client_Draw.cpp:2321
+msgctxt "Client"
+msgid "NE"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:359
+#: Sources/Client/Client_Draw.cpp:2322
+msgctxt "Client"
+msgid "E"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:360
+#: Sources/Client/Client_Draw.cpp:2322
+msgctxt "Client"
+msgid "SE"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:360
+#: Sources/Client/Client_Draw.cpp:2323
+msgctxt "Client"
+msgid "S"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:360
+#: Sources/Client/Client_Draw.cpp:2323
+msgctxt "Client"
+msgid "SW"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:361
+#: Sources/Client/Client_Draw.cpp:2324
+msgctxt "Client"
+msgid "W"
+msgstr ""
+
+#: Sources/Client/Client_DebugScreen.cpp:361
+#: Sources/Client/Client_Draw.cpp:2324
+msgctxt "Client"
+msgid "NW"
+msgstr ""
+
+#: Sources/Client/Client_Draw.cpp:134
 msgctxt "Client"
 msgid "Unbound"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:181
+#: Sources/Client/Client_Draw.cpp:180
 #, c++-format
 msgctxt "Client"
 msgid "Sceneshot saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:182
+#: Sources/Client/Client_Draw.cpp:181
 #, c++-format
 msgctxt "Client"
 msgid "Screenshot saved: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:187 Sources/Client/Client_Draw.cpp:192
+#: Sources/Client/Client_Draw.cpp:186 Sources/Client/Client_Draw.cpp:191
 msgctxt "Client"
 msgid "Screenshot failed: "
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:230
+#: Sources/Client/Client_Draw.cpp:229
 msgctxt "Client"
 msgid "NOW LOADING"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1144
+#: Sources/Client/Client_Draw.cpp:1143
 msgctxt "Client"
 msgid "YOU ARE MARKED"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1542
+#: Sources/Client/Client_Draw.cpp:1541
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Grab color"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1543
+#: Sources/Client/Client_Draw.cpp:1542
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1545
+#: Sources/Client/Client_Draw.cpp:1544
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Navigate left/right"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1547
+#: Sources/Client/Client_Draw.cpp:1546
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle extended palette"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1555
+#: Sources/Client/Client_Draw.cpp:1554
 #, c++-format
 msgctxt "Client"
 msgid "#{0} / RGB({1}, {2}, {3})"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1604
+#: Sources/Client/Client_Draw.cpp:1602
 #, c++-format
 msgctxt "Client"
 msgid "Accuracy: {0}%"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1608
+#: Sources/Client/Client_Draw.cpp:1606
 #, c++-format
 msgctxt "Client"
 msgid "Kill/Death Ratio: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1609
+#: Sources/Client/Client_Draw.cpp:1607
 #, c++-format
 msgctxt "Client"
 msgid "Kill Streak: {0}, Best: {1}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1610
+#: Sources/Client/Client_Draw.cpp:1608
 #, c++-format
 msgctxt "Client"
 msgid "Melee Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1611
+#: Sources/Client/Client_Draw.cpp:1609
 #, c++-format
 msgctxt "Client"
 msgid "Grenade Kills: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1614
+#: Sources/Client/Client_Draw.cpp:1612
 #, c++-format
 msgctxt "Client"
 msgid "Blocks Placed: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1947
+#: Sources/Client/Client_Draw.cpp:1968
 msgctxt "Client"
 msgid "Reloading"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:1955
+#: Sources/Client/Client_Draw.cpp:1976
 #, c++-format
 msgctxt "Client"
 msgid "Press [{0}] to Reload"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2107
+#: Sources/Client/Client_Draw.cpp:2128
 #, c++-format
 msgctxt "Client"
 msgid "You will respawn in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2108
+#: Sources/Client/Client_Draw.cpp:2129
 msgctxt "Client"
 msgid "Waiting for respawn"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2184
+#: Sources/Client/Client_Draw.cpp:2205
 #, c++-format
 msgctxt "Client"
 msgid "Following {0} [#{1}]"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2189
+#: Sources/Client/Client_Draw.cpp:2210
 #, c++-format
 msgctxt "Client"
 msgid "Respawning in: {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2194
+#: Sources/Client/Client_Draw.cpp:2215
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Cycle camera mode"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2195
+#: Sources/Client/Client_Draw.cpp:2216
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Next/Prev player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2198
+#: Sources/Client/Client_Draw.cpp:2219
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Unfollow"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2201
+#: Sources/Client/Client_Draw.cpp:2222
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Follow a player"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2206
+#: Sources/Client/Client_Draw.cpp:2227
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Go up/down"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2208
+#: Sources/Client/Client_Draw.cpp:2229
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Hold to Zoom"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2212
+#: Sources/Client/Client_Draw.cpp:2233
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle player names"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2215
+#: Sources/Client/Client_Draw.cpp:2236
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle ESP"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2223
+#: Sources/Client/Client_Draw.cpp:2244
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Resume"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2224
+#: Sources/Client/Client_Draw.cpp:2245
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Pause"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2225
+#: Sources/Client/Client_Draw.cpp:2246
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Seek +/-5s"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2230
+#: Sources/Client/Client_Draw.cpp:2251
 #, c++-format
 msgctxt "Client"
 msgid "[{0}/{1}] Speed: {2}x"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2232
+#: Sources/Client/Client_Draw.cpp:2253
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Toggle Demo HUD"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2234
+#: Sources/Client/Client_Draw.cpp:2255
 #, c++-format
 msgctxt "Client"
 msgid "[{0}] Select Team/Weapon"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2300
-#: Sources/Client/Client_DebugScreen.cpp:368
-#: Sources/Client/Client_DebugScreen.cpp:359
-msgctxt "Client"
-msgid "N"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2300
-#: Sources/Client/Client_DebugScreen.cpp:368
-#: Sources/Client/Client_DebugScreen.cpp:359
-msgctxt "Client"
-msgid "NE"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2301
-#: Sources/Client/Client_DebugScreen.cpp:368
-#: Sources/Client/Client_DebugScreen.cpp:359
-msgctxt "Client"
-msgid "E"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2301
-#: Sources/Client/Client_DebugScreen.cpp:369
-#: Sources/Client/Client_DebugScreen.cpp:360
-msgctxt "Client"
-msgid "SE"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2302
-#: Sources/Client/Client_DebugScreen.cpp:369
-#: Sources/Client/Client_DebugScreen.cpp:360
-msgctxt "Client"
-msgid "S"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2302
-#: Sources/Client/Client_DebugScreen.cpp:369
-#: Sources/Client/Client_DebugScreen.cpp:360
-msgctxt "Client"
-msgid "SW"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2303
-#: Sources/Client/Client_DebugScreen.cpp:370
-#: Sources/Client/Client_DebugScreen.cpp:361
-msgctxt "Client"
-msgid "W"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2303
-#: Sources/Client/Client_DebugScreen.cpp:370
-#: Sources/Client/Client_DebugScreen.cpp:361
-msgctxt "Client"
-msgid "NW"
-msgstr ""
-
-#: Sources/Client/Client_Draw.cpp:2806
+#: Sources/Client/Client_Draw.cpp:2827
 #, c++-format
 msgctxt "Client"
 msgid "Connecting to {0}"
 msgstr ""
 
-#: Sources/Client/Client_Draw.cpp:2812
+#: Sources/Client/Client_Draw.cpp:2833
 msgctxt "Client"
 msgid "[Esc] Cancel"
 msgstr ""
@@ -377,7 +370,7 @@ msgctxt "Client"
 msgid "Recording stopped"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:163 Sources/Client/Client_Input.cpp:892
+#: Sources/Client/Client_Input.cpp:892 Sources/Client/Client_NetHandler.cpp:169
 #, c++-format
 msgctxt "Client"
 msgid "Recording demo: {0}"
@@ -421,125 +414,131 @@ msgctxt "Client"
 msgid "You are connected with {0} ({2}) on {1}"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:183
+#: Sources/Client/Client_NetHandler.cpp:159
+#, c++-format
+msgctxt "Client"
+msgid "Join our official Discord {0}"
+msgstr ""
+
+#: Sources/Client/Client_NetHandler.cpp:189
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured a Neutral Territory"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:185
+#: Sources/Client/Client_NetHandler.cpp:191
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured {1}'s Territory"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:194
+#: Sources/Client/Client_NetHandler.cpp:200
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured a neutral territory"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:197
+#: Sources/Client/Client_NetHandler.cpp:203
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured {1}'s territory"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:219
+#: Sources/Client/Client_NetHandler.cpp:225
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured {1}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:223
+#: Sources/Client/Client_NetHandler.cpp:229
 #, c++-format
 msgctxt "Client"
 msgid "You captured {0}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:228
+#: Sources/Client/Client_NetHandler.cpp:234
 #, c++-format
 msgctxt "Client"
 msgid "{0} captured {1}'s intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:251
+#: Sources/Client/Client_NetHandler.cpp:257
 #, c++-format
 msgctxt "Client"
 msgid "{0} picked up {1}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:255
+#: Sources/Client/Client_NetHandler.cpp:261
 #, c++-format
 msgctxt "Client"
 msgid "You picked up {0}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:260
+#: Sources/Client/Client_NetHandler.cpp:266
 #, c++-format
 msgctxt "Client"
 msgid "{0} picked up {1}'s intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:281
+#: Sources/Client/Client_NetHandler.cpp:287
 #, c++-format
 msgctxt "Client"
 msgid "{0} dropped {1}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:285
+#: Sources/Client/Client_NetHandler.cpp:291
 #, c++-format
 msgctxt "Client"
 msgid "You dropped {0}'s Intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:290
+#: Sources/Client/Client_NetHandler.cpp:296
 #, c++-format
 msgctxt "Client"
 msgid "{0} dropped {1}'s intel"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:387
+#: Sources/Client/Client_NetHandler.cpp:393
 #, c++-format
 msgctxt "Client"
 msgid "Player {0} has left"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:390
+#: Sources/Client/Client_NetHandler.cpp:396
 msgctxt "Client"
 msgid " (ragequit)"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:415
+#: Sources/Client/Client_NetHandler.cpp:421
 msgctxt "Client"
 msgid "You are now a spectator"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:416
+#: Sources/Client/Client_NetHandler.cpp:422
 #, c++-format
 msgctxt "Client"
 msgid "You joined {0} team"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:421
+#: Sources/Client/Client_NetHandler.cpp:427
 #, c++-format
 msgctxt "Client"
 msgid "{0} joined {1} team"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:450
+#: Sources/Client/Client_NetHandler.cpp:465
 #, c++-format
 msgctxt "Client"
 msgid "{0} Wins!"
 msgstr ""
 
-#: Sources/Client/Client_NetHandler.cpp:457
+#: Sources/Client/Client_NetHandler.cpp:472
 #, c++-format
 msgctxt "Client"
 msgid "{0} wins!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:755
+#: Sources/Client/Client_Update.cpp:759
 #, c++-format
 msgctxt "Client"
 msgid "{0} block"
@@ -547,242 +546,247 @@ msgid_plural "{0} blocks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: Sources/Client/Client_Update.cpp:760
+#: Sources/Client/Client_Update.cpp:764
 msgctxt "Client"
 msgid "-- blocks"
 msgstr ""
 
+#: Sources/Client/Client_Update.cpp:1297
 #: Sources/Gui/UI/Components/LimboMenu.cpp:67
-#: Sources/Client/Client_Update.cpp:1293
 msgctxt "Client"
 msgid "Rifle"
 msgstr ""
 
+#: Sources/Client/Client_Update.cpp:1298
 #: Sources/Gui/UI/Components/LimboMenu.cpp:68
-#: Sources/Client/Client_Update.cpp:1294
 msgctxt "Client"
 msgid "SMG"
 msgstr ""
 
+#: Sources/Client/Client_Update.cpp:1299
 #: Sources/Gui/UI/Components/LimboMenu.cpp:69
-#: Sources/Client/Client_Update.cpp:1295
 msgctxt "Client"
 msgid "Shotgun"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1299
+#: Sources/Client/Client_Update.cpp:1303
 msgctxt "Client"
 msgid "Fall"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1300
+#: Sources/Client/Client_Update.cpp:1304
 msgctxt "Client"
 msgid "Melee"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1301
+#: Sources/Client/Client_Update.cpp:1305
 msgctxt "Client"
 msgid "Grenade"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1302
+#: Sources/Client/Client_Update.cpp:1306
 msgctxt "Client"
 msgid "Headshot"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1303
+#: Sources/Client/Client_Update.cpp:1307
 msgctxt "Client"
 msgid "Team Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1304
+#: Sources/Client/Client_Update.cpp:1308
 msgctxt "Client"
 msgid "Weapon Change"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1356
+#: Sources/Client/Client_Update.cpp:1360
 msgctxt "Client"
 msgid "Revenge!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1364
+#: Sources/Client/Client_Update.cpp:1368
 msgctxt "Client"
 msgid "Dominating!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1402
+#: Sources/Client/Client_Update.cpp:1406
 #, c++-format
 msgctxt "Client"
 msgid "You were killed by {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1404
+#: Sources/Client/Client_Update.cpp:1408
 #, c++-format
 msgctxt "Client"
 msgid "You have killed {0}"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1600
+#: Sources/Client/Client_Update.cpp:1604
 #, c++-format
 msgctxt "Client"
 msgid "You hit {0} from: {1} blocks "
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1620
+#: Sources/Client/Client_Update.cpp:1624
 msgctxt "Client"
 msgid "TORSO"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1621
+#: Sources/Client/Client_Update.cpp:1625
 msgctxt "Client"
 msgid "ARMS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1622
+#: Sources/Client/Client_Update.cpp:1626
 msgctxt "Client"
 msgid "LEGS"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1623
+#: Sources/Client/Client_Update.cpp:1627
 msgctxt "Client"
 msgid "MELEE"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1624
+#: Sources/Client/Client_Update.cpp:1628
 msgctxt "Client"
 msgid "HEAD"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1953
+#: Sources/Client/Client_Update.cpp:1957
 msgctxt "Client"
 msgid "You are taking damage. Find solid ground!"
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1971
+#: Sources/Client/Client_Update.cpp:1975
 msgctxt "Client"
 msgid "Insufficient blocks."
 msgstr ""
 
-#: Sources/Client/Client_Update.cpp:1974
+#: Sources/Client/Client_Update.cpp:1978
 msgctxt "Client"
 msgid "You cannot place a block there."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:323 Sources/Client/DemoNetClient.cpp:104
+#: Sources/Client/DemoNetClient.cpp:106 Sources/Client/NetClient.cpp:326
 msgctxt "NetClient"
 msgid "Not connected"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:118
+#: Sources/Client/DemoNetClient.cpp:120
 msgctxt "NetClient"
 msgid "Failed to open demo file"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:131
+#: Sources/Client/DemoNetClient.cpp:133
 msgctxt "NetClient"
 msgid "Loading demo"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:151
+#: Sources/Client/DemoNetClient.cpp:153
 #, c++-format
 msgctxt "NetClient"
 msgid "Demo finished - press [{0}] to replay"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:175
+#: Sources/Client/DemoNetClient.cpp:183
 msgctxt "NetClient"
 msgid "Loading map from demo"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:188 Sources/Client/DemoNetClient.cpp:1063
-#: Sources/Client/DemoNetClient.cpp:1083
+#: Sources/Client/DemoNetClient.cpp:196 Sources/Client/DemoNetClient.cpp:1084
+#: Sources/Client/DemoNetClient.cpp:1104
 msgctxt "NetClient"
 msgid "Playing demo"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:195
+#: Sources/Client/DemoNetClient.cpp:203
 msgctxt "NetClient"
 msgid "Error loading map"
 msgstr ""
 
-#: Sources/Client/DemoNetClient.cpp:983
+#: Sources/Client/DemoNetClient.cpp:999
 #, c++-format
 msgctxt "NetClient"
 msgid "Loading map from demo ({0}%)"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:312
+#: Sources/Client/NetClient.cpp:315
 msgctxt "NetClient"
 msgid "Connecting to the server"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:449
+#: Sources/Client/NetClient.cpp:453
 msgctxt "NetClient"
 msgid "Awaiting for state"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:465 Sources/Client/NetClient.cpp:1404
+#: Sources/Client/NetClient.cpp:469 Sources/Client/NetClient.cpp:1434
 msgctxt "NetClient"
 msgid "Loading snapshot"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:511
+#: Sources/Client/NetClient.cpp:519
 msgctxt "NetClient"
-msgid "Connected"
+msgid "Waiting for the time of day"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:520 Sources/Client/NetClient.cpp:525
-msgctxt "NetClient"
-msgid "Error"
-msgstr ""
-
-#: Sources/Client/NetClient.cpp:605
+#: Sources/Client/NetClient.cpp:599
 msgctxt "NetClient"
 msgid "You are banned from this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:606
+#: Sources/Client/NetClient.cpp:600
 msgctxt "NetClient"
 msgid "Your network's public address has too many connections to this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:607
+#: Sources/Client/NetClient.cpp:601
 msgctxt "NetClient"
 msgid "Incompatible client protocol version."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:608
+#: Sources/Client/NetClient.cpp:602
 msgctxt "NetClient"
 msgid "Server full"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:609
+#: Sources/Client/NetClient.cpp:603
 msgctxt "NetClient"
 msgid "Server shutdown"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:610
+#: Sources/Client/NetClient.cpp:604
 msgctxt "NetClient"
 msgid "You were kicked from this server."
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:611
+#: Sources/Client/NetClient.cpp:605
 msgctxt "NetClient"
 msgid "Invalid name"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:612
+#: Sources/Client/NetClient.cpp:606
 msgctxt "NetClient"
 msgid "Unknown Reason"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:625
+#: Sources/Client/NetClient.cpp:621
 #, c++-format
 msgctxt "NetClient"
 msgid "Unknown (ID {0})"
 msgstr ""
 
-#: Sources/Client/NetClient.cpp:2104
+#: Sources/Client/NetClient.cpp:2039
+msgctxt "NetClient"
+msgid "Connected"
+msgstr ""
+
+#: Sources/Client/NetClient.cpp:2047 Sources/Client/NetClient.cpp:2052
+msgctxt "NetClient"
+msgid "Error"
+msgstr ""
+
+#: Sources/Client/NetClient.cpp:2188
 #, c++-format
 msgctxt "NetClient"
 msgid "{0} second remaining"
@@ -790,7 +794,7 @@ msgid_plural "{0} seconds remaining"
 msgstr[0] ""
 msgstr[1] ""
 
-#: Sources/Client/NetClient.cpp:2107
+#: Sources/Client/NetClient.cpp:2191
 #, c++-format
 msgctxt "NetClient"
 msgid "{0} minute remaining"
@@ -848,7 +852,7 @@ msgctxt "Main"
 msgid "Localization System Loaded"
 msgstr ""
 
-#: Sources/Gui/Runner.cpp:56 Sources/Gui/Main.cpp:1061
+#: Sources/Gui/Main.cpp:1061 Sources/Gui/Runner.cpp:56
 #, c++-format
 msgctxt "Main"
 msgid ""
@@ -859,7 +863,7 @@ msgid ""
 "See SystemMessages.log for more details."
 msgstr ""
 
-#: Sources/Gui/Runner.cpp:62 Sources/Gui/Main.cpp:1069
+#: Sources/Gui/Main.cpp:1069 Sources/Gui/Runner.cpp:62
 msgctxt "Main"
 msgid "ZeroSpades Fatal Error"
 msgstr ""
@@ -869,10 +873,114 @@ msgctxt "MainScreen"
 msgid "NOW LOADING"
 msgstr ""
 
+#: Sources/Gui/ModsScreenHelper.cpp:445
+msgctxt "ModsScreenHelper"
+msgid "The downloaded file is not a zip."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:459
+msgctxt "ModsScreenHelper"
+msgid "The downloaded zip is damaged."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:474
+msgctxt "ModsScreenHelper"
+msgid "The release has no paks."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:480
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Installing official mods {0}: {1}"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:487
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "{0}: cannot read it from the zip."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:493 Sources/Gui/ModsScreenHelper.cpp:517
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "{0}: cannot write it."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:509
+msgctxt "ModsScreenHelper"
+msgid "The release is too big to install."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:515
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "{0}: damaged in the zip."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:565
+msgctxt "ModsScreenHelper"
+msgid "Looking for the latest official mods..."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:570
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Cannot list the official mods: {0}"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:576
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid ""
+"The official mods {0} need a newer version of ZeroSpades. Update the game to "
+"get them."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:581
+msgctxt "ModsScreenHelper"
+msgid "No official mods have been released for this version of ZeroSpades yet."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:597
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Downloading official mods {0}"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:612
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Cannot download the official mods {0}: {1}"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:624
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Cannot install the official mods {0}: {1}"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:633
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid "Installing official mods {0}..."
+msgstr ""
+
 #: Sources/Gui/ModsScreenHelper.cpp:643
 #, c++-format
 msgctxt "ModsScreenHelper"
 msgid "{0}: cannot replace (file in use?)"
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:649
+msgctxt "ModsScreenHelper"
+msgid "Cannot write Mods/index.txt."
+msgstr ""
+
+#: Sources/Gui/ModsScreenHelper.cpp:654
+#, c++-format
+msgctxt "ModsScreenHelper"
+msgid ""
+"{0} pak(s) failed to install; download the official mods again to retry:"
 msgstr ""
 
 #: Sources/Gui/UI/Components/LimboMenu.cpp:70
@@ -890,11 +998,12 @@ msgctxt "Client"
 msgid "Select Weapon:"
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:138
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:645
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:584
-#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:95
 #: Sources/Gui/UI/Components/LimboMenu.cpp:325
+#: Sources/Gui/UI/InGame/ChatLogWindow.cpp:95
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:584
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:647
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:138
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:175
 msgctxt "Client"
 msgid "[Esc]"
 msgstr ""
@@ -904,20 +1013,32 @@ msgctxt "Client"
 msgid "[1, 2, 3]"
 msgstr ""
 
-#: Sources/Gui/UI/Components/UpdateNotice.cpp:93
+#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:68
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0} are available (you have {1}). Click to download them."
+msgstr ""
+
+#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:80
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0} need a newer ZeroSpades. Click to update the game."
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:99
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
 "ZeroSpades {0} is available (you have {1}). Click to open the release page."
 msgstr ""
 
-#: Sources/Gui/UI/Components/UpdateNotice.cpp:112
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:127
 #, c++-format
 msgctxt "MainScreen"
 msgid "Up to date ({0})"
 msgstr ""
 
-#: Sources/Gui/UI/Components/UpdateNotice.cpp:181
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:199
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -930,18 +1051,18 @@ msgid ""
 "can be installed."
 msgstr ""
 
-#: Sources/Gui/UI/Components/UpdateNotice.cpp:197
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:215
 msgctxt "MainScreen"
 msgid "Open Release Page"
 msgstr ""
 
-#: Sources/Gui/UI/Components/UpdateNotice.cpp:197
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:215
 msgctxt "MainScreen"
 msgid "Later"
 msgstr ""
 
-#: Sources/Gui/UI/InGame/ChatWindow.cpp:364
 #: Sources/Gui/UI/Console/ConsoleCommandField.cpp:113
+#: Sources/Gui/UI/InGame/ChatWindow.cpp:364
 #, c++-format
 msgctxt "Client"
 msgid "+{0} more"
@@ -1107,10 +1228,12 @@ msgctxt "Client"
 msgid "Send"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:246
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:455
 #: Sources/Gui/UI/InGame/ChatWindow.cpp:575
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:54
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:248
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:457
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:55
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:156
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:174
 msgctxt "Client"
 msgid "[Enter]"
 msgstr ""
@@ -1284,218 +1407,292 @@ msgctxt "CreateProfileScreen"
 msgid "You can change it later in the Setup dialog."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:113
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:115
 msgctxt "MainScreen"
 msgid "Rename Demo"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:128
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:445
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:130
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:447
 msgctxt "MainScreen"
 msgid "Rename"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:135
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:137
 msgctxt "MainScreen"
 msgid "Cancel"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:245
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:247
 msgctxt "MainScreen"
 msgid "Connect"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:257
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:259
 msgctxt "MainScreen"
 msgid "Quick Connect"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:274
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:379
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:276
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:381
 msgctxt "MainScreen"
 msgid "0.75"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:285
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:392
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:287
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:394
 msgctxt "MainScreen"
 msgid "0.76"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:301
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:303
 msgctxt "MainScreen"
 msgid "Server Name"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:309
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:311
 msgctxt "MainScreen"
 msgid "Slots"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:318
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:320
 msgctxt "MainScreen"
 msgid "Map Name"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:326
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:485
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:328
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:487
 msgctxt "MainScreen"
 msgid "Game Mode"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:335
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:337
 msgctxt "MainScreen"
 msgid "Ver."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:344
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:346
 msgctxt "MainScreen"
 msgid "Ping"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:369
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:416
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:371
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:418
 msgctxt "MainScreen"
 msgid "Filter"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:406
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:408
 msgctxt "MainScreen"
 msgid "Not Full"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:428
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:430
 msgctxt "MainScreen"
 msgid "Select a demo"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:436
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:438
 msgctxt "MainScreen"
 msgid "Delete"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:454
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:456
 msgctxt "MainScreen"
 msgid "Play"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:471
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:473
 msgctxt "MainScreen"
 msgid "Server"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:478
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:480
 msgctxt "MainScreen"
 msgid "Map"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:492
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:494
 msgctxt "MainScreen"
 msgid "Timestamp"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:499
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:596
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:501
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:598
 msgctxt "MainScreen"
 msgid "Size"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:515
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:517
 msgctxt "MainScreen"
 msgid "Download official mods..."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:525
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:527
 msgctxt "MainScreen"
 msgid "Disable all"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:534
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:536
 msgctxt "MainScreen"
 msgid "Apply changes"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:561
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:563
 msgctxt "MainScreen"
 msgid "Status"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:568
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:570
 msgctxt "MainScreen"
 msgid "Apply Order"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:575
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:577
 msgctxt "MainScreen"
 msgid "Type"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:582
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:584
 msgctxt "MainScreen"
 msgid "Mod"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:589
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:591
 msgctxt "MainScreen"
 msgid "Author"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:624
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:605
+msgctxt "MainScreen"
+msgid "Official"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:626
 msgctxt "MainScreen"
 msgid "Servers"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:625
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:627
 msgctxt "MainScreen"
 msgid "Demos"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:629
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:631
 msgctxt "MainScreen"
 msgid "Mods"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:644
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:646
 msgctxt "MainScreen"
 msgid "Quit"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:653
-msgctxt "MainScreen"
-msgid "Credits"
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:661
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:655
 msgctxt "MainScreen"
 msgid "Setup"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:822
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:690
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:68
+msgctxt "StartupScreen"
+msgid "Website"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:692
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:70
+msgctxt "StartupScreen"
+msgid "GitHub"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:694
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:72
+msgctxt "StartupScreen"
+msgid "Discord"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:715
+msgctxt "MainScreen"
+msgid "Credits"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:857
 msgctxt "MainScreen"
 msgid "Press 'Apply changes' to restart and apply your mods."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:866
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:867
+msgctxt "MainScreen"
+msgid ""
+"Mods/index.txt is missing, so no mod can be verified as official. Download "
+"the official mods to write it."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:874
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0}: {1} is available."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:881
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:889
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0} (up to date)."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:884
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0}: {1} needs a newer ZeroSpades."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:891
+#, c++-format
+msgctxt "MainScreen"
+msgid "Official mods {0}."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:899
+msgctxt "MainScreen"
+msgid "Download the latest official ZeroSpades mods?"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:901
 msgctxt "MainScreen"
 msgid "These are mods reviewed and hosted by the ZeroSpades team."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:868
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:903
 msgctxt "MainScreen"
 msgid "Source: "
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:914
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:904
+msgctxt "MainScreen"
+msgid ""
+"They are saved into your Mods/ folder, replacing the official mods installed "
+"before. Mods you added yourself stay, unless a new pak has the same name."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:911
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"ZeroSpades {0} is available: update the game first to get the newest mods."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:949
 msgctxt "MainScreen"
 msgid "Disable all mods? This takes effect after a restart."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:965
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1000
 msgctxt "MainScreen"
 msgid "Mod download failed:"
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1003
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1038
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1503,18 +1700,34 @@ msgid ""
 "This action cannot be undone."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1041
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1076
 msgctxt "MainScreen"
 msgid "Failed to rename demo."
 msgstr ""
 
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1263
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1237
+msgctxt "MainScreen"
+msgid "Are you sure you want to quit?"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1268
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:157
+msgctxt "StartupScreen"
+msgid "An unknown error has occurred while opening this url."
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1319
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
 "You were disconnected from the server because of the following reason:\n"
 "\n"
 "{0}"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/ModListView.cpp:184
+msgctxt "MainScreen"
+msgid "Modified"
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/ServerListView.cpp:237
@@ -2210,9 +2423,9 @@ msgid ""
 "instead of the new ones."
 msgstr ""
 
-#: Sources/Gui/UI/Settings/PreferenceView.cpp:131
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:150
 #: Sources/Gui/UI/Settings/PreferencePanels.cpp:482
+#: Sources/Gui/UI/Settings/PreferenceView.cpp:131
 msgctxt "Preferences"
 msgid "Misc"
 msgstr ""
@@ -3291,25 +3504,29 @@ msgctxt "StartupScreen"
 msgid "Close"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:57
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:59
 msgctxt "StartupScreen"
 msgid "Graphics Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:65
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:67
 msgctxt "StartupScreen"
 msgid "Resolution"
 msgstr ""
 
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:76
+msgctxt "StartupScreen"
+msgid ""
+"The size of the game window. The native size (the default) follows the "
+"monitor this window is on, and the game opens on that monitor. Typing a size "
+"or picking another one turns that off."
+msgstr ""
+
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:85
 msgctxt "StartupScreen"
 msgid "Fullscreen Mode"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:82
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:91
 msgctxt "StartupScreen"
 msgid ""
@@ -3317,19 +3534,16 @@ msgid ""
 "easier for you to concentrate on playing the game."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:90
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:99
 msgctxt "StartupScreen"
 msgid "Renderer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:93
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:102
 msgctxt "StartupScreen"
 msgid "OpenGL"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:99
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:108
 msgctxt "StartupScreen"
 msgid ""
@@ -3337,13 +3551,11 @@ msgid ""
 "game screen."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:107
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:116
 msgctxt "StartupScreen"
 msgid "Software"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:113
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:122
 msgctxt "StartupScreen"
 msgid ""
@@ -3352,7 +3564,6 @@ msgid ""
 "unsupported GPU."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:133
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:142
 msgctxt "StartupScreen"
 msgid ""
@@ -3366,15 +3577,12 @@ msgid ""
 "Off|MSAA 2x|4x|FXAA"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:147
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:293
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:156
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:302
 msgctxt "StartupScreen"
 msgid "Global Illumination"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:149
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:158
 msgctxt "StartupScreen"
 msgid ""
@@ -3382,13 +3590,11 @@ msgid ""
 "lighting."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:157
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:166
 msgctxt "StartupScreen"
 msgid "Linear HDR Rendering"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:159
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:168
 msgctxt "StartupScreen"
 msgid ""
@@ -3398,7 +3604,6 @@ msgid ""
 "blending can be achieved."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:172
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:181
 msgctxt "StartupScreen"
 msgid ""
@@ -3406,93 +3611,76 @@ msgid ""
 "On|Adaptive"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:186
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:195
 msgctxt "StartupScreen"
 msgid "Camera Blur"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:188
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:197
 msgctxt "StartupScreen"
 msgid "Blurs the screen when you turn quickly."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:194
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:203
 msgctxt "StartupScreen"
 msgid "Lens Scattering Filter"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:196
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:205
 msgctxt "StartupScreen"
 msgid "Simulates light being scattered by dust on the camera lens."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:203
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:212
 msgctxt "StartupScreen"
 msgid "Lens Flare"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:204
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:213
 msgctxt "StartupScreen"
 msgid "The Sun causes lens flare."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:211
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:220
 msgctxt "StartupScreen"
 msgid "Flares for Dynamic Lights."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:213
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:222
 msgctxt "StartupScreen"
 msgid "Enables lens flare for light sources other than the Sun."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:220
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:229
 msgctxt "StartupScreen"
 msgid "Color Correction"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:222
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:231
 msgctxt "StartupScreen"
 msgid "Applies cinematic color correction to make the image look better."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:229
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:238
 msgctxt "StartupScreen"
 msgid "Depth of Field"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:230
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:239
 msgctxt "StartupScreen"
 msgid "Blurs out-of-focus objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:237
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:246
 msgctxt "StartupScreen"
 msgid "Screen Space Ambient Occlusion"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:239
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:248
 msgctxt "StartupScreen"
 msgid "Simulates soft shadows that occur between nearby objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:244
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:329
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:366
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:253
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:338
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:375
@@ -3500,17 +3688,12 @@ msgctxt "StartupScreen"
 msgid "Low"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:246
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:331
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:255
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:340
 msgctxt "StartupScreen"
 msgid "Medium"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:248
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:333
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:370
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:257
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:342
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:379
@@ -3518,28 +3701,23 @@ msgctxt "StartupScreen"
 msgid "High"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:250
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:372
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:259
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:381
 msgctxt "StartupScreen"
 msgid "Ultra"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:253
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:262
 msgctxt "StartupScreen"
 msgid "Post-process"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:255
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:264
 msgctxt "StartupScreen"
 msgid ""
 "Post-process modifies the image to make it look better and more realistic."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:267
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:276
 msgctxt "StartupScreen"
 msgid ""
@@ -3549,62 +3727,52 @@ msgid ""
 "particles."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:282
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:291
 msgctxt "StartupScreen"
 msgid "Volumetric Fog"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:283
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:292
 msgctxt "StartupScreen"
 msgid "None"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:284
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:293
 msgctxt "StartupScreen"
 msgid "Disables the volumetric fog effect."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:285
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:294
 msgctxt "StartupScreen"
 msgid "Level 1"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:286
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:295
 msgctxt "StartupScreen"
 msgid "Applies local illumination to the fog."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:287
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:296
 msgctxt "StartupScreen"
 msgid "Level 2"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:289
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:298
 msgctxt "StartupScreen"
 msgid "Applies both local illumination and global illumination to the fog."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:292
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:301
 #, c++-format
 msgctxt "StartupScreen"
 msgid "Warning: `{0}` must be enabled."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:304
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:313
 msgctxt "StartupScreen"
 msgid "Dynamic Lights"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:306
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:315
 msgctxt "StartupScreen"
 msgid ""
@@ -3612,25 +3780,21 @@ msgid ""
 "impression."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:314
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:323
 msgctxt "StartupScreen"
 msgid "Shadows"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:315
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:324
 msgctxt "StartupScreen"
 msgid "Non-static object casts a shadow."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:322
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:331
 msgctxt "StartupScreen"
 msgid "Physically Based Lighting"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:324
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:333
 msgctxt "StartupScreen"
 msgid ""
@@ -3638,13 +3802,11 @@ msgid ""
 "objects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:336
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:345
 msgctxt "StartupScreen"
 msgid "Direct Lights"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:338
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:347
 msgctxt "StartupScreen"
 msgid ""
@@ -3652,7 +3814,6 @@ msgid ""
 "appearance."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:355
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:364
 msgctxt "StartupScreen"
 msgid ""
@@ -3663,25 +3824,21 @@ msgid ""
 "techniques."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:368
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:377
 msgctxt "StartupScreen"
 msgid "Med"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:375
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:384
 msgctxt "StartupScreen"
 msgid "Shader Effects"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:376
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:385
 msgctxt "StartupScreen"
 msgid "Special effects."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:397
 #: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:406
 msgctxt "StartupScreen"
 msgid ""
@@ -3689,26 +3846,27 @@ msgid ""
 "4x"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:601
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:690
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:581
+msgctxt "StartupScreen"
+msgid "(native)"
+msgstr ""
+
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:723
 msgctxt "StartupScreen"
 msgid "Audio Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:609
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:698
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:731
 msgctxt "StartupScreen"
 msgid "Backend"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:612
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:701
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:734
 msgctxt "StartupScreen"
 msgid "OpenAL"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:618
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:707
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:740
 msgctxt "StartupScreen"
 msgid ""
 "Uses an OpenAL-capable sound card to process sound. In most cases where "
@@ -3716,32 +3874,27 @@ msgid ""
 msgstr ""
 
 #. ! The name of audio driver that outputs no audio.
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:629
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:718
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:751
 msgctxt "StartupScreen"
 msgid "Null"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:634
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:723
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:756
 msgctxt "StartupScreen"
 msgid "Disables audio output."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:647
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:736
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:769
 msgctxt "StartupScreen"
 msgid "Volume"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:655
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:744
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:777
 msgctxt "StartupScreen"
 msgid "Polyphonics"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:657
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:746
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:779
 msgctxt "StartupScreen"
 msgid ""
 "Specifies how many sounds can be played simultaneously. Higher value needs "
@@ -3749,182 +3902,150 @@ msgid ""
 "(especially with a software emulation)."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:668
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:757
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:790
 msgctxt "StartupScreen"
 msgid "EAX"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:670
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:759
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:792
 msgctxt "StartupScreen"
 msgid ""
 "Enables extended features provided by the OpenAL driver to create more "
 "ambience."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:682
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:771
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:804
 msgctxt "StartupScreen"
 msgid "Output Device"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:754
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:756
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:768
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1002
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1016
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:843
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:845
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:857
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1091
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1105
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:876
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:878
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:890
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1124
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1138
 msgctxt "StartupScreen"
 msgid "System default"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:801
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:890
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:923
 msgctxt "StartupScreen"
 msgid "Language"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:814
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:903
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:936
 msgctxt "StartupScreen"
 msgid "Tools"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:817
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:906
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:939
 msgctxt "StartupScreen"
 msgid "Reset All Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:826
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:915
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:948
 msgctxt "StartupScreen"
 msgid "Open Config Folder in Explorer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:828
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:917
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:950
 msgctxt "StartupScreen"
 msgid "Reveal Config Folder in Finder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:830
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:919
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:952
 msgctxt "StartupScreen"
 msgid "Browse Config Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:837
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:926
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:959
 msgctxt "StartupScreen"
 msgid "Demo Recording"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:840
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:929
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:962
 msgctxt "StartupScreen"
 msgid "Automatically record every game"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:848
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:937
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:970
 msgctxt "StartupScreen"
 msgid "Delete oldest demos when limit is reached"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:855
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:944
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:977
 msgctxt "StartupScreen"
 msgid "Max stored demos"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:868
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:957
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:990
 msgctxt "StartupScreen"
 msgid "Demos Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:873
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:962
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:995
 msgctxt "StartupScreen"
 msgid "Open Demos Folder in Explorer"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:875
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:964
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:997
 msgctxt "StartupScreen"
 msgid "Reveal Demos Folder in Finder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:877
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:966
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:999
 msgctxt "StartupScreen"
 msgid "Browse Demos Folder"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:885
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:974
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1007
 msgctxt "StartupScreen"
 msgid "Updates"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:889
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:978
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1011
 msgctxt "StartupScreen"
 msgid "Show a prompt when a new version is available"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:928
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1017
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1050
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening the demos directory."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:938
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1027
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1060
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening the config directory."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:946
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1035
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1068
 msgctxt "StartupScreen"
 msgid ""
 "Are you sure to reset all settings? They include (but are not limited to):"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:947
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1036
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1069
 msgctxt "StartupScreen"
 msgid "All graphics/audio settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:948
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1037
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1070
 msgctxt "StartupScreen"
 msgid "All key bindings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:949
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1038
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1071
 msgctxt "StartupScreen"
 msgid "Your player name"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:125
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:953
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1042
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1075
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:145
 msgctxt "StartupScreen"
 msgid "Advanced"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:951
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1040
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1073
 #, c++-format
 msgctxt "StartupScreen"
 msgid ""
@@ -3932,275 +4053,71 @@ msgid ""
 "commands."
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1000
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1089
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1122
 #, c++-format
 msgctxt "StartupScreen"
 msgid "Unknown ({0})"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1058
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1147
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1180
 msgctxt "StartupScreen"
 msgid "Copy to Clipboard"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1080
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1169
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1202
 msgctxt "StartupScreen"
 msgid "Advanced Settings"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1091
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1180
+#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:1213
 msgctxt "StartupScreen"
 msgid "Filter"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:53
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:54
 msgctxt "StartupScreen"
 msgid "Start"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:61
-msgctxt "StartupScreen"
-msgid "Official Website"
-msgstr ""
-
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:73
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:93
 msgctxt "StartupScreen"
 msgid "Skip this screen next time"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:121
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:141
 msgctxt "StartupScreen"
 msgid "Graphics"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:122
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:142
 msgctxt "StartupScreen"
 msgid "Audio"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:123
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:143
 msgctxt "StartupScreen"
 msgid "Generic"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:124
+#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:144
 msgctxt "StartupScreen"
 msgid "System Info"
 msgstr ""
 
-#: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:137
-msgctxt "StartupScreen"
-msgid "An unknown error has occurred while opening this url."
-msgstr ""
-
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:147
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:163
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:153
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:172
 msgctxt "MessageBox"
 msgid "OK"
 msgstr ""
 
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:163
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:172
 msgctxt "MessageBox"
 msgid "Cancel"
 msgstr ""
 
-#: Sources/Gui/UI/Widgets/MessageBox.cpp:186
+#: Sources/Gui/UI/Widgets/MessageBox.cpp:198
 msgctxt "MessageBox"
 msgid "Open this link in your browser?"
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:603
-msgctxt "MainScreen"
-msgid "Official"
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:839
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0}: {1} is available."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:846
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:854
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0} (up to date)."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:849
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0}: {1} needs a newer ZeroSpades."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:856
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0}."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:864
-msgctxt "MainScreen"
-msgid "Download the latest official ZeroSpades mods?"
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:869
-msgctxt "MainScreen"
-msgid ""
-"They are saved into your Mods/ folder, replacing the official mods installed "
-"before. Mods you added yourself stay, unless a new pak has the same name."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:876
-#, c++-format
-msgctxt "MainScreen"
-msgid ""
-"ZeroSpades {0} is available: update the game first to get the newest mods."
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/ModListView.cpp:184
-msgctxt "MainScreen"
-msgid "Modified"
-msgstr ""
-
-#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:68
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0} are available (you have {1}). Click to download them."
-msgstr ""
-
-#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:80
-#, c++-format
-msgctxt "MainScreen"
-msgid "Official mods {0} need a newer ZeroSpades. Click to update the game."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:445
-msgctxt "ModsScreenHelper"
-msgid "The downloaded file is not a zip."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:459
-msgctxt "ModsScreenHelper"
-msgid "The downloaded zip is damaged."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:474
-msgctxt "ModsScreenHelper"
-msgid "The release has no paks."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:480
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Installing official mods {0}: {1}"
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:487
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "{0}: cannot read it from the zip."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:493 Sources/Gui/ModsScreenHelper.cpp:517
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "{0}: cannot write it."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:509
-msgctxt "ModsScreenHelper"
-msgid "The release is too big to install."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:515
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "{0}: damaged in the zip."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:565
-msgctxt "ModsScreenHelper"
-msgid "Looking for the latest official mods..."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:570
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Cannot list the official mods: {0}"
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:576
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid ""
-"The official mods {0} need a newer version of ZeroSpades. Update the game to "
-"get them."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:581
-msgctxt "ModsScreenHelper"
-msgid "No official mods have been released for this version of ZeroSpades yet."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:597
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Downloading official mods {0}"
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:612
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Cannot download the official mods {0}: {1}"
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:624
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Cannot install the official mods {0}: {1}"
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:633
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid "Installing official mods {0}..."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:649
-msgctxt "ModsScreenHelper"
-msgid "Cannot write Mods/index.txt."
-msgstr ""
-
-#: Sources/Gui/ModsScreenHelper.cpp:654
-#, c++-format
-msgctxt "ModsScreenHelper"
-msgid ""
-"{0} pak(s) failed to install; download the official mods again to retry:"
-msgstr ""
-
-#: Sources/Gui/UI/MainScreen/MainMenu.cpp:832
-msgctxt "MainScreen"
-msgid ""
-"Mods/index.txt is missing, so no mod can be verified as official. Download "
-"the official mods to write it."
-msgstr ""
-
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:76
-msgctxt "StartupScreen"
-msgid ""
-"The size of the game window. The native size (the default) follows the "
-"monitor this window is on, and the game opens on that monitor. Typing a size "
-"or picking another one turns that off."
-msgstr ""
-
-#: Sources/Gui/UI/StartupScreen/ConfigViewTabs.cpp:581
-msgctxt "StartupScreen"
-msgid "(native)"
 msgstr ""
 
 #: Sources/Gui/Utils/DisplayUtils.cpp:68
