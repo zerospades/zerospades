@@ -22,9 +22,9 @@ ZIPARGS=-x@${EXCLUDELIST}
 zip -r "$OUTPUT_DIR/pak002-Base.pak" \
 License/Credits-pak002-Base.md Gfx Scripts/Main.as \
 Scripts/Base Shaders \
-Sounds/Feedback Sounds/Misc Sounds/Player Textures $ZIPARGS > "$LOG_FILE"
+Sounds/Feedback Sounds/Misc Sounds/Player Sounds/Effects Textures $ZIPARGS > "$LOG_FILE"
 
-zip -r "$OUTPUT_DIR/pak005-Models.pak" Maps Models/MapObjects Models/Player $ZIPARGS > "$LOG_FILE"
+zip -r "$OUTPUT_DIR/pak005-Models.pak" Maps Models/MapObjects Models/Player Models/Effects $ZIPARGS > "$LOG_FILE"
 
 zip -r "$OUTPUT_DIR/pak010-BaseSkin.pak" \
 License/Credits-pak010-BaseSkin.md \

@@ -57,10 +57,10 @@ Make-Pak -PakName pak002-Base.pak -RelativePaths `
   License/Credits-pak002-Base.md,
   Gfx, Scripts/Main.as,
   Scripts/Base, Shaders, Sounds/Feedback,
-  Sounds/Misc, Sounds/Player, Textures
+  Sounds/Misc, Sounds/Player, Sounds/Effects, Textures
 
 Make-Pak -PakName pak005-Models.pak -RelativePaths `
-  Maps, Models/MapObjects, Models/Player
+  Maps, Models/MapObjects, Models/Player, Models/Effects
 
 Make-Pak -PakName pak010-BaseSkin.pak -RelativePaths `
   License/Credits-pak010-BaseSkin.md,
