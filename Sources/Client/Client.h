@@ -825,6 +825,10 @@ namespace spades {
 				localEntities.emplace_back(std::move(ent));
 			}
 
+			/** Projects persistent blood marks (used by the headshot gore
+			 *  effect; thin public wrapper over the private BloodMarks). */
+			void SpatterBlood(const Vector3& pos, const Vector3& vel);
+
 			void MarkWorldUpdate();
 
 			IRenderer& GetRenderer() { return *renderer; }

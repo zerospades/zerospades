@@ -68,6 +68,7 @@ namespace spades {
 			bool isLocalPlayer;
 			bool isZombiePlayer;
 			bool isChristmasOn;
+			bool headless = false; // head blown off: skip head model render
 
 			Node nodes[NodeCount];
 			Edge edges[8];
@@ -108,6 +109,10 @@ namespace spades {
 
 			void AddHeadImpulse(Vector3);
 			void AddImpulse(Vector3);
+
+			/** Hides the ragdoll's head model (headshot gore effect);
+			 *  head physics is kept unchanged. */
+			void SetHeadless() { headless = true; }
 		};
 	} // namespace client
 } // namespace spades
