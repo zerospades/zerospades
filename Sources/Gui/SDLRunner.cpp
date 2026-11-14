@@ -146,7 +146,7 @@ namespace spades {
 					if (!event.key.repeat) {
 						const SDL_Keysym& keysym = event.key.keysym;
 						// Toggle fullscreen mode
-						if (keysym.mod & KMOD_ALT && keysym.sym == SDLK_RETURN) {
+						if (keysym.mod & KMOD_ALT && keysym.sym == SDLK_RETURN && !m_hasSystemMenu) {
 							SDL_Window* window = SDL_GetWindowFromID(event.key.windowID);
 							if (r_fullscreen) {
 								if (!SDL_SetWindowFullscreen(window, 0))
