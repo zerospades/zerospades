@@ -69,6 +69,9 @@ DEFINE_SPADES_SETTING(cg_killfeedDistance, "1");
 DEFINE_SPADES_SETTING(cg_classicSprinting, "0");
 DEFINE_SPADES_SETTING(cg_autoUnscope, "0");
 DEFINE_SPADES_SETTING(cg_spectatorNoclip, "0");
+// gate of the "/rocket" chat command (see ClientUI.cpp); also read by
+// the future RPG weapon once it is integrated into the game
+DEFINE_SPADES_SETTING(cg_rpgRocket, "1");
 
 SPADES_SETTING(cg_centerMessage);
 SPADES_SETTING(cg_holdAimDownSight);
