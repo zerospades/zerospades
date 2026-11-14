@@ -564,7 +564,8 @@ namespace spades {
 			IFont& smallFont = fontManager->GetSmallFont();
 			IFont& font = cg_debugSreenSmallFont ? smallFont : guiFont;
 
-			const float margin = 2.0F; // distance from the screen edge
+			const float margin = 2.0F; // distance from the screen edge (graphs)
+			const float textMargin = 0.0F; // distance from the screen edge (text columns)
 			const float padX = 3.0F; // space between a line's background and its text
 			const float padY = 1.0F;
 			const float lineH = font.Measure("Ag").y + padY * 2.0F;
@@ -594,7 +595,7 @@ namespace spades {
 			};
 
 			auto drawColumn = [&](const std::vector<DebugScreenLine>& lines, bool alignRight) {
-				float y = margin;
+				float y = textMargin;
 				for (const DebugScreenLine& line : lines) {
 					// A gap is half a line, and has no background.
 					if (line.text.empty()) {
@@ -605,7 +606,7 @@ namespace spades {
 						break;
 
 					const float x =
-					  alignRight ? floorf(sw - margin - textBoxWidth(line.text)) : margin;
+					  alignRight ? floorf(sw - textMargin - textBoxWidth(line.text)) : textMargin;
 					drawTextBox(line.text, x, y, line.color);
 					y += lineH;
 				}
