@@ -155,6 +155,12 @@ namespace spades {
 			chatWindow->AddMessage(s);
 			scriptedUI->RecordChatLog(s, chatWindow->GetColor(MsgColorSysInfo));
 
+			// display discord invite
+			s = _Tr("Client", "Join our official Discord {0}", "https://discord.gg/t64rKedpAu");
+			s = ChatWindow::ColoredMessage(s, MsgColorSysInfo);
+			chatWindow->AddMessage(s);
+			scriptedUI->RecordChatLog(s, chatWindow->GetColor(MsgColorSysInfo));
+
 			// start recording if auto-record is enabled
 			if (net && (int)cg_demoAutoRecord != 0) {
 				if (net->StartDemoRecording("", BuildDemoContext())) {
