@@ -204,7 +204,7 @@ namespace spades {
 			// the mirror planes (by whole voxels, so still on the half-step
 			// grid), the reference images, the selection, and pending voxels,
 			// which would otherwise land in the wrong place.
-			edit.mirror.plane += shift;
+			mirror.plane += shift;
 			// An image is lined up with the voxels it is being modelled from, so
 			// it goes where they go rather than letting the model slide out from
 			// under it every time the volume grows or is trimmed.

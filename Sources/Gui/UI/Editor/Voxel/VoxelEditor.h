@@ -120,6 +120,8 @@ namespace spades {
 			 *  document's, in the Transform tool. */
 			void InsertModel(const VoxelModel& model);
 
+			/** Undoes or redoes a step, from wherever it is asked for: whatever
+			 *  the active tool had in hand is abandoned first. */
 			void Undo();
 			void Redo();
 			/** Whether there is anything to undo or redo: what a menu row or a
@@ -282,7 +284,7 @@ namespace spades {
 			                    const Vector4& color) override;
 			bool MirrorEnabled(int axis) const override;
 			void SetMirrorEnabled(int axis, bool on) override;
-			Vector3 MirrorPlane() const override { return edit.mirror.plane; }
+			Vector3 MirrorPlane() const override { return mirror.plane; }
 			void SetMirrorPlane(const Vector3& plane) override;
 			void PreviewMirrorPlane(const Vector3& plane) override;
 			void ResetMirrorPlane() override;
@@ -327,7 +329,6 @@ namespace spades {
 			void UndoApplyOrigin(const Vector3& origin) override;
 			EditState UndoSnapshotState() const override { return edit; }
 			void UndoRestoreState(const EditState& state) override { edit = state; }
-			void UndoReplayed() override {}
 
 			bool InBounds(int x, int y, int z) const;
 			// Inside the volume and editable: the only voxels edits touch.
@@ -388,9 +389,11 @@ namespace spades {
 			void WireUI();
 
 			// --- Edit state ---------------------------------------------------
-			// Everything besides the voxels that undo restores: the selection, the
-			// mirror setup and the pending voxels.
+			// Everything besides the voxels that undo restores: the selection and
+			// the pending voxels.
 			EditState edit;
+			// Which axes mirror edits, and across what (see MirrorSetup).
+			MirrorSetup mirror;
 			void SelectIfSolid(const IntVector3& v);
 			void SelectBox(const IntVector3& lo, const IntVector3& hi);
 
@@ -443,6 +446,8 @@ namespace spades {
 
 			int documentCommandDepth = 0;
 			void NotifyDocumentChanged();
+			// Undoes (`forward` false) or redoes a step and reports it.
+			void StepHistory(bool forward);
 			void HistoryReplayed();
 
 			// --- Cavity --------------------------------------------------------

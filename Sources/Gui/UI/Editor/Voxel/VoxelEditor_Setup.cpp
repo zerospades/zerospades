@@ -155,34 +155,32 @@ namespace spades {
 		bool VoxelEditor::MirrorEnabled(int axis) const {
 			if (axis < 0 || axis > 2)
 				return false;
-			return edit.mirror.enabled[axis];
+			return mirror.enabled[axis];
 		}
 
-		// The mirror setup is journaled like the selection (each undo step
-		// restores it), so changing it is a command like any edit.
+		// The mirror setup is a setting of the editor's (see MirrorSetup):
+		// changing it is no undo step. It is still a command, as it changes
+		// where the active tool's next edit lands.
 		void VoxelEditor::SetMirrorEnabled(int axis, bool on) {
 			if (axis < 0 || axis > 2)
 				return;
 			DocumentCommand command(*this);
-			VoxelUndoStack::Step step(undo, "Mirror Axis");
-			edit.mirror.enabled[axis] = on;
+			mirror.enabled[axis] = on;
 		}
 
 		void VoxelEditor::SetMirrorPlane(const Vector3& plane) {
 			DocumentCommand command(*this);
-			VoxelUndoStack::Step step(undo, "Move Mirror");
 			PlaceMirrorPlane(plane);
 		}
 
 		void VoxelEditor::PreviewMirrorPlane(const Vector3& plane) {
 			if (!previewedMirrorPlane)
-				previewedMirrorPlane = edit.mirror.plane;
+				previewedMirrorPlane = mirror.plane;
 			PlaceMirrorPlane(plane);
 		}
 
 		void VoxelEditor::ResetMirrorPlane() {
 			DocumentCommand command(*this);
-			VoxelUndoStack::Step step(undo, "Reset Mirror");
 			PlaceMirrorPlane(GetPivot());
 		}
 
@@ -190,7 +188,7 @@ namespace spades {
 			// MirrorIdx only sees whole half steps, so anything finer would move the
 			// handle without moving the reflection.
 			auto snap = [](float v) { return float(HalfSteps(v)) * 0.5F; };
-			edit.mirror.plane = MakeVector3(snap(plane.x), snap(plane.y), snap(plane.z));
+			mirror.plane = MakeVector3(snap(plane.x), snap(plane.y), snap(plane.z));
 		}
 
 		// Semi-transparent quad at each enabled mirror plane (drawn as a fan of
@@ -214,7 +212,7 @@ namespace spades {
 			float hiZ = float(stop(d)) - 0.5F;
 
 			if (MirrorEnabled(0)) {
-				float px = edit.mirror.plane.x;
+				float px = mirror.plane.x;
 				Vector4 col = MakeVector4(1.0F, 0.35F, 0.35F, 0.25F);
 				for (int i = -2; i <= stop(h); i += 2)
 					line(MakeVector3(px, float(i) - 0.5F, lo),
@@ -224,7 +222,7 @@ namespace spades {
 					                       MakeVector3(px, hiY, float(i) - 0.5F), col);
 			}
 			if (MirrorEnabled(1)) {
-				float py = edit.mirror.plane.y;
+				float py = mirror.plane.y;
 				Vector4 col = MakeVector4(0.4F, 1.0F, 0.4F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
 					line(MakeVector3(float(i) - 0.5F, py, lo),
@@ -234,7 +232,7 @@ namespace spades {
 					                       MakeVector3(hiX, py, float(i) - 0.5F), col);
 			}
 			if (MirrorEnabled(2)) {
-				float pz = edit.mirror.plane.z;
+				float pz = mirror.plane.z;
 				Vector4 col = MakeVector4(0.45F, 0.6F, 1.0F, 0.25F);
 				for (int i = -2; i <= stop(w); i += 2)
 					line(MakeVector3(float(i) - 0.5F, lo, pz),

@@ -61,20 +61,20 @@ namespace spades {
 					for (int mz = 0; mz <= (MirrorEnabled(2) ? 1 : 0); mz++) {
 						IntVector3 a = lo, b = hi;
 						if (mx) {
-							int p = MirrorIdx(lo.x, edit.mirror.plane.x),
-							    q = MirrorIdx(hi.x, edit.mirror.plane.x);
+							int p = MirrorIdx(lo.x, mirror.plane.x),
+							    q = MirrorIdx(hi.x, mirror.plane.x);
 							a.x = std::min(p, q);
 							b.x = std::max(p, q);
 						}
 						if (my) {
-							int p = MirrorIdx(lo.y, edit.mirror.plane.y),
-							    q = MirrorIdx(hi.y, edit.mirror.plane.y);
+							int p = MirrorIdx(lo.y, mirror.plane.y),
+							    q = MirrorIdx(hi.y, mirror.plane.y);
 							a.y = std::min(p, q);
 							b.y = std::max(p, q);
 						}
 						if (mz) {
-							int p = MirrorIdx(lo.z, edit.mirror.plane.z),
-							    q = MirrorIdx(hi.z, edit.mirror.plane.z);
+							int p = MirrorIdx(lo.z, mirror.plane.z),
+							    q = MirrorIdx(hi.z, mirror.plane.z);
 							a.z = std::min(p, q);
 							b.z = std::max(p, q);
 						}

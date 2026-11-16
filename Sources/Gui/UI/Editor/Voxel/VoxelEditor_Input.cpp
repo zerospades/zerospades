@@ -97,7 +97,7 @@ namespace spades {
 				previewedOrigin.reset();
 			}
 			if (previewedMirrorPlane) {
-				edit.mirror.plane = *previewedMirrorPlane;
+				mirror.plane = *previewedMirrorPlane;
 				previewedMirrorPlane.reset();
 			}
 			if (previewedColors) {

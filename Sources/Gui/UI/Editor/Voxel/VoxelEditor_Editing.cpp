@@ -28,7 +28,6 @@ namespace spades {
 		int VoxelEditor::MirrorIdx(int i, float plane) const { return HalfSteps(plane) - i; }
 
 		void VoxelEditor::ExpandMirrors(std::vector<IntVector3>& cells) const {
-			const MirrorSetup& mirror = edit.mirror;
 			const bool mx = MirrorEnabled(0), my = MirrorEnabled(1), mz = MirrorEnabled(2);
 			if (mx || my || mz) {
 				std::vector<IntVector3> out;
