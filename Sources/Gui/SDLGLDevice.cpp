@@ -272,6 +272,17 @@ namespace spades {
 			// glFinish();
 			CheckErrorAlways();
 			SDL_GL_SwapWindow(window);
+
+			// The window can change size while the game runs (alt+enter switching to a
+			// fullscreen mode of another size). The renderer reads the new size after
+			// the swap and rebuilds its framebuffers for it.
+			int newW, newH;
+			SDL_GetWindowSize(window, &newW, &newH);
+			if ((newW != w || newH != h) && newW > 0 && newH > 0) {
+				SPLog("Window size changed from %dx%d to %dx%d", w, h, newW, newH);
+				w = newW;
+				h = newH;
+			}
 #if 0
 			Uint32 t = SDL_GetTicks();
 			if(lastFrame == 0) t = lastFrame - 30;
