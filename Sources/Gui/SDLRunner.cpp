@@ -461,9 +461,18 @@ namespace spades {
 			}
 		}
 
-		void SDLRunner::AutoSizeWindow(int displayIndex, bool fullscreen, int& x, int& y,
-		                               int& width, int& height) {
-			if (fullscreen) {
+		void SDLRunner::AutoSizeWindow(int displayIndex, bool fullscreen, bool coverDisplay,
+		                               int& x, int& y, int& width, int& height) {
+			if (coverDisplay) {
+				// The whole monitor, taskbar included.
+				display::Rect area;
+				if (display::GetBounds(displayIndex, area)) {
+					x = area.x;
+					y = area.y;
+					width = area.width;
+					height = area.height;
+				}
+			} else if (fullscreen) {
 				// The monitor's own mode, so going fullscreen switches no mode.
 				display::Resolution res;
 				if (display::GetDesktopResolution(displayIndex, res)) {
@@ -482,7 +491,7 @@ namespace spades {
 				}
 			}
 			SPLog("Auto resolution: %dx%d on display %d (%s)", width, height, displayIndex,
-			      fullscreen ? "fullscreen" : "windowed");
+			      fullscreen ? "fullscreen" : coverDisplay ? "borderless" : "windowed");
 		}
 
 		void SDLRunner::FitWindowToDisplay(SDL_Window* window, int displayIndex) {
@@ -571,8 +580,18 @@ namespace spades {
 				// The setup window keeps its own size; the game follows its monitor.
 				bool autoSize = !m_hasSystemMenu && display::IsAutoResolution();
 				bool fullscreen = (sdlFlags & SDL_WINDOW_FULLSCREEN) != 0;
+				// On Windows a windowed game at the auto resolution covers the whole
+				// monitor without decorations, as it did when its size was the desktop's
+				// and the title bar ended up off-screen. Its size then matches the
+				// desktop mode, so alt+enter switches to fullscreen without resizing it.
+				bool coverDisplay = false;
+#ifdef _WIN32
+				coverDisplay = autoSize && !fullscreen;
+				if (coverDisplay)
+					sdlFlags |= SDL_WINDOW_BORDERLESS;
+#endif
 				if (autoSize)
-					AutoSizeWindow(displayIndex, fullscreen, x, y, width, height);
+					AutoSizeWindow(displayIndex, fullscreen, coverDisplay, x, y, width, height);
 
 				SDL_Window* window =
 				  SDL_CreateWindow(caption.c_str(), x, y, width, height, sdlFlags);
@@ -582,7 +601,7 @@ namespace spades {
 					SPRaise("Failed to create graphics window: %s", msg.c_str());
 				}
 
-				if (autoSize && !fullscreen)
+				if (autoSize && !fullscreen && !coverDisplay)
 					FitWindowToDisplay(window, displayIndex);
 				if (autoSize) {
 					SDL_GetWindowSize(window, &width, &height);

@@ -172,6 +172,11 @@ namespace spades {
 					return true;
 				}
 #endif
+				return GetBounds(index, out);
+			}
+
+			bool GetBounds(int index, Rect& out) {
+				SDL_Rect r;
 				if (SDL_GetDisplayBounds(index, &r) == 0 && r.w > 0 && r.h > 0) {
 					out = {r.x, r.y, r.w, r.h};
 					return true;
