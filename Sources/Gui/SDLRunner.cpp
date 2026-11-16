@@ -609,6 +609,20 @@ namespace spades {
 					r_videoHeight = height;
 				}
 
+#ifdef _WIN32
+				{
+					// The horizontal DPI is the monitor's effective one; 100% is 96 DPI.
+					int index = SDL_GetWindowDisplayIndex(window);
+					int w = 0, h = 0;
+					SDL_GetWindowSize(window, &w, &h);
+					float dpi = 0.0F;
+					if (index >= 0 && SDL_GetDisplayDPI(index, nullptr, &dpi, nullptr) == 0 &&
+					    dpi > 0.0F)
+						SPLog("Window is %dx%d on display %d, scaled %.0f%% (%.0f DPI)", w, h,
+						      index, dpi / 96.0F * 100.0F, dpi);
+				}
+#endif
+
 #ifdef __APPLE__
 #elif __unix
 				SDL_Surface* icon = nullptr;
