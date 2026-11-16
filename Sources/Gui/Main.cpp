@@ -23,7 +23,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include <regex>
 #include <set>
 #include <string>
 #include <sys/stat.h>
@@ -35,7 +34,7 @@
 #include <curl/curl.h>
 #include <zlib.h>
 
-#include "KV6Tools.h"
+#include "CommandLine.h"
 #include "KV6Tools.h"
 #include "Main.h"
 #include "MainScreen.h"
@@ -199,301 +198,16 @@ namespace spades {
 }
 
 namespace {
-	bool g_autoconnect = false;
-	std::string g_autoconnectHostName;
-	spades::ProtocolVersion g_autoconnectProtocolVersion = spades::ProtocolVersion::v075;
+	// What the command line asked for (see CommandLine.h), parsed once in main.
+	spades::CommandLine g_commandLine;
 
-	bool g_replayDemo = false;
-	std::string g_replayDemoPath;
-
-	// Demo selection for --replay-demo, set with --demo and --player.
-	std::string g_demoPath;             // empty = latest demo in Demos/
-	std::string g_demoPlayer;           // empty = first player; else id or name
-
-	// Menuless demo replay (--replay-demo). Plays a demo and auto-follows a player,
-	// skipping the startup/setup/main screens entirely.
-	bool g_replayDemoMenuless = false;
-
-	bool g_printVersion = false;
-	bool g_registerFileTypes = false;
-	bool g_unregisterFileTypes = false;
-	bool g_printHelp = false;
-
-	std::string g_tryModPath;
-
-	// Config variable overrides requested on the command line via --override-cvar
-	// NAME=VALUE. Applied in memory after the preferences are loaded and reverted
-	// to their previous values before the config is written back, so the on-disk
-	// SPConfig.cfg is never modified by an override.
-	std::vector<std::pair<std::string, std::string>> g_cvarOverrides;
-
-	// Pre-override values of the variables in g_cvarOverrides, captured at apply
-	// time and written back before the config is flushed.
-	std::vector<std::pair<std::string, std::string>> g_cvarOverrideOriginals;
-
-	// Options for developers and tests, which a player never needs: each is
-	// refused unless --debug-tools is given too, so none is used by accident
-	// and --help lists only what a player may want.
-	const char* const kDebugOptions[] = {"--screenshot-quit", "--editor-reference",
-	                                     "--override-cvar",   "--replay-demo",
-	                                     "--demo",            "--player",
-	                                     "--kv6-tools"};
-
-	bool IsDebugOption(const char* arg) {
-		for (const char* option : kDebugOptions)
-			if (!strcasecmp(arg, option))
-				return true;
-		return false;
-	}
-
-	void printHelp(char* binaryName) {
-		printf("usage: %s [server_address] [v=protocol_version] [--replay demo.dem] [-h|--help] [-v|--version]\n",
-		       binaryName);
-		printf("  server_address       aos:// server address to connect to\n");
-		printf("  v=0.75 or v=0.76     protocol version (default: 0.75)\n");
-		printf("  --replay FILE        play back a demo recording\n");
-		printf("  -r FILE              play back a demo recording (short form)\n");
-		printf("  --try-mod PATH       try a mod (folder or .pak) on top of the base\n");
-		printf("                       game; bypasses the startup setup and the\n");
-		printf("                       enabled-mod set, and hides the Mods tab, so\n");
-		printf("                       only this mod applies. A bare name resolves\n");
-		printf("                       under the user Mods/ folder.\n");
-		printf("  --register-file-types\n");
-		printf("                       offer this program for the files its editors\n");
-		printf("                       open, so a file manager can open one with it.\n");
-		printf("                       Windows only, for the current user; elsewhere\n");
-		printf("                       this is done when the program is installed.\n");
-		printf("  --unregister-file-types\n");
-		printf("                       undo --register-file-types\n");
-		printf("  --open FILE          open a file in its editor, skipping the menus.\n");
-		printf("                       A file given on its own does the same, which\n");
-		printf("                       is what a file manager passes when it opens\n");
-		printf("                       one with this program.\n");
-		printf("  -h, --help           show this help message\n");
-		printf("  -v, --version        show version information\n");
-		printf("  --debug-tools        allow the options for developers and tests;\n");
-		printf("                       --debug-tools --help lists them\n");
-		printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
-		printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
-	}
-
-	void printDebugHelp(char* binaryName) {
-		printf("usage: %s --debug-tools [OPTIONS...]\n", binaryName);
-		printf("Options for developers and tests, refused without --debug-tools:\n");
-		printf("  --override-cvar NAME=VALUE\n");
-		printf("                       set a config variable for this run only; the\n");
-		printf("                       on-disk config is left unchanged. May be given\n");
-		printf("                       multiple times.\n");
-		printf("  --replay-demo        play a demo and follow a player, skipping all\n");
-		printf("                       menus. Use --demo and --player to customise it.\n");
-		printf("  --demo FILE          demo to use (default: latest in Demos/); a bare\n");
-		printf("                       name resolves under Demos/\n");
-		printf("  --player ID|NAME     player to follow (default: first player)\n");
-		printf("  --editor-reference X|Y|Z IMAGE\n");
-		printf("                       show IMAGE as a reference image across that\n");
-		printf("                       axis in the model editor --open opens\n");
-		printf("  --screenshot-quit SECONDS\n");
-		printf("                       take a screenshot that many seconds after\n");
-		printf("                       starting, then quit: to check what is drawn\n");
-		printf("                       with no one at the keyboard\n");
-		printf("  --kv6-tools COMMAND FILE [ARGS...]\n");
-		printf("                       read and edit a KV6 model without opening the\n");
-		printf("                       game (its size, pivot, bounds, voxels); comes\n");
-		printf("                       right after --debug-tools, and everything after\n");
-		printf("                       it is its own. --debug-tools --kv6-tools help\n");
-		printf("                       lists its commands.\n");
-	}
-
-	std::regex const hostNameRegex{"aos://.*"};
-	std::regex const v075Regex{"(?:v=)?0?\\.?75"};
-	std::regex const v076Regex{"(?:v=)?0?\\.?76"};
-
-	/**
-	 * A local path from what a desktop hands over. A file manager launched
-	 * through the `%U` field code passes a `file://` URL with its reserved
-	 * characters percent-encoded, so a model in a folder with a space in its
-	 * name arrives as `file:///home/u/My%20Models/a.kv6`. Anything that is not
-	 * such a URL is already a path and comes back unchanged.
-	 */
-	std::string LocalPathFromArgument(const std::string& arg) {
-		static const std::string scheme = "file://";
-		if (arg.compare(0, scheme.size(), scheme) != 0)
-			return arg;
-
-		// Everything between the scheme and the path is the host, which is empty
-		// or "localhost" for a file this machine can open; either way the path
-		// starts at the slash that follows it.
-		size_t start = arg.find('/', scheme.size());
-		if (start == std::string::npos)
-			return arg;
-
-		std::string path;
-		path.reserve(arg.size() - start);
-		for (size_t i = start; i < arg.size(); i++) {
-			if (arg[i] == '%' && i + 2 < arg.size() && std::isxdigit((unsigned char)arg[i + 1]) &&
-			    std::isxdigit((unsigned char)arg[i + 2])) {
-				path += char(std::stoi(arg.substr(i + 1, 2), nullptr, 16));
-				i += 2;
-			} else {
-				path += arg[i];
-			}
-		}
-
-		// A Windows URL names a drive after the leading slash (`file:///C:/a.kv6`),
-		// and the slash is not part of the path it stands for.
-		if (path.size() >= 3 && path[0] == '/' && path[2] == ':')
-			path.erase(0, 1);
-
-		return path;
-	}
-
-	int handleCommandLineArgument(int argc, char** argv, int& i) {
-		if (char* a = argv[i]) {
-			if (std::regex_match(a, hostNameRegex)) {
-				g_autoconnect = true;
-				g_autoconnectHostName = a;
-				return ++i;
-			}
-			if (std::regex_match(a, v075Regex)) {
-				g_autoconnectProtocolVersion = spades::ProtocolVersion::v075;
-				return ++i;
-			}
-			if (std::regex_match(a, v076Regex)) {
-				g_autoconnectProtocolVersion = spades::ProtocolVersion::v076;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--version") || !strcasecmp(a, "-v")) {
-				g_printVersion = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--debug-tools"))
-				return ++i; // seen before parsing began (main)
-			if (!strcasecmp(a, "--help") || !strcasecmp(a, "-h")) {
-				g_printHelp = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--replay") || !strcasecmp(a, "-r")) {
-				if (i + 1 < argc) {
-					g_replayDemo = true;
-					g_replayDemoPath = argv[++i];
-					return ++i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--open-mods")) {
-				spades::g_openModsTab = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--try-mod")) {
-				if (i + 1 < argc) {
-					spades::g_tryMod = true;
-					g_tryModPath = argv[++i];
-					return ++i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--override-cvar")) {
-				if (i + 1 < argc) {
-					std::string spec = argv[++i];
-					auto eq = spec.find('=');
-					if (eq != std::string::npos) {
-						std::string name = spec.substr(0, eq);
-						std::string value = spec.substr(eq + 1);
-						if (!name.empty())
-							g_cvarOverrides.emplace_back(name, value);
-						else
-							SPLog("Ignoring --override-cvar with empty name: %s", spec.c_str());
-					} else {
-						SPLog("Ignoring malformed --override-cvar (expected NAME=VALUE): %s",
-						      spec.c_str());
-					}
-					return ++i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--register-file-types")) {
-				g_registerFileTypes = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--unregister-file-types")) {
-				g_unregisterFileTypes = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--editor-reference")) {
-				if (i + 2 < argc) {
-					const std::string axis = argv[i + 1];
-					const int index = !strcasecmp(axis.c_str(), "x")   ? 0
-					                  : !strcasecmp(axis.c_str(), "y") ? 1
-					                  : !strcasecmp(axis.c_str(), "z") ? 2
-					                                                    : -1;
-					if (index < 0) {
-						fprintf(stderr, "--editor-reference: the axis is X, Y or Z\n");
-						return 0;
-					}
-					spades::gui::Automation().editorReferences.emplace_back(
-					  index, LocalPathFromArgument(argv[i + 2]));
-					i += 3;
-					return i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--screenshot-quit")) {
-				if (i + 1 < argc) {
-					spades::gui::Automation().screenshotQuitAfter =
-					  std::max(0.0F, float(atof(argv[++i])));
-					return ++i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--open")) {
-				if (i + 1 < argc) {
-					std::string path = LocalPathFromArgument(argv[++i]);
-					// Checked like a bare path is: an editor writes what it opens, so
-					// handing it a file of another type is how that file gets
-					// something else written over it.
-					if (spades::gui::IsEditableDocument(path)) {
-						spades::g_openDocumentPath = path;
-					} else {
-						fprintf(stderr, "Not a file this program can open: %s\n",
-						        path.c_str());
-						return 0;
-					}
-					return ++i;
-				}
-				return 0;
-			}
-			// A bare file is how a file manager hands one over: "open with" passes
-			// the file and nothing else, as a path or as a `file://` URL. Anything
-			// else that is not a known option is left for the checks that follow.
-			if (a[0] != '-') {
-				std::string path = LocalPathFromArgument(a);
-				if (spades::gui::IsEditableDocument(path)) {
-					spades::g_openDocumentPath = path;
-					return ++i;
-				}
-			}
-			if (!strcasecmp(a, "--replay-demo")) {
-				g_replayDemoMenuless = true;
-				return ++i;
-			}
-			if (!strcasecmp(a, "--demo")) {
-				if (i + 1 < argc) {
-					g_demoPath = argv[++i];
-					return ++i;
-				}
-				return 0;
-			}
-			if (!strcasecmp(a, "--player")) {
-				if (i + 1 < argc) {
-					g_demoPlayer = argv[++i];
-					return ++i;
-				}
-				return 0;
-			}
-		}
-
-		return 0;
-	}
+	// An --override-cvar applied: the variable, what it held before, and what
+	// it was set to. Put back before the config is written, unless the player
+	// changed it again meanwhile: the config on disk is never changed by one.
+	struct CvarOverride {
+		std::string name, original, value;
+	};
+	std::vector<CvarOverride> g_appliedCvarOverrides;
 
 	bool pathExists(const std::string& path) {
 		struct stat st;
@@ -746,6 +460,29 @@ static std::string Utf8FromWString(const wchar_t* ws) {
 }
 #endif
 
+namespace {
+	/**
+	 * A Windows program built for its windows has no console of its own: one
+	 * started from a terminal writes to that terminal's, so that --help, the
+	 * errors in its arguments and the command-line tools are seen. Started
+	 * from the desktop there is none, and nothing changes.
+	 */
+	void AttachToParentConsole() {
+#ifdef WIN32
+		if (!AttachConsole(ATTACH_PARENT_PROCESS))
+			return;
+#ifdef _MSC_VER
+		FILE* stream = nullptr;
+		freopen_s(&stream, "CONOUT$", "w", stdout);
+		freopen_s(&stream, "CONOUT$", "w", stderr);
+#else
+		freopen("CONOUT$", "w", stdout);
+		freopen("CONOUT$", "w", stderr);
+#endif
+#endif
+	}
+} // namespace
+
 int main(int argc, char** argv) {
 #ifdef WIN32
 	SetUnhandledExceptionFilter(UnhandledExceptionProc);
@@ -761,72 +498,50 @@ int main(int argc, char** argv) {
 	if (argc > 0 && argv[0])
 		spades::g_executablePath = argv[0];
 
-	// The options for developers and tests are allowed with --debug-tools
-	// only: one given without it is refused before anything is read, as
-	// reading its arguments as others could do anything.
-	bool debugTools = false;
-	for (int i = 1; i < argc; i++) {
-		if (!argv[i])
-			continue;
-		if (!strcasecmp(argv[i], "--debug-tools"))
-			debugTools = true;
-		if (IsDebugOption(argv[i]) && !debugTools) {
-			fprintf(stderr,
-			        "%s is an option for developers and tests: give --debug-tools before it\n"
-			        "(%s --debug-tools --help lists them all)\n",
-			        argv[i], argv[0] ? argv[0] : "ZeroSpades");
-			return 2;
-		}
-		// A command-line tool takes everything after it as its own, so it
-		// comes right after --debug-tools.
-		if (!strcasecmp(argv[i], "--kv6-tools")) {
-			if (i != 2) {
-				fprintf(stderr, "%s comes right after --debug-tools: %s --debug-tools %s ...\n",
-				        argv[i], argv[0] ? argv[0] : "ZeroSpades", argv[i]);
-				return 2;
-			}
-			break;
-		}
-	}
+	AttachToParentConsole();
+
+	spades::CommandLine& commandLine = g_commandLine;
+	if (spades::ParseCommandLine(argc, argv, commandLine) != spades::CommandLineResult::Run)
+		return 2;
 
 	// A command-line tool of its own: everything after it is its, and it runs
 	// with no window and none of the game's start-up.
-	if (argc > 2 && debugTools && argv[2] && !strcasecmp(argv[2], "--kv6-tools"))
-		return spades::RunKV6Tools(argc - 3, argv + 3);
-
-	for (int i = 1; i < argc;) {
-		int ret = handleCommandLineArgument(argc, argv, i);
-		if (!ret) {
-			// ignore unknown arg
-			i++;
-		}
+	if (commandLine.kv6Tools) {
+		std::vector<char*> toolArgs;
+		for (std::string& arg : commandLine.kv6ToolsArguments)
+			toolArgs.push_back(&arg[0]);
+		return spades::RunKV6Tools(int(toolArgs.size()), toolArgs.data());
 	}
 
-	if (g_printVersion) {
+	if (commandLine.printHelp) {
+		spades::PrintCommandLineHelp(argv[0], commandLine.debugTools);
+		return 0;
+	}
+
+	if (commandLine.printVersion) {
 		printf("%s\n", PACKAGE_STRING);
 		return 0;
 	}
 
-	if (g_registerFileTypes || g_unregisterFileTypes) {
-		std::string error = g_registerFileTypes ? spades::RegisterFileTypes()
-		                                        : spades::UnregisterFileTypes();
+	if (commandLine.registerFileTypes || commandLine.unregisterFileTypes) {
+		std::string error = commandLine.registerFileTypes ? spades::RegisterFileTypes()
+		                                                  : spades::UnregisterFileTypes();
 		if (!error.empty()) {
 			fprintf(stderr, "%s\n", error.c_str());
 			return 1;
 		}
-		printf("%s\n", g_registerFileTypes
+		printf("%s\n", commandLine.registerFileTypes
 		                  ? "ZeroSpades is now offered for voxel model files."
 		                  : "ZeroSpades is no longer offered for voxel model files.");
 		return 0;
 	}
 
-	if (g_printHelp) {
-		if (debugTools)
-			printDebugHelp(argv[0]);
-		else
-			printHelp(argv[0]);
-		return 0;
-	}
+	// What the rest of the program reads where it is used.
+	spades::g_openModsTab = commandLine.openModsTab;
+	spades::g_tryMod = !commandLine.tryMod.empty();
+	spades::g_openDocumentPath = commandLine.openDocument;
+	spades::gui::Automation().screenshotQuitAfter = commandLine.screenshotQuitAfter;
+	spades::gui::Automation().editorReferences = commandLine.editorReferences;
 
 	std::unique_ptr<spades::SplashWindow> splashWindow;
 
@@ -1000,17 +715,19 @@ int main(int argc, char** argv) {
 		// Only override variables that already exist (every real cvar is
 		// registered by static initializers before main runs); unknown names are
 		// skipped with a warning so the on-disk config is guaranteed untouched.
-		if (!g_cvarOverrides.empty()) {
+		if (!g_commandLine.cvarOverrides.empty()) {
 			auto knownNames = spades::Settings::GetInstance()->GetAllItemNames();
 			std::set<std::string> known(knownNames.begin(), knownNames.end());
-			for (const auto& ov : g_cvarOverrides) {
+			for (const auto& ov : g_commandLine.cvarOverrides) {
 				if (known.find(ov.first) == known.end()) {
+					fprintf(stderr, "Ignoring --override-cvar for an unknown config variable: %s\n",
+					        ov.first.c_str());
 					SPLog("Ignoring --override-cvar for unknown config variable: %s",
 					      ov.first.c_str());
 					continue;
 				}
 				spades::Settings::ItemHandle item(ov.first, nullptr);
-				g_cvarOverrideOriginals.emplace_back(ov.first, (std::string)item);
+				g_appliedCvarOverrides.push_back({ov.first, (std::string)item, ov.second});
 				item = ov.second;
 				SPLog("Overriding config variable for this run: %s = %s",
 				      ov.first.c_str(), ov.second.c_str());
@@ -1176,9 +893,13 @@ int main(int argc, char** argv) {
 		// tree, so the engine sees no difference between the two. No packing
 		// step, so editing files in the folder and relaunching is the whole loop.
 		if (spades::g_tryMod) {
-			std::string path = resolveTryMod(g_tryModPath);
+			std::string path = resolveTryMod(g_commandLine.tryMod);
 			if (path.empty()) {
-				SPLog("Mod to try not found: %s", g_tryModPath.c_str());
+				// Known only now the user's folders are: still the argument's
+				// fault, and reported as one.
+				fprintf(stderr, "--try-mod: no mod found at %s\n", g_commandLine.tryMod.c_str());
+				SPLog("Mod to try not found: %s", g_commandLine.tryMod.c_str());
+				return 2;
 			} else if (isDirectory(path)) {
 				spades::FileManager::PrependFileSystem(
 				  new spades::DirectoryFileSystem(path, false));
@@ -1219,22 +940,23 @@ int main(int argc, char** argv) {
 		pumpEvents();
 
 		// everything is now ready!
-		if (g_replayDemoMenuless) {
+		if (g_commandLine.replayFollowing) {
 			splashWindow.reset();
 
-			std::string demoPath = resolveCliDemoPath(g_demoPath);
+			std::string demoPath = resolveCliDemoPath(g_commandLine.followDemo);
 			if (demoPath.empty()) {
+				fprintf(stderr, "--replay-demo: there is no demo in Demos/ to play\n");
 				SPLog("No demos found in Demos/ for --replay-demo");
-			} else {
-				SPLog("Starting menuless demo replay: '%s'", demoPath.c_str());
-				spades::StartDemoReplayAutoFollow(demoPath, g_demoPlayer);
+				return 1;
 			}
-		} else if (g_replayDemo) {
+			SPLog("Starting menuless demo replay: '%s'", demoPath.c_str());
+			spades::StartDemoReplayAutoFollow(demoPath, g_commandLine.followPlayer);
+		} else if (!g_commandLine.replayPath.empty()) {
 			splashWindow.reset();
 
-			SPLog("Starting demo replay: %s", g_replayDemoPath.c_str());
-			spades::StartDemoReplay(g_replayDemoPath);
-		} else if (!g_autoconnect) {
+			SPLog("Starting demo replay: %s", g_commandLine.replayPath.c_str());
+			spades::StartDemoReplay(g_commandLine.replayPath);
+		} else if (g_commandLine.serverAddress.empty()) {
 			// A file to open is a destination of its own: the setup window would
 			// only stand between the player and the file they asked for.
 			if (spades::g_openModsTab || spades::g_tryMod || !spades::g_openDocumentPath.empty() ||
@@ -1252,15 +974,17 @@ int main(int argc, char** argv) {
 		} else {
 			splashWindow.reset();
 
-			spades::ServerAddress host(g_autoconnectHostName, g_autoconnectProtocolVersion);
+			spades::ServerAddress host(g_commandLine.serverAddress, g_commandLine.protocolVersion);
 			spades::StartClient(host);
 		}
 
-		// Revert any --override-cvar values to what they were before this run so
-		// the flush below writes the unchanged configuration back to disk.
-		for (const auto& orig : g_cvarOverrideOriginals) {
-			spades::Settings::ItemHandle item(orig.first, nullptr);
-			item = orig.second;
+		// Put back what --override-cvar changed, so the flush below writes the
+		// configuration as it was -- but not a variable the player has changed
+		// again since, in the game's options: that change is theirs to keep.
+		for (const CvarOverride& ov : g_appliedCvarOverrides) {
+			spades::Settings::ItemHandle item(ov.name, nullptr);
+			if ((std::string)item == ov.value)
+				item = ov.original;
 		}
 
 		spades::Settings::GetInstance()->Flush();
