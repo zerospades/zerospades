@@ -75,16 +75,18 @@ namespace spades {
 				// Read / replace everything besides the document that a step restores.
 				virtual State UndoSnapshotState() const = 0;
 				virtual void UndoRestoreState(const State& state) = 0;
-				// Called once after a step has been applied, to refresh derived state
-				// (the render model, etc.).
-				virtual void UndoReplayed() = 0;
 			};
 
 			/**
 			 * How much history is kept. Past either cap the oldest steps go; the
 			 * most recent step is always kept, even if it alone exceeds `bytes`.
-			 * The memory cap keeps neither big edits nor the state kept per step
-			 * from growing the history without bound.
+			 *
+			 * `steps` counts the steps that change the document: those that only
+			 * change the rest of the state (a selection) do not use it up, so
+			 * selecting back and forth never pushes the edits themselves out of
+			 * reach. Every step costs memory, those too, so `bytes` bounds them
+			 * all, and keeps neither big edits nor the state kept per step from
+			 * growing the history without bound.
 			 */
 			struct Limits {
 				std::size_t steps = 256;
@@ -127,10 +129,21 @@ namespace spades {
 			}
 			void EndAction() { action = 0; }
 
-			/** Appends a change of the document to the step open; ignored outside one. */
+			/**
+			 * Appends a change of the document to the step open. There must be
+			 * one: a change made outside every step is in the document but not
+			 * in the history, and every step replayed after it would meet a
+			 * document other than the one it was recorded against. Such a change
+			 * is a mistake of the caller's, asserted in a debug build; in any
+			 * other the history, which can no longer be trusted, starts afresh.
+			 */
 			void Append(Record record) {
-				if (depth == 0)
-					return; // only recorded inside a step
+				SPAssert(depth > 0);
+				if (depth == 0) {
+					SPLog("Undo history cleared: a change was made outside an undo step");
+					Clear();
+					return;
+				}
 				pending.records.push_back(std::move(record));
 			}
 
@@ -140,33 +153,50 @@ namespace spades {
 			std::string UndoLabel() const { return undoGroups.empty() ? "" : undoGroups.back().label; }
 			std::string RedoLabel() const { return redoGroups.empty() ? "" : redoGroups.back().label; }
 
-			bool Undo() { // false if there was nothing to undo
+			/**
+			 * Undoes the last step; false if there was nothing to undo.
+			 *
+			 * A step that fails part way through its replay leaves the document
+			 * matching neither end of it, and no other step can be replayed
+			 * against it: the history is cleared, and what failed rethrown for
+			 * the caller to report.
+			 */
+			bool Undo() {
 				if (depth != 0 || undoGroups.empty())
 					return false;
 				action = 0; // nothing done after this merges into what came before
-				Group g = std::move(undoGroups.back());
-				undoGroups.pop_back();
-				for (auto it = g.records.rbegin(); it != g.records.rend(); ++it)
-					sink.UndoApply(*it, false);
-				sink.UndoRestoreState(g.before);
-				sink.UndoReplayed();
+				Group& g = undoGroups.back();
+				try {
+					for (auto it = g.records.rbegin(); it != g.records.rend(); ++it)
+						sink.UndoApply(*it, false);
+					sink.UndoRestoreState(g.before);
+				} catch (...) {
+					Abandon("undoing", g.label);
+					throw;
+				}
 				documentId = g.documentBefore;
 				redoGroups.push_back(std::move(g));
+				undoGroups.pop_back();
 				return true;
 			}
 
+			/** Redoes the last step undone; as Undo. */
 			bool Redo() {
 				if (depth != 0 || redoGroups.empty())
 					return false;
 				action = 0;
-				Group g = std::move(redoGroups.back());
-				redoGroups.pop_back();
-				for (const Record& r : g.records)
-					sink.UndoApply(r, true);
-				sink.UndoRestoreState(g.after);
-				sink.UndoReplayed();
+				Group& g = redoGroups.back();
+				try {
+					for (const Record& r : g.records)
+						sink.UndoApply(r, true);
+					sink.UndoRestoreState(g.after);
+				} catch (...) {
+					Abandon("redoing", g.label);
+					throw;
+				}
 				documentId = g.documentAfter;
 				undoGroups.push_back(std::move(g));
+				redoGroups.pop_back();
 				return true;
 			}
 
@@ -274,19 +304,31 @@ namespace spades {
 				pending = Group();
 
 				// Evict the oldest history past either cap, but never the last step.
-				while ((undoGroups.size() > limits.steps || totalBytes > limits.bytes) &&
+				std::size_t documentSteps = 0;
+				for (const Group& g : undoGroups)
+					documentSteps += g.records.empty() ? 0 : 1;
+				while ((documentSteps > limits.steps || totalBytes > limits.bytes) &&
 				       undoGroups.size() > 1) {
+					documentSteps -= undoGroups.front().records.empty() ? 0 : 1;
 					totalBytes -= undoGroups.front().bytes;
 					undoGroups.pop_front();
 				}
 			}
 
-			// Approximate memory a group adds: its records, plus whatever of its
-			// after state it does not share with its before state. The before state
-			// is the after state of the step below it, which counts it already;
-			// only the oldest step's before state goes uncounted.
+			// Logs why the history goes, and clears it: see Undo.
+			void Abandon(const char* doing, const std::string& label) noexcept {
+				SPLog("Undo history cleared: %s '%s' failed part way", doing, label.c_str());
+				Clear();
+			}
+
+			// The memory a group adds: itself, its label and its records as
+			// allocated, plus whatever of its after state it does not share with
+			// its before state. The before state is the after state of the step
+			// below it, which counts it already; only the oldest step's before
+			// state goes uncounted.
 			static std::size_t BytesOf(const Group& g) {
-				return g.records.size() * sizeof(Record) + g.after.UnsharedBytes(g.before);
+				return sizeof(Group) + g.label.capacity() + g.records.capacity() * sizeof(Record) +
+				       g.after.UnsharedBytes(g.before);
 			}
 
 			Sink& sink;

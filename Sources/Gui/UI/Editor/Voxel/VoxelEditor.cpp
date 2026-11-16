@@ -297,13 +297,9 @@ namespace spades {
 		// --- Document ---------------------------------------------------------
 
 		void VoxelEditor::DocumentReplaced() {
-			// Nothing of the old document's edit state carries over but which
-			// axes mirror: that is how the user works, not part of the document.
-			MirrorSetup kept;
-			for (int a = 0; a < 3; a++)
-				kept.enabled[a] = edit.mirror.enabled[a];
+			// Nothing of the old document's edit state carries over. Which axes
+			// mirror does: that is how the user works, not part of the document.
 			edit = EditState();
-			edit.mirror = kept;
 			movedMiddle = SelectionMiddle();
 			previewedOrigin.reset();
 			previewedMirrorPlane.reset();
@@ -445,25 +441,31 @@ namespace spades {
 
 		// Undo and redo replay the one history, pending voxels included: a
 		// move or a turn is a step like any edit, so nothing is placed first.
-		void VoxelEditor::Undo() {
-			EndPreviews(); // the history holds only what was committed
-			std::string label = undo.UndoLabel();
-			if (!undo.Undo()) {
-				SetStatus("Nothing to undo");
-				return;
-			}
-			SetStatus("Undid " + (label.empty() ? std::string("edit") : label));
-			HistoryReplayed();
-		}
+		void VoxelEditor::Undo() { StepHistory(false); }
+		void VoxelEditor::Redo() { StepHistory(true); }
 
-		void VoxelEditor::Redo() {
-			EndPreviews(); // the history holds only what was committed
-			std::string label = undo.RedoLabel();
-			if (!undo.Redo()) {
-				SetStatus("Nothing to redo");
-				return;
+		void VoxelEditor::StepHistory(bool forward) {
+			// The same whether asked for by a key, the menu or the toolbar: a
+			// drag, a half-placed box or a colour being chosen is abandoned, and
+			// what is only previewed put back, as the history holds only what
+			// was committed.
+			CancelToolInteraction();
+			const std::string label = forward ? undo.RedoLabel() : undo.UndoLabel();
+			const char* const verb = forward ? "Redid " : "Undid ";
+			try {
+				if (!(forward ? undo.Redo() : undo.Undo())) {
+					SetStatus(forward ? "Nothing to redo" : "Nothing to undo");
+					return;
+				}
+				SetStatus(verb + (label.empty() ? std::string("edit") : label));
+			} catch (const std::exception& ex) {
+				// The history is gone (see UndoHistory::Undo); the document is as
+				// far as the replay got, and the tools catch up with that.
+				SPLog("%s '%s' failed: %s", forward ? "Redoing" : "Undoing", label.c_str(),
+				      ex.what());
+				SetStatus(std::string(forward ? "Redo" : "Undo") +
+				          " failed, and the undo history was cleared");
 			}
-			SetStatus("Redid " + (label.empty() ? std::string("edit") : label));
 			HistoryReplayed();
 		}
 

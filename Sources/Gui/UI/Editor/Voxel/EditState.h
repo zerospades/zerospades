@@ -35,7 +35,9 @@ namespace spades {
 	namespace gui {
 		/**
 		 * Mirror modelling: which axes reflect edits, and the plane each reflects
-		 * across. Not saved with the model, but it decides where edits land.
+		 * across. A setting of the editor's, as the reference images are: not
+		 * saved with the model, not an undo step, and kept when another model is
+		 * opened, but it decides where edits land.
 		 */
 		struct MirrorSetup {
 			bool enabled[3] = {false, false, false};
@@ -136,7 +138,6 @@ namespace spades {
 		 */
 		struct EditState {
 			VoxelSelection selection; // only ever solid voxels
-			MirrorSetup mirror;
 			bool placing = false;       // whether a paste or an import is waiting
 			PendingPlacement placement; // empty unless placing
 
@@ -147,7 +148,7 @@ namespace spades {
 			}
 
 			bool operator==(const EditState& o) const {
-				return selection == o.selection && mirror == o.mirror && placing == o.placing &&
+				return selection == o.selection && placing == o.placing &&
 				       (!placing || placement == o.placement);
 			}
 			bool operator!=(const EditState& o) const { return !(*this == o); }
