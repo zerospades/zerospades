@@ -32,8 +32,16 @@ namespace spades {
 		 */
 		namespace PlayerTemplate {
 			constexpr const char* kRoot = "Player";
+			/** The poses: each hinge stands where the game puts the player's
+			 *  origin for it, the legs' joint. */
 			constexpr const char* kStanding = "Player/Standing";
 			constexpr const char* kCrouching = "Player/Crouching";
+			/** The joints the game hangs a player's parts from, as the template's
+			 *  hinges: the head's and the arms', shared by both poses, and the
+			 *  torso's, a pose's own (under each pose's hinge). */
+			constexpr const char* kNeck = "Player/Neck";
+			constexpr const char* kShoulders = "Player/Shoulders";
+			constexpr const char* kUpperBody = "UpperBody";
 			/** Where a set's head wears the Christmas hat: a hinge the hat's
 			 *  pivot sits on. */
 			constexpr const char* kHatMount = "Player/Neck/SantaHat";

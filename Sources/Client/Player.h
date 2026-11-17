@@ -268,14 +268,22 @@ namespace spades {
 
 			// hit tests
 			HitBoxes GetHitBoxes(bool interpolate);
+			/** The joints the hit boxes hang from: the legs from `lower` (the
+			 *  player's origin), and the torso, head and arms from their own. */
+			struct HitBoxJoints {
+				Matrix4 lower, torso, head, arms;
+			};
+			/** The joints of a player standing at `origin`, turned by `yaw`,
+			 *  looking up or down by `pitch`, its arms at `armPitch`. */
+			static HitBoxJoints MakeHitBoxJoints(const Vector3& origin, float yaw, float pitch,
+			                                     float armPitch, bool crouch);
 			/**
-			 * The hit boxes of a player standing at `origin`, turned by `yaw`,
-			 * looking up or down by `pitch`, its arms at `armPitch`: the boxes
-			 * shots are tested against, wherever they are asked for (a live
-			 * player, or an editor showing where a skin can be hit).
+			 * The boxes shots are tested against, hung from `joints`: wherever
+			 * they are asked for, a live player or an editor showing where a
+			 * skin can be hit (on joints of its own, each box then in its
+			 * joint's frame).
 			 */
-			static HitBoxes MakeHitBoxes(const Vector3& origin, float yaw, float pitch,
-			                             float armPitch, bool crouch);
+			static HitBoxes MakeHitBoxes(const HitBoxJoints& joints, bool crouch);
 
 			/** Does approximated ray casting.
 			 * @param dir normalized direction vector.

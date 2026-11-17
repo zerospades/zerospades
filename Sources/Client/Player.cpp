@@ -1480,24 +1480,34 @@ namespace spades {
 			if (armPitch < 0.0F)
 				armPitch = std::max(armPitch, -kHalfPi) * 0.9F;
 
-			return MakeHitBoxes(GetOrigin(), yaw, pitch, armPitch, input.crouch);
+			return MakeHitBoxes(
+			  MakeHitBoxJoints(GetOrigin(), yaw, pitch, armPitch, input.crouch), input.crouch);
 		}
 
-		Player::HitBoxes Player::MakeHitBoxes(const Vector3& origin, float yaw, float pitch,
-		                                      float armPitch, bool crouch) {
-			Player::HitBoxes hb;
-
+		Player::HitBoxJoints Player::MakeHitBoxJoints(const Vector3& origin, float yaw,
+		                                              float pitch, float armPitch, bool crouch) {
+			HitBoxJoints j;
 			// lower axis
-			Matrix4 const lower = Matrix4::Translate(origin)
+			j.lower = Matrix4::Translate(origin)
 				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw);
-			Matrix4 const torso = lower
+			j.torso = j.lower
 				* Matrix4::Translate(0, 0, -(crouch ? 0.5F : 1.0F));
-			Matrix4 const head = torso
+			j.head = j.torso
 				* Matrix4::Translate(0.0F, 0.0F, -(crouch ? 0.05F : 0.0F))
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
-			Matrix4 const arms = torso
+			j.arms = j.torso
 				* Matrix4::Translate(0, 0, crouch ? 0.0F : 0.1F)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
+			return j;
+		}
+
+		Player::HitBoxes Player::MakeHitBoxes(const HitBoxJoints& joints, bool crouch) {
+			Player::HitBoxes hb;
+
+			Matrix4 const& lower = joints.lower;
+			Matrix4 const& torso = joints.torso;
+			Matrix4 const& head = joints.head;
+			Matrix4 const& arms = joints.arms;
 
 			if (crouch) {
 				hb.limbs[0] = lower * AABB3(-0.4F, -0.1F, -0.2F, 0.3F, 0.4F, 0.8F);

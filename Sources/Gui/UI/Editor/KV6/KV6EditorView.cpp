@@ -564,7 +564,10 @@ namespace spades {
 		}
 
 		bool KV6EditorView::TreeTakesPress() const {
+			// A menu of the bar, while it is down, has every press: one of its
+			// rows hanging over the tree is the menu's to pick, not a row's.
 			return ShowingObjects() && !leftToEditor && !rightToEditor &&
+			       !ui->GetMenuBar()->IsOpen() &&
 			       !ui->GetColorPicker()->IsOverPicker(softwareCursor->GetPosition()) &&
 			       tree->IsOver(*scene, softwareCursor->GetPosition());
 		}
@@ -1373,27 +1376,40 @@ namespace spades {
 		}
 
 		void KV6EditorView::DrawHitBoxes() {
-			// A pose's hinge stands where the game puts the player's origin for
-			// it; the game draws every part at a tenth of a block per voxel,
-			// its x and y the other way round, so its boxes come back the same.
-			const float k = client::PlayerTemplate::kVoxelsPerBlock;
+			namespace Template = client::PlayerTemplate;
+			// Each box rides the hinge that stands for the joint the game hangs
+			// it from, so it goes where that joint is moved and stays put when a
+			// part is: what can be hit follows the skeleton, not the skin. The
+			// game draws a part at a tenth of a block per voxel, its x and y the
+			// other way round, so a box in its joint's frame comes back so too.
+			const float k = Template::kVoxelsPerBlock;
 			const Matrix4 toVoxels = Matrix4::Scale(-k, -k, k);
+			// The joints at rest: every box in the frame of its own joint.
+			client::Player::HitBoxJoints atJoint;
+			atJoint.lower = atJoint.torso = atJoint.head = atJoint.arms = Matrix4::Identity();
+
 			NodePath path;
+			auto draw = [&](const std::string& hinge, const OBB3& box, const Vector4& color) {
+				if (!scene->PathNamed(hinge, path) || !scene->Shown(path))
+					return;
+				client::AddDebugOBB(*renderer, scene->NodeMatrix(path) * toVoxels * box, color);
+			};
+
+			// The head and the arms are the player's in either pose (the game
+			// hangs the same box from them in both), on joints both poses share.
+			const client::Player::HitBoxes shared = client::Player::MakeHitBoxes(atJoint, false);
+			draw(Template::kNeck, shared.head, EditorTheme::HitHead());
+			draw(Template::kShoulders, shared.limbs[2], EditorTheme::HitLimbs());
+
+			// A pose's own: the torso on its joint, and the legs on the pose's
+			// hinge, the player's origin, which the game hangs them from (not
+			// from the hips, so they keep still as the legs swing).
 			for (const HitBoxPose& pose : kHitBoxPoses) {
-				if (!scene->PathNamed(pose.path, path) || !scene->Shown(path))
-					continue;
-				// Looking straight ahead, its arms level: the pose the
-				// template's parts are laid out in.
-				const client::Player::HitBoxes hb = client::Player::MakeHitBoxes(
-				  MakeVector3(0.0F, 0.0F, 0.0F), 0.0F, 0.0F, 0.0F, pose.crouch);
-				const Matrix4 frame = scene->NodeMatrix(path) * toVoxels;
-				auto draw = [&](const OBB3& box, const Vector4& color) {
-					client::AddDebugOBB(*renderer, frame * box, Dimmed(color, pose.brightness));
-				};
-				draw(hb.head, EditorTheme::HitHead());
-				draw(hb.torso, EditorTheme::HitTorso());
-				for (const OBB3& limb : hb.limbs)
-					draw(limb, EditorTheme::HitLimbs());
+				const client::Player::HitBoxes hb = client::Player::MakeHitBoxes(atJoint, pose.crouch);
+				const std::string torso = std::string(pose.path) + "/" + Template::kUpperBody;
+				draw(torso, hb.torso, Dimmed(EditorTheme::HitTorso(), pose.brightness));
+				draw(pose.path, hb.limbs[0], Dimmed(EditorTheme::HitLimbs(), pose.brightness));
+				draw(pose.path, hb.limbs[1], Dimmed(EditorTheme::HitLimbs(), pose.brightness));
 			}
 		}
 
