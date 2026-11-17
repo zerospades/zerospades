@@ -212,8 +212,9 @@ namespace spades {
 		// bars, the host's widgets or colour sampling took are none of the
 		// tool's business, and start no user action to end.
 		void VoxelEditor::BuildPointerLayers() {
-			const PointerButton left = PointerButton::Left;
-			const PointerButton right = PointerButton::Right;
+			// Constants, so the lambdas read them without capturing them.
+			constexpr PointerButton left = PointerButton::Left;
+			constexpr PointerButton right = PointerButton::Right;
 			auto onPanel = [this](const Vector2& at) { return PanelTarget() && OnPanel(at); };
 
 			// Every button is the open menu's while it is down. The left one
@@ -222,7 +223,7 @@ namespace spades {
 			// and do nothing of what they would have done to the model behind.
 			pointerLayers.push_back(
 			  {"an open menu, any button but the left",
-			   [this, left](PointerButton button, const Vector2&) {
+			   [this](PointerButton button, const Vector2&) {
 				   if (button == left || !ui.GetMenuBar()->IsOpen())
 					   return false;
 				   ui.GetMenuBar()->Close();
@@ -235,7 +236,7 @@ namespace spades {
 			// is typed into, which answers for its own boxes.
 			pointerLayers.push_back(
 			  {"settling what is being typed",
-			   [this, left, onPanel](PointerButton button, const Vector2& at) {
+			   [this, onPanel](PointerButton button, const Vector2& at) {
 				   const bool panel = onPanel(at);
 				   if (!panel)
 					   SettlePanel();
@@ -251,14 +252,14 @@ namespace spades {
 
 			pointerLayers.push_back(
 			  {"the transform panel",
-			   [this, left, onPanel](PointerButton button, const Vector2& at) {
+			   [this, onPanel](PointerButton button, const Vector2& at) {
 				   if (!onPanel(at))
 					   return false;
 				   if (button == left)
 					   transformPanel->Press(*PanelTarget(), at);
 				   return true; // the other buttons have nothing to do on it
 			   },
-			   [this, left](PointerButton button) {
+			   [this](PointerButton button) {
 				   if (button != left || !transformPanel->IsHolding())
 					   return false;
 				   if (ITransformTarget* target = PanelTarget())
@@ -271,7 +272,7 @@ namespace spades {
 			// that press does.
 			pointerLayers.push_back(
 			  {"an open menu",
-			   [this, left](PointerButton button, const Vector2& at) {
+			   [this](PointerButton button, const Vector2& at) {
 				   return button == left && ui.GetMenuBar()->IsOpen() &&
 				          ui.GetMenuBar()->Click(at);
 			   },
@@ -281,7 +282,7 @@ namespace spades {
 			// nothing behind it is ever edited through it.
 			pointerLayers.push_back(
 			  {"the colour picker",
-			   [this, left](PointerButton button, const Vector2& at) {
+			   [this](PointerButton button, const Vector2& at) {
 				   if (!ui.GetColorPicker()->IsOverPicker(at))
 					   return false;
 				   if (button == left) {
@@ -296,7 +297,7 @@ namespace spades {
 				   }
 				   return true;
 			   },
-			   [this, left](PointerButton button) {
+			   [this](PointerButton button) {
 				   if (button != left)
 					   return false;
 				   ui.GetColorPicker()->MouseUp();
@@ -309,7 +310,7 @@ namespace spades {
 			// (the callbacks wired in WireUI act on it), or to nothing.
 			pointerLayers.push_back(
 			  {"the bars",
-			   [this, left](PointerButton button, const Vector2& at) {
+			   [this](PointerButton button, const Vector2& at) {
 				   if (at.y >= BarsHeight())
 					   return false;
 				   if (button != left)
@@ -334,7 +335,7 @@ namespace spades {
 			// button or not, and never reaches the model behind it.
 			pointerLayers.push_back(
 			  {"the strip",
-			   [this, left](PointerButton button, const Vector2& at) {
+			   [this](PointerButton button, const Vector2& at) {
 				   if (!ui.GetContextStrip()->Contains(at))
 					   return false;
 				   if (button == left) {
@@ -348,7 +349,7 @@ namespace spades {
 
 			pointerLayers.push_back(
 			  {"the host's widgets on the view",
-			   [this, left](PointerButton button, const Vector2& at) {
+			   [this](PointerButton button, const Vector2& at) {
 				   return button == left && host.ClickViewportWidget(at);
 			   },
 			   nullptr});
@@ -357,7 +358,7 @@ namespace spades {
 			// the click.
 			pointerLayers.push_back(
 			  {"sampling a colour",
-			   [this, left](PointerButton button, const Vector2&) {
+			   [this](PointerButton button, const Vector2&) {
 				   if (button != left || !SamplingArmed())
 					   return false;
 				   SampleColor();
@@ -367,7 +368,7 @@ namespace spades {
 
 			pointerLayers.push_back(
 			  {"the active tool",
-			   [this, left, right](PointerButton button, const Vector2&) {
+			   [this](PointerButton button, const Vector2&) {
 				   if (button == left)
 					   lmbHeld = true;
 				   else if (button == right)
@@ -377,7 +378,7 @@ namespace spades {
 				   DispatchPointer(MakePointer(button, PointerPhase::Down));
 				   return true;
 			   },
-			   [this, left, right](PointerButton button) {
+			   [this](PointerButton button) {
 				   bool& held = button == left ? lmbHeld : rmbHeld;
 				   if ((button != left && button != right) || !held)
 					   return false;
