@@ -5,7 +5,7 @@
 #   Player                            the player: turns with where they face
 #   ├─ Neck                           the head nods about it, with the aim
 #   │  ├─ Head                        Head.kv6
-#   │  └─ SantaHat                    where the shared SantaHat.kv6 sits at Christmas
+#   │  └─ HatPlacement                where the shared SantaHat.kv6 sits at Christmas
 #   ├─ Shoulders                      tilt with the aim
 #   │  └─ ArmsHolding                 Arms.kv6: both arms holding a tool, third person
 #   ├─ Standing                       the torso and legs, standing
@@ -61,7 +61,9 @@ at() {
 
 # The Christmas hat is one model every set shares, Models/Player/SantaHat.kv6
 # (XmasHat.kv6 without the head under it); a scene only says where its head
-# wears it: a hinge the hat's pivot sits on. Worn 5% larger about the middle
+# wears it: a placement, an empty the hat's pivot sits on, whose position,
+# turn and size the game reads, so a set with another head moves it to fit.
+# It keeps its name and stays empty, and is free to move. Worn 5% larger about the middle
 # of the head (voxels -2.5..2.5, -2.5..2.5, -5.5..-0.5 on the neck), so the
 # two never share a face: its pivot (5.5 2.5 7.5) then lands 0.15 above the
 # neck.
@@ -82,8 +84,8 @@ scene new "$out" --force >/dev/null
 	echo "add-hinge / Player"
 	echo "add-hinge Player Neck --at 0 0 -10"
 	part Player/Neck Head Head
-	echo "add-hinge Player/Neck SantaHat --at $hatAt"
-	echo "set-scale Player/Neck/SantaHat 1.05"
+	echo "add-hinge Player/Neck HatPlacement --at $hatAt"
+	echo "set-scale Player/Neck/HatPlacement 1.05"
 	echo "add-hinge Player Shoulders --at 0 0 -9"
 	part Player/Shoulders Arms ArmsHolding
 	echo "add-hinge Player Standing"
@@ -126,9 +128,9 @@ scene new "$out" --force >/dev/null
 	part Fallen Dead Corpse
 	echo "hide Fallen"
 
-	# Every hinge, held whole: the joints, the hat's mount, and the hinges that
+	# Every joint, held whole, and the hinges that only lay the scene out.
 	# only lay the scene out.
-	for n in Player Player/Neck Player/Neck/SantaHat Player/Shoulders \
+	for n in Player Player/Neck Player/Shoulders \
 		Player/Standing Player/Standing/UpperBody Player/Standing/LeftHip Player/Standing/RightHip \
 		Player/Crouching Player/Crouching/UpperBody Player/Crouching/LeftHip Player/Crouching/RightHip \
 		Player/JointedArms Player/JointedArms/LeftShoulder \
@@ -138,6 +140,8 @@ scene new "$out" --force >/dev/null
 		Fallen; do
 		echo "lock $n"
 	done
+	# The placement the game reads: its name kept and empty, its place free.
+	echo "lock Player/Neck/HatPlacement --name --voxels"
 } | scene apply "$out"
 
 # What each part is, for whoever opens the scene.
@@ -146,12 +150,13 @@ Player model template. The game finds every part by its path and places
 every joint itself; a part is drawn on its own hinge, as its classic .kv6
 was on its pivot. Give a part new voxels, or move, turn or scale it on
 its hinge: the game draws it so. Keep its name and its hinge: the game
-finds it by them. The hinges are locked: each stands where the game puts
-that joint, and owns the hit box of what hangs from it.
+finds it by them. The joints' hinges are locked: each stands where the
+game puts that joint, and owns the hit box of what hangs from it.
+HatPlacement is free to move: the game reads it, to put the hat there.
 
 Part                                            Classic file        Used in
 Player/Neck/Head                                Head.kv6            third person, corpse; standing and crouched
-Player/Neck/SantaHat                            (SantaHat.kv6)      a hinge: where the shared hat
+Player/Neck/HatPlacement                        (SantaHat.kv6)      a placement: where the shared hat
                                                                     sits over Head, 20-27 December
 Player/Shoulders/ArmsHolding                    Arms.kv6            third person; standing and crouched
 Player/Standing/UpperBody/Torso                 Torso.kv6           third person, first person, corpse

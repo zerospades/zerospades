@@ -45,9 +45,16 @@ namespace spades {
 			constexpr const char* kUpperBody = "UpperBody";
 			constexpr const char* kLeftHip = "LeftHip";
 			constexpr const char* kRightHip = "RightHip";
-			/** Where a set's head wears the Christmas hat: a hinge the hat's
-			 *  pivot sits on. */
-			constexpr const char* kHatMount = "Player/Neck/SantaHat";
+			/**
+			 * Where a set's head wears the Christmas hat: a placement, an empty
+			 * the hat's pivot sits on, whose position, turn and size the game
+			 * reads. Not the hat, which is one model every set shares.
+			 */
+			constexpr const char* kHatPlacement = "Player/Neck/HatPlacement";
+			/** Its name before it was called a placement, still read, so a skin
+			 *  made with it keeps its hat. */
+			constexpr const char* kHatPlacementOld = "Player/Neck/SantaHat";
+			constexpr const char* kHatFile = "Models/Player/SantaHat.kv6";
 
 			/**
 			 * From the game's world units to the template's voxels: a voxel is

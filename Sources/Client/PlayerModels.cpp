@@ -37,7 +37,6 @@ namespace spades {
 	namespace client {
 		namespace {
 			const char* const kSetsDir = "Models/Player/";
-			const char* const kHatFile = "Models/Player/SantaHat.kv6";
 
 			// Where the template keeps each classic part (player-scene.sh).
 			const char* ScenePathOf(const std::string& name) {
@@ -200,11 +199,13 @@ namespace spades {
 			// the classic hatted head instead.
 			if (ClassicWins(set, dir + "Head.kv6"))
 				return PlayerPart();
-			const VoxelObject* mount = FindObject(set.scene, PlayerTemplate::kHatMount);
+			const VoxelObject* mount = FindObject(set.scene, PlayerTemplate::kHatPlacement);
+			if (!mount)
+				mount = FindObject(set.scene, PlayerTemplate::kHatPlacementOld);
 			if (!mount)
 				return PlayerPart();
 			PlayerPart hat;
-			hat.model = renderer.RegisterModel(kHatFile);
+			hat.model = renderer.RegisterModel(PlayerTemplate::kHatFile);
 			hat.local = LocalTransform(mount->position, mount->rotation, mount->scale);
 			return hat;
 		}

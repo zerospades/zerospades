@@ -412,21 +412,29 @@ namespace spades {
 				return;
 			editor->ReleaseHeldInput();
 			const std::string name = "\"" + o->name + "\"";
-			// A node with nothing hanging off it as voxels is one of the joints
-			// a player template lays out, which the game places itself.
-			const std::string joint =
-			  o->model ? std::string()
-			           : " The game also places a joint like this one itself: moved, turned or "
-			             "scaled, it changes what the editor shows, hit boxes included, but not "
-			             "what the game draws. And a joint holds no voxels: given some, it is no "
-			             "longer the empty the template made it.";
+			// An empty is one of two things to a template: a joint, which the
+			// game places itself (its place held), or a placement, which the
+			// game reads to put something there (its place free).
+			std::string about;
+			if (!o->model) {
+				if (o->locks.AnyTransform())
+					about += " The game places a joint like this one itself: moved, turned or "
+					         "scaled, it changes what the editor shows, hit boxes included, but "
+					         "not what the game draws.";
+				else
+					about += " The game reads where this placement is, and puts what it places "
+					         "there.";
+				if (o->locks.voxels)
+					about += " It holds no voxels: given some, it is no longer the empty the "
+					         "template made it.";
+			}
 			// Two steps, each modal: the first says what is given up, the
 			// second asks once more, as this is not something done in passing.
 			ConfirmEditorAction(
 			  *ui->GetOverlay(),
 			  "Unlock " + name + " completely? Its template holds it. The game finds it, and "
 			    "what hangs under it, by name and by place in the tree: renamed or moved under "
-			    "another object, the game may no longer find them." + joint,
+			    "another object, the game may no longer find them." + about,
 			  [this, path, name] {
 				  ConfirmEditorAction(*ui->GetOverlay(),
 				                      "Are you sure? This removes every lock on " + name +
@@ -1484,6 +1492,23 @@ namespace spades {
 				editor->SetStatus("Hit boxes: shown in Object mode, over the whole player");
 		}
 
+		void KV6EditorView::DrawHatPreview() {
+			namespace Template = client::PlayerTemplate;
+			NodePath path;
+			if (!scene->PathNamed(Template::kHatPlacement, path) &&
+			    !scene->PathNamed(Template::kHatPlacementOld, path))
+				return;
+			if (!scene->Shown(path))
+				return;
+			// As the game draws it: the placement's transform, the hat's own
+			// pivot added by the renderer; faint, as it is no part of the file.
+			client::ModelRenderParam param;
+			param.matrix = scene->NodeMatrix(path);
+			param.ghost = true;
+			param.opacity = 0.45F;
+			renderer->RenderModel(*renderer->RegisterModel(Template::kHatFile), param);
+		}
+
 		void KV6EditorView::DrawHitBoxes() {
 			namespace Template = client::PlayerTemplate;
 			// Each box rides the hinge that stands for the joint the game hangs
@@ -2002,6 +2027,8 @@ namespace spades {
 			DrawOriginAxes();
 			// Over the whole player only: a lone part in Edit mode has no place
 			// in the boxes to show.
+			if (ShowingObjects())
+				DrawHatPreview();
 			if (showHitBoxes && ShowingObjects())
 				DrawHitBoxes();
 			editor->DrawScene();

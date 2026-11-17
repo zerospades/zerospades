@@ -273,13 +273,13 @@ namespace spades {
 			return result;
 		}
 
-		// Whether it or anything under it is kept by its name: removing it
-		// would take that away.
-		bool AnyNameLocked(const VoxelObject& o) {
-			if (o.locks.name)
+		// Whether it or anything under it has a lock of any kind: removing it
+		// would take what is held away.
+		bool AnyLocked(const VoxelObject& o) {
+			if (o.locks.Any())
 				return true;
 			for (const VoxelObject& c : o.children)
-				if (AnyNameLocked(c))
+				if (AnyLocked(c))
 					return true;
 			return false;
 		}
@@ -797,8 +797,8 @@ namespace spades {
 				const Options o = TakeOptions(a, 1, {{"--force", 0}});
 				Need(o.rest, 1, "remove OBJECT [--force]");
 				Ref ref = Find(scene, o.rest[0]);
-				if (!o.Has("--force") && AnyNameLocked(ref.Object()))
-					throw std::runtime_error("an object kept by its name would go with it (--force)");
+				if (!o.Has("--force") && AnyLocked(ref.Object()))
+					throw std::runtime_error("a locked object would go with it (--force)");
 				ref.siblings->erase(ref.siblings->begin() + long(ref.index));
 				return true;
 			}

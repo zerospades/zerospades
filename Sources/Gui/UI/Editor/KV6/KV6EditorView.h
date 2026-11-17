@@ -312,6 +312,9 @@ namespace spades {
 			// it is laid out in Object mode, so a skin is made to fit them. The
 			// game's own boxes, in each pose shown, never anything of the game's.
 			bool showHitBoxes = false;
+			/** The shared Christmas hat, faint, where a player template's
+			 *  placement puts it: what moving the placement does in game. */
+			void DrawHatPreview();
 			/** Whether the scene is a player template: it has a pose to show
 			 *  boxes on. */
 			bool IsPlayerTemplate() const;

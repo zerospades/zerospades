@@ -1089,11 +1089,11 @@ namespace spades {
 				return "nothing to delete";
 			for (const NodePath& p : top) {
 				const VoxelObject& o = *Node(p);
-				// What the game finds by name must stay: the name lock holds a
-				// node's path, and so its being there at all.
+				// Anything its template holds in any way stays: deleting it, or
+				// what hangs above it, would take what is held with it.
 				const VoxelObject* locked = nullptr;
 				std::function<void(const VoxelObject&)> find = [&](const VoxelObject& n) {
-					if (!locked && n.locks.name)
+					if (!locked && n.locks.Any())
 						locked = &n;
 					for (const VoxelObject& child : n.children)
 						find(child);
