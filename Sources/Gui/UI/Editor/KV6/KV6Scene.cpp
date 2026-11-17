@@ -600,8 +600,8 @@ namespace spades {
 
 			for (const NodePath& p : from) {
 				const VoxelObject& o = *Node(p);
-				if (o.locked) {
-					why = Quoted(o) + " is held in place by its template";
+				if (o.locks.name) {
+					why = Quoted(o) + " keeps the place in the tree its template gave it";
 					return false;
 				}
 				if (StartsWith(parent, p)) {
@@ -1062,7 +1062,7 @@ namespace spades {
 				return false;
 			}
 			std::function<void(VoxelObject&)> settle = [&](VoxelObject& o) {
-				o.locked = false;
+				o.locks = VoxelObject::Locks();
 				for (VoxelObject& child : o.children)
 					settle(child);
 			};
@@ -1089,19 +1089,20 @@ namespace spades {
 				return "nothing to delete";
 			for (const NodePath& p : top) {
 				const VoxelObject& o = *Node(p);
+				// What the game finds by name must stay: the name lock holds a
+				// node's path, and so its being there at all.
 				const VoxelObject* locked = nullptr;
 				std::function<void(const VoxelObject&)> find = [&](const VoxelObject& n) {
-					if (!locked && n.locked)
+					if (!locked && n.locks.name)
 						locked = &n;
 					for (const VoxelObject& child : n.children)
 						find(child);
 				};
 				find(o);
 				if (locked == &o)
-					return Quoted(o) + " is held in place by its template";
+					return Quoted(o) + " is kept by its template";
 				if (locked)
-					return Quoted(o) + " holds " + Quoted(*locked) +
-					       ", which its template holds in place";
+					return Quoted(o) + " holds " + Quoted(*locked) + ", which its template keeps";
 			}
 			return std::string();
 		}
@@ -1144,7 +1145,7 @@ namespace spades {
 				return "there is nothing to rename";
 			if (name == o->name)
 				return std::string();
-			if (o->locked)
+			if (o->locks.name)
 				return Quoted(*o) + " keeps the name its template gave it";
 			if (name.empty())
 				return "a name cannot be empty";
@@ -1211,19 +1212,33 @@ namespace spades {
 			Record(std::move(step));
 		}
 
-		bool KV6Scene::SetLocked(const NodePath& path, bool locked) {
-			VoxelObject* o = MutableNode(path);
-			if (!o || o->locked == locked)
+		VoxelObject::Locks KV6Scene::LocksOf(const NodePath& path) const {
+			const VoxelObject* o = path.empty() ? nullptr : Node(path);
+			return o ? o->locks : VoxelObject::Locks();
+		}
+
+		bool KV6Scene::SetLocks(const NodePath& path, const VoxelObject::Locks& locks) {
+			VoxelObject* o = path.empty() ? nullptr : MutableNode(path);
+			if (!o || o->locks == locks)
 				return false;
 			CancelDrag();
 			CancelPlacement();
-			o->locked = locked;
 			Step step;
 			step.kind = Step::Kind::Lock;
 			step.path = path;
-			step.locked = locked;
+			step.locksBefore = o->locks;
+			step.locksAfter = locks;
+			o->locks = locks;
 			Record(std::move(step));
 			return true;
+		}
+
+		bool KV6Scene::PivotHeld() const {
+			for (const VoxelObject& o : roots) {
+				if (o.locks.position)
+					return true;
+			}
+			return false;
 		}
 
 		// --- Placing -----------------------------------------------------------
@@ -1301,16 +1316,20 @@ namespace spades {
 			                   move.z / KeepScale(parentScale.z));
 			const Quaternion turn = toParent * total.rotation * parentRotation;
 
-			// A locked node keeps its turn and its scale, as in the panel.
-			const Quaternion rotation = o.locked ? startRotation : (turn * startRotation).Normalize();
+			// What the node's locks hold keeps what it was, as in the panel.
+			const Quaternion rotation =
+			  o.locks.rotation ? startRotation : (turn * startRotation).Normalize();
 			const Vector3 scale =
-			  o.locked ? dragStart.scale
-			           : MakeVector3(KeepScale(dragStart.scale.x * total.scale.x),
-			                         KeepScale(dragStart.scale.y * total.scale.y),
-			                         KeepScale(dragStart.scale.z * total.scale.z));
+			  o.locks.scale ? dragStart.scale
+			                : MakeVector3(KeepScale(dragStart.scale.x * total.scale.x),
+			                              KeepScale(dragStart.scale.y * total.scale.y),
+			                              KeepScale(dragStart.scale.z * total.scale.z));
 			o.rotation = rotation.v;
 			o.scale = scale;
-			o.position = startPivot + move - rotation.Apply(scale * pivot);
+			// A held position stays, and the node then turns and scales about
+			// its origin, which is where it is held.
+			o.position = o.locks.position ? dragStart.position
+			                              : startPivot + move - rotation.Apply(scale * pivot);
 		}
 
 		bool KV6Scene::CommitDrag() {
@@ -1320,7 +1339,9 @@ namespace spades {
 			if (draggingScene) {
 				const Vector3 shift = scenePivotOffset * -1.0F;
 				scenePivotOffset = MakeVector3(0.0F, 0.0F, 0.0F);
-				if (shift.x == 0.0F && shift.y == 0.0F && shift.z == 0.0F)
+				// Setting the pivot moves the top objects, which a held one
+				// refuses (see PivotHeld).
+				if ((shift.x == 0.0F && shift.y == 0.0F && shift.z == 0.0F) || PivotHeld())
 					return false;
 				ShiftRoots(shift);
 				Step step;
@@ -1382,11 +1403,6 @@ namespace spades {
 			return true;
 		}
 
-		bool KV6Scene::KeepsTurnAndScale(const NodePath& path) const {
-			const VoxelObject* o = Node(path);
-			return o && o->locked;
-		}
-
 		void KV6Scene::PreviewPlacement(const NodePath& path, const LocalPlacement& p) {
 			VoxelObject* o = MutableNode(path);
 			if (!o)
@@ -1398,11 +1414,12 @@ namespace spades {
 				placingPath = path;
 				placingStart = PlacementOf(*o);
 			}
-			o->position = p.position;
-			if (!o->locked) {
+			if (!o->locks.position)
+				o->position = p.position;
+			if (!o->locks.rotation)
 				o->rotation = Quaternion(p.rotation).Normalize().v;
+			if (!o->locks.scale)
 				o->scale = MakeVector3(KeepScale(p.scale.x), KeepScale(p.scale.y), KeepScale(p.scale.z));
-			}
 		}
 
 		bool KV6Scene::CommitPlacement() {
@@ -1494,8 +1511,14 @@ namespace spades {
 				case Step::Kind::Place: return "placing " + named(step.path);
 				case Step::Kind::Hide:
 					return (step.hidden ? "hiding " : "showing ") + named(step.path);
-				case Step::Kind::Lock:
-					return (step.locked ? "locking " : "unlocking ") + named(step.path);
+				case Step::Kind::Lock: {
+					// Locking when it now holds more than it did, else unlocking.
+					const VoxelObject::Locks& a = step.locksBefore;
+					const VoxelObject::Locks& b = step.locksAfter;
+					const bool more = (!a.name && b.name) || (!a.position && b.position) ||
+					                  (!a.rotation && b.rotation) || (!a.scale && b.scale);
+					return (more ? "locking " : "unlocking ") + named(step.path);
+				}
 				case Step::Kind::Move:
 					return "moving " + objects(done ? step.move->relocation.to
 					                                : step.move->relocation.from);
@@ -1536,7 +1559,7 @@ namespace spades {
 					Select({step.path}, step.path);
 					break;
 				case Step::Kind::Hide: MutableNode(step.path)->hidden = !step.hidden; break;
-				case Step::Kind::Lock: MutableNode(step.path)->locked = !step.locked; break;
+				case Step::Kind::Lock: MutableNode(step.path)->locks = step.locksBefore; break;
 				case Step::Kind::Move: {
 					const MoveStep& m = *step.move;
 					Relocate(m.relocation.Reversed(), m.before);
@@ -1584,7 +1607,7 @@ namespace spades {
 					Select({step.path}, step.path);
 					break;
 				case Step::Kind::Hide: ApplyHidden(step.path, step.hidden); break;
-				case Step::Kind::Lock: MutableNode(step.path)->locked = step.locked; break;
+				case Step::Kind::Lock: MutableNode(step.path)->locks = step.locksAfter; break;
 				case Step::Kind::Move: {
 					const MoveStep& m = *step.move;
 					Relocate(m.relocation, m.after);

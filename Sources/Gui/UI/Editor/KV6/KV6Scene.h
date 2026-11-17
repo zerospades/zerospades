@@ -160,10 +160,15 @@ namespace spades {
 			/** Hides the node (and so all under it) or shows it again; a hidden
 			 *  node and all under it leave the selection. */
 			void SetHidden(const NodePath& path, bool hidden);
-			/** Locks the node as a template holds it (its name, parent, turn and
-			 *  scale kept, see VoxelObject::locked), or unlocks it, as one step.
-			 *  False when there is no such node or it is that way already. */
-			bool SetLocked(const NodePath& path, bool locked);
+			/** What its template holds of the node (VoxelObject::Locks); none
+			 *  for no node. */
+			VoxelObject::Locks LocksOf(const NodePath& path) const;
+			/** Holds the node as `locks` say, as one step. False when there is
+			 *  no such node or it is held so already. */
+			bool SetLocks(const NodePath& path, const VoxelObject::Locks& locks);
+			/** Whether the scene's pivot is held: a top object's position is,
+			 *  and setting the pivot moves the top objects. */
+			bool PivotHeld() const;
 
 			/**
 			 * Why the node cannot be named `name`, empty when it can: a locked
@@ -203,13 +208,10 @@ namespace spades {
 				Vector3 scale;
 			};
 			bool LocalPlacementOf(const NodePath& path, LocalPlacement& out) const;
-			/** Whether the node is held in place by its template: it then keeps
-			 *  its rotation and scale, and may only be moved. */
-			bool KeepsTurnAndScale(const NodePath& path) const;
 			/**
 			 * Shows the node at `p` while an edit of it goes on, recording
-			 * nothing; the first call keeps where it was. A locked node takes
-			 * only the position, and no scale goes below a hundredth.
+			 * nothing; the first call keeps where it was. What the node's locks
+			 * hold of it is not taken, and no scale goes below a hundredth.
 			 */
 			void PreviewPlacement(const NodePath& path, const LocalPlacement& p);
 			/** Keeps the edit as one step; false when it changed nothing. */
@@ -413,7 +415,7 @@ namespace spades {
 				NodePath path;          // Place, Hide, Voxels
 				Placement before, after; // Place
 				bool hidden = false;     // Hide: what it became
-				bool locked = false;     // Lock: what it became
+				VoxelObject::Locks locksBefore, locksAfter; // Lock
 				Vector3 shift = MakeVector3(0.0F, 0.0F, 0.0F); // ScenePivot: what the top objects moved by
 				Handle<VoxelModel> voxels; // Voxels: what the node held before it was emptied
 				std::unique_ptr<MoveStep> move;

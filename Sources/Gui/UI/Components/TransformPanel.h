@@ -53,16 +53,23 @@ namespace spades {
 			virtual ~ITransformTarget() {}
 
 			virtual unsigned ShownRows() const { return kAllRows; }
-			/** Whether its scale's lock is offered (IsScaleLocked), on the
-			 *  panel's Scale row. */
+			/** Whether keeping its scale's proportions is offered (IsScaleLocked),
+			 *  on the panel's Scale row. */
 			virtual bool CanLockScale() const { return false; }
+			/**
+			 * The rows whose hold can be set from the panel (Rows): each gets a
+			 * padlock before its label, shut while the row is held, and a click
+			 * on it calls ToggleRowHeld. None by default.
+			 */
+			virtual unsigned HoldableRows() const { return 0; }
+			virtual void ToggleRowHeld(unsigned row) { (void)row; }
 			/** The panel's title: what is set ("Transform", "Pivot"). */
 			virtual std::string Title() const { return "Transform"; }
 
 			/** What there is to show: false when nothing. `name` titles it;
-			 *  `onlyMoves` when its rotation and scale cannot be set. */
+			 *  `held` gets the rows (Rows) that cannot be set now. */
 			virtual bool CurrentTransform(Transform& transform, std::string& name,
-			                              bool& onlyMoves) const = 0;
+			                              unsigned& held) const = 0;
 			virtual void PreviewTransform(const Transform& transform) = 0;
 			virtual void CommitTransform() = 0;
 			virtual void CancelTransform() = 0;
@@ -142,12 +149,20 @@ namespace spades {
 			ITransformTarget::Transform editing; // as it was when the field began, then as set
 			Vector3 begunScale; // the scale when the field began, which a locked one keeps the
 			                    // proportions of
-			bool lockShown = false; // the Scale row's lock, as drawn last frame
+			bool lockShown = false; // the Scale row's chain, as drawn last frame
 			bool lockUsable = false;
-			bool scaleLocked = false; // the lock, for the field being set
-			/** Where the lock sits, at the end of the Scale row's label. */
+			bool scaleLocked = false; // keeping proportions, for the field being set
+			/** Where keeping proportions is set: a chain at the end of the
+			 *  Scale row's label. */
 			AABB2 LockRect() const;
-			void DrawLock(const Vector2& cursor);
+			void DrawProportionsLink(const Vector2& cursor);
+
+			// The rows' padlocks (ITransformTarget::HoldableRows), in a column
+			// before their labels, as drawn last frame.
+			unsigned holdable = 0;
+			AABB2 RowLockRect(int row) const;
+			void DrawRowLock(int row, bool held, const Vector2& cursor);
+			float LabelX() const; // where the labels start, after the padlocks' column
 
 			float Left() const;
 			float Height() const;

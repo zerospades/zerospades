@@ -75,12 +75,15 @@ namespace spades {
 			/** The picked object's name, for the hint line. */
 			virtual std::string PickedObjectName() const = 0;
 
-			/** What a drag of the gizmo may do to what it is on. */
-			enum class Handling {
-				Free,        ///< an object with voxels: move, turn and scale
-				MoveAndTurn, ///< an empty: it has no voxels to scale
-				MoveOnly,    ///< held by its template, which keeps its turn and scale
-				ScenePivot   ///< the scene itself: its pivot moves, the objects stay
+			/** What a drag of the gizmo may do to what it is on: each of moving,
+			 *  turning and scaling apart, as its template holds them. */
+			struct Handling {
+				/** The scene itself: its pivot moves, the objects stay. */
+				bool scenePivot = false;
+				bool move = true;
+				bool turn = true;
+				bool scale = true; ///< an empty has no voxels to scale
+				bool Nothing() const { return !move && !turn && !scale; }
 			};
 			virtual Handling PickedObjectHandling() const = 0;
 

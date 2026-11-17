@@ -30,7 +30,10 @@
 # (Client/PlayerModels.cpp), so the hinges' places here only show the parts
 # together: the jointed arms are laid out in a T-pose to be edited. Each part
 # sits on its hinge as its .kv6 sat on its pivot, so the game draws it as it
-# drew the .kv6. Hinges and parts are locked: the game finds them by name.
+# drew the .kv6. What the game relies on is locked, and nothing more: every
+# hinge is a joint the game places itself, so its name, place, turn and size
+# are all held; a part (and the hat's mount) keeps only its name, the path the
+# game finds it by, and moves, turns and scales freely, as the game draws it.
 # The scene frame is the game's model frame: +Y the front, +X the player's
 # left, -Z up.
 #
@@ -122,20 +125,28 @@ scene new "$out" --force >/dev/null
 	part Fallen Dead Corpse
 	echo "hide Fallen"
 
-	for n in Player Player/Standing Player/Standing/UpperBody Player/Standing/UpperBody/Torso \
-		Player/Neck Player/Neck/Head Player/Neck/SantaHat Player/Shoulders Player/Shoulders/ArmsHolding \
-		Player/Standing/LeftHip Player/Standing/LeftHip/LeftLeg \
-		Player/Standing/RightHip Player/Standing/RightHip/RightLeg \
-		Player/Crouching Player/Crouching/UpperBody Player/Crouching/UpperBody/Torso Player/Crouching/LeftHip \
-		Player/Crouching/LeftHip/LeftLeg Player/Crouching/RightHip Player/Crouching/RightHip/RightLeg \
-		Player/JointedArms Player/JointedArms/LeftShoulder Player/JointedArms/LeftShoulder/LeftUpperArm \
+	# The joints, and the hinges that only lay the scene out: held whole.
+	for n in Player Player/Neck Player/Shoulders \
+		Player/Standing Player/Standing/UpperBody Player/Standing/LeftHip Player/Standing/RightHip \
+		Player/Crouching Player/Crouching/UpperBody Player/Crouching/LeftHip Player/Crouching/RightHip \
+		Player/JointedArms Player/JointedArms/LeftShoulder \
 		Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow \
-		Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm \
-		Player/JointedArms/RightShoulder Player/JointedArms/RightShoulder/RightUpperArm \
+		Player/JointedArms/RightShoulder \
 		Player/JointedArms/RightShoulder/RightUpperArm/RightElbow \
-		Player/JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm \
-		Fallen Fallen/Corpse; do
+		Fallen; do
 		echo "lock $n"
+	done
+	# The parts, and the hat's mount, which the game places by: their names.
+	for n in Player/Neck/Head Player/Neck/SantaHat Player/Shoulders/ArmsHolding \
+		Player/Standing/UpperBody/Torso Player/Standing/LeftHip/LeftLeg Player/Standing/RightHip/RightLeg \
+		Player/Crouching/UpperBody/Torso Player/Crouching/LeftHip/LeftLeg \
+		Player/Crouching/RightHip/RightLeg \
+		Player/JointedArms/LeftShoulder/LeftUpperArm \
+		Player/JointedArms/LeftShoulder/LeftUpperArm/LeftElbow/LeftForearm \
+		Player/JointedArms/RightShoulder/RightUpperArm \
+		Player/JointedArms/RightShoulder/RightUpperArm/RightElbow/RightForearm \
+		Fallen/Corpse; do
+		echo "lock $n --name"
 	done
 } | scene apply "$out"
 
@@ -143,8 +154,9 @@ scene new "$out" --force >/dev/null
 cat >"$tmp/template.txt" <<'EOF'
 Player model template. The game finds every part by its path and places
 every joint itself; a part is drawn on its own hinge, as its classic .kv6
-was on its pivot. Give a part new voxels or move it on its hinge (its
-pivot); its name and turn are the template's.
+was on its pivot. Give a part new voxels, or move, turn or scale it on
+its hinge: the game draws it so. Its name is the template's, and so is
+every hinge, which stands where the game puts that joint.
 
 Part                                            Classic file        Used in
 Player/Neck/Head                                Head.kv6            third person, corpse; standing and crouched

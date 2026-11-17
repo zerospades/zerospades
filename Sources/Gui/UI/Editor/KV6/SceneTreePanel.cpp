@@ -548,6 +548,67 @@ namespace spades {
 			OverlayFillRect(renderer, c.x - 4.0F, c.y - 1.0F, 8.0F, 6.0F);
 		}
 
+		void SceneTreePanel::DrawHeld(const Vector2& c, const VoxelObject::Locks& locks,
+		                              const Vector4& color) {
+			if (locks.position && locks.rotation && locks.scale) {
+				DrawLock(c, color);
+				return;
+			}
+			auto line = [&](Vector2 a, Vector2 b) {
+				const Vector2 p[2] = {a, b};
+				OverlayStrokePolyline(renderer, p, 2, 1.2F, color, false);
+			};
+			auto chevron = [&](Vector2 a, Vector2 tip, Vector2 b) {
+				const Vector2 p[3] = {a, tip, b};
+				OverlayStrokePolyline(renderer, p, 3, 1.2F, color, false);
+			};
+			// The glyph of the first held, in the order the panel's rows go;
+			// the badge says it is held, where several are and not all.
+			const Vector2 o = c + MakeVector2(-1.5F, -1.5F); // leaves the badge its corner
+			if (locks.position) {
+				// Moving: arrows out four ways.
+				line(o + MakeVector2(-5.5F, 0.0F), o + MakeVector2(5.5F, 0.0F));
+				line(o + MakeVector2(0.0F, -5.5F), o + MakeVector2(0.0F, 5.5F));
+				chevron(o + MakeVector2(-1.6F, -3.9F), o + MakeVector2(0.0F, -5.5F),
+				        o + MakeVector2(1.6F, -3.9F));
+				chevron(o + MakeVector2(-1.6F, 3.9F), o + MakeVector2(0.0F, 5.5F),
+				        o + MakeVector2(1.6F, 3.9F));
+				chevron(o + MakeVector2(-3.9F, -1.6F), o + MakeVector2(-5.5F, 0.0F),
+				        o + MakeVector2(-3.9F, 1.6F));
+				chevron(o + MakeVector2(3.9F, -1.6F), o + MakeVector2(5.5F, 0.0F),
+				        o + MakeVector2(3.9F, 1.6F));
+			} else if (locks.rotation) {
+				// Turning: three quarters of a ring, an arrow on its end.
+				std::vector<Vector2> arc;
+				for (int i = 0; i <= 12; i++) {
+					const float a = float(M_PI) * (0.25F + 1.5F * float(i) / 12.0F);
+					arc.push_back(o + MakeVector2(4.5F * std::cos(a), -4.5F * std::sin(a)));
+				}
+				OverlayStrokePolyline(renderer, arc.data(), arc.size(), 1.2F, color, false);
+				const Vector2 end = arc.back();
+				chevron(end + MakeVector2(-2.4F, -0.6F), end, end + MakeVector2(0.4F, -2.5F));
+			} else {
+				// Scaling: a box, and an arrow out of its corner.
+				OverlayStrokeRect(renderer, o.x - 5.0F, o.y - 0.5F, 5.5F, 5.5F, 1.2F, color);
+				line(o + MakeVector2(-1.0F, -1.0F), o + MakeVector2(4.5F, -6.5F));
+				chevron(o + MakeVector2(1.5F, -6.5F), o + MakeVector2(4.5F, -6.5F),
+				        o + MakeVector2(4.5F, -3.5F));
+			}
+			// The badge: a small padlock in the corner, ringed in the panel's fill
+			// so it reads apart from the glyph under it.
+			const Vector2 b = c + MakeVector2(4.0F, 3.5F);
+			OverlayColorNP(renderer, EditorTheme::PanelFill());
+			OverlayFillRect(renderer, b.x - 3.8F, b.y - 4.5F, 7.6F, 8.5F);
+			std::vector<Vector2> shackle;
+			for (int i = 0; i <= 6; i++) {
+				const float a = float(M_PI) * float(i) / 6.0F;
+				shackle.push_back(MakeVector2(b.x + 1.6F * std::cos(a), b.y - 0.6F - 1.8F * std::sin(a)));
+			}
+			OverlayStrokePolyline(renderer, shackle.data(), shackle.size(), 1.0F, color, false);
+			OverlayColorNP(renderer, color);
+			OverlayFillRect(renderer, b.x - 2.6F, b.y - 0.6F, 5.2F, 3.8F);
+		}
+
 		void SceneTreePanel::DrawFold(const Vector2& c, bool folded, const Vector4& color) {
 			Vector2 p[3];
 			if (folded) {
@@ -623,10 +684,10 @@ namespace spades {
 					         Faded(hovered ? kHoverText : kIcon, hidden ? kDimmed : 1.0F));
 
 				float labelEnd = left + kWidth - kEyeW - 4.0F;
-				if (row.node && row.node->locked) {
+				if (row.node && row.node->locks.AnyTransform()) {
 					labelEnd -= kLockW;
-					DrawLock(MakeVector2(left + kWidth - kEyeW - kLockW * 0.5F, midY),
-					         Faded(kIcon, hidden ? kDimmed : 0.8F));
+					DrawHeld(MakeVector2(left + kWidth - kEyeW - kLockW * 0.5F, midY),
+					         row.node->locks, Faded(kIcon, hidden ? kDimmed : 0.8F));
 				}
 				if (IsRenaming() && row.path == renamed) {
 					nameField.SetRect(RenameBox(row, i));
@@ -705,7 +766,7 @@ namespace spades {
 				why = "there is nothing to rename";
 				return false;
 			}
-			if (o->locked) {
+			if (o->locks.name) {
 				why = scene.WhyNotRename(path, o->name + "?");
 				return false;
 			}

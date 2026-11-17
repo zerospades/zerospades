@@ -38,17 +38,16 @@ namespace spades {
 				return GizmoHandleSet::All().Without(GizmoHandle::RotateTrackball);
 			}
 
-			// The handles for what the gizmo is on.
-			GizmoHandleSet HandlesFor(IObjectModeHost::Handling handling) {
-				switch (handling) {
-					case IObjectModeHost::Handling::Free: return ObjectHandles();
-					case IObjectModeHost::Handling::MoveAndTurn:
-						return GizmoHandleSet::Translation() |
-						       GizmoHandleSet::Rotation().Without(GizmoHandle::RotateTrackball);
-					case IObjectModeHost::Handling::MoveOnly:
-					case IObjectModeHost::Handling::ScenePivot: break;
-				}
-				return GizmoHandleSet::Translation();
+			// The handles for what the gizmo is on: each kind only where it may.
+			GizmoHandleSet HandlesFor(const IObjectModeHost::Handling& handling) {
+				GizmoHandleSet handles = GizmoHandleSet::None();
+				if (handling.move)
+					handles = handles | GizmoHandleSet::Translation();
+				if (handling.turn)
+					handles = handles | GizmoHandleSet::Rotation();
+				if (handling.scale)
+					handles = handles | GizmoHandleSet::Scaling();
+				return handles.Without(GizmoHandle::RotateTrackball);
 			}
 
 			// With the scale locked (IsScaleLocked), every scale handle scales
@@ -159,19 +158,36 @@ namespace spades {
 		std::string ObjectTool::Hint(IVoxelEditContext& ed) {
 			IObjectModeHost* objects = ed.ObjectMode();
 			const IObjectModeHost::Handling handling =
-			  objects ? objects->PickedObjectHandling() : IObjectModeHost::Handling::Free;
-			if (handling == IObjectModeHost::Handling::ScenePivot)
+			  objects ? objects->PickedObjectHandling() : IObjectModeHost::Handling();
+			const char* const others =
+			  "  |  click another object to pick it, nothing to select again";
+			if (handling.scenePivot) {
+				if (!handling.move)
+					return std::string("Scene:  its pivot is held, as its template holds the "
+					                   "objects in place") + others;
 				return "Scene:  drag the gizmo to set its pivot, the objects staying where they are  "
 				       "|  click nothing to select again";
+			}
 			if (!objects || !objects->HasPickedObject())
 				return "click an object to pick it  |  click nothing to select again";
-			const char* action = "move, turn or scale it";
-			if (handling == IObjectModeHost::Handling::MoveAndTurn)
-				action = "move or turn it";
-			else if (handling == IObjectModeHost::Handling::MoveOnly)
-				action = "move it";
-			return objects->PickedObjectName() + ":  drag the gizmo to " + action +
-			       "  |  click another object to pick it, nothing to select again  |  [Tab] edit "
+			const std::string name = objects->PickedObjectName();
+			if (handling.Nothing())
+				return name + ":  held in place by its template" + others + "  |  [Tab] edit its voxels";
+			// What may be done, in the order the gizmo's handles are read.
+			std::vector<const char*> verbs;
+			if (handling.move)
+				verbs.push_back("move");
+			if (handling.turn)
+				verbs.push_back("turn");
+			if (handling.scale)
+				verbs.push_back("scale");
+			std::string action;
+			for (std::size_t i = 0; i < verbs.size(); i++) {
+				if (i > 0)
+					action += i + 1 == verbs.size() ? " or " : ", ";
+				action += verbs[i];
+			}
+			return name + ":  drag the gizmo to " + action + " it" + others + "  |  [Tab] edit "
 			       "its voxels";
 		}
 	} // namespace gui

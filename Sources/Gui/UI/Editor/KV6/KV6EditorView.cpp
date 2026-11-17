@@ -21,6 +21,7 @@
 #include "KV6EditorView.h"
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <initializer_list>
 
@@ -222,6 +223,21 @@ namespace spades {
 
 		bool KV6EditorView::ShowingObjects() const { return scene && editor->InObjectMode(); }
 
+		namespace {
+			// A row of the transform panel, as the lock it is and what it holds.
+			struct RowLock {
+				bool VoxelObject::Locks::*lock;
+				const char* noun;
+			};
+			RowLock LockOfRow(unsigned row) {
+				if (row == ITransformTarget::kRotation)
+					return {&VoxelObject::Locks::rotation, "rotation"};
+				if (row == ITransformTarget::kScale)
+					return {&VoxelObject::Locks::scale, "scale"};
+				return {&VoxelObject::Locks::position, "location"};
+			}
+		} // namespace
+
 		void KV6EditorView::OpenTreeMenu() {
 			NodePath row;
 			if (tree->ContextRow(*scene, softwareCursor->GetPosition(), row))
@@ -269,7 +285,7 @@ namespace spades {
 			    ContextMenuItem("KV6 or 2KV6 File...", [this, row] { OpenAddChildFile(row); })}));
 			if (!onScene)
 				items.push_back(ContextMenuItem("Rename", [this, row] { RenameInTree(row); })
-				                  .Enabled(node && !node->locked)
+				                  .Enabled(node && !node->locks.name)
 				                  .Shortcut(kRenameKey));
 			items.push_back(
 			  ContextMenuItem("Save as KV6...", [this, row] { SaveNodeAsModel(row); }).Enabled(voxels));
@@ -283,16 +299,29 @@ namespace spades {
 			  ContextMenuItem(onScene ? "Paste" : "Paste Into", [this, row] { PasteObjects(row); })
 			    .Enabled(!objectClipboard.empty()));
 			// A template's locks, near the end: they are set once, and undone
-			// only on purpose.
-			if (!onScene) {
-				const bool locked = node && node->locked;
-				items.push_back(
-				  ContextMenuItem(
-				    "Templating",
-				    std::vector<ContextMenuItem>{
-				      ContextMenuItem("Lock", [this, row] { SetNodeLocked(row, true); }).Enabled(!locked),
-				      ContextMenuItem("Unlock...", [this, row] { ConfirmUnlock(row); }).Enabled(locked)})
+			// only on purpose. The three a panel row also has, then all of them,
+			// the name's included, which no icon shows.
+			if (!onScene && node) {
+				const VoxelObject::Locks locks = node->locks;
+				std::vector<ContextMenuItem> templating;
+				for (unsigned rowBit : {unsigned(ITransformTarget::kLocation),
+				                        unsigned(ITransformTarget::kRotation),
+				                        unsigned(ITransformTarget::kScale)}) {
+					const RowLock which = LockOfRow(rowBit);
+					std::string caption = std::string("Lock ") + which.noun;
+					caption[5] = char(std::toupper(static_cast<unsigned char>(caption[5])));
+					templating.push_back(
+					  ContextMenuItem(caption, [this, row, rowBit] { ToggleNodeLock(row, rowBit); })
+					    .Checked(locks.*which.lock));
+				}
+				templating.push_back(
+				  ContextMenuItem("Lock Everything", [this, row] { LockEverything(row); })
+				    .Enabled(!locks.All())
 				    .Separated());
+				templating.push_back(
+				  ContextMenuItem("Unlock Everything...", [this, row] { ConfirmUnlockEverything(row); })
+				    .Enabled(locks.Any()));
+				items.push_back(ContextMenuItem("Templating", std::move(templating)).Separated());
 			}
 			items.push_back(ContextMenuItem("Delete", [this, selection] { DeleteObjects(selection); })
 			                  .Enabled(selected)
@@ -331,27 +360,76 @@ namespace spades {
 			editor->ObjectSelectionChanged();
 		}
 
-		void KV6EditorView::SetNodeLocked(const NodePath& path, bool locked) {
-			if (!scene || !scene->SetLocked(path, locked))
+		void KV6EditorView::SetNodeLocks(const NodePath& path, const VoxelObject::Locks& locks,
+		                                 const std::string& what) {
+			if (!scene || !scene->SetLocks(path, locks))
 				return;
 			const VoxelObject* o = scene->Node(path);
-			editor->SetStatus((locked ? "Locked \"" : "Unlocked \"") + o->name + "\"");
-			editor->ObjectSelectionChanged(); // the panel and the gizmo follow the lock
+			editor->SetStatus(what + " of \"" + o->name + "\"");
+			editor->ObjectSelectionChanged(); // the panel and the gizmo follow the locks
 		}
 
-		void KV6EditorView::ConfirmUnlock(const NodePath& path) {
-			const VoxelObject* o = scene->Node(path);
+		void KV6EditorView::ToggleNodeLock(const NodePath& path, unsigned row) {
+			const VoxelObject* o = scene ? scene->Node(path) : nullptr;
+			if (!o)
+				return;
+			const RowLock which = LockOfRow(row);
+			VoxelObject::Locks locks = o->locks;
+			const bool unlocking = locks.*which.lock;
+			locks.*which.lock = !unlocking;
+			const std::string what = std::string(unlocking ? "Unlocked the " : "Locked the ") + which.noun;
+			// What a template holds by name is the game's to place: letting that
+			// go is asked about. Anything else toggles at once.
+			if (!unlocking || !o->locks.name) {
+				SetNodeLocks(path, locks, what);
+				return;
+			}
+			editor->ReleaseHeldInput();
+			// The dialog is modal: the tree cannot change under `path` meanwhile.
+			ConfirmEditorAction(*ui->GetOverlay(),
+			                    "Unlock the " + std::string(which.noun) + " of \"" + o->name +
+			                      "\"? Its template holds it where the game expects it. Changed, "
+			                      "it changes what the editor shows, and may not change what the "
+			                      "game draws.",
+			                    [this, path, locks, what] { SetNodeLocks(path, locks, what); });
+		}
+
+		void KV6EditorView::LockEverything(const NodePath& path) {
+			VoxelObject::Locks all;
+			all.name = all.position = all.rotation = all.scale = true;
+			SetNodeLocks(path, all, "Locked everything");
+		}
+
+		void KV6EditorView::ConfirmUnlockEverything(const NodePath& path) {
+			const VoxelObject* o = scene ? scene->Node(path) : nullptr;
 			if (!o)
 				return;
 			editor->ReleaseHeldInput();
-			// The dialog is modal: the tree cannot change under `path` meanwhile.
+			const std::string name = "\"" + o->name + "\"";
+			// A node with nothing hanging off it as voxels is one of the joints
+			// a player template lays out, which the game places itself.
+			const std::string joint =
+			  o->model ? std::string()
+			           : " The game also places a joint like this one itself: moved, turned or "
+			             "scaled, it changes what the editor shows, hit boxes included, but not "
+			             "what the game draws.";
+			// Two steps, each modal: the first says what is given up, the
+			// second asks once more, as this is not something done in passing.
 			ConfirmEditorAction(
 			  *ui->GetOverlay(),
-			  "Unlock \"" + o->name +
-			    "\"? A template locks it because the game finds it by its name and its place "
-			    "in the tree. Unlocked, it can be renamed, moved under another object, turned, "
-			    "scaled or deleted, and the game may no longer find it.",
-			  [this, path] { SetNodeLocked(path, false); });
+			  "Unlock " + name + " completely? Its template holds it. The game finds it, and "
+			    "what hangs under it, by name and by place in the tree: renamed or moved under "
+			    "another object, the game may no longer find them." + joint,
+			  [this, path, name] {
+				  ConfirmEditorAction(*ui->GetOverlay(),
+				                      "Are you sure? This removes every lock on " + name +
+				                        ": its name, location, rotation and scale. Undo puts "
+				                        "them back.",
+				                      [this, path] {
+					                      SetNodeLocks(path, VoxelObject::Locks(),
+					                                   "Unlocked everything");
+				                      });
+			  });
 		}
 
 		void KV6EditorView::RenameInTree(const NodePath& path) {
@@ -546,6 +624,9 @@ namespace spades {
 
 		ITransformTarget& KV6EditorView::ObjectTransform() {
 			transformTarget.SetScene(scene.get());
+			transformTarget.OnToggleHeld = [this](const NodePath& path, unsigned row) {
+				ToggleNodeLock(path, row);
+			};
 			return transformTarget;
 		}
 
@@ -893,12 +974,21 @@ namespace spades {
 		}
 
 		IObjectModeHost::Handling KV6EditorView::PickedObjectHandling() const {
-			if (scene && scene->SceneActive())
-				return Handling::ScenePivot;
+			Handling h;
+			if (scene && scene->SceneActive()) {
+				// Its pivot only moves, and moving it moves the top objects.
+				h.scenePivot = true;
+				h.move = !scene->PivotHeld();
+				h.turn = h.scale = false;
+				return h;
+			}
 			const VoxelObject* o = scene ? scene->Node(scene->Active()) : nullptr;
-			if (o && o->locked)
-				return Handling::MoveOnly;
-			return o && !o->model ? Handling::MoveAndTurn : Handling::Free;
+			if (!o)
+				return h;
+			h.move = !o->locks.position;
+			h.turn = !o->locks.rotation;
+			h.scale = o->model && !o->locks.scale; // an empty has no voxels to scale
+			return h;
 		}
 
 		void KV6EditorView::BeginObjectDrag() { scene->BeginDrag(); }

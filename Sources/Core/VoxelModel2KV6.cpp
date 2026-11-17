@@ -31,9 +31,15 @@
 namespace spades {
 	namespace {
 		// Object flags, one bit each.
-		constexpr uint8_t kFlagLocked = 1u << 0;
+		constexpr uint8_t kFlagNameLocked = 1u << 0;
 		constexpr uint8_t kFlagHidden = 1u << 1;
-		constexpr uint8_t kKnownFlags = kFlagLocked | kFlagHidden;
+		constexpr uint8_t kFlagPositionLocked = 1u << 2;
+		constexpr uint8_t kFlagRotationLocked = 1u << 3;
+		constexpr uint8_t kFlagScaleLocked = 1u << 4;
+		constexpr uint8_t kKnownFlags = kFlagNameLocked | kFlagHidden | kFlagPositionLocked |
+		                                kFlagRotationLocked | kFlagScaleLocked;
+		// Before version 3, bit 0 was the only lock, and the others unknown.
+		constexpr uint8_t kKnownFlagsBefore3 = kFlagNameLocked | kFlagHidden;
 
 		// Clip flags, one bit each.
 		constexpr uint8_t kClipNameLocked = 1u << 0;
@@ -222,10 +228,19 @@ namespace spades {
 			uint8_t flags;
 			if (stream.Read(&flags, sizeof(flags)) < sizeof(flags))
 				SPRaise(".2kv6 file truncated: failed to read flags at depth %d", depth);
-			if ((flags & ~kKnownFlags) != 0)
+			if ((flags & ~(version < 3 ? kKnownFlagsBefore3 : kKnownFlags)) != 0)
 				SPRaise("Unknown .2kv6 object flags 0x%02x at depth %d", unsigned(flags), depth);
-			obj.locked = (flags & kFlagLocked) != 0;
 			obj.hidden = (flags & kFlagHidden) != 0;
+			obj.locks.name = (flags & kFlagNameLocked) != 0;
+			if (version < 3) {
+				// The one lock held the name, the turn and the scale, and let
+				// it move: read as the locks it meant.
+				obj.locks.rotation = obj.locks.scale = obj.locks.name;
+			} else {
+				obj.locks.position = (flags & kFlagPositionLocked) != 0;
+				obj.locks.rotation = (flags & kFlagRotationLocked) != 0;
+				obj.locks.scale = (flags & kFlagScaleLocked) != 0;
+			}
 
 			// Read hasModel flag
 			uint8_t hasModel;
@@ -288,8 +303,10 @@ namespace spades {
 			stream.Write(rotData, sizeof(rotData));
 			stream.Write(scaleData, sizeof(scaleData));
 
-			const uint8_t flags =
-			  uint8_t((obj.locked ? kFlagLocked : 0) | (obj.hidden ? kFlagHidden : 0));
+			const uint8_t flags = uint8_t(
+			  (obj.locks.name ? kFlagNameLocked : 0) | (obj.hidden ? kFlagHidden : 0) |
+			  (obj.locks.position ? kFlagPositionLocked : 0) |
+			  (obj.locks.rotation ? kFlagRotationLocked : 0) | (obj.locks.scale ? kFlagScaleLocked : 0));
 			stream.Write(&flags, sizeof(flags));
 
 			// Write hasModel flag

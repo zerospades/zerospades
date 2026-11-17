@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
@@ -47,7 +48,8 @@ namespace spades {
 			constexpr float kLabelW = 64.0F;
 			constexpr float kFieldGap = 4.0F;
 			constexpr float kTextScale = 0.85F;
-			constexpr float kLockW = 18.0F; // the Scale row's lock, before its fields
+			constexpr float kLockW = 18.0F; // the Scale row's chain, before its fields
+			constexpr float kRowLockW = 18.0F; // a row's padlock, before its label
 			// No scale set through the lock goes below the fields' own floor.
 			constexpr float kMinScale = 0.01F;
 
@@ -165,11 +167,16 @@ namespace spades {
 			Place();
 		}
 
+		float TransformPanel::LabelX() const {
+			return Left() + kPad + (holdable != 0 ? kRowLockW : 0.0F);
+		}
+
 		void TransformPanel::Place() {
-			const float fieldW = (kWidth - kPad * 2.0F - kLabelW - kFieldGap * 2.0F) / 3.0F;
+			const float fieldsX = LabelX() + kLabelW;
+			const float fieldW = (Left() + kWidth - kPad - fieldsX - kFieldGap * 2.0F) / 3.0F;
 			for (int i = 0; i < 9; i++) {
 				const int slot = std::max(0, Slot(i / 3)), axis = i % 3;
-				const float x = Left() + kPad + kLabelW + float(axis) * (fieldW + kFieldGap);
+				const float x = fieldsX + float(axis) * (fieldW + kFieldGap);
 				const float y = top + kPad + kTitleH + float(slot) * (kRowH + kRowGap);
 				fields[std::size_t(i)]->SetRect(AABB2(x, y, fieldW, kRowH));
 			}
@@ -189,10 +196,10 @@ namespace spades {
 
 		bool TransformPanel::Begin(ITransformTarget& target, int index) {
 			std::string name;
-			bool onlyMoves = false;
-			if (!target.CurrentTransform(editing, name, onlyMoves))
+			unsigned held = 0;
+			if (!target.CurrentTransform(editing, name, held))
 				return false;
-			if ((onlyMoves && index >= 3) || Slot(index / 3) < 0)
+			if (((held >> (index / 3)) & 1) || Slot(index / 3) < 0)
 				return false;
 			active = index;
 			begunScale = editing.scale;
@@ -221,14 +228,36 @@ namespace spades {
 			Component(editing, index) = value; // exactly as typed
 		}
 
+		namespace {
+			// A capsule's outline, from `a` to `b`, `r` round at its ends: one
+			// link of a chain.
+			std::vector<Vector2> Link(const Vector2& a, const Vector2& b, float r) {
+				const Vector2 d = b - a;
+				const float len = std::max(1.0e-4F, d.GetLength());
+				const Vector2 u = d * (1.0F / len), n = MakeVector2(-u.y, u.x);
+				std::vector<Vector2> pts;
+				constexpr int kArc = 6;
+				for (int i = 0; i <= kArc; i++) { // round about b
+					const float t = float(M_PI) * float(i) / float(kArc) - float(M_PI) * 0.5F;
+					pts.push_back(b + (u * std::cos(t) + n * std::sin(t)) * r);
+				}
+				for (int i = 0; i <= kArc; i++) { // round about a
+					const float t = float(M_PI) * float(i) / float(kArc) + float(M_PI) * 0.5F;
+					pts.push_back(a + (u * std::cos(t) + n * std::sin(t)) * r);
+				}
+				pts.push_back(pts.front());
+				return pts;
+			}
+		} // namespace
+
 		AABB2 TransformPanel::LockRect() const {
 			const float y = top + kPad + kTitleH + float(std::max(0, Slot(2))) * (kRowH + kRowGap);
-			return AABB2(Left() + kPad + kLabelW - kLockW - 3.0F, y, kLockW, kRowH);
+			return AABB2(LabelX() + kLabelW - kLockW - 3.0F, y, kLockW, kRowH);
 		}
 
-		void TransformPanel::DrawLock(const Vector2& cursor) {
+		void TransformPanel::DrawProportionsLink(const Vector2& cursor) {
 			const AABB2 r = LockRect();
-			const bool locked = IsScaleLocked();
+			const bool linked = IsScaleLocked();
 			const bool hot = lockUsable && r.Contains(cursor);
 			if (hot) {
 				OverlayColorNP(renderer, EditorTheme::Highlight());
@@ -236,24 +265,54 @@ namespace spades {
 				                r.GetHeight() - 4.0F);
 			}
 			const Vector4 color = !lockUsable ? EditorTheme::TextFaint()
-			                      : locked || hot ? EditorTheme::Text()
+			                      : linked || hot ? EditorTheme::Text()
 			                                      : EditorTheme::TextDim();
-			// A padlock: its body, and over it the shackle, shut when locked
-			// and lifted open on one side when not.
+			// Two links on the diagonal: hooked through each other while the
+			// proportions are kept, drawn apart when they are not.
+			const Vector2 c = MakeVector2(r.GetMinX() + r.GetWidth() * 0.5F,
+			                              r.GetMinY() + r.GetHeight() * 0.5F);
+			const Vector2 diag = MakeVector2(0.7071F, -0.7071F);
+			const float apart = linked ? 0.0F : 1.6F;
+			const std::vector<Vector2> lower =
+			  Link(c - diag * (5.0F + apart), c - diag * (1.0F + apart), 2.2F);
+			const std::vector<Vector2> upper =
+			  Link(c + diag * (1.0F + apart), c + diag * (5.0F + apart), 2.2F);
+			OverlayStrokePolyline(renderer, lower.data(), lower.size(), 1.3F, color, false);
+			OverlayStrokePolyline(renderer, upper.data(), upper.size(), 1.3F, color, false);
+		}
+
+		AABB2 TransformPanel::RowLockRect(int row) const {
+			const float y = top + kPad + kTitleH + float(std::max(0, Slot(row))) * (kRowH + kRowGap);
+			return AABB2(Left() + kPad - 2.0F, y, kRowLockW, kRowH);
+		}
+
+		void TransformPanel::DrawRowLock(int row, bool held, const Vector2& cursor) {
+			const AABB2 r = RowLockRect(row);
+			const bool hot = r.Contains(cursor);
+			if (hot) {
+				OverlayColorNP(renderer, EditorTheme::Highlight());
+				OverlayFillRect(renderer, r.GetMinX(), r.GetMinY() + 2.0F, r.GetWidth(),
+				                r.GetHeight() - 4.0F);
+			}
+			const Vector4 color = held || hot ? EditorTheme::Text() : EditorTheme::TextFaint();
+			// A padlock, as the tree draws one: shut over a solid body while
+			// the row is held, its shackle lifted off a hollow one when free.
 			const float cx = r.GetMinX() + r.GetWidth() * 0.5F;
-			const float bodyTop = r.GetMinY() + r.GetHeight() * 0.5F;
+			const float bodyTop = r.GetMinY() + r.GetHeight() * 0.5F - 0.5F;
 			OverlayColorNP(renderer, color);
-			OverlayFillRect(renderer, cx - 5.0F, bodyTop, 10.0F, 7.5F);
-			const float lift = locked ? 0.0F : 2.5F;
-			const float legL = locked ? bodyTop : bodyTop - lift - 1.5F;
+			if (held)
+				OverlayFillRect(renderer, cx - 4.5F, bodyTop, 9.0F, 7.0F);
+			else
+				OverlayStrokeRect(renderer, cx - 4.5F, bodyTop, 9.0F, 7.0F, 1.2F, color);
+			const float lift = held ? 0.0F : 2.0F;
 			const Vector2 shackle[6] = {
-			  MakeVector2(cx - 3.2F, legL),
-			  MakeVector2(cx - 3.2F, bodyTop - 3.5F - lift),
-			  MakeVector2(cx - 1.8F, bodyTop - 5.5F - lift),
-			  MakeVector2(cx + 1.8F, bodyTop - 5.5F - lift),
-			  MakeVector2(cx + 3.2F, bodyTop - 3.5F - lift),
-			  MakeVector2(cx + 3.2F, bodyTop - lift)};
-			OverlayStrokePolyline(renderer, shackle, 6, 1.6F, color, false);
+			  MakeVector2(cx - 3.0F, held ? bodyTop : bodyTop - lift - 1.5F),
+			  MakeVector2(cx - 3.0F, bodyTop - 3.2F - lift),
+			  MakeVector2(cx - 1.6F, bodyTop - 5.2F - lift),
+			  MakeVector2(cx + 1.6F, bodyTop - 5.2F - lift),
+			  MakeVector2(cx + 3.0F, bodyTop - 3.2F - lift),
+			  MakeVector2(cx + 3.0F, bodyTop - lift)};
+			OverlayStrokePolyline(renderer, shackle, 6, 1.5F, color, false);
 		}
 
 		void TransformPanel::Press(ITransformTarget& target, const Vector2& at) {
@@ -266,6 +325,12 @@ namespace spades {
 			if (lockShown && lockUsable && LockRect().Contains(at)) {
 				SetScaleLocked(!IsScaleLocked());
 				return;
+			}
+			for (int row = 0; row < 3; row++) {
+				if (((holdable >> row) & 1) && Slot(row) >= 0 && RowLockRect(row).Contains(at)) {
+					target.ToggleRowHeld(1u << row);
+					return;
+				}
 			}
 			for (int i = 0; i < 9; i++) {
 				NumberField& field = *fields[std::size_t(i)];
@@ -362,10 +427,11 @@ namespace spades {
 		void TransformPanel::Draw(ITransformTarget& target, const Vector2& cursor, float time) {
 			ITransformTarget::Transform now;
 			std::string name;
-			bool onlyMoves = false;
-			shown = target.CurrentTransform(now, name, onlyMoves);
-			if (rows != target.ShownRows()) {
+			unsigned held = 0;
+			shown = target.CurrentTransform(now, name, held);
+			if (rows != target.ShownRows() || holdable != target.HoldableRows()) {
 				rows = target.ShownRows();
+				holdable = target.HoldableRows(); // the padlocks' column, or none
 				if (fromBottom)
 					top = bottom - Height(); // as tall as its rows, up from its foot
 				Place();
@@ -377,10 +443,10 @@ namespace spades {
 				return;
 			}
 			// A field Begin would now refuse is not the one being set either: its
-			// row has gone, or the target only moves. What was typed is kept, as a
-			// press elsewhere would keep it, rather than left open in a field the
+			// row has gone, or is held. What was typed is kept, as a press
+			// elsewhere would keep it, rather than left open in a field the
 			// panel draws greyed out or does not draw at all.
-			if (active >= 0 && (Slot(active / 3) < 0 || (onlyMoves && active >= 3)))
+			if (active >= 0 && (Slot(active / 3) < 0 || ((held >> (active / 3)) & 1)))
 				Settle(target);
 
 			const float x = Left(), h = Height();
@@ -407,12 +473,14 @@ namespace spades {
 					continue;
 				}
 				const float y = top + kPad + kTitleH + float(slot) * (kRowH + kRowGap);
-				const bool settable = row == 0 || !onlyMoves;
-				text(kRows[row], x + kPad, y + (kRowH - labelH) * 0.5F, kTextScale,
+				const bool settable = !((held >> row) & 1);
+				if ((holdable >> row) & 1)
+					DrawRowLock(row, !settable, cursor);
+				text(kRows[row], LabelX(), y + (kRowH - labelH) * 0.5F, kTextScale,
 				     settable ? EditorTheme::TextDim() : EditorTheme::TextFaint());
 				if (row == 2 && target.CanLockScale()) {
 					lockUsable = settable;
-					DrawLock(cursor);
+					DrawProportionsLink(cursor);
 				}
 				for (int axis = 0; axis < 3; axis++) {
 					const int i = row * 3 + axis;

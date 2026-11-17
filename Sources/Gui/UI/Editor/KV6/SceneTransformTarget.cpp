@@ -35,8 +35,22 @@ namespace spades {
 			return o && !o->model ? unsigned(kLocation | kRotation) : unsigned(kAllRows);
 		}
 
+		unsigned SceneTransformTarget::HoldableRows() const {
+			if (!scene || (editing ? node : scene->Active()).empty())
+				return 0;
+			return ShownRows();
+		}
+
+		void SceneTransformTarget::ToggleRowHeld(unsigned row) {
+			if (!scene || !OnToggleHeld)
+				return;
+			const NodePath path = editing ? node : scene->Active();
+			if (!path.empty())
+				OnToggleHeld(path, row);
+		}
+
 		bool SceneTransformTarget::CurrentTransform(Transform& transform, std::string& name,
-		                                            bool& onlyMoves) const {
+		                                            unsigned& held) const {
 			if (!scene)
 				return false;
 			const NodePath path = editing ? node : scene->Active();
@@ -48,7 +62,9 @@ namespace spades {
 			transform.scale = p.scale;
 			const VoxelObject* o = scene->Node(path);
 			name = o->name.empty() ? std::string("(unnamed)") : o->name;
-			onlyMoves = scene->KeepsTurnAndScale(path);
+			const VoxelObject::Locks locks = scene->LocksOf(path);
+			held = (locks.position ? kLocation : 0u) | (locks.rotation ? kRotation : 0u) |
+			       (locks.scale ? kScale : 0u);
 			return true;
 		}
 

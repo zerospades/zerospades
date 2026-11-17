@@ -37,12 +37,12 @@ namespace spades {
 			unsigned ShownRows() const override { return kLocation; }
 			std::string Title() const override { return "Pivot"; }
 
-			bool CurrentTransform(Transform& t, std::string& name, bool& onlyMoves) const override {
+			bool CurrentTransform(Transform& t, std::string& name, unsigned& held) const override {
 				t.position = editor.GetPivot();
 				t.rotation = MakeVector3(0.0F, 0.0F, 0.0F);
 				t.scale = MakeVector3(1.0F, 1.0F, 1.0F);
 				name = "of the " + editor.document.Noun();
-				onlyMoves = true;
+				held = kRotation | kScale; // a pivot only moves
 				return true;
 			}
 			void PreviewTransform(const Transform& t) override {

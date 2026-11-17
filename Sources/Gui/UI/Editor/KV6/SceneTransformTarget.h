@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include <Gui/UI/Components/TransformPanel.h>
 
 #include "KV6Scene.h"
@@ -42,9 +44,16 @@ namespace spades {
 			/** An empty has no voxels to scale: a place and a turn. */
 			unsigned ShownRows() const override;
 			bool CanLockScale() const override { return true; }
+			/** Every row shown has its lock (VoxelObject::Locks). */
+			unsigned HoldableRows() const override;
+			/** Asks OnToggleHeld, which decides: unlocking what a template
+			 *  holds is asked about first. */
+			void ToggleRowHeld(unsigned row) override;
+			/** Toggles `row`'s lock (Rows) on the node at the path. */
+			std::function<void(const NodePath&, unsigned row)> OnToggleHeld;
 
 			bool CurrentTransform(Transform& transform, std::string& name,
-			                      bool& onlyMoves) const override;
+			                      unsigned& held) const override;
 			void PreviewTransform(const Transform& transform) override;
 			void CommitTransform() override;
 			void CancelTransform() override;

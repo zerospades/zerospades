@@ -94,11 +94,28 @@ namespace spades {
 		Vector3 scale;
 
 		/**
-		 * Held in place by a template: an editor keeps it from being renamed,
-		 * deleted, moved under another object, turned or scaled, and lets it be
-		 * unlocked only on purpose: a template's hinges are locked.
+		 * What a template holds of it, each apart, so a template holds only
+		 * what whoever reads it relies on: an editor keeps each from being
+		 * changed, and lets it go only on purpose.
 		 */
-		bool locked = false;
+		struct Locks {
+			/** Its name and its parent: the path it is found by. It is not
+			 *  renamed, deleted or moved under another object. */
+			bool name = false;
+			bool position = false; ///< not moved
+			bool rotation = false; ///< not turned
+			bool scale = false;    ///< not scaled
+			bool Any() const { return name || position || rotation || scale; }
+			bool All() const { return name && position && rotation && scale; }
+			/** Whether its place in its parent is held in any way, not only its name. */
+			bool AnyTransform() const { return position || rotation || scale; }
+			bool operator==(const Locks& o) const {
+				return name == o.name && position == o.position && rotation == o.rotation &&
+				       scale == o.scale;
+			}
+			bool operator!=(const Locks& o) const { return !(*this == o); }
+		};
+		Locks locks;
 
 		/**
 		 * Not drawn, and neither is anything under it: kept in the file, but
@@ -163,7 +180,9 @@ namespace spades {
 	 *     float[3] Position          relative to the parent
 	 *     float[4] Rotation          quaternion x, y, z, w
 	 *     float[3] Scale
-	 *     uint8    Flags             bit 0 locked, bit 1 hidden, others zero
+	 *     uint8    Flags             bit 0 name locked, bit 1 hidden,
+	 *                                bit 2 position locked, bit 3 rotation
+	 *                                locked, bit 4 scale locked, others zero
 	 *     uint8    HasModel          0 a hinge, 1 a model follows
 	 *     [KV6]    if HasModel: a KV6 without its magic (header, blocks, indices)
 	 *     uint16   NumChildren, then OBJECT x NumChildren
@@ -186,10 +205,14 @@ namespace spades {
 	 *         float    Time          seconds, 0 to Duration
 	 *         float[3] Position, float[4] Rotation, float[3] Scale
 	 *
-	 * Version 1, still read (and no longer written), is the same up to
-	 * METADATA and CLIPS, which it has not, and gives every OBJECT a uint16
-	 * NumKeys and its keys (as above) after its KV6; files of it carry none,
-	 * and one that does is refused: animations are the scene's clips.
+	 * Version 2, still read (and no longer written), has one lock per
+	 * OBJECT, bit 0, which held its name, its parent, its turn and its scale
+	 * and let it move: it is read as those locks.
+	 *
+	 * Version 1, still read, is version 2 up to METADATA and CLIPS, which it
+	 * has not, and gives every OBJECT a uint16 NumKeys and its keys (as
+	 * above) after its KV6; files of it carry none, and one that does is
+	 * refused: animations are the scene's clips.
 	 */
 	class VoxelModel2KV6 {
 	public:
@@ -198,7 +221,7 @@ namespace spades {
 		void operator=(const VoxelModel2KV6&) = delete;
 
 		/** The newest version read and written. */
-		static constexpr uint16_t FORMAT_VERSION = 2;
+		static constexpr uint16_t FORMAT_VERSION = 3;
 
 		/** A whole .2kv6 file: its objects, its notes and its animations. */
 		struct SceneFile {
