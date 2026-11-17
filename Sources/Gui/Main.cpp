@@ -506,12 +506,8 @@ int main(int argc, char** argv) {
 
 	// A command-line tool of its own: everything after it is its, and it runs
 	// with no window and none of the game's start-up.
-	if (commandLine.kv6Tools) {
-		std::vector<char*> toolArgs;
-		for (std::string& arg : commandLine.kv6ToolsArguments)
-			toolArgs.push_back(&arg[0]);
-		return spades::RunKV6Tools(int(toolArgs.size()), toolArgs.data());
-	}
+	if (commandLine.kv6Tools)
+		return spades::RunKV6Tools(commandLine.kv6ToolsArguments);
 
 	if (commandLine.printHelp) {
 		spades::PrintCommandLineHelp(argv[0], commandLine.debugTools);
@@ -981,10 +977,12 @@ int main(int argc, char** argv) {
 		// Put back what --override-cvar changed, so the flush below writes the
 		// configuration as it was -- but not a variable the player has changed
 		// again since, in the game's options: that change is theirs to keep.
-		for (const CvarOverride& ov : g_appliedCvarOverrides) {
-			spades::Settings::ItemHandle item(ov.name, nullptr);
-			if ((std::string)item == ov.value)
-				item = ov.original;
+		// Backwards, so a variable overridden more than once steps back
+		// through each override to its original value.
+		for (auto it = g_appliedCvarOverrides.rbegin(); it != g_appliedCvarOverrides.rend(); ++it) {
+			spades::Settings::ItemHandle item(it->name, nullptr);
+			if ((std::string)item == it->value)
+				item = it->original;
 		}
 
 		spades::Settings::GetInstance()->Flush();

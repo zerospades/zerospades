@@ -359,8 +359,6 @@ namespace spades {
 			 *  InputLayers.h); built once, by BuildPointerLayers. */
 			std::vector<PointerLayer> pointerLayers;
 			void BuildPointerLayers();
-			/** The colour the picker and the swatch show and set: the brush's,
-			 *  unless the active tool has one of its own for them. */
 			/** The colour the picker and the swatch show: the active tool's
 			 *  own for them where it has one (a ToolOption of type Color),
 			 *  else the brush's. */

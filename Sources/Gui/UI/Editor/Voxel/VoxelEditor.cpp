@@ -98,6 +98,11 @@ namespace spades {
 			}
 			// Open on the tool registered for it, or the first.
 			activeTool = std::max(0, ToolWithRole(ToolRole::Initial));
+			// A history thrown away is said where the user reads, not only in
+			// the log: undo falling silent would otherwise go unexplained.
+			undo.OnDiscarded = [this](const std::string& why) {
+				SetStatus("The undo history was cleared: " + why);
+			};
 			WireUI();
 			BuildPointerLayers();
 		}
@@ -207,12 +212,12 @@ namespace spades {
 		}
 
 		const ToolOption* VoxelEditor::ToolColorOption() {
+			// As it stands: the tool keeps it standing (seeded on creation,
+			// synced by the bars' per-frame UpdateOptions), so reading it --
+			// every frame, for the swatch -- runs no option refresh of its own.
 			VoxelTool* tool = ActiveTool();
 			ToolOptions* options = tool ? tool->Options() : nullptr;
-			if (!options)
-				return nullptr;
-			tool->UpdateOptions(*this); // as the tool holds it now
-			return options->First(ToolOption::Type::Color);
+			return options ? options->First(ToolOption::Type::Color) : nullptr;
 		}
 
 		std::uint32_t VoxelEditor::PickedColor() {
@@ -478,7 +483,7 @@ namespace spades {
 			NotifyDocumentChanged();
 		}
 
-		// --- Tools and modes --------------------------------------------------
+		// --- Tools --------------------------------------------------------------
 
 		std::string VoxelEditor::ToolLabel(int index) const {
 			if (index < 0 || index >= int(tools.size()))

@@ -54,7 +54,7 @@ namespace spades {
 		/**
 		 * The undo history of a voxel document (see UndoHistory), recording
 		 * voxels, reframes and pivot moves, with the rest of the edit state
-		 * (selection, mirror, pending placement) snapshotted as an EditState.
+		 * (the selection and a pending placement) snapshotted as an EditState.
 		 */
 		class VoxelUndoStack : public UndoHistory<VoxelUndoRecord, EditState> {
 		public:

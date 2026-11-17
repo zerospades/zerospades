@@ -47,6 +47,8 @@ namespace spades {
 			int valueCount;
 			bool forDevelopers; // refused without --debug-tools
 			const char* help;   // lines parted by '\n'
+			// Null for the one option that takes every argument after it as
+			// its own (--kv6-tools), which the parser hands over whole.
 			Apply apply;
 		};
 
@@ -212,17 +214,22 @@ namespace spades {
 			return arg.size() > scheme.size() && EqualsIgnoringCase(arg.substr(0, scheme.size()), scheme);
 		}
 
-		// The protocol version a server address is spoken to with: `v=0.75`,
-		// `v=0.76`, or the number alone.
+		// The protocol version a server address is spoken to with, in every
+		// spelling that has been accepted around it: `0.75`, `.75`, `75`,
+		// each with or without `v=`, and 76 the same ways.
 		bool ParseProtocolVersion(const std::string& arg, ProtocolVersion& out) {
 			std::string text = arg;
-			if (text.size() > 2 && EqualsIgnoringCase(text.substr(0, 2), "v="))
+			if (text.size() >= 2 && EqualsIgnoringCase(text.substr(0, 2), "v="))
 				text = text.substr(2);
-			if (text == "0.75") {
+			if (!text.empty() && text[0] == '0')
+				text = text.substr(1);
+			if (!text.empty() && text[0] == '.')
+				text = text.substr(1);
+			if (text == "75") {
 				out = ProtocolVersion::v075;
 				return true;
 			}
-			if (text == "0.76") {
+			if (text == "76") {
 				out = ProtocolVersion::v076;
 				return true;
 			}
@@ -274,15 +281,18 @@ namespace spades {
 		const Option* developerOption = nullptr; // the first given, to name it
 		bool versionGiven = false;
 		bool anythingBeforeTools = false; // but --debug-tools
+		bool optionsEnded = false;   // a bare `--`: only files and addresses follow
+		std::string skippedOption;   // an unknown option just skipped, for its value
 		for (std::size_t i = 0; i < args.size(); i++) {
 			const std::string& arg = args[i];
+			const std::string skippedBefore = skippedOption;
+			skippedOption.clear();
 			if (arg.empty())
 				continue;
 
-			if (arg[0] != '-') {
+			if (arg[0] != '-' || optionsEnded) {
 				// What is not an option: a server address, its protocol
 				// version, or a file to open.
-				anythingBeforeTools = true;
 				if (IsServerAddress(arg)) {
 					out.serverAddress = arg;
 				} else if (ParseProtocolVersion(arg, out.protocolVersion)) {
@@ -293,12 +303,28 @@ namespace spades {
 					// `file://` URL.
 					const std::string path = LocalPathFromArgument(arg);
 					if (!gui::IsEditableDocument(path)) {
+						// An option skipped as not ours may have brought a value
+						// of its own, not ours either.
+						if (!skippedBefore.empty()) {
+							std::fprintf(stderr,
+							             "Ignoring what may be the value of %s: %s\n",
+							             skippedBefore.c_str(), arg.c_str());
+							continue;
+						}
 						Error("Not an option, a server address or a file this program can open: " +
 						      arg);
 						return CommandLineResult::Error;
 					}
 					out.openDocument = path;
 				}
+				anythingBeforeTools = true;
+				continue;
+			}
+
+			if (arg == "--") {
+				// The options end here, as they do everywhere: what follows is
+				// a file or an address, whatever it starts with.
+				optionsEnded = true;
 				continue;
 			}
 
@@ -306,18 +332,21 @@ namespace spades {
 			if (!option) {
 				// macOS hands a program launched from the Finder a process
 				// serial number of its own; it is not the user's.
-				if (arg.compare(0, 5, "-psn_") != 0)
+				if (arg.compare(0, 5, "-psn_") != 0) {
 					std::fprintf(stderr, "Ignoring an option this program does not know: %s\n",
 					             arg.c_str());
+					skippedOption = arg;
+				}
 				continue;
 			}
 			if (option->forDevelopers && !developerOption)
 				developerOption = option;
 
-			if (IsName(arg, "--kv6-tools")) {
+			if (!option->apply) {
 				// A program of its own: every argument after it is its.
 				if (anythingBeforeTools) {
-					Error("--kv6-tools takes every argument after it, so only --debug-tools may "
+					Error(std::string(option->name) +
+					      " takes every argument after it, so only --debug-tools may "
 					      "come before it");
 					return CommandLineResult::Error;
 				}
@@ -426,23 +455,25 @@ namespace spades {
 			}
 		};
 
-		if (debugTools) {
-			std::printf("usage: %s --debug-tools [OPTIONS...]\n", name.c_str());
-			std::printf("Options for developers and tests, refused without --debug-tools:\n");
-		} else {
-			std::printf("usage: %s [OPTIONS...] [aos://ADDRESS [v=0.75|v=0.76]] [FILE]\n",
-			            name.c_str());
-			std::printf("  aos://ADDRESS         connect to that server; v=0.75 (the default)\n");
-			std::printf("                        or v=0.76 says its protocol version\n");
-			std::printf("  FILE                  a file to open in its editor, as --open\n");
-		}
+		std::printf("usage: %s [OPTIONS...] [aos://ADDRESS [v=0.75|v=0.76]] [FILE]\n",
+		            name.c_str());
+		std::printf("  aos://ADDRESS         connect to that server; v=0.75 (the default)\n");
+		std::printf("                        or v=0.76 says its protocol version\n");
+		std::printf("  FILE                  a file to open in its editor, as --open\n");
+		std::printf("  --                    the options end here: what follows is a file\n");
+		std::printf("                        or an address, whatever it starts with\n");
 		for (const Option& option : Options()) {
-			if (option.forDevelopers == debugTools)
+			if (!option.forDevelopers)
 				print(option);
 		}
-		if (!debugTools) {
-			std::printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
-			std::printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
+		if (debugTools) {
+			std::printf("\nOptions for developers and tests, refused without --debug-tools:\n");
+			for (const Option& option : Options()) {
+				if (option.forDevelopers)
+					print(option);
+			}
 		}
+		std::printf("\nAuto-recording can be enabled with the cg_demoAutoRecord setting.\n");
+		std::printf("Recordings are kept in the Demos/ folder; only the last 10 are retained.\n");
 	}
 } // namespace spades

@@ -1178,10 +1178,7 @@ namespace spades {
 		}
 	} // namespace
 
-	int RunKV6Tools(int argc, char** argv) {
-		std::vector<std::string> args;
-		for (int i = 0; i < argc; i++)
-			args.push_back(argv[i] ? argv[i] : "");
+	int RunKV6Tools(const std::vector<std::string>& args) {
 		try {
 			return Run(args);
 		} catch (const UsageError& ex) {
