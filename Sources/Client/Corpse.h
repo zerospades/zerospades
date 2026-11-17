@@ -28,6 +28,7 @@ namespace spades {
 		class GameMap;
 		class Player;
 		class IModel;
+		class PlayerModels;
 
 		class Corpse {
 			enum NodeType {
@@ -61,6 +62,7 @@ namespace spades {
 			};
 
 			IRenderer& renderer;
+			PlayerModels& models;
 			GameMap& map;
 			int playerId;
 			Vector3 color;
@@ -90,11 +92,13 @@ namespace spades {
 			 * Construct a "corpse" client object.
 			 *
 			 * @param renderer The renderer. Must outlive `Corpse`.
+			 * @param models The player model sets. Must outlive `Corpse`.
 			 * @param map The game map, used for physics. Must outlive `Corpse`.
 			 * @param p The player to create a corpse from. Can be destroyed
 			 *			after `Corpse` is constructed.
 			 */
-			Corpse(IRenderer& renderer, GameMap& map, Player& p, bool isChristmasOn);
+			Corpse(IRenderer& renderer, PlayerModels& models, GameMap& map, Player& p,
+			       bool isChristmasOn);
 			~Corpse();
 
 			void Update(float dt);

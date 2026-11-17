@@ -21,11 +21,15 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <Core/Math.h>
 #include <Core/RefCountedObject.h>
 
 namespace spades {
 	class VoxelModel;
+	struct VoxelObject;
 
 	/**
 	 * Provides a method for loading `VoxelModel` augmented by metadata.
@@ -36,6 +40,10 @@ namespace spades {
 	public:
 		/**
 		 * Load a `VoxelModel` from the specified `FileManager`-style path.
+		 *
+		 * Supports both .kv6 (single model) and .2kv6 (scene) formats.
+		 * For .2kv6 files, all objects in the scene are composited into a single model
+		 * with proper transforms applied. This ensures seamless rendering as game assets.
 		 *
 		 * In addition to loading the file at `path`, this method also loads
 		 * metadata from `BASENAME.meta.json` (where `BASENAME` is a portion of
@@ -55,5 +63,24 @@ namespace spades {
 		 *     }
 		 */
 		static Handle<VoxelModel> Load(const char* path);
+
+		/**
+		 * The objects of a .2kv6 scene composed into one model, as `Load` does
+		 * when the game loads one: each voxel placed by its object's transform
+		 * and its parents', hidden objects left out. `lowCorner`, when given,
+		 * gets where the model's voxel 0 0 0 lies in the scene. Throws when the
+		 * scene holds no voxel.
+		 */
+		static Handle<VoxelModel> MergeScene(const std::vector<VoxelObject>& scene,
+		                                     IntVector3* lowCorner = nullptr);
+
+		/**
+		 * Where every object of the .2kv6 scene at `path` sits, by its path of
+		 * names ("Gun/Bolt"): the matrix taking its own coordinates to the
+		 * scene's, the frame its parts are drawn in ("scene.2kv6#Gun/Bolt"), so
+		 * an object holding no voxels marks a point to attach things to. A
+		 * path several objects share names none of them, and is left out.
+		 */
+		static std::vector<std::pair<std::string, Matrix4>> SceneTransforms(const char* path);
 	};
 } // namespace spades

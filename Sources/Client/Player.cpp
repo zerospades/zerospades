@@ -1469,8 +1469,6 @@ namespace spades {
 		Player::HitBoxes Player::GetHitBoxes(bool interpolate) {
 			SPADES_MARK_FUNCTION_DEBUG();
 
-			Player::HitBoxes hb;
-
 			Vector3 o = GetFront(interpolate);
 
 			float yaw = atan2f(o.y, o.x) + kHalfPi;
@@ -1482,19 +1480,40 @@ namespace spades {
 			if (armPitch < 0.0F)
 				armPitch = std::max(armPitch, -kHalfPi) * 0.9F;
 
-			// lower axis
-			Matrix4 const lower = Matrix4::Translate(GetOrigin())
-				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw);
-			Matrix4 const torso = lower
-				* Matrix4::Translate(0, 0, -(input.crouch ? 0.5F : 1.0F));
-			Matrix4 const head = torso
-				* Matrix4::Translate(0.0F, 0.0F, -(input.crouch ? 0.05F : 0.0F))
-				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
-			Matrix4 const arms = torso
-				* Matrix4::Translate(0, 0, input.crouch ? 0.0F : 0.1F)
-				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
+			return MakeHitBoxes(
+			  MakeHitBoxJoints(GetOrigin(), yaw, pitch, armPitch, input.crouch), input.crouch);
+		}
 
-			if (input.crouch) {
+		Player::HitBoxJoints Player::MakeHitBoxJoints(const Vector3& origin, float yaw,
+		                                              float pitch, float armPitch, bool crouch) {
+			HitBoxJoints j;
+			// lower axis
+			j.lower = Matrix4::Translate(origin)
+				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw);
+			j.torso = j.lower
+				* Matrix4::Translate(0, 0, -(crouch ? 0.5F : 1.0F));
+			j.head = j.torso
+				* Matrix4::Translate(0.0F, 0.0F, -(crouch ? 0.05F : 0.0F))
+				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
+			j.arms = j.torso
+				* Matrix4::Translate(0, 0, crouch ? 0.0F : 0.1F)
+				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
+			return j;
+		}
+
+		Vector3 Player::LegJoint(bool right, bool crouch) {
+			return MakeVector3(right ? 0.25F : -0.25F, crouch ? 0.25F : 0.0F, -(crouch ? 0.05F : 0.1F));
+		}
+
+		Player::HitBoxes Player::MakeHitBoxes(const HitBoxJoints& joints, bool crouch) {
+			Player::HitBoxes hb;
+
+			Matrix4 const& lower = joints.lower;
+			Matrix4 const& torso = joints.torso;
+			Matrix4 const& head = joints.head;
+			Matrix4 const& arms = joints.arms;
+
+			if (crouch) {
 				hb.limbs[0] = lower * AABB3(-0.4F, -0.1F, -0.2F, 0.3F, 0.4F, 0.8F);
 				hb.limbs[1] = lower * AABB3(0.1F, -0.1F, -0.2F, 0.3F, 0.4F, 0.8F);
 				hb.torso = torso * AABB3(-0.4F, -0.1F, -0.1F, 0.8F, 0.8F, 0.7F);

@@ -61,6 +61,18 @@ namespace spades {
 			GLSettings &settings;
 			std::vector<Sprite> sprites;
 
+			// An image laid flat (see IRenderer::AddImagePlane).
+			struct Plane {
+				GLImage *image;
+				Vector3 origin, axisU, axisV;
+				Vector4 color;
+			};
+			std::vector<Plane> planes;
+			void RenderPlanes();
+
+			// The colour as this pass blends it: linear when rendering in HDR.
+			Vector4 PassColor(Vector4 color) const;
+
 			GLImage *lastImage;
 
 			std::vector<Vertex> vertices;
@@ -87,6 +99,8 @@ namespace spades {
 			~GLLongSpriteRenderer();
 
 			void Add(GLImage *img, Vector3 p1, Vector3 p2, float rad, Vector4 color);
+			void AddPlane(GLImage *img, Vector3 origin, Vector3 axisU, Vector3 axisV,
+			              Vector4 color);
 			void Clear();
 			void Render();
 		};
