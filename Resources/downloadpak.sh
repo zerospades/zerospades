@@ -24,15 +24,19 @@ echo "BASEURL ************ $PAK_URL"
 PAK_NAME=$(basename "$PAK_URL")
 OUTPUT_DIR="."
 
-if [ -f "$PAK_NAME" ]; then
+# Done only when what this script is for exists: the paks, not just the
+# downloaded archive. A `make clean` removes the paks (they are outputs)
+# but leaves the archive, and the build needs them back from it.
+if [ -f "$PAK_NAME" ] && [ -f "pak000-Nonfree.pak" ] && [ -f "font-unifont.pak" ]; then
 	exit 0
 fi
-# TODO: Check if the extracted files are present and up-to-date (#988)
 
-if [ -n "$ZEROSPADES_DEVPAK_PATH" ]; then
-	cp "$ZEROSPADES_DEVPAK_PATH" "$PAK_NAME"
-else
-	wget "$PAK_URL" -O "$PAK_NAME"
+if [ ! -f "$PAK_NAME" ]; then
+	if [ -n "$ZEROSPADES_DEVPAK_PATH" ]; then
+		cp "$ZEROSPADES_DEVPAK_PATH" "$PAK_NAME"
+	else
+		wget "$PAK_URL" -O "$PAK_NAME"
+	fi
 fi
 unzip -o "$PAK_NAME" -d "$OUTPUT_DIR"
 
