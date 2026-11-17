@@ -35,6 +35,10 @@ uniform vec3 fogColor;
 uniform vec3 customColor;
 uniform float modelOpacity;
 
+// 1.0 lights the model from every direction at once (the model editor), 0.0
+// keeps the sun. See SceneDefinition::flatModelLighting.
+uniform float flatLighting;
+
 float VisibilityOfSunLight();
 vec3 EvaluateAmbientLight(float detailAmbientOcclusion);
 vec3 EvaluateDirectionalAmbientLight(float detailAmbientOcclusion, vec3 direction);
@@ -69,7 +73,10 @@ void main() {
 
 	float ao = texture2D(ambientOcclusionTexture, ambientOcclusionCoord).x;
 	vec3 diffuseShading = EvaluateAmbientLight(ao);
-	float shadowing = VisibilityOfSunLight() * (0.6 * sunlight);
+	// Omnidirectional: drop the sun so the two shading branches below fall away,
+	// leaving every face at full albedo. See the matching note in
+	// OptimizedVoxelModel.fs.
+	float shadowing = VisibilityOfSunLight() * (0.6 * sunlight) * (1.0 - flatLighting);
 
 	vec3 eyeVec = -normalize(viewSpaceCoord);
 	vec3 normal = normalize(viewSpaceNormal);
@@ -80,7 +87,8 @@ void main() {
 	// fresnel term
 	// FIXME: use split-sum approximation from UE4
 	float fresnel2 = 1.0 - dotNV;
-	float fresnel = 0.03 + 0.1 * fresnel2 * fresnel2;
+	// Reflections are directional too, so they are faded out along with the sun.
+	float fresnel = (0.03 + 0.1 * fresnel2 * fresnel2) * (1.0 - flatLighting);
 
 	// specular shading (blurred reflections, assuming roughness is high)
 	vec3 reflectWS = normalize(reflectionDir);
@@ -94,6 +102,8 @@ void main() {
 		diffuseShading += sunDiffuseShading * shadowing;
 		gl_FragColor.xyz += sunSpecularShading * shadowing;
 	}
+
+	diffuseShading = mix(diffuseShading, vec3(ao), flatLighting);
 
 	// apply diffuse/specular shading
 	if (!isEmissive)

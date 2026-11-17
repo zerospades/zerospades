@@ -40,4 +40,29 @@ namespace spades {
         void Draw2D();
     }
 
+    /**
+     * Optional, for a first-person skin that handles left-handedness itself.
+     *
+     * A skin that does not implement it is mirrored whole when the player
+     * is left-handed (cg_viewWeaponSide < 0): the client flips its sway and
+     * swaps and mirrors the arms, and its brass flies out to the left. A
+     * skin that implements it is told which hand the player holds the tool
+     * in, and left alone: it places the tool itself, the hand positions it
+     * returns are the player's own left and right hands, and its brass flies
+     * where it says.
+     */
+    interface IViewToolSkin2 {
+
+        /** Receives whether the player is left-handed, before every frame. */
+        bool LeftHanded { set; }
+
+        /**
+         * Returns the velocity brass flies out at, in view coordinate (as
+         * the hand positions), its length the speed: the client's own is
+         * about 1, mostly to the right. A zero vector leaves it to the
+         * client, which throws it out to the right.
+         */
+        Vector3 CaseEjectDirection { get; }
+    }
+
 }

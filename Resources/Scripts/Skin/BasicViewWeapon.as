@@ -315,6 +315,72 @@ namespace spades {
 			return mat;
 		}
 
+		// --- Sights -------------------------------------------------------
+		//
+		// One description of a weapon's sights, for every way of aiming the
+		// player can pick: true aim down the sights (cg_trueAimDownSight), a
+		// 2D scope over the screen (cg_pngScope: an image, scopeImage, a dot or
+		// a crosshair), or a reflex sight (cg_reflexScope: a 3D dot or glass,
+		// or a 2D one). A skin sets the points below in its constructor and
+		// builds its matrix with the helpers; the base class draws the 2D
+		// scope and the 2D reflex sight. Nothing here applies to a skin that
+		// sets no sight, which aims as it always did.
+		//
+		// The points are in metres, in the frame GetViewWeaponMatrix() places:
+		// the model's coordinates times its scale.
+
+		// The point looked through with the iron sights, on the line of sight.
+		protected Vector3 ironSightPoint = Vector3(0.0F, 0.0F, 0.0F);
+		// Where a reflex sight's dot shows, when the weapon carries one.
+		protected Vector3 reflexSightPoint = Vector3(0.0F, 0.0F, 0.0F);
+		protected bool hasIronSight = false;
+		protected bool hasReflexSight = false;
+
+		// Whether the reflex sight is the one aimed with: the player asks for
+		// it, and the weapon has one.
+		bool AimsWithReflexSight() { return hasReflexSight and cg_reflexScope.BoolValue; }
+
+		// The point aimed through now, in the weapon's frame.
+		Vector3 SightPoint() { return AimsWithReflexSight() ? reflexSightPoint : ironSightPoint; }
+
+		// Whether a 2D scope replaces the weapon at full aim.
+		bool HiddenByScope() { return cg_pngScope.BoolValue and AimDownSightStateSmooth > 0.99F; }
+
+		// Where the weapon sits: at the hip, and while aiming, with its sight
+		// brought to the eye's height, or lowered aside for a 2D scope. `sp` is
+		// 1 at the hip and 0 at full aim, as the stock skins use it.
+		Vector3 SightOffset(float sp) {
+			if (cg_trueAimDownSight.BoolValue and cg_pngScope.BoolValue)
+				return Vector3(Mix(-0.26F, -0.13F, sp), 0.5F * sp, Mix(0.3F, 0.2F, sp));
+			if (!hasIronSight and !AimsWithReflexSight())
+				return Vector3(-0.13F * sp, 0.5F, GetZPos());
+			return Vector3(-0.13F * sp, 0.5F, GetZPos(-SightPoint().z));
+		}
+
+		// Turns the weapon so the sight aimed through is in the middle of the
+		// screen, with true aim down the sights.
+		Matrix4 AlignToSight(Matrix4 mat) {
+			if (!cg_trueAimDownSight.BoolValue or cg_pngScope.BoolValue or
+			    AimDownSightStateSmooth <= 0.0F)
+				return mat;
+			if (!hasIronSight and !AimsWithReflexSight())
+				return mat;
+			return AdjustToAlignSight(mat, SightPoint(), AimDownSightStateSmooth);
+		}
+
+		// The reflex sight's dot or glass, as a 3D sprite, when the player
+		// asked for one (cg_reflexScope 1 or 2); call it from AddToScene with
+		// the weapon's matrix in world space (eyeMatrix * the view matrix).
+		void DrawSight3D(Matrix4 worldWeaponMatrix) {
+			int reflexMode = cg_reflexScope.IntValue;
+			if (!AimsWithReflexSight() or reflexMode >= 3 or cg_pngScope.BoolValue or
+			    AimDownSightStateSmooth <= 0.8F)
+				return;
+			bool dotReflex = reflexMode == 1;
+			DrawReflexSight3D(dotReflex ? ballImage : reflexImage,
+			                  worldWeaponMatrix * reflexSightPoint, dotReflex ? 0.02F : 0.125F);
+		}
+
 		Matrix4 GetViewWeaponMatrix() {
 			Matrix4 mat;
 
@@ -452,6 +518,14 @@ namespace spades {
 		void Draw2D() {
 			float sw = renderer.ScreenWidth;
 			float sh = renderer.ScreenHeight;
+
+			// a reflex sight drawn flat (cg_reflexScope 3 and up), for a skin
+			// describing one (see Sights)
+			if (AimsWithReflexSight() and cg_reflexScope.IntValue >= 3 and
+			    not cg_pngScope.BoolValue and AimDownSightStateSmooth > 0.8F) {
+				DrawReflexSight2D(GetViewWeaponMatrix() * CreateTranslateMatrix(reflexSightPoint));
+				return;
+			}
 
 			Vector2 scrCenter = Vector2(sw, sh) * 0.5F;
 

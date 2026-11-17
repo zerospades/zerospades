@@ -125,6 +125,11 @@ namespace spades {
 				}
 			}
 
+			// Lit from every direction at once (SceneDefinition::flatModelLighting):
+			// every face at its own colour, whichever way it points.
+			if (r->sceneDef.flatModelLighting)
+				std::fill(std::begin(brights), std::end(brights), std::uint8_t(255));
+
 			// "emissive" material
 			brights[27] = 255;
 

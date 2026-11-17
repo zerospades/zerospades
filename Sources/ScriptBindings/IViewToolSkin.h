@@ -36,5 +36,24 @@ namespace spades {
 			Vector3 GetRightHandPosition();
 			void Draw2D();
 		};
+
+		/** Optional, for a view skin that handles left-handedness itself rather
+		 * than having the client mirror it: the client then tells it which hand
+		 * the player holds the tool in, never flips its sway nor swaps or
+		 * mirrors the arms (the hand positions are the player's own left and
+		 * right), and takes the direction brass flies out in from it. A skin
+		 * that does not implement it is mirrored whole when left-handed, as
+		 * always. */
+		class ScriptIViewToolSkin2 {
+			asIScriptObject* obj;
+
+		public:
+			ScriptIViewToolSkin2(asIScriptObject* obj);
+			bool ImplementsInterface();
+			void SetLeftHanded(bool);
+			/** The direction brass flies out in, in the frame of the skin's own
+			 *  positions (as MuzzlePosition); zero for the client's own. */
+			Vector3 GetCaseEjectDirection();
+		};
 	} // namespace client
 } // namespace spades
