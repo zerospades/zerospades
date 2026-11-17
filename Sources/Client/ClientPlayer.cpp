@@ -1112,10 +1112,9 @@ namespace spades {
 
 			PlayerInput const inp = p.GetInput();
 
-			float const legsPosX = 0.25F;
-			float const legsPosY = inp.crouch ? 1.25F : 1.0F;
-			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
 			float const torsoPosZ = TorsoHeight(inp.crouch);
+			// The body seen from inside it is drawn a block behind the eye.
+			Vector3 const bodyBehind = MakeVector3(0.0F, 1.0F, 0.0F);
 
 			Vector2 legsRot;
 			legsRot.x = Vector3::Dot(vel, p.GetFront2D());
@@ -1123,17 +1122,17 @@ namespace spades {
 			legsRot *= sinf(p.GetWalkAnimationProgress() * kTwoPi) * 3.0F;
 
 			Matrix4 const legLeft = lower
-				* Matrix4::Translate(-legsPosX, legsPosY, -legsPosZ)
+				* Matrix4::Translate(Player::LegJoint(false, inp.crouch) + bodyBehind)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), -legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), -legsRot.y);
 
 			Matrix4 const legRight = lower
-				* Matrix4::Translate(legsPosX, legsPosY, -legsPosZ)
+				* Matrix4::Translate(Player::LegJoint(true, inp.crouch) + bodyBehind)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), legsRot.y);
 
 			Matrix4 const torso = lower
-				* Matrix4::Translate(0.0F, 1.0F, -torsoPosZ);
+				* Matrix4::Translate(bodyBehind + MakeVector3(0.0F, 0.0F, -torsoPosZ));
 
 			// Legs and Torso
 			PlayerModels& models = client.GetPlayerModels();
@@ -1302,9 +1301,6 @@ namespace spades {
 
 			PlayerInput const inp = p.GetInput();
 
-			float const legsPosX = 0.25F;
-			float const legsPosY = inp.crouch ? 0.25F : 0.0F;
-			float const legsPosZ = inp.crouch ? 0.05F : 0.1F;
 			float const headPosZ = HeadDrop(inp.crouch);
 			float const torsoPosZ = TorsoHeight(inp.crouch);
 			float const armsPosZ = inp.crouch ? 0.0F : 0.1F;
@@ -1359,12 +1355,12 @@ namespace spades {
 			legsRot *= sinf(p.GetWalkAnimationProgress() * kTwoPi) * 3.0F;
 
 			Matrix4 const legLeft = lower
-				* Matrix4::Translate(-legsPosX, legsPosY, -legsPosZ)
+				* Matrix4::Translate(Player::LegJoint(false, inp.crouch))
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), -legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), -legsRot.y);
 
 			Matrix4 const legRight = lower
-				* Matrix4::Translate(legsPosX, legsPosY, -legsPosZ)
+				* Matrix4::Translate(Player::LegJoint(true, inp.crouch))
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), legsRot.x)
 				* Matrix4::Rotate(MakeVector3(0, 1, 0), legsRot.y);
 

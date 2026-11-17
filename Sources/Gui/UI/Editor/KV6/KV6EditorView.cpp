@@ -1491,15 +1491,24 @@ namespace spades {
 			draw(Template::kNeck, shared.head, EditorTheme::HitHead());
 			draw(Template::kShoulders, shared.limbs[2], EditorTheme::HitLimbs());
 
-			// A pose's own: the torso on its joint, and the legs on the pose's
-			// hinge, the player's origin, which the game hangs them from (not
-			// from the hips, so they keep still as the legs swing).
+			// A pose's own: the torso on its joint, and each leg on its hip.
+			// The game hangs a leg's box from the player's origin, where the
+			// hip hangs the leg from: on the hip, the box is that origin's box
+			// seen from the hip, so it sits where the game has it as long as
+			// the hip stands where the game puts the leg.
 			for (const HitBoxPose& pose : kHitBoxPoses) {
 				const client::Player::HitBoxes hb = client::Player::MakeHitBoxes(atJoint, pose.crouch);
-				const std::string torso = std::string(pose.path) + "/" + Template::kUpperBody;
-				draw(torso, hb.torso, Dimmed(EditorTheme::HitTorso(), pose.brightness));
-				draw(pose.path, hb.limbs[0], Dimmed(EditorTheme::HitLimbs(), pose.brightness));
-				draw(pose.path, hb.limbs[1], Dimmed(EditorTheme::HitLimbs(), pose.brightness));
+				const std::string under = std::string(pose.path) + "/";
+				draw(under + Template::kUpperBody, hb.torso,
+				     Dimmed(EditorTheme::HitTorso(), pose.brightness));
+				// limbs[0] is the left leg (on -X), limbs[1] the right.
+				for (int side = 0; side < 2; side++) {
+					const bool right = side == 1;
+					const Matrix4 fromHip =
+					  Matrix4::Translate(client::Player::LegJoint(right, pose.crouch) * -1.0F);
+					draw(under + (right ? Template::kRightHip : Template::kLeftHip),
+					     fromHip * hb.limbs[side], Dimmed(EditorTheme::HitLimbs(), pose.brightness));
+				}
 			}
 		}
 

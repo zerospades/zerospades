@@ -284,6 +284,12 @@ namespace spades {
 			 * joint's frame).
 			 */
 			static HitBoxes MakeHitBoxes(const HitBoxJoints& joints, bool crouch);
+			/**
+			 * Where a leg is hung from, from the player's origin (its `lower`
+			 * joint) before the leg swings: the hip a leg's model and an
+			 * editor's leg hit box are placed by. The left leg on -X.
+			 */
+			static Vector3 LegJoint(bool right, bool crouch);
 
 			/** Does approximated ray casting.
 			 * @param dir normalized direction vector.

@@ -1501,6 +1501,10 @@ namespace spades {
 			return j;
 		}
 
+		Vector3 Player::LegJoint(bool right, bool crouch) {
+			return MakeVector3(right ? 0.25F : -0.25F, crouch ? 0.25F : 0.0F, -(crouch ? 0.05F : 0.1F));
+		}
+
 		Player::HitBoxes Player::MakeHitBoxes(const HitBoxJoints& joints, bool crouch) {
 			Player::HitBoxes hb;
 
