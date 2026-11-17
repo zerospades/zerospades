@@ -56,8 +56,8 @@ namespace spades {
 			std::tuple<Handle<client::IRenderer>, Handle<Disposable>>
 			CreateRenderer(SDL_Window*, RendererType type);
 			/** The game window's position and size in auto-resolution mode. */
-			static void AutoSizeWindow(int displayIndex, bool fullscreen, int& x, int& y,
-			                           int& width, int& height);
+			static void AutoSizeWindow(int displayIndex, bool fullscreen, bool coverDisplay,
+			                           int& x, int& y, int& width, int& height);
 			/** Fits a windowed game window, decorations included, to its monitor. */
 			static void FitWindowToDisplay(SDL_Window*, int displayIndex);
 			/** Called once the window exists, before the view is created. */

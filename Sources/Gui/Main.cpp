@@ -589,6 +589,13 @@ static std::string Utf8FromWString(const wchar_t* ws) {
 int main(int argc, char** argv) {
 #ifdef WIN32
 	SetUnhandledExceptionFilter(UnhandledExceptionProc);
+
+	// Handle display scaling ourselves, so every size SDL reports (windows, monitor
+	// bounds, display modes, the GL drawable, the mouse) is in real pixels. Without
+	// it, Windows reports scaled-down sizes above 100% and stretches the window,
+	// blurring it and mixing those sizes with the display modes, which are in pixels.
+	// Must come before the video subsystem starts (the splash window).
+	SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
 #endif
 
 	if (argc > 0 && argv[0])

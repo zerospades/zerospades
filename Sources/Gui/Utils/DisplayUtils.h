@@ -79,6 +79,9 @@ namespace spades {
 			 */
 			bool GetUsableBounds(int index, Rect& out);
 
+			/** The whole monitor, in desktop coordinates. */
+			bool GetBounds(int index, Rect& out);
+
 			/**
 			 * The monitor's distinct video modes of at least 640x480, largest first.
 			 * Never empty: a stock list is returned when SDL reports nothing.
