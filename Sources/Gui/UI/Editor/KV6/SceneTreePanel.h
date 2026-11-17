@@ -200,15 +200,15 @@ namespace spades {
 			void DrawBranches(const Row& row, float y);
 			void DrawText(const std::string& text, float x, float y, const Vector4& color);
 			void DrawEye(const Vector2& centre, bool open, const Vector4& color);
-			void DrawLock(const Vector2& centre, const Vector4& color);
+			/** What a node's template holds of its place, a column each before
+			 *  the eye, in the order the transform panel's rows go. */
+			enum class HeldKind { Position, Rotation, Scale };
 			/**
-			 * What a node's template holds of its place, in the lock column:
-			 * the padlock when it holds all three, else a glyph of what it
-			 * holds (move, turn or scale) with a padlock's badge; nothing when
-			 * it holds only the name, which no icon shows.
+			 * One of those columns' marks, drawn where that lock is held: the
+			 * glyph of what it holds (move, turn or scale) with a padlock's
+			 * badge. A name held alone shows no mark.
 			 */
-			void DrawHeld(const Vector2& centre, const VoxelObject::Locks& locks,
-			              const Vector4& color);
+			void DrawHeld(const Vector2& centre, HeldKind kind, const Vector4& color);
 			void DrawFold(const Vector2& centre, bool folded, const Vector4& color);
 		};
 	} // namespace gui

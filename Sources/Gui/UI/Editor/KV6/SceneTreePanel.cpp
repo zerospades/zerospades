@@ -37,7 +37,7 @@ namespace spades {
 			constexpr float kIndent = 14.0F;
 			constexpr float kFoldW = 12.0F;  // the arrow's box, left of the label
 			constexpr float kEyeW = 18.0F;   // the eye's box, at the row's end
-			constexpr float kLockW = 16.0F;  // the lock's, before the eye
+			constexpr float kLockW = 16.0F;  // each lock's column, before the eye
 			constexpr float kSlack = 6.0F;   // the selection bar's room, left of the rows
 			constexpr float kTextScale = 0.9F;
 			constexpr float kDragStart = 4.0F; // pixels a press moves before it drags
@@ -537,23 +537,7 @@ namespace spades {
 			}
 		}
 
-		void SceneTreePanel::DrawLock(const Vector2& c, const Vector4& color) {
-			std::vector<Vector2> shackle;
-			for (int i = 0; i <= 8; i++) {
-				const float a = float(M_PI) * float(i) / 8.0F;
-				shackle.push_back(MakeVector2(c.x + 2.6F * std::cos(a), c.y - 1.0F - 2.8F * std::sin(a)));
-			}
-			OverlayStrokePolyline(renderer, shackle.data(), shackle.size(), 1.3F, color, false);
-			OverlayColorNP(renderer, color);
-			OverlayFillRect(renderer, c.x - 4.0F, c.y - 1.0F, 8.0F, 6.0F);
-		}
-
-		void SceneTreePanel::DrawHeld(const Vector2& c, const VoxelObject::Locks& locks,
-		                              const Vector4& color) {
-			if (locks.position && locks.rotation && locks.scale) {
-				DrawLock(c, color);
-				return;
-			}
+		void SceneTreePanel::DrawHeld(const Vector2& c, HeldKind kind, const Vector4& color) {
 			auto line = [&](Vector2 a, Vector2 b) {
 				const Vector2 p[2] = {a, b};
 				OverlayStrokePolyline(renderer, p, 2, 1.2F, color, false);
@@ -562,43 +546,44 @@ namespace spades {
 				const Vector2 p[3] = {a, tip, b};
 				OverlayStrokePolyline(renderer, p, 3, 1.2F, color, false);
 			};
-			// The glyph of the first held, in the order the panel's rows go;
-			// the badge says it is held, where several are and not all.
 			const Vector2 o = c + MakeVector2(-1.5F, -1.5F); // leaves the badge its corner
-			if (locks.position) {
-				// Moving: arrows out four ways.
-				line(o + MakeVector2(-5.5F, 0.0F), o + MakeVector2(5.5F, 0.0F));
-				line(o + MakeVector2(0.0F, -5.5F), o + MakeVector2(0.0F, 5.5F));
-				chevron(o + MakeVector2(-1.6F, -3.9F), o + MakeVector2(0.0F, -5.5F),
-				        o + MakeVector2(1.6F, -3.9F));
-				chevron(o + MakeVector2(-1.6F, 3.9F), o + MakeVector2(0.0F, 5.5F),
-				        o + MakeVector2(1.6F, 3.9F));
-				chevron(o + MakeVector2(-3.9F, -1.6F), o + MakeVector2(-5.5F, 0.0F),
-				        o + MakeVector2(-3.9F, 1.6F));
-				chevron(o + MakeVector2(3.9F, -1.6F), o + MakeVector2(5.5F, 0.0F),
-				        o + MakeVector2(3.9F, 1.6F));
-			} else if (locks.rotation) {
-				// Turning: three quarters of a ring, an arrow on its end.
-				std::vector<Vector2> arc;
-				for (int i = 0; i <= 12; i++) {
-					const float a = float(M_PI) * (0.25F + 1.5F * float(i) / 12.0F);
-					arc.push_back(o + MakeVector2(4.5F * std::cos(a), -4.5F * std::sin(a)));
+			switch (kind) {
+				case HeldKind::Position:
+					// Moving: arrows out four ways.
+					line(o + MakeVector2(-5.5F, 0.0F), o + MakeVector2(5.5F, 0.0F));
+					line(o + MakeVector2(0.0F, -5.5F), o + MakeVector2(0.0F, 5.5F));
+					chevron(o + MakeVector2(-1.6F, -3.9F), o + MakeVector2(0.0F, -5.5F),
+					        o + MakeVector2(1.6F, -3.9F));
+					chevron(o + MakeVector2(-1.6F, 3.9F), o + MakeVector2(0.0F, 5.5F),
+					        o + MakeVector2(1.6F, 3.9F));
+					chevron(o + MakeVector2(-3.9F, -1.6F), o + MakeVector2(-5.5F, 0.0F),
+					        o + MakeVector2(-3.9F, 1.6F));
+					chevron(o + MakeVector2(3.9F, -1.6F), o + MakeVector2(5.5F, 0.0F),
+					        o + MakeVector2(3.9F, 1.6F));
+					break;
+				case HeldKind::Rotation: {
+					// Turning: three quarters of a ring, an arrow on its end.
+					std::vector<Vector2> arc;
+					for (int i = 0; i <= 12; i++) {
+						const float a = float(M_PI) * (0.25F + 1.5F * float(i) / 12.0F);
+						arc.push_back(o + MakeVector2(4.5F * std::cos(a), -4.5F * std::sin(a)));
+					}
+					OverlayStrokePolyline(renderer, arc.data(), arc.size(), 1.2F, color, false);
+					const Vector2 end = arc.back();
+					chevron(end + MakeVector2(-2.4F, -0.6F), end, end + MakeVector2(0.4F, -2.5F));
+					break;
 				}
-				OverlayStrokePolyline(renderer, arc.data(), arc.size(), 1.2F, color, false);
-				const Vector2 end = arc.back();
-				chevron(end + MakeVector2(-2.4F, -0.6F), end, end + MakeVector2(0.4F, -2.5F));
-			} else {
-				// Scaling: a box, and an arrow out of its corner.
-				OverlayStrokeRect(renderer, o.x - 5.0F, o.y - 0.5F, 5.5F, 5.5F, 1.2F, color);
-				line(o + MakeVector2(-1.0F, -1.0F), o + MakeVector2(4.5F, -6.5F));
-				chevron(o + MakeVector2(1.5F, -6.5F), o + MakeVector2(4.5F, -6.5F),
-				        o + MakeVector2(4.5F, -3.5F));
+				case HeldKind::Scale:
+					// Scaling: a box, and an arrow out of its corner.
+					OverlayStrokeRect(renderer, o.x - 5.0F, o.y - 0.5F, 5.5F, 5.5F, 1.2F, color);
+					line(o + MakeVector2(-1.0F, -1.0F), o + MakeVector2(4.5F, -6.5F));
+					chevron(o + MakeVector2(1.5F, -6.5F), o + MakeVector2(4.5F, -6.5F),
+					        o + MakeVector2(4.5F, -3.5F));
+					break;
 			}
-			// The badge: a small padlock in the corner, ringed in the panel's fill
-			// so it reads apart from the glyph under it.
+			// The badge: a small padlock in the corner the glyph leaves it, on
+			// whatever the row is drawn on (its band, when selected).
 			const Vector2 b = c + MakeVector2(4.0F, 3.5F);
-			OverlayColorNP(renderer, EditorTheme::PanelFill());
-			OverlayFillRect(renderer, b.x - 3.8F, b.y - 4.5F, 7.6F, 8.5F);
 			std::vector<Vector2> shackle;
 			for (int i = 0; i <= 6; i++) {
 				const float a = float(M_PI) * float(i) / 6.0F;
@@ -645,6 +630,18 @@ namespace spades {
 			  held == Held::Drag ? DropAt(scene, rows, cursor) : Drop();
 			const int last = std::min(int(rows.size()), scroll + VisibleRows());
 
+			// The lock columns stand on every row once any node of the scene
+			// holds part of its place, so they line up whichever rows show.
+			std::function<bool(const std::vector<VoxelObject>&)> anyHeld =
+			  [&](const std::vector<VoxelObject>& nodes) {
+				  for (const VoxelObject& o : nodes) {
+					  if (o.locks.AnyTransform() || anyHeld(o.children))
+						  return true;
+				  }
+				  return false;
+			  };
+			const bool lockColumns = anyHeld(scene.Roots());
+
 			for (int i = scroll; i < last; i++) {
 				const Row& row = rows[std::size_t(i)];
 				const float y = RowTop(i);
@@ -684,10 +681,19 @@ namespace spades {
 					         Faded(hovered ? kHoverText : kIcon, hidden ? kDimmed : 1.0F));
 
 				float labelEnd = left + kWidth - kEyeW - 4.0F;
-				if (row.node && row.node->locks.AnyTransform()) {
-					labelEnd -= kLockW;
-					DrawHeld(MakeVector2(left + kWidth - kEyeW - kLockW * 0.5F, midY),
-					         row.node->locks, Faded(kIcon, hidden ? kDimmed : 0.8F));
+				if (lockColumns) {
+					labelEnd -= kLockW * 3.0F;
+					const float firstX = left + kWidth - kEyeW - kLockW * 2.5F;
+					const Vector4 ink = Faded(kIcon, hidden ? kDimmed : 0.8F);
+					if (row.node) {
+						const VoxelObject::Locks& l = row.node->locks;
+						if (l.position)
+							DrawHeld(MakeVector2(firstX, midY), HeldKind::Position, ink);
+						if (l.rotation)
+							DrawHeld(MakeVector2(firstX + kLockW, midY), HeldKind::Rotation, ink);
+						if (l.scale)
+							DrawHeld(MakeVector2(firstX + kLockW * 2.0F, midY), HeldKind::Scale, ink);
+					}
 				}
 				if (IsRenaming() && row.path == renamed) {
 					nameField.SetRect(RenameBox(row, i));
