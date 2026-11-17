@@ -592,6 +592,20 @@ namespace spades {
 					chevron(o + MakeVector2(1.5F, -6.5F), o + MakeVector2(4.5F, -6.5F),
 					        o + MakeVector2(4.5F, -3.5F));
 					break;
+				case HeldKind::Voxels: {
+					// What it holds: a voxel, a cube seen from a corner.
+					const float rx = 4.6F, ry = 2.7F;
+					const Vector2 hex[7] = {
+					  o + MakeVector2(0.0F, -2.0F * ry), o + MakeVector2(rx, -ry),
+					  o + MakeVector2(rx, ry),           o + MakeVector2(0.0F, 2.0F * ry),
+					  o + MakeVector2(-rx, ry),          o + MakeVector2(-rx, -ry),
+					  o + MakeVector2(0.0F, -2.0F * ry)};
+					OverlayStrokePolyline(renderer, hex, 7, 1.2F, color, false);
+					line(o, o + MakeVector2(-rx, -ry));
+					line(o, o + MakeVector2(rx, -ry));
+					line(o, o + MakeVector2(0.0F, 2.0F * ry));
+					break;
+				}
 			}
 			if (!held)
 				return;
@@ -686,7 +700,7 @@ namespace spades {
 					         Faded(hovered ? kHoverText : kIcon, hidden ? kDimmed : 1.0F));
 
 				float labelEnd = left + kWidth - kEyeW - 4.0F;
-				if (row.node && row.node->locks.AnyTransform()) {
+				if (row.node && row.node->locks.AnyMarked()) {
 					labelEnd -= kLockW;
 					const float lockX = left + kWidth - kEyeW - kLockW;
 					const bool overLock = hovered && cursor.x >= lockX && cursor.x < lockX + kLockW;
@@ -869,7 +883,9 @@ namespace spades {
 			};
 			const Line lines[] = {{HeldKind::Position, "Location", locks.position},
 			                      {HeldKind::Rotation, "Rotation", locks.rotation},
-			                      {HeldKind::Scale, "Scale", locks.scale}};
+			                      {HeldKind::Scale, "Scale", locks.scale},
+			                      {HeldKind::Voxels, "Voxels", locks.voxels}};
+			constexpr int kLines = int(sizeof(lines) / sizeof(lines[0]));
 			constexpr float kPadX = 8.0F, kPadY = 5.0F, kIconW = 20.0F, kGap = 14.0F;
 			const char* const kHeld = "locked";
 			const char* const kFree = "free";
@@ -879,13 +895,13 @@ namespace spades {
 			const float stateW =
 			  std::max(font.Measure(kHeld).x, font.Measure(kFree).x) * kTextScale;
 			const float w = kPadX * 2.0F + kIconW + nameW + kGap + stateW;
-			const float h = kPadY * 2.0F + kRowH * 3.0F;
+			const float h = kPadY * 2.0F + kRowH * float(kLines);
 			// Beside the tree, level with the row, and kept on the screen.
 			const float x = left + kWidth + 6.0F;
 			const float rowMid = RowTop(index) + kRowH * 0.5F;
 			const float y = std::max(2.0F, rowMid - h * 0.5F);
 			EditorTheme::PaintPanel(renderer, x, y, w, h);
-			for (int n = 0; n < 3; n++) {
+			for (int n = 0; n < kLines; n++) {
 				const Line& l = lines[n];
 				const float ly = y + kPadY + float(n) * kRowH;
 				const Vector4 ink = l.held ? EditorTheme::Text() : EditorTheme::TextFaint();

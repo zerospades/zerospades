@@ -171,8 +171,10 @@ namespace spades {
 			if (!objects || !objects->HasPickedObject())
 				return "click an object to pick it  |  click nothing to select again";
 			const std::string name = objects->PickedObjectName();
+			// Tab is offered only where it does something.
+			const std::string tab = handling.voxels ? "  |  [Tab] edit its voxels" : "";
 			if (handling.Nothing())
-				return name + ":  held in place by its template" + others + "  |  [Tab] edit its voxels";
+				return name + ":  held in place by its template" + others + tab;
 			// What may be done, in the order the gizmo's handles are read.
 			std::vector<const char*> verbs;
 			if (handling.move)
@@ -187,8 +189,7 @@ namespace spades {
 					action += i + 1 == verbs.size() ? " or " : ", ";
 				action += verbs[i];
 			}
-			return name + ":  drag the gizmo to " + action + " it" + others + "  |  [Tab] edit "
-			       "its voxels";
+			return name + ":  drag the gizmo to " + action + " it" + others + tab;
 		}
 	} // namespace gui
 } // namespace spades

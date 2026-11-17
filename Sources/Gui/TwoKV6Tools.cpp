@@ -61,8 +61,9 @@ namespace spades {
 		  "prints (#3); PARENT is one too, or / for the top. Turns are degrees\n"
 		  "about X, then Y, then Z; Z points down, as in the game. A template\n"
 		  "locks what the game relies on, each apart: an object's name (and so\n"
-		  "its parent, and its being there), its position, its turn, its scale;\n"
-		  "a locked one is refused until unlocked. Voxels are never locked.\n"
+		  "its parent, and its being there), its position, its turn, its scale,\n"
+		  "its voxels (an empty so locked stays empty); what is locked is\n"
+		  "refused until unlocked.\n"
 		  "What hangs under an object follows it wherever it goes.\n"
 		  "\n"
 		  "  new FILE [--force]       an empty scene\n"
@@ -114,7 +115,7 @@ namespace spades {
 		  "  remove FILE OBJECT [--force]\n"
 		  "                           with all under it; --force for locked ones\n"
 		  "  lock|unlock FILE OBJECT [--name] [--position] [--rotation] [--scale]\n"
-		  "                           those locks, or with none named all four\n"
+		  "              [--voxels]   those locks, or with none named all five\n"
 		  "  hide|show FILE OBJECT\n"
 		  "\n"
 		  "  render FILE VIEW OUT.png [--object OBJECT] [--scale N] [--shade]\n"
@@ -299,7 +300,7 @@ namespace spades {
 				                         " locked: unlock it to " + what + " it");
 		}
 
-		// Its locks as words: "" for none, "locked" for all four, else the
+		// Its locks as words: "" for none, "locked" for all five, else the
 		// ones it has ("locked name, scale").
 		std::string LocksText(const VoxelObject::Locks& l) {
 			if (!l.Any())
@@ -315,6 +316,7 @@ namespace spades {
 			add(l.position, "position");
 			add(l.rotation, "rotation");
 			add(l.scale, "scale");
+			add(l.voxels, "voxels");
 			return text;
 		}
 
@@ -658,7 +660,7 @@ namespace spades {
 					hinge.position = ParseVector(o.Values("--at"), 0, "--at");
 				if (o.Has("--lock"))
 					hinge.locks.name = hinge.locks.position = hinge.locks.rotation =
-					  hinge.locks.scale = true;
+					  hinge.locks.scale = hinge.locks.voxels = true;
 				siblings.push_back(std::move(hinge));
 				return true;
 			}
@@ -670,6 +672,7 @@ namespace spades {
 				     "combine TARGET SOURCE [--over|--under|--carve|--paint|--intersect] [--grow]");
 				VoxelObject& target = Find(scene, o.rest[0]).Object();
 				const VoxelObject& source = Find(scene, o.rest[1]).Object();
+				RefuseLocked(target, target.locks.voxels, "voxels", "combine into");
 				if (&target == &source)
 					throw UsageError("an object combines with another, not with itself");
 				for (const VoxelObject* obj : {static_cast<const VoxelObject*>(&target), &source})
@@ -732,13 +735,16 @@ namespace spades {
 			}
 			if (cmd == "set-model") {
 				Need(a, 3, "set-model OBJECT MODEL.kv6");
-				// A template's locked hinge is meant to be filled in.
-				Find(scene, a[1]).Object().model = LoadModel(a[2]);
+				VoxelObject& o = Find(scene, a[1]).Object();
+				RefuseLocked(o, o.locks.voxels, "voxels", "give voxels to");
+				o.model = LoadModel(a[2]);
 				return true;
 			}
 			if (cmd == "clear-model") {
 				Need(a, 2, "clear-model OBJECT");
-				Find(scene, a[1]).Object().model = Handle<VoxelModel>();
+				VoxelObject& o = Find(scene, a[1]).Object();
+				RefuseLocked(o, o.locks.voxels, "voxels", "take the voxels of");
+				o.model = Handle<VoxelModel>();
 				return true;
 			}
 			if (cmd == "move" || cmd == "set-position") {
@@ -820,14 +826,16 @@ namespace spades {
 				return true;
 			}
 			if (cmd == "lock" || cmd == "unlock") {
-				const Options o = TakeOptions(
-				  a, 1, {{"--name", 0}, {"--position", 0}, {"--rotation", 0}, {"--scale", 0}});
-				Need(o.rest, 1, (cmd + " OBJECT [--name] [--position] [--rotation] [--scale]").c_str());
+				const Options o = TakeOptions(a, 1,
+				                              {{"--name", 0}, {"--position", 0}, {"--rotation", 0},
+				                               {"--scale", 0}, {"--voxels", 0}});
+				Need(o.rest, 1,
+				     (cmd + " OBJECT [--name] [--position] [--rotation] [--scale] [--voxels]").c_str());
 				VoxelObject& object = Find(scene, o.rest[0]).Object();
 				const bool on = cmd == "lock";
-				// None named is all four.
+				// None named is all five.
 				const bool all = !o.Has("--name") && !o.Has("--position") && !o.Has("--rotation") &&
-				                 !o.Has("--scale");
+				                 !o.Has("--scale") && !o.Has("--voxels");
 				if (all || o.Has("--name"))
 					object.locks.name = on;
 				if (all || o.Has("--position"))
@@ -836,6 +844,8 @@ namespace spades {
 					object.locks.rotation = on;
 				if (all || o.Has("--scale"))
 					object.locks.scale = on;
+				if (all || o.Has("--voxels"))
+					object.locks.voxels = on;
 				return true;
 			}
 			if (cmd == "hide" || cmd == "show") {
@@ -878,13 +888,15 @@ namespace spades {
 						std::printf("%s{\"number\": %d, \"path\": \"%s\", \"depth\": %d, \"kind\": "
 						            "\"%s\", \"position\": [%s], \"rotation\": [%s], \"scale\": "
 						            "[%s], \"locked\": %s, \"locks\": {\"name\": %s, \"position\": %s, "
-						            "\"rotation\": %s, \"scale\": %s}, \"hidden\": %s, \"children\": %d}",
+						            "\"rotation\": %s, \"scale\": %s, \"voxels\": %s}, \"hidden\": %s, "
+						            "\"children\": %d}",
 						            first ? "" : ", ", n, full.c_str(), depth,
 						            o.model ? "model" : "hinge", Format3(shown.position, ", ").c_str(),
 						            Format3(turn, ", ").c_str(), Format3(shown.scale, ", ").c_str(),
 						            o.locks.Any() ? "true" : "false", o.locks.name ? "true" : "false",
 						            o.locks.position ? "true" : "false", o.locks.rotation ? "true" : "false",
-						            o.locks.scale ? "true" : "false", o.hidden ? "true" : "false",
+						            o.locks.scale ? "true" : "false", o.locks.voxels ? "true" : "false",
+						            o.hidden ? "true" : "false",
 						            int(o.children.size()));
 						first = false;
 					} else {

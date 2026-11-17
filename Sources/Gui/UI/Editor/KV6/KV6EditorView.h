@@ -125,6 +125,7 @@ namespace spades {
 			bool HasSelectedObjects() const override;
 			void SelectNoObject() override;
 			bool HasPickedObject() const override;
+			std::string WhyNotEditPicked() const override;
 			std::string PickedObjectName() const override;
 			bool PickedObjectPose(GizmoPose& pose) const override;
 			void BeginObjectDrag() override;

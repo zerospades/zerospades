@@ -105,13 +105,19 @@ namespace spades {
 			bool position = false; ///< not moved
 			bool rotation = false; ///< not turned
 			bool scale = false;    ///< not scaled
-			bool Any() const { return name || position || rotation || scale; }
-			bool All() const { return name && position && rotation && scale; }
+			/** Its voxels are kept as they are: none given, edited or taken.
+			 *  An empty so held stays empty (a template's hinge). */
+			bool voxels = false;
+			bool Any() const { return name || position || rotation || scale || voxels; }
+			bool All() const { return name && position && rotation && scale && voxels; }
 			/** Whether its place in its parent is held in any way, not only its name. */
 			bool AnyTransform() const { return position || rotation || scale; }
+			/** Whether anything but the name is held: what an editor marks, as
+			 *  the name is kept without a mark. */
+			bool AnyMarked() const { return AnyTransform() || voxels; }
 			bool operator==(const Locks& o) const {
 				return name == o.name && position == o.position && rotation == o.rotation &&
-				       scale == o.scale;
+				       scale == o.scale && voxels == o.voxels;
 			}
 			bool operator!=(const Locks& o) const { return !(*this == o); }
 		};
@@ -182,7 +188,8 @@ namespace spades {
 	 *     float[3] Scale
 	 *     uint8    Flags             bit 0 name locked, bit 1 hidden,
 	 *                                bit 2 position locked, bit 3 rotation
-	 *                                locked, bit 4 scale locked, others zero
+	 *                                locked, bit 4 scale locked, bit 5 voxels
+	 *                                locked, others zero
 	 *     uint8    HasModel          0 a hinge, 1 a model follows
 	 *     [KV6]    if HasModel: a KV6 without its magic (header, blocks, indices)
 	 *     uint16   NumChildren, then OBJECT x NumChildren

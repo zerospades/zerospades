@@ -1484,6 +1484,10 @@ namespace spades {
 		}
 
 		void KV6Scene::GiveVoxels(const NodePath& path, Handle<VoxelModel> model) {
+			// What its template keeps as it is takes none (Edit mode never
+			// asks for such a node: see WhyNotEditPicked).
+			if (LocksOf(path).voxels)
+				return;
 			SetVoxels(path, std::move(model));
 		}
 

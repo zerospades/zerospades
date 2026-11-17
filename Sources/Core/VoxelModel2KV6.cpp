@@ -36,8 +36,10 @@ namespace spades {
 		constexpr uint8_t kFlagPositionLocked = 1u << 2;
 		constexpr uint8_t kFlagRotationLocked = 1u << 3;
 		constexpr uint8_t kFlagScaleLocked = 1u << 4;
+		constexpr uint8_t kFlagVoxelsLocked = 1u << 5;
 		constexpr uint8_t kKnownFlags = kFlagNameLocked | kFlagHidden | kFlagPositionLocked |
-		                                kFlagRotationLocked | kFlagScaleLocked;
+		                                kFlagRotationLocked | kFlagScaleLocked |
+		                                kFlagVoxelsLocked;
 		// Before version 3, bit 0 was the only lock, and the others unknown.
 		constexpr uint8_t kKnownFlagsBefore3 = kFlagNameLocked | kFlagHidden;
 
@@ -240,6 +242,7 @@ namespace spades {
 				obj.locks.position = (flags & kFlagPositionLocked) != 0;
 				obj.locks.rotation = (flags & kFlagRotationLocked) != 0;
 				obj.locks.scale = (flags & kFlagScaleLocked) != 0;
+				obj.locks.voxels = (flags & kFlagVoxelsLocked) != 0;
 			}
 
 			// Read hasModel flag
@@ -306,7 +309,8 @@ namespace spades {
 			const uint8_t flags = uint8_t(
 			  (obj.locks.name ? kFlagNameLocked : 0) | (obj.hidden ? kFlagHidden : 0) |
 			  (obj.locks.position ? kFlagPositionLocked : 0) |
-			  (obj.locks.rotation ? kFlagRotationLocked : 0) | (obj.locks.scale ? kFlagScaleLocked : 0));
+			  (obj.locks.rotation ? kFlagRotationLocked : 0) | (obj.locks.scale ? kFlagScaleLocked : 0) |
+			  (obj.locks.voxels ? kFlagVoxelsLocked : 0));
 			stream.Write(&flags, sizeof(flags));
 
 			// Write hasModel flag

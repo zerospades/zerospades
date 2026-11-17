@@ -72,6 +72,10 @@ namespace spades {
 			/** Whether an object is picked, with voxels or none: Edit mode then
 			 *  edits it. */
 			virtual bool HasPickedObject() const = 0;
+			/** Why Edit mode cannot take the picked object's voxels, as the
+			 *  status line says it; empty when it can. Nothing picked, or its
+			 *  voxels locked (an empty its template keeps empty). */
+			virtual std::string WhyNotEditPicked() const = 0;
 			/** The picked object's name, for the hint line. */
 			virtual std::string PickedObjectName() const = 0;
 
@@ -83,6 +87,8 @@ namespace spades {
 				bool move = true;
 				bool turn = true;
 				bool scale = true; ///< an empty has no voxels to scale
+				/** Its voxels can be edited (Tab, Edit mode): not when locked. */
+				bool voxels = true;
 				bool Nothing() const { return !move && !turn && !scale; }
 			};
 			virtual Handling PickedObjectHandling() const = 0;

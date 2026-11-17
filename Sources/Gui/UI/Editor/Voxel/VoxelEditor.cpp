@@ -633,13 +633,16 @@ namespace spades {
 		void VoxelEditor::Activate(int toolIndex, EditorMode mode) {
 			if (toolIndex == activeTool && mode == currentMode)
 				return;
-			// Edit mode edits the picked object of a scene, so a scene with none
-			// picked stays in Object mode.
+			// Edit mode edits the picked object of a scene's voxels: a scene with
+			// none picked, or one whose voxels are locked, stays in Object mode.
+			// Every way into Edit mode comes through here (Tab, the mode menu).
 			IObjectModeHost* objects = ObjectMode();
-			if (mode == EditorMode::Edit && currentMode != EditorMode::Edit && objects &&
-			    !objects->HasPickedObject()) {
-				SetStatus("Pick an object to edit first");
-				return;
+			if (mode == EditorMode::Edit && currentMode != EditorMode::Edit && objects) {
+				const std::string why = objects->WhyNotEditPicked();
+				if (!why.empty()) {
+					SetStatus(why);
+					return;
+				}
 			}
 			// A number being typed into the sub-toolbar, or the panel, belongs to
 			// the tool whose box it is: it is settled here, while that tool is
@@ -694,6 +697,10 @@ namespace spades {
 				// Tab goes between these two: it says so on both.
 				if (mode == EditorMode::Object || mode == EditorMode::Edit)
 					item.Shortcut(kModeToggleKey);
+				// Edit mode greyed while what is picked cannot be edited; the
+				// status line says why when Tab is pressed for it.
+				if (mode == EditorMode::Edit && currentMode != EditorMode::Edit && ObjectMode())
+					item.Enabled(ObjectMode()->WhyNotEditPicked().empty());
 				items.push_back(std::move(item));
 			}
 			ui.GetContextMenu()->OpenBelow(anchor, std::move(items), this);

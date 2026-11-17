@@ -202,14 +202,14 @@ namespace spades {
 			void DrawEye(const Vector2& centre, bool open, const Vector4& color);
 			/** A padlock: a node's template holds part of its place. */
 			void DrawLock(const Vector2& centre, const Vector4& color);
-			/** What of its place a lock holds, in the order the transform
-			 *  panel's rows go. */
-			enum class HeldKind { Position, Rotation, Scale };
-			/** The glyph of what `kind` holds (move, turn or scale), with a
-			 *  padlock's badge when `held`. */
+			/** What a lock holds: of its place, in the order the transform
+			 *  panel's rows go, then its voxels. */
+			enum class HeldKind { Position, Rotation, Scale, Voxels };
+			/** The glyph of what `kind` holds (move, turn, scale or a voxel's
+			 *  cube), with a padlock's badge when `held`. */
 			void DrawHeld(const Vector2& centre, HeldKind kind, bool held, const Vector4& color);
 			/**
-			 * The padlock under the pointer, opened up: each of the three
+			 * The padlock under the pointer, opened up: each of its four marked
 			 * locks as its glyph and its name, the held ones bright and badged,
 			 * the free ones faint, on a card beside row `index`.
 			 */

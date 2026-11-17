@@ -229,7 +229,13 @@ namespace spades {
 				bool VoxelObject::Locks::*lock;
 				const char* noun;
 			};
+			// Not a row of the transform panel, which sets a place: the lock on
+			// what the object holds, toggled from the tree's menu alone.
+			constexpr unsigned kVoxelsLock = 8;
+
 			RowLock LockOfRow(unsigned row) {
+				if (row == kVoxelsLock)
+					return {&VoxelObject::Locks::voxels, "voxels"};
 				if (row == ITransformTarget::kRotation)
 					return {&VoxelObject::Locks::rotation, "rotation"};
 				if (row == ITransformTarget::kScale)
@@ -306,7 +312,7 @@ namespace spades {
 				std::vector<ContextMenuItem> templating;
 				for (unsigned rowBit : {unsigned(ITransformTarget::kLocation),
 				                        unsigned(ITransformTarget::kRotation),
-				                        unsigned(ITransformTarget::kScale)}) {
+				                        unsigned(ITransformTarget::kScale), kVoxelsLock}) {
 					const RowLock which = LockOfRow(rowBit);
 					std::string caption = std::string("Lock ") + which.noun;
 					caption[5] = char(std::toupper(static_cast<unsigned char>(caption[5])));
@@ -388,7 +394,7 @@ namespace spades {
 			// The dialog is modal: the tree cannot change under `path` meanwhile.
 			ConfirmEditorAction(*ui->GetOverlay(),
 			                    "Unlock the " + std::string(which.noun) + " of \"" + o->name +
-			                      "\"? Its template holds it where the game expects it. Changed, "
+			                      "\"? Its template holds it as the game expects it. Changed, "
 			                      "it changes what the editor shows, and may not change what the "
 			                      "game draws.",
 			                    [this, path, locks, what] { SetNodeLocks(path, locks, what); });
@@ -396,7 +402,7 @@ namespace spades {
 
 		void KV6EditorView::LockEverything(const NodePath& path) {
 			VoxelObject::Locks all;
-			all.name = all.position = all.rotation = all.scale = true;
+			all.name = all.position = all.rotation = all.scale = all.voxels = true;
 			SetNodeLocks(path, all, "Locked everything");
 		}
 
@@ -412,7 +418,8 @@ namespace spades {
 			  o->model ? std::string()
 			           : " The game also places a joint like this one itself: moved, turned or "
 			             "scaled, it changes what the editor shows, hit boxes included, but not "
-			             "what the game draws.";
+			             "what the game draws. And a joint holds no voxels: given some, it is no "
+			             "longer the empty the template made it.";
 			// Two steps, each modal: the first says what is given up, the
 			// second asks once more, as this is not something done in passing.
 			ConfirmEditorAction(
@@ -423,8 +430,8 @@ namespace spades {
 			  [this, path, name] {
 				  ConfirmEditorAction(*ui->GetOverlay(),
 				                      "Are you sure? This removes every lock on " + name +
-				                        ": its name, location, rotation and scale. Undo puts "
-				                        "them back.",
+				                        ": its name, location, rotation, scale and voxels. Undo "
+				                        "puts them back.",
 				                      [this, path] {
 					                      SetNodeLocks(path, VoxelObject::Locks(),
 					                                   "Unlocked everything");
@@ -959,6 +966,17 @@ namespace spades {
 
 		bool KV6EditorView::HasPickedObject() const { return scene && !scene->Active().empty(); }
 
+		std::string KV6EditorView::WhyNotEditPicked() const {
+			if (!HasPickedObject())
+				return "Pick an object to edit first";
+			const VoxelObject* o = scene->Node(scene->Active());
+			if (o && o->locks.voxels)
+				return "\"" + o->name + "\"" +
+				       (o->model ? " keeps its voxels: its template locks them"
+				                 : " stays empty: its template locks its voxels");
+			return std::string();
+		}
+
 		std::string KV6EditorView::PickedObjectName() const {
 			if (!HasPickedObject())
 				return std::string();
@@ -988,6 +1006,7 @@ namespace spades {
 			h.move = !o->locks.position;
 			h.turn = !o->locks.rotation;
 			h.scale = o->model && !o->locks.scale; // an empty has no voxels to scale
+			h.voxels = !o->locks.voxels;
 			return h;
 		}
 
