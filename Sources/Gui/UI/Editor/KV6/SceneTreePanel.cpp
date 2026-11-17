@@ -537,7 +537,19 @@ namespace spades {
 			}
 		}
 
-		void SceneTreePanel::DrawHeld(const Vector2& c, HeldKind kind, const Vector4& color) {
+		void SceneTreePanel::DrawLock(const Vector2& c, const Vector4& color) {
+			std::vector<Vector2> shackle;
+			for (int i = 0; i <= 8; i++) {
+				const float a = float(M_PI) * float(i) / 8.0F;
+				shackle.push_back(MakeVector2(c.x + 2.6F * std::cos(a), c.y - 1.0F - 2.8F * std::sin(a)));
+			}
+			OverlayStrokePolyline(renderer, shackle.data(), shackle.size(), 1.3F, color, false);
+			OverlayColorNP(renderer, color);
+			OverlayFillRect(renderer, c.x - 4.0F, c.y - 1.0F, 8.0F, 6.0F);
+		}
+
+		void SceneTreePanel::DrawHeld(const Vector2& c, HeldKind kind, bool held,
+		                              const Vector4& color) {
 			auto line = [&](Vector2 a, Vector2 b) {
 				const Vector2 p[2] = {a, b};
 				OverlayStrokePolyline(renderer, p, 2, 1.2F, color, false);
@@ -581,8 +593,9 @@ namespace spades {
 					        o + MakeVector2(4.5F, -3.5F));
 					break;
 			}
-			// The badge: a small padlock in the corner the glyph leaves it, on
-			// whatever the row is drawn on (its band, when selected).
+			if (!held)
+				return;
+			// The badge: a small padlock in the corner the glyph leaves it.
 			const Vector2 b = c + MakeVector2(4.0F, 3.5F);
 			std::vector<Vector2> shackle;
 			for (int i = 0; i <= 6; i++) {
@@ -630,17 +643,9 @@ namespace spades {
 			  held == Held::Drag ? DropAt(scene, rows, cursor) : Drop();
 			const int last = std::min(int(rows.size()), scroll + VisibleRows());
 
-			// The lock columns stand on every row once any node of the scene
-			// holds part of its place, so they line up whichever rows show.
-			std::function<bool(const std::vector<VoxelObject>&)> anyHeld =
-			  [&](const std::vector<VoxelObject>& nodes) {
-				  for (const VoxelObject& o : nodes) {
-					  if (o.locks.AnyTransform() || anyHeld(o.children))
-						  return true;
-				  }
-				  return false;
-			  };
-			const bool lockColumns = anyHeld(scene.Roots());
+			// The row whose padlock the pointer is on, opened up once the rows
+			// are drawn, over them.
+			int lockCardRow = -1;
 
 			for (int i = scroll; i < last; i++) {
 				const Row& row = rows[std::size_t(i)];
@@ -681,19 +686,14 @@ namespace spades {
 					         Faded(hovered ? kHoverText : kIcon, hidden ? kDimmed : 1.0F));
 
 				float labelEnd = left + kWidth - kEyeW - 4.0F;
-				if (lockColumns) {
-					labelEnd -= kLockW * 3.0F;
-					const float firstX = left + kWidth - kEyeW - kLockW * 2.5F;
-					const Vector4 ink = Faded(kIcon, hidden ? kDimmed : 0.8F);
-					if (row.node) {
-						const VoxelObject::Locks& l = row.node->locks;
-						if (l.position)
-							DrawHeld(MakeVector2(firstX, midY), HeldKind::Position, ink);
-						if (l.rotation)
-							DrawHeld(MakeVector2(firstX + kLockW, midY), HeldKind::Rotation, ink);
-						if (l.scale)
-							DrawHeld(MakeVector2(firstX + kLockW * 2.0F, midY), HeldKind::Scale, ink);
-					}
+				if (row.node && row.node->locks.AnyTransform()) {
+					labelEnd -= kLockW;
+					const float lockX = left + kWidth - kEyeW - kLockW;
+					const bool overLock = hovered && cursor.x >= lockX && cursor.x < lockX + kLockW;
+					DrawLock(MakeVector2(lockX + kLockW * 0.5F, midY),
+					         overLock ? kHoverText : Faded(kIcon, hidden ? kDimmed : 0.8F));
+					if (overLock)
+						lockCardRow = i;
 				}
 				if (IsRenaming() && row.path == renamed) {
 					nameField.SetRect(RenameBox(row, i));
@@ -712,6 +712,9 @@ namespace spades {
 					DrawEye(MakeVector2(left + kWidth - kEyeW * 0.5F, midY), !row.node->hidden, eye);
 				}
 			}
+
+			if (lockCardRow >= 0)
+				DrawLockCard(rows[std::size_t(lockCardRow)].node->locks, lockCardRow);
 
 			if (IsRenaming()) {
 				const int index = RowOf(rows, renamed);
@@ -856,6 +859,41 @@ namespace spades {
 
 		AABB2 SceneTreePanel::RenameRect(const KV6Scene& scene) const {
 			return IsRenaming() ? nameField.Rect() : AABB2();
+		}
+
+		void SceneTreePanel::DrawLockCard(const VoxelObject::Locks& locks, int index) {
+			struct Line {
+				HeldKind kind;
+				const char* name;
+				bool held;
+			};
+			const Line lines[] = {{HeldKind::Position, "Location", locks.position},
+			                      {HeldKind::Rotation, "Rotation", locks.rotation},
+			                      {HeldKind::Scale, "Scale", locks.scale}};
+			constexpr float kPadX = 8.0F, kPadY = 5.0F, kIconW = 20.0F, kGap = 14.0F;
+			const char* const kHeld = "locked";
+			const char* const kFree = "free";
+			float nameW = 0.0F;
+			for (const Line& l : lines)
+				nameW = std::max(nameW, font.Measure(l.name).x * kTextScale);
+			const float stateW =
+			  std::max(font.Measure(kHeld).x, font.Measure(kFree).x) * kTextScale;
+			const float w = kPadX * 2.0F + kIconW + nameW + kGap + stateW;
+			const float h = kPadY * 2.0F + kRowH * 3.0F;
+			// Beside the tree, level with the row, and kept on the screen.
+			const float x = left + kWidth + 6.0F;
+			const float rowMid = RowTop(index) + kRowH * 0.5F;
+			const float y = std::max(2.0F, rowMid - h * 0.5F);
+			EditorTheme::PaintPanel(renderer, x, y, w, h);
+			for (int n = 0; n < 3; n++) {
+				const Line& l = lines[n];
+				const float ly = y + kPadY + float(n) * kRowH;
+				const Vector4 ink = l.held ? EditorTheme::Text() : EditorTheme::TextFaint();
+				DrawHeld(MakeVector2(x + kPadX + kIconW * 0.5F, ly + kRowH * 0.5F), l.kind, l.held, ink);
+				DrawText(l.name, x + kPadX + kIconW, ly, ink);
+				DrawText(l.held ? kHeld : kFree, x + w - kPadX - stateW, ly,
+				         l.held ? EditorTheme::TextDim() : EditorTheme::TextFaint());
+			}
 		}
 
 		void SceneTreePanel::DrawRenameReason(const KV6Scene& scene) {
