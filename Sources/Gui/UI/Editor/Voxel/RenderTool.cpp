@@ -69,8 +69,11 @@ namespace spades {
 			options.AddHex(kHexOption, "Hex", kBackgroundGroup);
 			options.AddBool(kTransparentOption, "Transparent", kBackgroundGroup);
 			options.AddAction(kSaveOption, "Render", kImageGroup);
-			// What the picker sets while this tool is active.
+			// What the picker sets while this tool is active. Seeded with the
+			// colour as it stands: it is read (for the toolbar's swatch) before
+			// the first UpdateOptions runs.
 			options.AddColor(kBackgroundOption);
+			options.SetColor(kBackgroundOption, background);
 		}
 
 		std::string RenderTool::Hint(IVoxelEditContext&) {

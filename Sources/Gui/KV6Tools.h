@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 namespace spades {
 	/**
 	 * `--kv6-tools`: reads and edits KV6 models from the command line, with no
@@ -27,5 +30,5 @@ namespace spades {
 	 * the command in `args` (what follows `--kv6-tools`) and returns the exit
 	 * code: 0 done, 1 the command failed, 2 it was not understood.
 	 */
-	int RunKV6Tools(int argc, char** argv);
+	int RunKV6Tools(const std::vector<std::string>& args);
 } // namespace spades

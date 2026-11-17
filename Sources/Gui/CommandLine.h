@@ -85,13 +85,15 @@ namespace spades {
 	 * A usage error -- an option missing its value, a value that is not one,
 	 * an option for developers without --debug-tools, options that contradict
 	 * each other -- is reported on stderr and makes the result Error. An option
-	 * that is not known is warned about and skipped, as a system may add some
-	 * of its own when it starts a program.
+	 * that is not known is warned about and skipped, along with the value it
+	 * may have brought, as a system may add options of its own when it starts
+	 * a program. A bare `--` ends the options, as it does everywhere.
 	 */
 	CommandLineResult ParseCommandLine(int argc, char** argv, CommandLine& out);
 
-	/** Prints the options a player may use, or with `debugTools` the ones for
-	 *  developers and tests. `program` is how the program was started. */
+	/** Prints the options a player may use, and with `debugTools` the ones
+	 *  for developers and tests as well. `program` is how the program was
+	 *  started. */
 	void PrintCommandLineHelp(const char* program, bool debugTools);
 
 	/**

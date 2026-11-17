@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <deque>
 #include <exception>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -96,6 +97,15 @@ namespace spades {
 			explicit UndoHistory(Sink& sink, Limits limits = Limits())
 			    : sink(sink), limits(limits) {}
 
+			/**
+			 * Told when the history is thrown away because it can no longer be
+			 * trusted (a step failed to record or to replay), with why in a
+			 * short phrase: for the editor to show, as undo falling silent
+			 * would otherwise go unexplained. A deliberate Clear() -- a new
+			 * document -- is not reported.
+			 */
+			std::function<void(const std::string& why)> OnDiscarded;
+
 			// --- recording ----------------------------------------------------
 
 			/**
@@ -140,8 +150,7 @@ namespace spades {
 			void Append(Record record) {
 				SPAssert(depth > 0);
 				if (depth == 0) {
-					SPLog("Undo history cleared: a change was made outside an undo step");
-					Clear();
+					Discard("a change was made outside an undo step", "");
 					return;
 				}
 				pending.records.push_back(std::move(record));
@@ -171,10 +180,11 @@ namespace spades {
 						sink.UndoApply(*it, false);
 					sink.UndoRestoreState(g.before);
 				} catch (...) {
-					Abandon("undoing", g.label);
+					Discard("undoing failed part way", g.label);
 					throw;
 				}
 				documentId = g.documentBefore;
+				documentSteps -= g.records.empty() ? 0 : 1;
 				redoGroups.push_back(std::move(g));
 				undoGroups.pop_back();
 				return true;
@@ -191,10 +201,11 @@ namespace spades {
 						sink.UndoApply(r, true);
 					sink.UndoRestoreState(g.after);
 				} catch (...) {
-					Abandon("redoing", g.label);
+					Discard("redoing failed part way", g.label);
 					throw;
 				}
 				documentId = g.documentAfter;
+				documentSteps += g.records.empty() ? 0 : 1;
 				undoGroups.push_back(std::move(g));
 				redoGroups.pop_back();
 				return true;
@@ -206,6 +217,7 @@ namespace spades {
 				pending = Group();
 				depth = 0;
 				action = 0;
+				documentSteps = 0;
 				// Ids are never reused: the document kept its unrecorded changes (when
 				// a step could not be recorded), so it must not match an id it was
 				// saved at.
@@ -256,12 +268,10 @@ namespace spades {
 					else
 						pending = Group();
 				} catch (const std::exception& ex) {
-					SPLog("Undo history cleared: could not record '%s': %s",
-					      pending.label.c_str(), ex.what());
-					Clear();
+					SPLog("Recording '%s' failed: %s", pending.label.c_str(), ex.what());
+					Discard("an edit could not be recorded", pending.label);
 				} catch (...) {
-					SPLog("Undo history cleared: could not record '%s'", pending.label.c_str());
-					Clear();
+					Discard("an edit could not be recorded", pending.label);
 				}
 			}
 
@@ -282,6 +292,7 @@ namespace spades {
 					// Later in the same user action: extend its step, which keeps the
 					// label and the "before" state of the action's first edit.
 					Group& step = undoGroups.back();
+					const bool counted = !step.records.empty();
 					totalBytes -= step.bytes;
 					step.records.insert(step.records.end(),
 					                    std::make_move_iterator(pending.records.begin()),
@@ -289,14 +300,18 @@ namespace spades {
 					step.after = std::move(pending.after);
 					step.documentAfter = pending.documentAfter;
 					// An action that put everything back (select, then deselect)
-					// leaves nothing to undo, so it leaves no step either.
+					// leaves nothing to undo, so it leaves no step either. Records
+					// are only ever added to it, so an empty one was never counted.
 					if (step.records.empty() && !(step.before != step.after)) {
 						undoGroups.pop_back();
 					} else {
+						if (!counted && !step.records.empty())
+							documentSteps++;
 						step.bytes = BytesOf(step);
 						totalBytes += step.bytes;
 					}
 				} else {
+					documentSteps += pending.records.empty() ? 0 : 1;
 					pending.bytes = BytesOf(pending);
 					totalBytes += pending.bytes;
 					undoGroups.push_back(std::move(pending));
@@ -304,9 +319,6 @@ namespace spades {
 				pending = Group();
 
 				// Evict the oldest history past either cap, but never the last step.
-				std::size_t documentSteps = 0;
-				for (const Group& g : undoGroups)
-					documentSteps += g.records.empty() ? 0 : 1;
 				while ((documentSteps > limits.steps || totalBytes > limits.bytes) &&
 				       undoGroups.size() > 1) {
 					documentSteps -= undoGroups.front().records.empty() ? 0 : 1;
@@ -315,9 +327,25 @@ namespace spades {
 				}
 			}
 
-			// Logs why the history goes, and clears it: see Undo.
-			void Abandon(const char* doing, const std::string& label) noexcept {
-				SPLog("Undo history cleared: %s '%s' failed part way", doing, label.c_str());
+			/**
+			 * Clears the history because it can no longer be trusted, and says
+			 * so: in the log, and through OnDiscarded where the host set it.
+			 * It never throws -- it runs where memory may be short and an
+			 * exception may be unwinding -- so a notice that cannot be
+			 * delivered is dropped, and `label`, which may live in what Clear
+			 * resets, is read before it.
+			 */
+			void Discard(const char* why, const std::string& label) noexcept {
+				try {
+					if (label.empty())
+						SPLog("Undo history cleared: %s", why);
+					else
+						SPLog("Undo history cleared: %s ('%s')", why, label.c_str());
+					if (OnDiscarded)
+						OnDiscarded(label.empty() ? std::string(why)
+						                          : std::string(why) + " (" + label + ")");
+				} catch (...) {
+				}
 				Clear();
 			}
 
@@ -340,6 +368,9 @@ namespace spades {
 			unsigned action = 0, nextAction = 0;
 			long documentId = 0, nextDocumentId = 0;
 			std::size_t totalBytes = 0; // BytesOf every group held, undo + redo
+			// Of undoGroups, those that change the document: what limits.steps
+			// caps, kept as the groups come and go rather than recounted.
+			std::size_t documentSteps = 0;
 		};
 	} // namespace gui
 } // namespace spades
