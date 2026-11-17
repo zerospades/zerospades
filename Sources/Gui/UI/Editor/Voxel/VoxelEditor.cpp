@@ -582,14 +582,14 @@ namespace spades {
 
 		bool VoxelEditor::InObjectMode(int index) const {
 			return host.ObjectMode() && index >= 0 && index < int(tools.size()) &&
-			       tools[std::size_t(index)].id == "reference";
+			       tools[std::size_t(index)].traits.objectMode;
 		}
 
 		bool VoxelEditor::InBothModes(int index) const {
 			// An image is made of whatever the view shows: the scene in Object
 			// mode, the object being edited in Edit mode.
 			return host.ObjectMode() && index >= 0 && index < int(tools.size()) &&
-			       tools[std::size_t(index)].id == "render";
+			       tools[std::size_t(index)].traits.bothModes;
 		}
 
 		bool VoxelEditor::OfferedIn(int index, bool objectMode) const {

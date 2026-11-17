@@ -67,6 +67,18 @@ namespace spades {
 			 * with nothing of what they draw to work by.
 			 */
 			bool presents = false;
+			/**
+			 * With a scene open, offered in Object mode instead of Edit mode:
+			 * what it sets belongs to the scene (the reference images are set
+			 * among its objects). Without one it stays Edit mode's.
+			 */
+			bool objectMode = false;
+			/**
+			 * With a scene open, offered in Object mode as well as Edit mode:
+			 * it works on whatever the view shows (Render makes an image of
+			 * the scene, or of the object being edited).
+			 */
+			bool bothModes = false;
 		};
 
 		/** A tool as the editor holds it: the instance, and its toolbar button's place. */

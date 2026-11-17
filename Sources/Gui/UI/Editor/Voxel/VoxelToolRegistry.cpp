@@ -77,11 +77,16 @@ namespace spades {
 				registry.Register(Make<PaintTool>(), "paint", kEditingGroup, "P");
 				registry.Register(Make<MirrorTool>(), "mirror", kSetupGroup, "M");
 				registry.Register(Make<PivotTool>(), "pivot", kSetupGroup, "O");
-				// The images to model from, across each axis.
-				registry.Register(Make<ReferenceTool>(), "reference", kSetupGroup, "I");
-				// An image of the model, from where the camera stands.
+				// The images to model from, across each axis; a scene's are set
+				// among its objects, in Object mode.
+				ToolTraits references;
+				references.objectMode = true;
+				registry.Register(Make<ReferenceTool>(), "reference", kSetupGroup, "I", references);
+				// An image of the model, from where the camera stands; of a
+				// scene, in either mode, of whatever the view shows.
 				ToolTraits renders;
 				renders.presents = true;
+				renders.bothModes = true;
 				registry.Register(Make<RenderTool>(), "render", kOutputGroup, "", renders);
 			}
 			return registry;
