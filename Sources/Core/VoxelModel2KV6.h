@@ -116,6 +116,17 @@ namespace spades {
 	Matrix4 LocalTransform(const Vector3& position, const Vector4& rotation, const Vector3& scale);
 
 	/**
+	 * The object `path` names in `roots` ("Player/Neck/Head"), a name per
+	 * level; null when there is none, or several share a name on the way.
+	 * `indices`, when given, receives where it is: its index among the roots,
+	 * then among each parent's children.
+	 */
+	const VoxelObject* FindObject(const std::vector<VoxelObject>& roots, const std::string& path,
+	                              std::vector<int>* indices = nullptr);
+	VoxelObject* FindObject(std::vector<VoxelObject>& roots, const std::string& path,
+	                        std::vector<int>* indices = nullptr);
+
+	/**
 	 * `m` back into a position, a rotation and a scale, LocalTransform's
 	 * inverse. False when they cannot hold it exactly: it shears (an object
 	 * turned within a parent scaled unevenly), or flattens an axis; they are

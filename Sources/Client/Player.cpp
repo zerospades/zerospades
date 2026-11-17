@@ -1469,8 +1469,6 @@ namespace spades {
 		Player::HitBoxes Player::GetHitBoxes(bool interpolate) {
 			SPADES_MARK_FUNCTION_DEBUG();
 
-			Player::HitBoxes hb;
-
 			Vector3 o = GetFront(interpolate);
 
 			float yaw = atan2f(o.y, o.x) + kHalfPi;
@@ -1482,19 +1480,26 @@ namespace spades {
 			if (armPitch < 0.0F)
 				armPitch = std::max(armPitch, -kHalfPi) * 0.9F;
 
+			return MakeHitBoxes(GetOrigin(), yaw, pitch, armPitch, input.crouch);
+		}
+
+		Player::HitBoxes Player::MakeHitBoxes(const Vector3& origin, float yaw, float pitch,
+		                                      float armPitch, bool crouch) {
+			Player::HitBoxes hb;
+
 			// lower axis
-			Matrix4 const lower = Matrix4::Translate(GetOrigin())
+			Matrix4 const lower = Matrix4::Translate(origin)
 				* Matrix4::Rotate(MakeVector3(0, 0, 1), yaw);
 			Matrix4 const torso = lower
-				* Matrix4::Translate(0, 0, -(input.crouch ? 0.5F : 1.0F));
+				* Matrix4::Translate(0, 0, -(crouch ? 0.5F : 1.0F));
 			Matrix4 const head = torso
-				* Matrix4::Translate(0.0F, 0.0F, -(input.crouch ? 0.05F : 0.0F))
+				* Matrix4::Translate(0.0F, 0.0F, -(crouch ? 0.05F : 0.0F))
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), pitch);
 			Matrix4 const arms = torso
-				* Matrix4::Translate(0, 0, input.crouch ? 0.0F : 0.1F)
+				* Matrix4::Translate(0, 0, crouch ? 0.0F : 0.1F)
 				* Matrix4::Rotate(MakeVector3(1, 0, 0), armPitch);
 
-			if (input.crouch) {
+			if (crouch) {
 				hb.limbs[0] = lower * AABB3(-0.4F, -0.1F, -0.2F, 0.3F, 0.4F, 0.8F);
 				hb.limbs[1] = lower * AABB3(0.1F, -0.1F, -0.2F, 0.3F, 0.4F, 0.8F);
 				hb.torso = torso * AABB3(-0.4F, -0.1F, -0.1F, 0.8F, 0.8F, 0.7F);

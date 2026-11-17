@@ -33,6 +33,7 @@
 #include "Corpse.h"
 #include "CTFGameMode.h"
 #include "DaytimeWeather.h"
+#include "DebugShapes.h"
 #include "GameProperties.h"
 #include "IGameMode.h"
 #include "Player.h"
@@ -576,31 +577,7 @@ namespace spades {
 		}
 
 		void Client::AddDebugObjectToScene(const spades::OBB3& obb, const Vector4& color) {
-			const auto& m = obb.m;
-			Vector3 v[2][2][2];
-			v[0][0][0] = (m * MakeVector3(0, 0, 0)).GetXYZ();
-			v[0][0][1] = (m * MakeVector3(0, 0, 1)).GetXYZ();
-			v[0][1][0] = (m * MakeVector3(0, 1, 0)).GetXYZ();
-			v[0][1][1] = (m * MakeVector3(0, 1, 1)).GetXYZ();
-			v[1][0][0] = (m * MakeVector3(1, 0, 0)).GetXYZ();
-			v[1][0][1] = (m * MakeVector3(1, 0, 1)).GetXYZ();
-			v[1][1][0] = (m * MakeVector3(1, 1, 0)).GetXYZ();
-			v[1][1][1] = (m * MakeVector3(1, 1, 1)).GetXYZ();
-
-			renderer->AddDebugLine(v[0][0][0], v[1][0][0], color);
-			renderer->AddDebugLine(v[0][0][1], v[1][0][1], color);
-			renderer->AddDebugLine(v[0][1][0], v[1][1][0], color);
-			renderer->AddDebugLine(v[0][1][1], v[1][1][1], color);
-
-			renderer->AddDebugLine(v[0][0][0], v[0][1][0], color);
-			renderer->AddDebugLine(v[0][0][1], v[0][1][1], color);
-			renderer->AddDebugLine(v[1][0][0], v[1][1][0], color);
-			renderer->AddDebugLine(v[1][0][1], v[1][1][1], color);
-
-			renderer->AddDebugLine(v[0][0][0], v[0][0][1], color);
-			renderer->AddDebugLine(v[0][1][0], v[0][1][1], color);
-			renderer->AddDebugLine(v[1][0][0], v[1][0][1], color);
-			renderer->AddDebugLine(v[1][1][0], v[1][1][1], color);
+			AddDebugOBB(*renderer, obb, color);
 		}
 
 		void Client::AddMapObjectsToScene() {

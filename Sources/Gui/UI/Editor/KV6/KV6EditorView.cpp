@@ -24,9 +24,12 @@
 #include <exception>
 #include <initializer_list>
 
+#include <Client/DebugShapes.h>
 #include <Client/Fonts.h>
 #include <Client/IFont.h>
 #include <Client/IModel.h>
+#include <Client/Player.h>
+#include <Client/PlayerTemplate.h>
 #include <Client/ScreenShot.h>
 #include <Core/Bitmap.h>
 #include <Gui/UI/Editor/Shell/RenderImage.h>
@@ -37,6 +40,7 @@
 #include <Gui/AutomationOptions.h>
 #include <Gui/OverlayPaint.h>
 #include <Gui/UI/Components/ColorPicker.h>
+#include <Gui/UI/Components/EditorTheme.h>
 #include <Gui/UI/Components/Gizmo/TransformGizmo.h>
 #include <Gui/UI/Components/OptionBar.h>
 #include <Gui/UI/Components/UIOverlayHost.h>
@@ -1111,6 +1115,13 @@ namespace spades {
 			                                      kProjectionKey);
 			parallel.checked = cam.IsOrthogonal();
 			view.items.push_back(parallel);
+			// Offered on a player set's template, which a skin is made from.
+			if (IsPlayerTemplate()) {
+				MenuBarItem hitBoxes =
+				  MenuCommand("Hit Boxes", [this] { ToggleHitBoxes(); }, true);
+				hitBoxes.checked = showHitBoxes;
+				view.items.push_back(hitBoxes);
+			}
 			view.items.push_back(MenuRule());
 			view.items.push_back(MenuCommand("Save Screenshot", [this] { wantScreenShot = true; },
 			                                 true, cg_keyScreenshot));
@@ -1318,6 +1329,72 @@ namespace spades {
 			                       MakeVector4(0.4F, 1.0F, 0.4F, 0.5F));
 			renderer->AddDebugLine(p - MakeVector3(0, 0, L), p + MakeVector3(0, 0, L),
 			                       MakeVector4(0.45F, 0.6F, 1.0F, 0.5F));
+		}
+
+		namespace {
+			// A template's poses, and how bright each one's boxes are drawn:
+			// the crouching ones dimmer, so both shown at once read apart.
+			struct HitBoxPose {
+				const char* path;
+				bool crouch;
+				float brightness;
+			};
+			const HitBoxPose kHitBoxPoses[] = {
+			  {client::PlayerTemplate::kStanding, false, 1.0F},
+			  {client::PlayerTemplate::kCrouching, true, 0.6F},
+			};
+
+			Vector4 Dimmed(const Vector4& color, float brightness) {
+				return MakeVector4(color.x * brightness, color.y * brightness,
+				                   color.z * brightness, color.w);
+			}
+		} // namespace
+
+		bool KV6EditorView::IsPlayerTemplate() const {
+			if (!scene)
+				return false;
+			NodePath path;
+			for (const HitBoxPose& pose : kHitBoxPoses) {
+				if (scene->PathNamed(pose.path, path))
+					return true;
+			}
+			return false;
+		}
+
+		void KV6EditorView::ToggleHitBoxes() {
+			showHitBoxes = !showHitBoxes;
+			if (!showHitBoxes)
+				editor->SetStatus("Hit boxes hidden");
+			else if (ShowingObjects())
+				editor->SetStatus("Hit boxes: where shots hit a player in each pose shown; what "
+				                  "lies outside them cannot be hit");
+			else
+				editor->SetStatus("Hit boxes: shown in Object mode, over the whole player");
+		}
+
+		void KV6EditorView::DrawHitBoxes() {
+			// A pose's hinge stands where the game puts the player's origin for
+			// it; the game draws every part at a tenth of a block per voxel,
+			// its x and y the other way round, so its boxes come back the same.
+			const float k = client::PlayerTemplate::kVoxelsPerBlock;
+			const Matrix4 toVoxels = Matrix4::Scale(-k, -k, k);
+			NodePath path;
+			for (const HitBoxPose& pose : kHitBoxPoses) {
+				if (!scene->PathNamed(pose.path, path) || !scene->Shown(path))
+					continue;
+				// Looking straight ahead, its arms level: the pose the
+				// template's parts are laid out in.
+				const client::Player::HitBoxes hb = client::Player::MakeHitBoxes(
+				  MakeVector3(0.0F, 0.0F, 0.0F), 0.0F, 0.0F, 0.0F, pose.crouch);
+				const Matrix4 frame = scene->NodeMatrix(path) * toVoxels;
+				auto draw = [&](const OBB3& box, const Vector4& color) {
+					client::AddDebugOBB(*renderer, frame * box, Dimmed(color, pose.brightness));
+				};
+				draw(hb.head, EditorTheme::HitHead());
+				draw(hb.torso, EditorTheme::HitTorso());
+				for (const OBB3& limb : hb.limbs)
+					draw(limb, EditorTheme::HitLimbs());
+			}
 		}
 
 		void KV6EditorView::DrawHelpers() {
@@ -1789,6 +1866,10 @@ namespace spades {
 				return;
 			DrawHelpers();
 			DrawOriginAxes();
+			// Over the whole player only: a lone part in Edit mode has no place
+			// in the boxes to show.
+			if (showHitBoxes && ShowingObjects())
+				DrawHitBoxes();
 			editor->DrawScene();
 		}
 

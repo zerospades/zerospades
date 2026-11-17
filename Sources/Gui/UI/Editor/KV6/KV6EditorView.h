@@ -295,6 +295,17 @@ namespace spades {
 			// Drawing
 			void DrawHelpers();
 			void DrawOriginAxes();
+
+			// --- Hit boxes ------------------------------------------------------
+			// Where shots hit a player, shown over a player set's template while
+			// it is laid out in Object mode, so a skin is made to fit them. The
+			// game's own boxes, in each pose shown, never anything of the game's.
+			bool showHitBoxes = false;
+			/** Whether the scene is a player template: it has a pose to show
+			 *  boxes on. */
+			bool IsPlayerTemplate() const;
+			void ToggleHitBoxes();
+			void DrawHitBoxes();
 			void DrawRibbon(float sw); // full-width title/filename bar above the toolbar
 			// The keys the view handles itself, for the help line.
 			std::string HelpLine() const;

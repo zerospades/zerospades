@@ -116,6 +116,12 @@ namespace spades {
 			/** Whether the node is drawn: neither it nor any node above it hidden. */
 			bool Shown(const NodePath& path) const;
 			bool Shown(int index) const;
+			/** What the node at `path` and its parents do to what hangs under
+			 *  it: its frame in the world, voxels or none. */
+			Matrix4 NodeMatrix(const NodePath& path) const;
+			/** The node a path of names ("Player/Standing") names, NamePath's
+			 *  inverse; false when none does, or several share a name on the way. */
+			bool PathNamed(const std::string& names, NodePath& path) const;
 			/** Bumped whenever the tree's nodes take other paths. */
 			long ShapeVersion() const { return shapeVersion; }
 
@@ -459,8 +465,6 @@ namespace spades {
 			VoxelObject* MutableNode(const NodePath& path);
 			std::vector<VoxelObject>* ChildrenOf(const NodePath& parent);
 			const std::vector<VoxelObject>* ChildrenOf(const NodePath& parent) const;
-			/** What the node at `path` and its parents do to its voxels. */
-			Matrix4 NodeMatrix(const NodePath& path) const;
 			/** The node at `path` (the scene's top objects for the scene) as
 			 *  objects in its own frame, shown whatever it is set to; false, `why`
 			 *  saying why, when there is nothing there. `what` names it. */

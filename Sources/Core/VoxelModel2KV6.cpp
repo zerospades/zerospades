@@ -483,6 +483,43 @@ namespace spades {
 		       Matrix4::Scale(scale);
 	}
 
+	const VoxelObject* FindObject(const std::vector<VoxelObject>& roots, const std::string& path,
+	                              std::vector<int>* indices) {
+		if (indices)
+			indices->clear();
+		const std::vector<VoxelObject>* level = &roots;
+		std::size_t start = 0;
+		while (true) {
+			const std::size_t slash = path.find('/', start);
+			const std::string name =
+			  path.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+			const VoxelObject* found = nullptr;
+			int at = -1;
+			for (std::size_t i = 0; i < level->size(); i++) {
+				if ((*level)[i].name != name)
+					continue;
+				if (found)
+					return nullptr; // a name shared on the way names nothing
+				found = &(*level)[i];
+				at = int(i);
+			}
+			if (!found)
+				return nullptr;
+			if (indices)
+				indices->push_back(at);
+			if (slash == std::string::npos)
+				return found;
+			level = &found->children;
+			start = slash + 1;
+		}
+	}
+
+	VoxelObject* FindObject(std::vector<VoxelObject>& roots, const std::string& path,
+	                        std::vector<int>* indices) {
+		const std::vector<VoxelObject>& constRoots = roots;
+		return const_cast<VoxelObject*>(FindObject(constRoots, path, indices));
+	}
+
 	namespace {
 		// The rotation of an orthonormal, right-handed frame, built from its
 		// largest part so a half turn never divides by zero.

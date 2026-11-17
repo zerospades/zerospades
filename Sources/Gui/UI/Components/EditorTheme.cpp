@@ -46,6 +46,12 @@ namespace spades {
 			Vector4 Active() { return MakeVector4(1.0F, 0.65F, 0.2F, 1.0F); }
 			Vector4 Selected() { return MakeVector4(0.95F, 0.52F, 0.18F, 1.0F); }
 
+			// Apart from the selection's orange, the refusals' red and the drop
+			// target's blue, and from each other.
+			Vector4 HitHead() { return MakeVector4(1.0F, 0.3F, 0.85F, 1.0F); }
+			Vector4 HitTorso() { return MakeVector4(0.75F, 1.0F, 0.3F, 1.0F); }
+			Vector4 HitLimbs() { return MakeVector4(0.3F, 0.95F, 0.9F, 1.0F); }
+
 			void PaintPanel(client::IRenderer& renderer, float x, float y, float width,
 			                float height) {
 				OverlayColorNP(renderer, PanelShadow());

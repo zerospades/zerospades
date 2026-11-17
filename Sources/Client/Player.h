@@ -268,6 +268,14 @@ namespace spades {
 
 			// hit tests
 			HitBoxes GetHitBoxes(bool interpolate);
+			/**
+			 * The hit boxes of a player standing at `origin`, turned by `yaw`,
+			 * looking up or down by `pitch`, its arms at `armPitch`: the boxes
+			 * shots are tested against, wherever they are asked for (a live
+			 * player, or an editor showing where a skin can be hit).
+			 */
+			static HitBoxes MakeHitBoxes(const Vector3& origin, float yaw, float pitch,
+			                             float armPitch, bool crouch);
 
 			/** Does approximated ray casting.
 			 * @param dir normalized direction vector.

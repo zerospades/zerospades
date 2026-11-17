@@ -327,6 +327,10 @@ namespace spades {
 			return m;
 		}
 
+		bool KV6Scene::PathNamed(const std::string& names, NodePath& path) const {
+			return FindObject(roots, names, &path) != nullptr;
+		}
+
 		std::string KV6Scene::NamePath(const NodePath& path) const {
 			std::string names;
 			for (std::size_t n = 1; n <= path.size(); n++) {

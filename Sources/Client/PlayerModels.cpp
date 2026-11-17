@@ -31,14 +31,12 @@
 
 #include "IModel.h"
 #include "IRenderer.h"
+#include "PlayerTemplate.h"
 
 namespace spades {
 	namespace client {
 		namespace {
 			const char* const kSetsDir = "Models/Player/";
-			// Where a scene's head wears the Christmas hat every set shares: a
-			// hinge the hat's pivot sits on.
-			const char* const kHatPath = "Player/Neck/SantaHat";
 			const char* const kHatFile = "Models/Player/SantaHat.kv6";
 
 			// Where the template keeps each classic part (player-scene.sh).
@@ -60,31 +58,6 @@ namespace spades {
 				};
 				const auto it = paths.find(name);
 				return it == paths.end() ? nullptr : it->second;
-			}
-
-			// The object `path` names ("Body/Neck/Head"); null when there is
-			// none, or several share a name on the way.
-			VoxelObject* Find(std::vector<VoxelObject>& scene, const std::string& path) {
-				std::vector<VoxelObject>* level = &scene;
-				VoxelObject* found = nullptr;
-				std::size_t start = 0;
-				while (true) {
-					const std::size_t slash = path.find('/', start);
-					const std::string name = path.substr(
-					  start, slash == std::string::npos ? std::string::npos : slash - start);
-					found = nullptr;
-					for (VoxelObject& o : *level) {
-						if (o.name != name)
-							continue;
-						if (found)
-							return nullptr;
-						found = &o;
-					}
-					if (!found || slash == std::string::npos)
-						return found;
-					level = &found->children;
-					start = slash + 1;
-				}
 			}
 		} // namespace
 
@@ -191,7 +164,7 @@ namespace spades {
 			if (cached != set.parts.end())
 				return cached->second;
 			PlayerPart part;
-			if (VoxelObject* o = Find(set.scene, path)) {
+			if (VoxelObject* o = FindObject(set.scene, path)) {
 				if (o->model) {
 					// Voxel `i` lands at its place on the hinge times `i`, as a
 					// classic part's lands at its pivot plus `i`: the model's own
@@ -227,7 +200,7 @@ namespace spades {
 			// the classic hatted head instead.
 			if (ClassicWins(set, dir + "Head.kv6"))
 				return PlayerPart();
-			const VoxelObject* mount = Find(set.scene, kHatPath);
+			const VoxelObject* mount = FindObject(set.scene, PlayerTemplate::kHatMount);
 			if (!mount)
 				return PlayerPart();
 			PlayerPart hat;

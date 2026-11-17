@@ -62,6 +62,12 @@ namespace spades {
 			Vector4 Active();
 			Vector4 Selected();
 
+			// Where a player can be hit, as a skin template shows it: the head,
+			// the torso, and the legs and arms.
+			Vector4 HitHead();
+			Vector4 HitTorso();
+			Vector4 HitLimbs();
+
 			/** A floating panel's body: its shadow, its fill and its border. */
 			void PaintPanel(client::IRenderer& renderer, float x, float y, float width,
 			                float height);
