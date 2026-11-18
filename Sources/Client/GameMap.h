@@ -160,6 +160,47 @@ namespace spades {
 				}
 			}
 
+			/**
+			 * Client-side render hiding. A hidden block keeps
+			 * everything: solidity, collision, raycast, color.
+			 * Only the map renderer's chunk mesh builder skips
+			 * it, so the block is solid yet invisible. Used by
+			 * the sentry gun feature: the server turret's
+			 * pillar blocks are replaced on the screen by the
+			 * animated model while staying a real hitbox.
+			 */
+			inline bool IsHidden(int x, int y, int z) const {
+				if (z < 0 || z >= DefaultDepth)
+					return false;
+				return ((hiddenMap[x & (DefaultWidth - 1)]
+				         [y & (DefaultHeight - 1)]) >>
+				        (uint64_t)z) &
+				       1ULL;
+			}
+			inline void SetHidden(int x, int y, int z, bool hidden) {
+				if (z < 0 || z >= DefaultDepth)
+					return;
+				x &= DefaultWidth - 1;
+				y &= DefaultHeight - 1;
+				uint64_t mask = 1ULL << z;
+				uint64_t value = hiddenMap[x][y];
+				bool was = (value & mask) != 0;
+				if (was == hidden)
+					return;
+				if (hidden)
+					value |= mask;
+				else
+					value &= ~mask;
+				hiddenMap[x][y] = value;
+
+				// same notification path as Set(): the map
+				// renderer listens and rebuilds the chunk
+				std::lock_guard<std::mutex> guard{
+					listenersMutex};
+				for (auto* l : listeners)
+					l->GameMapChanged(x, y, z, this);
+			}
+
 			void AddListener(IGameMapListener*);
 			void RemoveListener(IGameMapListener*);
 
@@ -229,6 +270,9 @@ namespace spades {
 			explicit GameMap(NoInit) {}
 
 			uint64_t solidMap[DefaultWidth][DefaultHeight];
+			// per-column bitmask of render-hidden blocks
+			// (see IsHidden/SetHidden); zero-initialized
+			uint64_t hiddenMap[DefaultWidth][DefaultHeight] = {};
 			uint32_t colorMap[DefaultWidth][DefaultHeight][DefaultDepth];
 			std::list<IGameMapListener*> listeners;
 			std::mutex listenersMutex;

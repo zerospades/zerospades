@@ -37,6 +37,7 @@
 #include "Grenade.h"
 #include "NetClient.h"
 #include "Player.h"
+#include "SentryEntity.h"
 #include "TCGameMode.h"
 #include "PieMenu.h"
 #include "Teamplay.h"
@@ -1079,12 +1080,37 @@ namespace spades {
 					p.SetTool(GetToolType(tool));
 				} break;
 				case PacketTypeSetColour: {
-					stmp::optional<Player&> p = GetPlayerOrNull(r.ReadByte());
-					IntVector3 color = r.ReadIntColor();
-					if (p)
-						p->SetHeldBlockColor(color);
-					else
-						temporaryPlayerBlockColor = color;
+					int colorSenderId = (int)r.ReadByte();
+					stmp::optional<Player&> p =
+					  GetPlayerOrNull(colorSenderId);
+					if (!p && colorSenderId == 34) {
+						// sentry.py announces every real server-side
+						// shot with a SetColor on this reserved id
+						// (SENTRY_SHOT_ID in the script; no block is
+						// ever built with it): vanilla clients just
+						// store the color and nothing renders, the
+						// fork decodes the 24-bit value as the
+						// turret's (x, y) and plays the muzzle flash
+						// + tracer at the exact moment the damage
+						// lands. Wire layout = three bytes, low
+						// to high, matching the script's
+						// `x | (y << 9)`; read them ONE BY ONE:
+						// the evaluation order of several
+						// ReadByte() inside a single expression
+						// is unspecified in C++
+						int b0 = (int)r.ReadByte();
+						int b1 = (int)r.ReadByte();
+						int b2 = (int)r.ReadByte();
+						int packed =
+						  b0 | (b1 << 8) | (b2 << 16);
+						SentryEntity::OnServerSentryFire(packed);
+					} else {
+						IntVector3 color = r.ReadIntColor();
+						if (p)
+							p->SetHeldBlockColor(color);
+						else
+							temporaryPlayerBlockColor = color;
+					}
 				} break;
 				case PacketTypeExistingPlayer:
 					if (!GetWorld())
@@ -1223,6 +1249,19 @@ namespace spades {
 					if (action == BlockActionCreate) {
 						if (!p) {
 							GetWorld()->CreateBlock(pos, temporaryPlayerBlockColor);
+							// a block built by the server's reserved
+							// player id: may be a sentry.py turret
+							// block (or one of its heartbeat
+							// re-builds of the top pillar block);
+							// the fork then spawns the animated
+							// model and hides the blocks for the
+							// renderer (solid yet invisible, see
+							// GameMap::SetHidden). audioDevice is
+							// private in Client; GetAudioDevice()
+							// is the public accessor.
+							SentryEntity::OnServerBlockTurret(
+							  *client, &client->GetAudioDevice(), pos,
+							  temporaryPlayerBlockColor);
 						} else {
 							GetWorld()->CreateBlock(pos, p->GetBlockColor());
 							if (!GetWorld()->GetMap()->IsSolidWrapped(pos.x, pos.y, pos.z)) {

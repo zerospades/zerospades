@@ -26,12 +26,21 @@
 #include "ClientUIHelper.h"
 #include "NetClient.h"
 #include <Client/Client.h>
+#include "SentryEntity.h"
+#include "Player.h"
+#include "World.h"
 #include <Client/Fonts.h>
 #include <Core/Exception.h>
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/InGame/ChatLogWindow.h>
 #include <Gui/UI/InGame/ChatWindow.h>
 #include <Gui/UI/InGame/ClientMenu.h>
+
+// Gate of the "/sentrylocal" chat command below. The DEFINE lives ONLY in
+// this file (a duplicate DEFINE anywhere else in the project is a
+// linker error). The sentry's own tunables (range, fire interval,
+// model orientation fixes...) are DEFINE'd in SentryEntity.cpp.
+DEFINE_SPADES_SETTING(cg_sentry, "1");
 
 namespace spades {
 	namespace client {
@@ -67,6 +76,92 @@ namespace spades {
 		void ClientUI::SendChat(const std::string& msg, bool isGlobal) {
 			if (!client)
 				return;
+
+			// "/sentrylocal", "/sentrylocal 1..3" and
+			// "/sentrylocal1..3": local, client-side only command.
+			// Deploys a purely cosmetic sentry gun on the block the
+			// player is aiming at. The optional number picks the
+			// tier (1 = classic MG, 2 = faster MG, 3 = minigun;
+			// plain "/sentrylocal" deploys tier 1). The digit GLUED
+			// to the word is accepted on purpose: both spellings
+			// are unambiguous, and the space-less one is a natural
+			// slip that would otherwise leak the command to the
+			// server chat. Anything else after "/sentrylocal" is
+			// refused with a usage hint. Never sent to the server,
+			// deals no damage and is visible only to the local
+			// player. Gated by cg_sentry (DEFINE'd in this file).
+			//
+			// NOTE: "/sentry" itself is NOT intercepted anymore: it
+			// goes to the server, where the sentry.py piqueserver
+			// script builds the REAL block turret (damage, solid,
+			// destructible, visible to everyone). The fork's
+			// NetClient replaces those blocks on the screen with
+			// the animated model: they are hidden for the
+			// renderer but stay solid (see
+			// SentryEntity::OnServerBlockTurret).
+			if (msg == "/sentrylocal" ||
+			    (msg.size() > 11 &&
+			     msg.compare(0, 11, "/sentrylocal") == 0)) {
+				if (!cg_sentry) {
+					RecordChatLog(
+					  "/sentrylocal is disabled (cg_sentry is 0)",
+					  Vector4(1.0F, 0.8F, 0.3F, 1.0F));
+					return;
+				}
+
+				// tier argument: exactly one digit in 1..3,
+				// with or without a space before it; anything
+				// else is refused with a usage hint instead of
+				// guessing a level
+				int level = 1;
+				if (msg.size() > 11) {
+					const char *arg = msg.c_str() + 11;
+					if (arg[0] == ' ')
+						arg++; // "/sentrylocal N": skip the space
+					if (arg[0] >= '1' && arg[0] <= '3' &&
+					    arg[1] == '\0') {
+						level = arg[0] - '0';
+					} else {
+						RecordChatLog(
+						  "usage: /sentrylocal [1-3] (sentry tier)",
+						  Vector4(1.0F, 0.8F, 0.3F, 1.0F));
+						return;
+					}
+				}
+
+				stmp::optional<Player&> maybePlayer;
+				if (client->world)
+					maybePlayer = client->world->GetLocalPlayer();
+
+				if (maybePlayer && maybePlayer->IsAlive()) {
+					Player& p = *maybePlayer;
+
+					// deploy on the aimed surface: the sentry sits
+					// where the crosshair ray hits a block
+					World::WeaponRayCastResult res =
+					  client->world->WeaponRayCast(p.GetEye(), p.GetFront(),
+					                               stmp::optional<int>{});
+					if (res.hit) {
+						client->AddLocalEntity(
+						  stmp::make_unique<SentryEntity>(
+						    *client,
+						    client->audioDevice.GetPointerOrNull(),
+						    res.hitPos, level));
+						RecordChatLog(
+						  std::string("sentry deployed (level ") +
+						    std::to_string(level) + ")",
+						  Vector4(0.6F, 1.0F, 0.6F, 1.0F));
+					} else {
+						RecordChatLog("aim at a block to deploy a sentry",
+						              Vector4(1.0F, 0.8F, 0.3F, 1.0F));
+					}
+				} else {
+					RecordChatLog("sentry needs a living local player",
+					              Vector4(1.0F, 0.5F, 0.5F, 1.0F));
+				}
+				return;
+			}
+
 			client->activeNet->SendChat(msg, isGlobal);
 		}
 

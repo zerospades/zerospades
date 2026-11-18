@@ -213,6 +213,15 @@ namespace spades {
 			x &= 511;
 			y &= 511;
 
+			// render-hidden blocks (see GameMap::SetHidden):
+			// solid for the game, but the mesh builder must
+			// not emit them, and the faces of their solid
+			// neighbors become exposed, which is exactly the
+			// wanted result (e.g. the ground shows normally
+			// under an invisible pillar)
+			if (map->IsHidden(x, y, z))
+				return false;
+
 			return map->IsSolid(x, y, (z == 63)
 				? (renderer.renderer.GetSettings().r_water ? 62 : 63) : z);
 		}
