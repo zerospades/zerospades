@@ -194,6 +194,57 @@ namespace spades {
 					ScriptContextUtils().SetNativeException(ex);
 				}
 			}
+			static void DrawFilledRect(float x0, float y0, float x1, float y1, IRenderer* r) {
+				try {
+					r->DrawFilledRect(x0, y0, x1, y1);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
+			static void DrawOutlinedRect(float x0, float y0, float x1, float y1, int thickness,
+			                             IRenderer* r) {
+				try {
+					r->DrawOutlinedRect(x0, y0, x1, y1, thickness);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
+			static void DrawLine(const Vector2& p1, const Vector2& p2, float thickness,
+			                     IRenderer* r) {
+				try {
+					r->DrawLine(p1, p2, thickness);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
+			static void DrawFilledTriangle(const Vector2& v0, const Vector2& v1, const Vector2& v2,
+			                               IRenderer* r) {
+				try {
+					r->DrawFilledTriangle(v0, v1, v2);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
+			static void DrawFilledRectFade(float x0, float y0, float x1, float y1,
+                               const Vector4& color0, const Vector4& color1,
+                               bool horizontal, IRenderer* r) {
+				try {
+					r->DrawFilledRectFade(x0, y0, x1, y1, color0, color1, horizontal);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
+			static void DrawFilledRectFadeSolid(float x0, float y0, float x1, float y1,
+												float fadeStart, float fadeEnd,
+												const Vector4& color0, const Vector4& color1,
+												bool horizontal, IRenderer* r) {
+				try {
+					r->DrawFilledRectFadeSolid(x0, y0, x1, y1, fadeStart, fadeEnd,
+											   color0, color1, horizontal);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
 			static Bitmap* ReadBitmap(IRenderer* r) {
 				try {
 					return r->ReadBitmap().Unmanage();
@@ -525,11 +576,31 @@ namespace spades {
 						  "Vector2&in, const AABB2& in)",
 						  asFUNCTION(DrawImage5), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
-						r = eng->RegisterObjectMethod("Renderer", "void DrawFilledRect(float, float, float, float)",
-							asMETHODPR(IRenderer, DrawFilledRect, (float, float, float, float), void), asCALL_THISCALL);
+						r = eng->RegisterObjectMethod("Renderer", 
+							"void DrawFilledRect(float, float, float, float)",
+							asFUNCTION(DrawFilledRect), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
-						r = eng->RegisterObjectMethod("Renderer", "void DrawOutlinedRect(float, float, float, float, int thickness = 1)",
-							asMETHODPR(IRenderer, DrawOutlinedRect, (float, float, float, float, int), void), asCALL_THISCALL);
+						r = eng->RegisterObjectMethod("Renderer", 
+							"void DrawOutlinedRect(float, float, float, float, int thickness = 1)",
+							asFUNCTION(DrawOutlinedRect), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer",
+							"void DrawLine(const Vector2& in, const Vector2& in, float thickness = 1.0F)",
+							asFUNCTION(DrawLine), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer",
+							"void DrawFilledTriangle(const Vector2& in, const Vector2& in, const Vector2& in)",
+							asFUNCTION(DrawFilledTriangle), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer",
+							"void DrawFilledRectFade(float, float, float, float, const Vector4& in, "
+							"const Vector4& in, bool horizontal = false)",
+							asFUNCTION(DrawFilledRectFade), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod("Renderer",
+							"void DrawFilledRectFadeSolid(float, float, float, float, float, float, "
+							"const Vector4& in, const Vector4& in, bool horizontal = false)",
+							asFUNCTION(DrawFilledRectFadeSolid), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void DrawFlatGameMap(const AABB2&in, const AABB2& in)",
