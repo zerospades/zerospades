@@ -380,8 +380,8 @@ namespace spades {
 			renderer->RegisterImage("Gfx/Bullet/7.62mm.png");
 			renderer->RegisterImage("Gfx/Bullet/9mm.png");
 			renderer->RegisterImage("Gfx/Bullet/12gauge.png");
-			renderer->RegisterImage("Gfx/Demo/Pause.png");
-			renderer->RegisterImage("Gfx/Demo/Play.png");
+			renderer->RegisterImage("Gfx/UI/Pause.png");
+			renderer->RegisterImage("Gfx/UI/Play.png");
 			renderer->RegisterImage("Gfx/Hotbar/Block.png");
 			renderer->RegisterImage("Gfx/Hotbar/Grenade.png");
 			renderer->RegisterImage("Gfx/Hotbar/Spade.png");
@@ -405,7 +405,7 @@ namespace spades {
 			renderer->RegisterImage("Gfx/HurtRing.png");
 			renderer->RegisterImage("Gfx/HurtSprite.png");
 			renderer->RegisterImage("Gfx/Glare.png");
-			renderer->RegisterImage("Gfx/ReflexSight.png");
+			renderer->RegisterImage("Gfx/SightReflex.png");
 			renderer->RegisterImage("Gfx/Spotlight.jpg");
 			renderer->RegisterImage("Textures/Fluid.png");
 			renderer->RegisterImage("Textures/WaterExpl.png");

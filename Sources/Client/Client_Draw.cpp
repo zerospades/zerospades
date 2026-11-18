@@ -335,8 +335,8 @@ namespace spades {
 			renderer->DrawOutlinedRect(lineX - 1, barY - lineH - 1, lineX + lineW + 1, barY + barH + lineH + 1);
 
 			// draw status playing/paused
-			Handle<IImage> playIcon = renderer->RegisterImage("Gfx/Demo/Play.png");
-			Handle<IImage> pauseIcon = renderer->RegisterImage("Gfx/Demo/Pause.png");
+			Handle<IImage> playIcon = renderer->RegisterImage("Gfx/UI/Play.png");
+			Handle<IImage> pauseIcon = renderer->RegisterImage("Gfx/UI/Pause.png");
 			const float iconX = statusX;
 			const float iconY = barY + (barH - statusIconSize) * 0.5F;
 			renderer->SetColorAlphaPremultiplied(white);
@@ -510,7 +510,7 @@ namespace spades {
 			);
 
 			// draw player icon
-			img = renderer->RegisterImage("Gfx/User.png");
+			img = renderer->RegisterImage("Gfx/IconUser.png");
 			float iconSize = 12.0F;
 			float iconSpacing = 5.0F;
 			pos.x = x - (teamBarW * 0.5F) - (iconSize * 0.5F);
@@ -1649,7 +1649,7 @@ namespace spades {
 			float borderFade = (time - alertAppearTime) / 0.5F;
 			borderFade = Clamp(1.0F - borderFade, 0.0F, 1.0F);
 
-			Handle<IImage> alertIcon = renderer->RegisterImage("Gfx/AlertIcon.png");
+			Handle<IImage> alertIcon = renderer->RegisterImage("Gfx/IconAlert.png");
 
 			IFont& font = fontManager->GetGuiFont();
 			Vector2 textSize = font.Measure(alertContents);
@@ -1943,7 +1943,7 @@ namespace spades {
 			if (mode && mode->ModeType() == IGameMode::m_CTF) {
 				auto& ctf = static_cast<CTFGameMode&>(mode.value());
 				if (ctf.PlayerHasIntel(p)) {
-					Handle<IImage> img = renderer->RegisterImage("Gfx/Intel.png");
+					Handle<IImage> img = renderer->RegisterImage("Gfx/IconIntel.png");
 					Vector2 size = {img->GetWidth(), img->GetHeight()};
 					Vector2 pos = MakeVector2(((sw - size.x) * 0.5F) - 64.0F, y - size.y);
 

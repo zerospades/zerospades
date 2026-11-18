@@ -341,7 +341,7 @@ namespace spades {
 
 			// draw target
 			if (scopeType == 2) { // draw dot png scope
-				Handle<client::IImage> dotSightImage = r.RegisterImage("Gfx/DotSight.tga");
+				Handle<client::IImage> dotSightImage = r.RegisterImage("Gfx/SightDot.tga");
 				Vector2 imgSize =
 				    MakeVector2(dotSightImage->GetWidth(), dotSightImage->GetHeight());
 				SetColorNP(r, color);

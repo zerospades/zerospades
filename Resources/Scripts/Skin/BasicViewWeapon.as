@@ -278,8 +278,8 @@ namespace spades {
 			@charmBaseModel = renderer.RegisterModel("Models/Weapons/Charms/CharmBase.kv6");
 			@scopeImage = renderer.RegisterImage("Gfx/Rifle.png");
 			@sightImage = renderer.RegisterImage("Gfx/Sight.tga");
-			@dotSightImage = renderer.RegisterImage("Gfx/DotSight.tga");
-			@reflexImage = renderer.RegisterImage("Gfx/ReflexSight.png");
+			@dotSightImage = renderer.RegisterImage("Gfx/SightDot.tga");
+			@reflexImage = renderer.RegisterImage("Gfx/SightReflex.png");
 			@ballImage = renderer.RegisterImage("Gfx/Ball.png");
 
 			time = -1.0F;
