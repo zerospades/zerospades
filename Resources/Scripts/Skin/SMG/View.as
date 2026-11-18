@@ -222,7 +222,20 @@ namespace spades {
 		}
 
 		void Update(float dt) {
+			bool isSprinting = sprintState >= 1 or sprintState > lastSprintState;
+			bool isRaised = raiseState >= 1 or raiseState > lastRaiseState;
+			sprintSpring.desired = isSprinting ? 1 : 0;
+			raiseSpring.desired = isRaised ? 0 : 1;
+			charmSprintSpring.desired = isSprinting ? 1 : 0;
+			charmRaiseSpring.desired = isRaised ? 0 : 1;
+			lastSprintState = sprintState;
+			lastRaiseState = raiseState;
+			
+			// update base script
 			BasicViewWeapon::Update(dt);
+
+			sprintSpring.Update(dt);
+			raiseSpring.Update(dt);
 
 			reloadPitchSpring.Update(dt);
 			reloadRollSpring.Update(dt);
@@ -240,20 +253,6 @@ namespace spades {
 			verticalSwingSpring.velocity += swing.z * 60 * dt * 2;
 			horizontalSwingSpring.Update(dt);
 			verticalSwingSpring.Update(dt);
-
-			sprintSpring.Update(dt);
-			raiseSpring.Update(dt);
-
-			bool isSprinting = sprintState >= 1 or sprintState > lastSprintState;
-			bool isRaised = raiseState >= 1 or raiseState > lastRaiseState;
-
-			sprintSpring.desired = isSprinting ? 1 : 0;
-			raiseSpring.desired = isRaised ? 0 : 1;
-			charmSprintSpring.desired = isSprinting ? 1 : 0;
-			charmRaiseSpring.desired = isRaised ? 0 : 1;
-
-			lastSprintState = sprintState;
-			lastRaiseState = raiseState;
 		}
 
 		void WeaponFired() {

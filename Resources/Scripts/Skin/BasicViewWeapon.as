@@ -373,6 +373,7 @@ namespace spades {
 		void Update(float dt) {
 			if (time < 0.0F)
 				time = 0.0F;
+			time += Min(dt, 0.05F);
 
 			if (localFireVibration > 0.0F) {
 				localFireVibration -= dt * 10.0F;
@@ -393,8 +394,6 @@ namespace spades {
 			charmVerticalSwingSpring.Update(dt);
 			charmSprintSpring.Update(dt);
 			charmRaiseSpring.Update(dt);
-
-			time += Min(dt, 0.05F);
 		}
 
 		void WeaponFired() {
