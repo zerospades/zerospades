@@ -18,81 +18,57 @@
 
  */
 
- namespace spades {
-	class ViewSpadeSkin : IToolSkin, IViewToolSkin, ISpadeSkin {
-		private float sprintState;
-		private float raiseState;
-		private Vector3 teamColor;
-		private Matrix4 eyeMatrix;
-		private Vector3 swing;
-		private Vector3 leftHand;
-		private Vector3 rightHand;
+namespace spades {
+	class ViewSpadeSkin : BasicViewTool, ISpadeSkin {
 		private SpadeActionType actionType;
 		private float actionProgress;
-		private float sprintStateSmooth;
 
-		float SprintState { set { sprintState = value; } }
-		float RaiseState { set { raiseState = value; } }
-		Vector3 TeamColor { set { teamColor = value; } }
-		bool IsMuted { set {} } // nothing to do
-		Matrix4 EyeMatrix { set { eyeMatrix = value; } }
-		Vector3 Swing { set { swing = value; } }
-		Vector3 LeftHandPosition { get { return leftHand; } }
-		Vector3 RightHandPosition { get { return rightHand; } }
 		SpadeActionType ActionType { set { actionType = value; } }
 		float ActionProgress { set { actionProgress = value; } }
 
-		private Renderer@ renderer;
-		private AudioDevice@ audioDevice;
 		private Model@ spadeModel;
 		private Model@ pickaxeModel;
 		private Model@ model;
-		private Image@ sightImage;
 
-		protected ConfigItem cg_viewWeaponX("cg_viewWeaponX");
-		protected ConfigItem cg_viewWeaponY("cg_viewWeaponY");
-		protected ConfigItem cg_viewWeaponZ("cg_viewWeaponZ");
-		protected ConfigItem cg_viewWeaponSide("cg_viewWeaponSide");
+		// The keyframed action poses are fed through springs (the rifle does the
+		// same with its reload springs). Raise the frequency to reduce the lag,
+		// lower the damping for more bounce.
+		private ViewWeaponSpring bashSpring = ViewWeaponSpring(600, 26);
+		private ViewWeaponSpring digSpring = ViewWeaponSpring(600, 26);
+		private ViewWeaponSpring digSideSpring = ViewWeaponSpring(600, 26);
+
+		private bool wasBashing = false;
+		private float lastActionProgress = 0.0F;
 
 		ViewSpadeSkin(Renderer@ r, AudioDevice@ dev) {
-			@renderer = r;
-			@audioDevice = dev;
-			@spadeModel	= renderer.RegisterModel("Models/Weapons/Spade/Spade.kv6");
+			super(r, dev);
+
+			@spadeModel = renderer.RegisterModel("Models/Weapons/Spade/Spade.kv6");
 			@pickaxeModel = renderer.RegisterModel("Models/Weapons/Spade/Pickaxe.kv6");
 			@model = @spadeModel;
-			@sightImage = renderer.RegisterImage("Gfx/Sight.tga");
 		}
 
 		void Update(float dt) {
-			float sprintStateSS = sprintState * sprintState;
-			if (sprintStateSS > sprintStateSmooth)
-				sprintStateSmooth = Mix(sprintStateSmooth, sprintStateSS, 1.0F - pow(0.001F, dt));
-			else
-				sprintStateSmooth = sprintStateSS;
-		}
+			float bashTarget = 0.0F;
+			float digTarget = 0.0F;
+			float digSideTarget = 0.0F;
 
-		void AddToScene() {
-			Matrix4 mat = CreateScaleMatrix(0.033F);
-
-			float weapSide = Clamp(cg_viewWeaponSide.FloatValue, -1.0F, 1.0F);
-			bool leftHanded = weapSide < 0.0F;
-
-			if (sprintStateSmooth > 0.0F or raiseState < 1.0F) {
-				float per = Max(sprintStateSmooth, 1.0F - raiseState);
-				mat = CreateRotateMatrix(Vector3(0.0F, 1.0F, 0.0F), per * 1.3F) * mat;
-				mat = CreateTranslateMatrix(Vector3(0.3F, -0.4F, -0.1F) * per) * mat;
-			}
-			mat = CreateTranslateMatrix(0.0F, (1.0F - raiseState) * -0.3F, 0.0F) * mat;
-
-			if (actionType == spades::SpadeActionType::Bash) {
+			bool bashing = actionType == spades::SpadeActionType::Bash;
+			if (bashing) {
 				@model = @pickaxeModel;
+				bashTarget = SmoothStep(1.0F - actionProgress);
 
-				float per = SmoothStep(1.0F - actionProgress);
-				mat = CreateRotateMatrix(Vector3(1, 0, 0), per * 1.7F) * mat;
-				mat = CreateTranslateMatrix(per * 0.2F, per * 0.3F, 0.0F) * mat;
-			} else if (actionType == spades::SpadeActionType::DigStart or actionType == spades::SpadeActionType::Dig) {
+				// The hit happens when the cooldown restarts: either the action just
+				// switched to Bash or the progress dropped back to the start of a new
+				// cycle. Snap the spring to the impact pose so the hit is not delayed
+				// by the spring, then let it follow the recovery.
+				if (not wasBashing or actionProgress < lastActionProgress) {
+					bashSpring.position = bashTarget;
+					bashSpring.velocity = 0;
+				}
+			} else if (actionType == spades::SpadeActionType::DigStart
+				or actionType == spades::SpadeActionType::Dig) {
 				@model = @spadeModel;
-
 				float f = SmoothStep(1.0F - actionProgress);
 				float f2;
 				if (f >= 0.6F) {
@@ -108,28 +84,57 @@
 					f2 = f * 3.0F;
 					f *= 4.0F;
 				}
-
-				mat = CreateTranslateMatrix(Vector3(f2, f * -0.2F, -f2 * 0.25F)) * mat;
-				mat = CreateRotateMatrix(Vector3(1, 0, 0), f / 0.32F) * mat;
-				mat = CreateRotateMatrix(Vector3(0, 1, 0), -f) * mat;
+				digTarget = f;
+				digSideTarget = f2;
 			}
+			bashSpring.desired = bashTarget;
+			digSpring.desired = digTarget;
+			digSideSpring.desired = digSideTarget;
+			wasBashing = bashing;
+			lastActionProgress = actionProgress;
+			
+			// update base script
+			BasicViewTool::Update(dt);
+			
+			bashSpring.Update(dt);
+			digSpring.Update(dt);
+			digSideSpring.Update(dt);
+		}
 
-			// add weapon offset
-			Vector3 trans(0.0F, 0.0F, 0.0F);
-			trans += Vector3(-0.3F, 0.7F, 0.3F);
+		void AddToScene() {
+			Matrix4 mat = CreateScaleMatrix(0.033F);
 
-			// manual adjustment
-			trans.x += cg_viewWeaponX.FloatValue;
-			trans.y += cg_viewWeaponY.FloatValue;
-			trans.z += cg_viewWeaponZ.FloatValue;
-			trans.x *= abs(weapSide);
+			float weapSide = GetWeaponSide();
+			bool leftHanded = weapSide < 0.0F;
 
-			// add weapon sway
-			trans += swing;
+			// sprint and raise animation
+			float sprint = sprintSpring.position;
+			float putdown = raiseSpring.position;
+			float per = sprint + putdown - sprint * putdown;
+			mat = CreateRotateMatrix(Vector3(0.0F, 1.0F, 0.0F), per * 1.3F) * mat;
+			mat = CreateTranslateMatrix(Vector3(0.3F, -0.4F, -0.1F) * per) * mat;
+			mat = CreateTranslateMatrix(0.0F, putdown * -0.3F, 0.0F) * mat;
 
+			// bash animation
+			float bash = bashSpring.position;
+			mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), bash * 1.7F) * mat;
+			mat = CreateTranslateMatrix(bash * 0.2F, bash * 0.3F, 0.0F) * mat;
+
+			// dig animation
+			float f = digSpring.position;
+			float f2 = digSideSpring.position;
+			mat = CreateTranslateMatrix(Vector3(f2, f * -0.2F, -f2 * 0.25F)) * mat;
+			mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), f / 0.32F) * mat;
+			mat = CreateRotateMatrix(Vector3(0.0F, 1.0F, 0.0F), -f) * mat;
+
+			// weapon offset, manual adjustment and sway
+			Vector3 trans = GetViewOffset(Vector3(-0.3F, 0.7F, 0.3F));
 			mat = CreateTranslateMatrix(trans) * mat;
 
-			// mirror geometry when left-handed
+			// twist the tool when strafing
+			mat = ApplySwingTwist(mat);
+
+			// apply handedness
 			if (leftHanded)
 				mat = CreateScaleMatrix(Vector3(-1.0F, 1.0F, 1.0F)) * mat;
 
@@ -141,13 +146,6 @@
 			param.depthHack = true;
 			param.matrix = eyeMatrix * mat;
 			renderer.AddModel(model, param);
-		}
-
-		void Draw2D() {
-			renderer.ColorNP = Vector4(1.0F, 1.0F, 1.0F, 1.0F);
-			renderer.DrawImage(sightImage,
-				Vector2((renderer.ScreenWidth - sightImage.Width) * 0.5F,
-						(renderer.ScreenHeight - sightImage.Height) * 0.5F));
 		}
 	}
 

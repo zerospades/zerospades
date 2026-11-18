@@ -18,89 +18,77 @@
 
  */
 
- namespace spades {
-	class ViewBlockSkin : IToolSkin, IViewToolSkin, IBlockSkin {
-		private float sprintState;
-		private float raiseState;
-		private Vector3 teamColor;
-		private Matrix4 eyeMatrix;
-		private Vector3 swing;
-		private Vector3 leftHand;
-		private Vector3 rightHand;
+namespace spades {
+	class ViewBlockSkin : BasicViewTool, IBlockSkin {
 		private Vector3 blockColor;
 		private float readyState;
-		private float sprintStateSmooth;
+		private float lastReadyState = 0.0F;
+		private bool hasLastReadyState = false;
 
-		float SprintState { set { sprintState = value; } }
-		float RaiseState { set { raiseState = value; } }
-		Vector3 TeamColor { set { teamColor = value; } }
-		bool IsMuted { set {} } // nothing to do
-		Matrix4 EyeMatrix { set { eyeMatrix = value; } }
-		Vector3 Swing { set { swing = value; } }
-		Vector3 LeftHandPosition { get { return leftHand; } }
-		Vector3 RightHandPosition { get { return rightHand; } }
 		Vector3 BlockColor { set { blockColor = value; } }
 		float ReadyState { set { readyState = value; } }
 
-		private Renderer@ renderer;
-		private AudioDevice@ audioDevice;
 		private Model@ model;
-		private Image@ sightImage;
 
-		protected ConfigItem cg_viewWeaponX("cg_viewWeaponX");
-		protected ConfigItem cg_viewWeaponY("cg_viewWeaponY");
-		protected ConfigItem cg_viewWeaponZ("cg_viewWeaponZ");
-		protected ConfigItem cg_viewWeaponSide("cg_viewWeaponSide");
+		// Kicked when a block is placed, gives a small rebound on top of the
+		// keyframed animation (like the recoil springs of the weapons).
+		private ViewWeaponSpring placeSpring = ViewWeaponSpring(150, 12);
 
 		ViewBlockSkin(Renderer@ r, AudioDevice@ dev) {
-			@renderer = r;
-			@audioDevice = dev;
+			super(r, dev);
+
 			@model = renderer.RegisterModel("Models/Weapons/Block/Block.kv6");
-			@sightImage = renderer.RegisterImage("Gfx/Sight.tga");
 		}
 
 		void Update(float dt) {
-			float sprintStateSS = sprintState * sprintState;
-			if (sprintStateSS > sprintStateSmooth)
-				sprintStateSmooth = Mix(sprintStateSmooth, sprintStateSS, 1.0F - pow(0.001F, dt));
-			else
-				sprintStateSmooth = sprintStateSS;
+			// update base script
+			BasicViewTool::Update(dt);
+
+			placeSpring.Update(dt);
+
+			// The first update runs before the game has set readyState, so there is
+			// nothing to compare against yet. A sudden drop of readyState afterwards
+			// means a block was placed.
+			if (hasLastReadyState and readyState < lastReadyState - 0.3F)
+				placeSpring.velocity += 15.0;
+			lastReadyState = readyState;
+			hasLastReadyState = true;
 		}
 
 		void AddToScene() {
 			Matrix4 mat = CreateScaleMatrix(0.033F);
 
-			float weapSide = Clamp(cg_viewWeaponSide.FloatValue, -1.0F, 1.0F);
+			float weapSide = GetWeaponSide();
 			bool leftHanded = weapSide < 0.0F;
 
-			if (sprintStateSmooth > 0.0F) {
-				mat = CreateRotateMatrix(Vector3(0.0F, 0.0F, 1.0F), sprintStateSmooth * -0.3F) * mat;
-				mat = CreateTranslateMatrix(Vector3(0.1F, -0.4F, -0.05F) * sprintStateSmooth) * mat;
-			}
-			mat = CreateTranslateMatrix(Vector3(-0.1F, -0.3F, 0.2F) * (1.0F - raiseState)) * mat;
+			// sprint animation
+			float sprint = sprintSpring.position;
+			mat = CreateRotateMatrix(Vector3(0.0F, 0.0F, 1.0F), sprint * -0.3F) * mat;
+			mat = CreateTranslateMatrix(Vector3(0.1F, -0.4F, -0.05F) * sprint) * mat;
 
+			// raise animation
+			mat = CreateTranslateMatrix(Vector3(-0.1F, -0.3F, 0.2F) * raiseSpring.position) * mat;
+
+			// placement animation
 			if (readyState < 0.99F) {
 				float per = 1.0F - readyState;
 				mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), per * 0.8F) * mat;
 				mat = CreateTranslateMatrix(Vector3(0.0F, 0.1F, 0.2F) * per) * mat;
 			}
 
-			// add weapon offset
-			Vector3 trans(0.0F, 0.0F, 0.0F);
-			trans += Vector3(-0.3F, 0.7F, 0.3F);
+			// placement rebound
+			float place = placeSpring.position * 5;
+			mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), place * 0.25F) * mat;
+			mat = CreateTranslateMatrix(Vector3(0.0F, 0.05F, 0.1F) * place) * mat;
 
-			// manual adjustment
-			trans.x += cg_viewWeaponX.FloatValue;
-			trans.y += cg_viewWeaponY.FloatValue;
-			trans.z += cg_viewWeaponZ.FloatValue;
-			trans.x *= abs(weapSide);
-
-			// add weapon sway
-			trans += swing;
-
+			// weapon offset, manual adjustment and sway
+			Vector3 trans = GetViewOffset(Vector3(-0.3F, 0.7F, 0.3F));
 			mat = CreateTranslateMatrix(trans) * mat;
 
-			// mirror geometry when left-handed
+			// twist the tool when strafing
+			mat = ApplySwingTwist(mat);
+
+			// apply handedness
 			if (leftHanded)
 				mat = CreateScaleMatrix(Vector3(-1.0F, 1.0F, 1.0F)) * mat;
 
@@ -113,13 +101,6 @@
 			param.customColor = blockColor;
 			param.matrix = eyeMatrix * mat;
 			renderer.AddModel(model, param);
-		}
-
-		void Draw2D() {
-			renderer.ColorNP = Vector4(1.0F, 1.0F, 1.0F, 1.0F);
-			renderer.DrawImage(sightImage,
-				Vector2((renderer.ScreenWidth - sightImage.Width) * 0.5F,
-						(renderer.ScreenHeight - sightImage.Height) * 0.5F));
 		}
 	}
 

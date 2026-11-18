@@ -19,6 +19,7 @@
  */
  
 #include "BasicViewWeapon.as"
+#include "BasicViewTool.as"
 #include "Spade/ThirdPerson.as"
 #include "Spade/View.as"
 #include "Block/ThirdPerson.as"
@@ -30,4 +31,4 @@
 #include "SMG/ThirdPerson.as"
 #include "SMG/View.as"
 #include "Shotgun/ThirdPerson.as"
-#include "Shotgun/View.as"
+#include "Shotgun/View.as"
