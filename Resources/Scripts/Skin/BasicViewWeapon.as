@@ -457,7 +457,8 @@ namespace spades {
 
 			TargetParam param;
 			int targetType = cg_target.IntValue;
-			int scopeType = cg_pngScope.IntValue;
+			// unknown scope types behave like the highest supported one
+			int scopeType = Clamp(cg_pngScope.IntValue, 0, 3);
 
 			Vector4 color = Vector4(1, 1, 1, 1);
 
