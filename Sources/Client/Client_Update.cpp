@@ -37,6 +37,7 @@
 #include "ClientUI.h"
 #include "Corpse.h"
 #include "FallingBlock.h"
+#include "HeadBurstEntity.h"
 #include "HurtRingView.h"
 #include "ILocalEntity.h"
 #include "MapView.h"
@@ -52,6 +53,7 @@
 #include "NetClient.h"
 
 DEFINE_SPADES_SETTING(cg_ragdoll, "1");
+SPADES_SETTING(cg_headshotGore);
 SPADES_SETTING(cg_blood);
 DEFINE_SPADES_SETTING(cg_ejectBrass, "1");
 DEFINE_SPADES_SETTING(cg_hitFeedbackSoundGain, "0.2");
@@ -79,6 +81,12 @@ SPADES_SETTING(cg_killfeedFadeTime);
 
 namespace spades {
 	namespace client {
+
+		void Client::SpatterBlood(const Vector3& pos, const Vector3& vel) {
+			// thin public wrapper for HeadBurstEntity: bloodMarks is private
+			if (bloodMarks)
+				bloodMarks->Spatter(pos, vel, false);
+		}
 
 #pragma mark - World States
 
@@ -1218,11 +1226,14 @@ namespace spades {
 				}
 
 				// play death sound
-				Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
-				AudioParam param;
-				param.volume = cg_deathSoundGain;
-				param.pitch = victim.IsZombie() ? 0.5F : 1.0F;
-				audioDevice->PlayLocal(c.GetPointerOrNull(), param);
+				// headshot gore: the skull burst sound plays instead
+				if (!(kt == KillTypeHeadshot && cg_headshotGore)) {
+					Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
+					AudioParam param;
+					param.volume = cg_deathSoundGain;
+					param.pitch = victim.IsZombie() ? 0.5F : 1.0F;
+					audioDevice->PlayLocal(c.GetPointerOrNull(), param);
+				}
 
 				// reset hit counter
 				if (kt == KillTypeClassChange)
@@ -1249,7 +1260,8 @@ namespace spades {
 				}
 
 				// play death sound for non local player
-				if (!IsMuted()) {
+				// headshot gore: the skull burst sound plays instead
+				if (!IsMuted() && !(kt == KillTypeHeadshot && cg_headshotGore)) {
 					Handle<IAudioChunk> c = audioDevice->RegisterSound("Sounds/Player/Death.opus");
 
 					AudioParam param;
@@ -1427,9 +1439,25 @@ namespace spades {
 				default: break;
 			}
 
+			// headshot gore: burst the skull into flying chunks
+			if (kt == KillTypeHeadshot && cg_headshotGore) {
+				Vector3 dir;
+				if (killerId != victimId) {
+					dir = (victim.GetPosition() - killer.GetPosition()).Normalize();
+				} else {
+					// suicide: straight-up geyser (the z axis points down)
+					dir = MakeVector3(0, 0, -1);
+				}
+				AddLocalEntity(stmp::make_unique<HeadBurstEntity>(*this, victim.GetEye(), dir));
+			}
+
 			// create ragdoll corpse
 			if (cg_ragdoll) {
 				auto corp = stmp::make_unique<Corpse>(*renderer, *map, victim, isChristmasOn);
+
+				// skull burst: hide the ragdoll's head
+				if (kt == KillTypeHeadshot && cg_headshotGore)
+					corp->SetHeadless();
 
 				if (kt == KillTypeGrenade) {
 					corp->AddImpulse(MakeVector3(0, 0, -4.0F - SampleRandomFloat() * 4.0F));

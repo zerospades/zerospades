@@ -551,8 +551,8 @@ namespace spades {
 				renderer.RenderModel(*model, param);
 			}
 
-			// Head
-			{
+			// Head (hidden when the skull burst, headshot gore effect)
+			if (!headless) {
 				model = isChristmasOn
 					? renderer.RegisterModel("Models/Player/XmasHat.kv6")
 					: renderer.RegisterModel((modelPath + "Head.kv6").c_str());
