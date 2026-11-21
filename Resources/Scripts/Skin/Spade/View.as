@@ -23,7 +23,18 @@ namespace spades {
 		private SpadeActionType actionType;
 		private float actionProgress;
 
-		SpadeActionType ActionType { set { actionType = value; } }
+		private bool bashing;
+		private bool digging;
+
+		SpadeActionType ActionType {
+			set {
+				bashing = value == spades::SpadeActionType::Bash;
+				digging = value == spades::SpadeActionType::DigStart
+						or value == spades::SpadeActionType::Dig;
+				actionType = value;
+			}
+		}
+
 		float ActionProgress { set { actionProgress = value; } }
 
 		private Model@ spadeModel;
@@ -53,10 +64,12 @@ namespace spades {
 			float digTarget = 0.0F;
 			float digSideTarget = 0.0F;
 
-			bool bashing = actionType == spades::SpadeActionType::Bash;
+			// goes from 0 (start of the swing) to 1 (end of the cooldown)
+			float t = 1.0F - actionProgress;
+
 			if (bashing) {
 				@model = @pickaxeModel;
-				bashTarget = SmoothStep(1.0F - actionProgress);
+				bashTarget = SmoothStep(t);
 
 				// The hit happens when the cooldown restarts: either the action just
 				// switched to Bash or the progress dropped back to the start of a new
@@ -66,24 +79,32 @@ namespace spades {
 					bashSpring.position = bashTarget;
 					bashSpring.velocity = 0;
 				}
-			} else if (actionType == spades::SpadeActionType::DigStart
-				or actionType == spades::SpadeActionType::Dig) {
+			} else if (digging) {
 				@model = @spadeModel;
-				float f = SmoothStep(1.0F - actionProgress);
+
+				float f;
 				float f2;
-				if (f >= 0.6F) {
-					f2 = 0.0F;
-					f = 1.0F - f;
-				} else if (f >= 0.3F) {
-					f2 = 0.6F - f;
-					f = 0.4F;
-				} else if (f >= 0.1F) {
-					f2 = 0.3F;
-					f = 0.4F;
+				if (t < 0.15F) {
+					// wind-up: pull the spade back
+					float w = Ramp(t, 0.0F, 0.15F);
+					f = 0.5F * w;
+					f2 = 0.45F * w;
+				} else if (t < 0.3F) {
+					// short hold at the top, builds anticipation
+					f = 0.5F;
+					f2 = 0.45F;
+				} else if (t < 0.5F) {
+					// strike: accelerates into the hit and overshoots a bit
+					float s = EaseInQuad(Ramp(t, 0.3F, 0.5F));
+					f = Mix(0.5F, 0.6F, s);
+					f2 = Mix(0.45F, -0.1F, s);
 				} else {
-					f2 = f * 3.0F;
-					f *= 4.0F;
+					// recovery
+					float r = SmoothStep(Ramp(t, 0.5F, 1.0F));
+					f = Mix(0.6F, 0.0F, r);
+					f2 = Mix(-0.1F, 0.0F, r);
 				}
+
 				digTarget = f;
 				digSideTarget = f2;
 			}
@@ -92,10 +113,10 @@ namespace spades {
 			digSideSpring.desired = digSideTarget;
 			wasBashing = bashing;
 			lastActionProgress = actionProgress;
-			
+
 			// update base script
 			BasicViewTool::Update(dt);
-			
+
 			bashSpring.Update(dt);
 			digSpring.Update(dt);
 			digSideSpring.Update(dt);
