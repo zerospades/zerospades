@@ -61,20 +61,12 @@ namespace spades {
 		private ViewWeaponSpring recoilVerticalSpring = ViewWeaponSpring(300, 24);
 		private ViewWeaponSpring recoilBackSpring = ViewWeaponSpring(300, 16);
 		private ViewWeaponSpring recoilRotationSpring = ViewWeaponSpring(50, 8);
-		private ViewWeaponSpring horizontalSwingSpring = ViewWeaponSpring(100, 12);
-		private ViewWeaponSpring verticalSwingSpring = ViewWeaponSpring(100, 12);
-		private ViewWeaponSpring sprintSpring = ViewWeaponSpring(100, 10);
-		private ViewWeaponSpring raiseSpring = ViewWeaponSpring(200, 20, 1);
 
 		// A bunch of events.
 		private ViewWeaponEvent magazineTouched = ViewWeaponEvent();
 		private ViewWeaponEvent magazineRemoved = ViewWeaponEvent();
 		private ViewWeaponEvent magazineInserted = ViewWeaponEvent();
 		private ViewWeaponEvent chargingHandlePulled = ViewWeaponEvent();
-
-		// A bunch of states.
-		private double lastSprintState = 0;
-		private double lastRaiseState = 0;
 
 		Matrix4 AdjustToReload(Matrix4 mat) {
 			if (reloadProgress < 0.6) {
@@ -179,7 +171,7 @@ namespace spades {
 			Vector3 rightHandOffset = Vector3(0.0F, -8.0F, 2.0F);
 
 			// sprint animation
-			rightHandOffset -= Vector3(0.0F, 3.0F, 0.5F) * sprintSpring.position;
+			rightHandOffset -= Vector3(0.0F, 3.0F, 0.5F) * baseSprintSpring.position;
 
 			return rightHandOffset;
 		}
@@ -217,25 +209,13 @@ namespace spades {
 			@scopeImage = renderer.RegisterImage("Gfx/SMG.png");
 
 			// initial raise spring
-			raiseSpring.position = 1;
+			baseRaiseSpring.position = 1;
 			charmRaiseSpring.position = 1;
 		}
 
 		void Update(float dt) {
-			bool isSprinting = sprintState >= 1 or sprintState > lastSprintState;
-			bool isRaised = raiseState >= 1 or raiseState > lastRaiseState;
-			sprintSpring.desired = isSprinting ? 1 : 0;
-			raiseSpring.desired = isRaised ? 0 : 1;
-			charmSprintSpring.desired = isSprinting ? 1 : 0;
-			charmRaiseSpring.desired = isRaised ? 0 : 1;
-			lastSprintState = sprintState;
-			lastRaiseState = raiseState;
-			
 			// update base script
 			BasicViewWeapon::Update(dt);
-
-			sprintSpring.Update(dt);
-			raiseSpring.Update(dt);
 
 			reloadPitchSpring.Update(dt);
 			reloadRollSpring.Update(dt);
@@ -248,11 +228,6 @@ namespace spades {
 			recoilVerticalSpring.Update(dt);
 			recoilBackSpring.Update(dt);
 			recoilRotationSpring.Update(dt);
-
-			horizontalSwingSpring.velocity += swing.x * 60 * dt * 2;
-			verticalSwingSpring.velocity += swing.z * 60 * dt * 2;
-			horizontalSwingSpring.Update(dt);
-			verticalSwingSpring.Update(dt);
 		}
 
 		void WeaponFired() {
@@ -312,20 +287,20 @@ namespace spades {
 			float sp = 1.0F - AimDownSightStateSmooth;
 
 			// sprint animation
-			mat = CreateEulerAnglesMatrix(Vector3(0.3F, -0.1F, -0.55F) * sprintSpring.position * sp) * mat;
-			mat = CreateTranslateMatrix(Vector3(0.23F, -0.05F, 0.15F) * sprintSpring.position * sp) * mat;
+			mat = CreateEulerAnglesMatrix(Vector3(0.3F, -0.1F, -0.55F) * baseSprintSpring.position * sp) * mat;
+			mat = CreateTranslateMatrix(Vector3(0.23F, -0.05F, 0.15F) * baseSprintSpring.position * sp) * mat;
 
 			// raise gun animation
-			mat = CreateRotateMatrix(Vector3(0, 0, -1), 1.3F * raiseSpring.position * sp) * mat;
-			mat = CreateRotateMatrix(Vector3(0, 1, 0), 0.2F * raiseSpring.position * sp) * mat;
-			mat = CreateTranslateMatrix(Vector3(0.1F, -0.3F, 0.1F) * raiseSpring.position * sp) * mat;
+			mat = CreateRotateMatrix(Vector3(0, 0, -1), 1.3F * baseRaiseSpring.position * sp) * mat;
+			mat = CreateRotateMatrix(Vector3(0, 1, 0), 0.2F * baseRaiseSpring.position * sp) * mat;
+			mat = CreateTranslateMatrix(Vector3(0.1F, -0.3F, 0.1F) * baseRaiseSpring.position * sp) * mat;
 
 			// recoil animation
 			Vector3 recoilRot(0.0F, 0.0F, 0.0F);
 			recoilRot.x = -1.0F * recoilVerticalSpring.position;
 			recoilRot.y = 0.2F * recoilRotationSpring.position;
 			recoilRot.z = 0.2F * recoilRotationSpring.position;
-			Vector3 recoilOffset = Vector3(0.0F, 0.0F, 0.0F);
+			Vector3 recoilOffset(0.0F, 0.0F, 0.0F);
 			recoilOffset.y -= Mix(0.5F, 0.25F, sp) * recoilBackSpring.position;
 			recoilOffset.z -= 0.1F * recoilVerticalSpring.position * sp;
 			mat = CreateEulerAnglesMatrix(recoilRot * sp) * mat;
@@ -356,11 +331,8 @@ namespace spades {
 
 			mat = CreateTranslateMatrix(trans) * mat;
 
-			// twist the gun when strafing
-			Vector3 swingRot(0.0F, 0.0F, 0.0F);
-			swingRot.z += 2.0F * horizontalSwingSpring.position;
-			swingRot.x -= 2.0F * verticalSwingSpring.position;
-			mat = mat * CreateEulerAnglesMatrix(swingRot * sp);
+			// twist the gun when strafing (unless aiming)
+			mat = mat * GetSwingTiltMatrix(2.0F * sp);
 
 			if ((cg_trueAimDownSight.BoolValue and not cg_pngScope.BoolValue) and AimDownSightStateSmooth > 0.0F)
 				mat = AdjustToAlignSight(mat, sightPos, AimDownSightStateSmooth);
@@ -444,38 +416,9 @@ namespace spades {
 
 			// draw charms
 			if (cg_weaponCharms.BoolValue) {
-				Vector3 charmRot(0.0F, 0.0F, 0.0F);
-
-				// add sway spring
-				charmRot.x -= 50.0F * charmVerticalSwingSpring.position;	// pitch
-				charmRot.y += 30.0F * charmHorizontalSwingSpring.position;	// yaw
-				charmRot.z += 20.0F * charmHorizontalSwingSpring.position;	// roll
-
-				// add sprint/raise spring
-				charmRot += Vector3(-0.5F, -0.2F, -0.2F) * charmSprintSpring.position;
-				charmRot += Vector3(0.7F, 0.5F, 0.1F) * charmRaiseSpring.position;
-
-				// tilt backward/forward based on camera pitch
-				Vector3 front = eyeMatrix.GetAxis(1);
-				charmRot.x -= asin(front.z) * 0.85F;
-
-				// avoid clipping into the weapon
-				charmRot.y = abs(charmRot.y);
-
-				// rainbow color
 				param.customColor = HSV(time * 0.05F, 0.5F, 1.0F);
-
-				// draw base
-				param.matrix = weapMatrix
-					* CreateTranslateMatrix(1.95F, -2.5F, -1.8F)
-					* CreateScaleMatrix(0.1F);
-				renderer.AddModel(charmBaseModel, param);
-
-				param.matrix = param.matrix
-					* CreateTranslateMatrix(-0.75F, -1.0F, 1.25F)
-					* CreateEulerAnglesMatrix(charmRot)
-					* CreateEulerAnglesMatrix(Vector3(rad(90.0F), 0, rad(-90.0F)));
-				renderer.AddModel(charmModel, param);
+				Vector3 charmBaseOffset = Vector3(1.95F, -2.5F, -1.8F);
+				DrawCharms(weapMatrix, charmBaseOffset, param);
 			}
 
 			// draw reflex sight (3D sprite)

@@ -62,12 +62,12 @@ namespace spades {
 			bool leftHanded = weapSide < 0.0F;
 
 			// sprint animation
-			float sprint = sprintSpring.position;
+			float sprint = baseSprintSpring.position;
 			mat = CreateRotateMatrix(Vector3(0.0F, 0.0F, 1.0F), sprint * -0.3F) * mat;
 			mat = CreateTranslateMatrix(Vector3(0.1F, -0.4F, -0.05F) * sprint) * mat;
 
 			// raise animation
-			mat = CreateTranslateMatrix(Vector3(-0.1F, -0.3F, 0.2F) * raiseSpring.position) * mat;
+			mat = CreateTranslateMatrix(Vector3(-0.1F, -0.3F, 0.2F) * baseRaiseSpring.position) * mat;
 
 			// placement animation
 			if (readyState < 0.99F) {
@@ -85,8 +85,8 @@ namespace spades {
 			Vector3 trans = GetViewOffset(Vector3(-0.3F, 0.7F, 0.3F));
 			mat = CreateTranslateMatrix(trans) * mat;
 
-			// twist the tool when strafing
-			mat = ApplySwingTwist(mat);
+			// twist when strafing
+			mat = mat * GetSwingTiltMatrix();
 
 			// apply handedness
 			if (leftHanded)

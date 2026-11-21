@@ -28,13 +28,23 @@ namespace spades {
 		protected Vector3 teamColor;
 		protected bool muted;
 
+		protected bool sprinting;
+		protected bool raised;
+
 		float SprintState {
-			set { sprintState = value; }
+			set {
+				// true when fully reached or still increasing
+				sprinting = value >= 1.0F or value > sprintState;
+				sprintState = value;
+			}
 			get { return sprintState; }
 		}
 
 		float RaiseState {
-			set { raiseState = value; }
+			set {
+				raised = value >= 1.0F or value > raiseState;
+				raiseState = value;
+			}
 			get { return raiseState; }
 		}
 
@@ -72,13 +82,10 @@ namespace spades {
 		protected Image@ sightImage;
 
 		// Springs
-		protected ViewWeaponSpring horizontalSwingSpring = ViewWeaponSpring(100, 12);
-		protected ViewWeaponSpring verticalSwingSpring = ViewWeaponSpring(100, 12);
-		protected ViewWeaponSpring sprintSpring = ViewWeaponSpring(100, 10);
-		protected ViewWeaponSpring raiseSpring = ViewWeaponSpring(200, 20, 1);
-
-		private float lastSprintState = 0.0F;
-		private float lastRaiseState = 0.0F;
+		protected ViewWeaponSpring baseSprintSpring;
+		protected ViewWeaponSpring baseRaiseSpring;
+		protected ViewWeaponSpring baseHorizontalSwingSpring;
+		protected ViewWeaponSpring baseVerticalSwingSpring;
 
 		protected ConfigItem cg_viewWeaponX("cg_viewWeaponX");
 		protected ConfigItem cg_viewWeaponY("cg_viewWeaponY");
@@ -88,12 +95,18 @@ namespace spades {
 		BasicViewTool(Renderer@ r, AudioDevice@ dev) {
 			@renderer = r;
 			@audioDevice = dev;
+
 			@sightImage = renderer.RegisterImage("Gfx/Sight.tga");
+
+			baseSprintSpring = ViewWeaponSpring(100, 10);
+			baseRaiseSpring = ViewWeaponSpring(200, 20, 1);
+			baseHorizontalSwingSpring = ViewWeaponSpring(100, 12);
+			baseVerticalSwingSpring = ViewWeaponSpring(100, 12);
 
 			time = -1.0F;
 
 			// initial raise spring
-			raiseSpring.position = 1;
+			baseRaiseSpring.position = 1;
 		}
 
 		void Update(float dt) {
@@ -101,20 +114,15 @@ namespace spades {
 				time = 0.0F;
 			time += Min(dt, 0.05F);
 
-			bool isSprinting = sprintState >= 1 or sprintState > lastSprintState;
-			bool isRaised = raiseState >= 1 or raiseState > lastRaiseState;
-			sprintSpring.desired = isSprinting ? 1 : 0;
-			raiseSpring.desired = isRaised ? 0 : 1;
-			lastSprintState = sprintState;
-			lastRaiseState = raiseState;
+			baseSprintSpring.desired = sprinting ? 1 : 0;
+			baseRaiseSpring.desired = raised ? 0 : 1;
+			baseHorizontalSwingSpring.velocity += swing.x * 60 * dt * 2;
+			baseVerticalSwingSpring.velocity += swing.z * 60 * dt * 2;
 
-			horizontalSwingSpring.velocity += swing.x * 60 * dt * 2;
-			verticalSwingSpring.velocity += swing.z * 60 * dt * 2;
-			horizontalSwingSpring.Update(dt);
-			verticalSwingSpring.Update(dt);
-
-			sprintSpring.Update(dt);
-			raiseSpring.Update(dt);
+			baseSprintSpring.Update(dt);
+			baseRaiseSpring.Update(dt);
+			baseHorizontalSwingSpring.Update(dt);
+			baseVerticalSwingSpring.Update(dt);
 		}
 
 		void AddToScene() {}
@@ -139,12 +147,12 @@ namespace spades {
 			return trans;
 		}
 
-		// Twists the tool when strafing
-		Matrix4 ApplySwingTwist(Matrix4 mat) {
-			Vector3 swingRot(0.0F, 0.0F, 0.0F);
-			swingRot.z += 2.0F * horizontalSwingSpring.position;
-			swingRot.x -= 2.0F * verticalSwingSpring.position;
-			return mat * CreateEulerAnglesMatrix(swingRot);
+		// Rotation that tilts the tool when strafing or moving vertically. Pitch follows
+		// the vertical swing and roll follows the horizontal swing. Yaw is left untouched.
+		Matrix4 GetSwingTiltMatrix(float amount = 2.0F) {
+			float pitch = baseVerticalSwingSpring.position * amount;
+			float roll = baseHorizontalSwingSpring.position * amount;
+			return CreateEulerAnglesMatrix(Vector3(-pitch, 0.0F, roll));
 		}
 
 		void Draw2D() {

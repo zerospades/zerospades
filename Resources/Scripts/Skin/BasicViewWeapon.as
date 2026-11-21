@@ -85,13 +85,23 @@ namespace spades {
 		protected Vector3 teamColor;
 		protected bool muted;
 
+		protected bool sprinting;
+		protected bool raised;
+
 		float SprintState {
-			set { sprintState = value; }
+			set {
+				// true when fully reached or still increasing
+				sprinting = value >= 1.0F or value > sprintState;
+				sprintState = value;
+			}
 			get { return sprintState; }
 		}
 
 		float RaiseState {
-			set { raiseState = value; }
+			set {
+				raised = value >= 1.0F or value > raiseState;
+				raiseState = value;
+			}
 			get { return raiseState; }
 		}
 
@@ -201,10 +211,14 @@ namespace spades {
 		protected Image@ ballImage;
 
 		// Springs
-		protected ViewWeaponSpring charmHorizontalSwingSpring;
-		protected ViewWeaponSpring charmVerticalSwingSpring;
+		protected ViewWeaponSpring baseSprintSpring;
+		protected ViewWeaponSpring baseRaiseSpring;
+		protected ViewWeaponSpring baseHorizontalSwingSpring;
+		protected ViewWeaponSpring baseVerticalSwingSpring;
 		protected ViewWeaponSpring charmSprintSpring;
 		protected ViewWeaponSpring charmRaiseSpring;
+		protected ViewWeaponSpring charmHorizontalSwingSpring;
+		protected ViewWeaponSpring charmVerticalSwingSpring;
 
 		protected ConfigItem cg_fov("cg_fov");
 		protected ConfigItem cg_reflexScope("cg_reflexScope", "0");
@@ -272,23 +286,29 @@ namespace spades {
 		protected ConfigItem cg_scopeDynamic("cg_scopeDynamic");
 		protected ConfigItem cg_scopeDynamicSplitDist("cg_scopeDynamicSplitdist");
 
-		BasicViewWeapon(Renderer@ renderer) {
-			@this.renderer = renderer;
-			@charmModel = renderer.RegisterModel("Models/Weapons/Charms/Charm.kv6");
-			@charmBaseModel = renderer.RegisterModel("Models/Weapons/Charms/CharmBase.kv6");
-			@scopeImage = renderer.RegisterImage("Gfx/Rifle.png");
-			@sightImage = renderer.RegisterImage("Gfx/Sight.tga");
-			@dotSightImage = renderer.RegisterImage("Gfx/SightDot.tga");
-			@reflexImage = renderer.RegisterImage("Gfx/SightReflex.png");
-			@ballImage = renderer.RegisterImage("Gfx/Ball.png");
+		BasicViewWeapon(Renderer@ r) {
+			@renderer = r;
+			// @audioDevice = dev;
+
+			@charmModel = r.RegisterModel("Models/Weapons/Charms/Charm.kv6");
+			@charmBaseModel = r.RegisterModel("Models/Weapons/Charms/CharmBase.kv6");
+			@scopeImage = r.RegisterImage("Gfx/Rifle.png");
+			@sightImage = r.RegisterImage("Gfx/Sight.tga");
+			@dotSightImage = r.RegisterImage("Gfx/SightDot.tga");
+			@reflexImage = r.RegisterImage("Gfx/SightReflex.png");
+			@ballImage = r.RegisterImage("Gfx/Ball.png");
 
 			time = -1.0F;
 			localFireVibration = 0.0F;
 
-			charmHorizontalSwingSpring = ViewWeaponSpring(200, 4);
-			charmVerticalSwingSpring = ViewWeaponSpring(200, 4);
+			baseSprintSpring = ViewWeaponSpring(100, 10);
+			baseRaiseSpring = ViewWeaponSpring(200, 20, 1);
+			baseHorizontalSwingSpring = ViewWeaponSpring(100, 12);
+			baseVerticalSwingSpring = ViewWeaponSpring(100, 12);
 			charmSprintSpring = ViewWeaponSpring(200, 4);
 			charmRaiseSpring = ViewWeaponSpring(200, 4);
+			charmHorizontalSwingSpring = ViewWeaponSpring(200, 4);
+			charmVerticalSwingSpring = ViewWeaponSpring(200, 4);
 		}
 
 		float GetLocalFireVibration() { return localFireVibration; }
@@ -313,6 +333,14 @@ namespace spades {
 			mat = CreateRotateMatrix(Vector3(0, 1, 1), atan2(p.x, p.y) * fade) * mat;
 			mat = CreateRotateMatrix(Vector3(-1, 0, 0), atan2(p.z, p.y) * fade) * mat;
 			return mat;
+		}
+
+		// Rotation that tilts the gun when strafing or moving vertically. Pitch follows
+		// the vertical swing and roll follows the horizontal swing. Yaw is left untouched.
+		Matrix4 GetSwingTiltMatrix(float amount = 2.0F) {
+			float pitch = baseVerticalSwingSpring.position * amount;
+			float roll = baseHorizontalSwingSpring.position * amount;
+			return CreateEulerAnglesMatrix(Vector3(-pitch, 0.0F, roll));
 		}
 
 		Matrix4 GetViewWeaponMatrix() {
@@ -387,22 +415,64 @@ namespace spades {
 			else
 				sprintStateSmooth = sprintStateSS;
 
-			// update charm springs
+			baseSprintSpring.desired = sprinting ? 1 : 0;
+			baseRaiseSpring.desired = raised ? 0 : 1;
+			baseHorizontalSwingSpring.velocity += swing.x * 60 * dt * 2;
+			baseVerticalSwingSpring.velocity += swing.z * 60 * dt * 2;
+
+			charmSprintSpring.desired = sprinting ? 1 : 0;
+			charmRaiseSpring.desired = raised ? 0 : 1;
 			charmHorizontalSwingSpring.velocity += swing.x * 60 * dt * 2;
 			charmVerticalSwingSpring.velocity += swing.z * 60 * dt * 2;
-			charmHorizontalSwingSpring.Update(dt);
-			charmVerticalSwingSpring.Update(dt);
+
+			// update springs
+			baseSprintSpring.Update(dt);
+			baseRaiseSpring.Update(dt);
+			baseHorizontalSwingSpring.Update(dt);
+			baseVerticalSwingSpring.Update(dt);
 			charmSprintSpring.Update(dt);
 			charmRaiseSpring.Update(dt);
+			charmHorizontalSwingSpring.Update(dt);
+			charmVerticalSwingSpring.Update(dt);
 		}
 
-		void WeaponFired() {
-			localFireVibration = 1.0F;
-		}
-
+		void WeaponFired() { localFireVibration = 1.0F; }
 		void AddToScene() {}
 		void ReloadingWeapon() {}
 		void ReloadedWeapon() {}
+
+		void DrawCharms(Matrix4 weapMatrix, Vector3 baseOffset, ModelRenderParam param) {
+			Vector3 charmRot(0.0F, 0.0F, 0.0F);
+
+			// add sway spring
+			charmRot.x -= 50.0F * charmVerticalSwingSpring.position;	// pitch
+			charmRot.y += 30.0F * charmHorizontalSwingSpring.position;	// yaw
+			charmRot.z += 20.0F * charmHorizontalSwingSpring.position;	// roll
+
+			// add sprint/raise spring
+			charmRot += Vector3(-0.5F, -0.2F, -0.2F) * charmSprintSpring.position;
+			charmRot += Vector3(0.7F, 0.5F, 0.1F) * charmRaiseSpring.position;
+
+			// tilt backward/forward based on camera pitch
+			Vector3 front = eyeMatrix.GetAxis(1);
+			charmRot.x -= asin(front.z) * 0.85F;
+
+			// avoid clipping into the weapon
+			charmRot.y = abs(charmRot.y);
+
+			// draw base
+			param.matrix = weapMatrix
+				* CreateTranslateMatrix(baseOffset)
+				* CreateScaleMatrix(0.1F);
+			renderer.AddModel(charmBaseModel, param);
+
+			// draw charm
+			param.matrix = param.matrix
+				* CreateTranslateMatrix(-0.75F, -1.0F, 1.25F)
+				* CreateEulerAnglesMatrix(charmRot)
+				* CreateEulerAnglesMatrix(Vector3(rad(90.0F), 0, rad(-90.0F)));
+			renderer.AddModel(charmModel, param);
+		}
 
 		void DrawReflexSight3D(Image@ img, Vector3 pos, float size, Vector3 color = Vector3(1, 0, 0)) {
 			float reflexSize = size * 0.025F;

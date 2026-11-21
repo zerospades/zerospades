@@ -41,14 +41,14 @@ namespace spades {
 			bool leftHanded = weapSide < 0.0F;
 
 			// sprint animation
-			float sprint = sprintSpring.position;
+			float sprint = baseSprintSpring.position;
 			mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), sprint * -0.3F) * mat;
 			mat = CreateRotateMatrix(Vector3(0.0F, 1.0F, 0.0F), sprint * -0.1F) * mat;
 			mat = CreateRotateMatrix(Vector3(0.0F, 0.0F, 1.0F), sprint * -0.2F) * mat;
 			mat = CreateTranslateMatrix(Vector3(0.1F, -0.2F, 0.05F) * sprint) * mat;
 
 			// raise animation
-			float putdown = raiseSpring.position;
+			float putdown = baseRaiseSpring.position;
 			mat = CreateRotateMatrix(Vector3(1.0F, 0.0F, 0.0F), putdown * -0.5F) * mat;
 			mat = CreateRotateMatrix(Vector3(0.0F, 1.0F, 0.0F), putdown * -0.2F) * mat;
 			mat = CreateTranslateMatrix(Vector3(0.3F, -0.5F, 0.1F) * putdown) * mat;
@@ -80,16 +80,16 @@ namespace spades {
 					grenadeMat = CreateTranslateMatrix(side * -0.5F, per * -0.2F, 0.0F) * mat;
 				}
 
-				// twist the grenade when strafing
-				grenadeMat = ApplySwingTwist(grenadeMat);
-				
+				// twist when strafing
+				grenadeMat = grenadeMat * GetSwingTiltMatrix();
+			
 				// apply handedness
 				if (leftHanded) {
 					Matrix4 invertScale = CreateScaleMatrix(Vector3(-1.0F, 1.0F, 1.0F));
 					leftHandMat = invertScale * leftHandMat;
 					grenadeMat = invertScale * grenadeMat;
 				}
-				
+
 				// hands offset
 				leftHand = leftHandMat * Vector3(10.0F, 0.0F, 8.0F);
 				rightHand = grenadeMat * Vector3(-2.0F, -1.0F, 1.0F);
