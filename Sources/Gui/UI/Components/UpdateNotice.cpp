@@ -36,6 +36,10 @@
 // release. Prefixed `zs` because the client shares SPConfig.cfg with OpenSpades.
 DEFINE_SPADES_SETTING(cl_zsUpdatePrompt, "1");
 
+// Nightly builds only: the nightly the startup prompt last announced. Nightlies
+// come with every push, so each one is prompted for once; the banner stays.
+DEFINE_SPADES_SETTING(cl_zsNightlyPromptedCommit, "");
+
 namespace spades {
 	namespace gui {
 		namespace {
@@ -94,10 +98,24 @@ namespace spades {
 
 			isMouseInteractive = true;
 			releaseUrl = result.releaseUrl;
-			caption =
-			  _Tr("MainScreen",
-			      "ZeroSpades {0} is available (you have {1}). Click to open the release page.",
-			      result.latestVersion.ToString(), ReleaseVersion::Current().ToString());
+			if (!UpdateChecker::IsNightlyBuild())
+				caption =
+				  _Tr("MainScreen",
+				      "ZeroSpades {0} is available (you have {1}). Click to open the release page.",
+				      result.latestVersion.ToString(), ReleaseVersion::Current().ToString());
+			else if (result.commitsAhead >= 0)
+				caption = _TrN("MainScreen",
+				               "A newer nightly is out ({1}, {0} new commit; you have {2}). Click "
+				               "to open the release page.",
+				               "A newer nightly is out ({1}, {0} new commits; you have {2}). Click "
+				               "to open the release page.",
+				               result.commitsAhead, result.latestCommit,
+				               UpdateChecker::CurrentNightlyCommit());
+			else
+				caption = _Tr("MainScreen",
+				              "A newer nightly is out ({0}; you have {1}). Click to open the "
+				              "release page.",
+				              result.latestCommit, UpdateChecker::CurrentNightlyCommit());
 		}
 
 		void UpdateNotice::OnActivated() {
@@ -124,7 +142,10 @@ namespace spades {
 			color.w *= alpha;
 
 			std::string text =
-			  _Tr("MainScreen", "Up to date ({0})", ReleaseVersion::Current().ToString());
+			  UpdateChecker::IsNightlyBuild()
+			    ? _Tr("MainScreen", "Up to date (nightly {0})",
+			          UpdateChecker::CurrentNightlyCommit())
+			    : _Tr("MainScreen", "Up to date ({0})", ReleaseVersion::Current().ToString());
 			Vector2 txtSize = font->Measure(text);
 
 			// Anchored to the top right corner of the screen instead of the strip, so the
@@ -190,17 +211,31 @@ namespace spades {
 				return;
 			if (!static_cast<bool>(cl_zsUpdatePrompt))
 				return;
+			const bool nightly = UpdateChecker::IsNightlyBuild();
+			if (nightly) {
+				// Peek before claiming: a nightly already prompted for only gets the banner.
+				UpdateChecker::Result peek = UpdateChecker::Get().GetResult();
+				if (peek.state == UpdateChecker::State::UpdateAvailable &&
+				    peek.latestCommit == static_cast<std::string>(cl_zsNightlyPromptedCommit))
+					return;
+			}
 			if (!UpdateChecker::Get().ClaimStartupPrompt())
 				return;
 
 			UpdateChecker::Result result = UpdateChecker::Get().GetResult();
 			std::string text =
-			  _Tr("MainScreen",
-			      "A new version of ZeroSpades is available!\n\n"
-			      "Installed version: {0}\nLatest version: {1}\n\n"
-			      "Open the release page to download it? ZeroSpades will close so the "
-			      "update can be installed.",
-			      ReleaseVersion::Current().ToString(), result.latestVersion.ToString());
+			  nightly ? _Tr("MainScreen",
+			                "A newer ZeroSpades nightly is available!\n\n"
+			                "Installed nightly: {0}\nLatest nightly: {1}\n\n"
+			                "Open the release page to download it? ZeroSpades will close so the "
+			                "update can be installed.",
+			                UpdateChecker::CurrentNightlyCommit(), result.latestCommit)
+			          : _Tr("MainScreen",
+			                "A new version of ZeroSpades is available!\n\n"
+			                "Installed version: {0}\nLatest version: {1}\n\n"
+			                "Open the release page to download it? ZeroSpades will close so the "
+			                "update can be installed.",
+			                ReleaseVersion::Current().ToString(), result.latestVersion.ToString());
 
 			Handle<UpdatePromptScreen> prompt =
 			  Handle<UpdatePromptScreen>::New(owner, text, result.releaseUrl,
@@ -215,7 +250,12 @@ namespace spades {
 		                       {_Tr("MainScreen", "Open Release Page"), _Tr("MainScreen", "Later")},
 		                       kPromptHeight, true) {
 			closed = [releaseUrl, releasePageOpened](ui::UIElement& sender) {
-				if (static_cast<UpdatePromptScreen&>(sender).resultIndex == 0)
+				// Answered either way: do not prompt for this nightly again. A prompt
+				// closed unanswered (the game quit under it) is shown again next time.
+				const int answer = static_cast<UpdatePromptScreen&>(sender).resultIndex;
+				if (answer >= 0 && UpdateChecker::IsNightlyBuild())
+					cl_zsNightlyPromptedCommit = UpdateChecker::Get().GetResult().latestCommit;
+				if (answer == 0)
 					OpenReleasePage(releaseUrl, releasePageOpened);
 			};
 		}

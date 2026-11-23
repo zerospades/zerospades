@@ -52,6 +52,11 @@ namespace spades {
 		 * newer ZeroSpades has been published. It only reports; it never downloads
 		 * or installs anything.
 		 *
+		 * A build published as the `nightly` release (see `IsNightlyBuild`) asks
+		 * about the nightly release instead of the latest stable one: it is told
+		 * about a newer nightly, and never about a stable release, which the newer
+		 * nightly already contains.
+		 *
 		 * The check is process-wide, so the main screen keeps its result when it is
 		 * rebuilt (resize, return from a game) instead of asking again.
 		 */
@@ -72,6 +77,17 @@ namespace spades {
 				/** The latest published version; set when `state` is `UpdateAvailable`. */
 				ReleaseVersion latestVersion;
 				/**
+				 * Nightly builds only: the short commit of the published nightly, set
+				 * when `state` is `UpToDate` or `UpdateAvailable`.
+				 */
+				std::string latestCommit;
+				/**
+				 * Nightly builds only: how many commits the published nightly is ahead
+				 * of this one, or -1 when it is not simply ahead (it was rebuilt from
+				 * another branch).
+				 */
+				int commitsAhead = -1;
+				/**
 				 * The release page to send the user to; always under the project's
 				 * GitHub releases, whatever the response said.
 				 */
@@ -79,6 +95,18 @@ namespace spades {
 			};
 
 			static UpdateChecker& Get();
+
+			/** Whether this build was published as the `nightly` release. */
+			static bool IsNightlyBuild();
+
+			/** The short commit this nightly was built from; empty for other builds. */
+			static std::string CurrentNightlyCommit();
+
+			/**
+			 * Where a player gets a newer build of this kind: the nightly release for
+			 * a nightly, the latest stable release otherwise.
+			 */
+			static const char* UpdatePageUrl();
 
 			/**
 			 * Starts the check unless it already ran in this process. Call on the

@@ -827,10 +827,15 @@ namespace spades {
 			// A game update comes first: newer mods may need it.
 			UpdateChecker::Result game = UpdateChecker::Get().GetResult();
 			if (game.state == UpdateChecker::State::UpdateAvailable)
-				body += "\n\n" + _Tr("MainScreen",
-				                     "ZeroSpades {0} is available: update the game first to get "
-				                     "the newest mods.",
-				                     game.latestVersion.ToString());
+				body += "\n\n" + (UpdateChecker::IsNightlyBuild()
+				                    ? _Tr("MainScreen",
+				                          "A newer nightly ({0}) is out: update the game first "
+				                          "to get the newest mods.",
+				                          game.latestCommit)
+				                    : _Tr("MainScreen",
+				                          "ZeroSpades {0} is available: update the game first to "
+				                          "get the newest mods.",
+				                          game.latestVersion.ToString()));
 			Handle<ConfirmScreen> cs = Handle<ConfirmScreen>::New(
 			    this, body, std::min(500.0F, GetManager().screenHeight - 100.0F), true);
 			cs->closed = [this](UIElement& s) { OnDownloadConfirmed(s); };

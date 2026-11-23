@@ -26,9 +26,15 @@
         in rec {
           packages.default = packages.zerospades;
 
+          # The build published as the `nightly` release: it checks the nightly
+          # release for updates. Needs a clean checkout, for `self.rev`.
+          packages.nightly = packages.zerospades.overrideAttrs (old: {
+            cmakeFlags = old.cmakeFlags ++ [ "-DZEROSPADES_NIGHTLY_COMMIT=${self.rev}" ];
+          });
+
           packages.zerospades = stdenv.mkDerivation rec {
             pname = "zerospades";
-            version = "0.0.8";
+            version = "0.0.9";
 
             src = self;
 

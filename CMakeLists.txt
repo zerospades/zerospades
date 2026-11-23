@@ -226,6 +226,23 @@ set(ZEROSPADES_INSTALL_LIBS		 "lib/zerospades"		CACHE STRING "Directory for inst
 
 set(ZEROSPADES_RESDIR "" CACHE STRING "Resource dir to use while developing")
 set(ZEROSPADES_EXTRATITLE "" CACHE STRING "Extra info to add to the package name")
+
+# Set by CI only, for the builds published as the `nightly` release: such a build
+# checks the nightly release for updates instead of the latest stable one.
+set(ZEROSPADES_NIGHTLY_COMMIT "" CACHE STRING "Full commit SHA of a published nightly build; empty for any other build")
+if(ZEROSPADES_NIGHTLY_COMMIT)
+	string(TOLOWER "${ZEROSPADES_NIGHTLY_COMMIT}" ZEROSPADES_NIGHTLY_COMMIT_LOWER)
+	string(LENGTH "${ZEROSPADES_NIGHTLY_COMMIT_LOWER}" _nightly_commit_length)
+	if(NOT _nightly_commit_length EQUAL 40 OR NOT ZEROSPADES_NIGHTLY_COMMIT_LOWER MATCHES "^[0-9a-f]+$")
+		message(FATAL_ERROR "ZEROSPADES_NIGHTLY_COMMIT must be a full 40-character commit SHA, got '${ZEROSPADES_NIGHTLY_COMMIT}'.")
+	endif()
+	set(ZEROSPADES_NIGHTLY TRUE)
+	set(ZEROSPADES_NIGHTLY_COMMIT_VALUE "${ZEROSPADES_NIGHTLY_COMMIT_LOWER}")
+	message(STATUS "Building as the nightly for commit ${ZEROSPADES_NIGHTLY_COMMIT_VALUE}")
+else()
+	set(ZEROSPADES_NIGHTLY FALSE)
+	set(ZEROSPADES_NIGHTLY_COMMIT_VALUE "")
+endif()
 if(ZEROSPADES_RESDIR)
 	set(RESDIR ${ZEROSPADES_RESDIR})
 	set(RESDIR_DEFINED TRUE)
