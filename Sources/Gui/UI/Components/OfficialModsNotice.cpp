@@ -37,10 +37,6 @@ namespace spades {
 		namespace {
 			// Cool accent, so it reads apart from the warm game update notice.
 			const Vector3 kAccent = MakeVector3(0.35F, 0.65F, 1.0F);
-
-			// Where a player goes to update the game for newer official mods.
-			constexpr const char* kGameReleasesPageUrl =
-			  "https://github.com/zerospades/zerospades/releases/latest";
 		} // namespace
 
 		OfficialModsNotice::OfficialModsNotice(ui::UIManager* manager,
@@ -93,8 +89,10 @@ namespace spades {
 
 		void OfficialModsNotice::OnActivated() {
 			if (needsGameUpdate) {
-				if (!OpenURLInBrowser(kGameReleasesPageUrl))
-					SPLog("[!] Could not open the release page: %s", kGameReleasesPageUrl);
+				// Where a player goes to update the game for newer official mods.
+				const char* url = UpdateChecker::UpdatePageUrl();
+				if (!OpenURLInBrowser(url))
+					SPLog("[!] Could not open the release page: %s", url);
 			} else if (downloadRequested) {
 				downloadRequested();
 			}

@@ -847,12 +847,13 @@ msgctxt "Client"
 msgid "Clear the SFX cache, forcing reload"
 msgstr ""
 
-#: Sources/Gui/Main.cpp:983
+#: Sources/Gui/Main.cpp:983 Sources/Gui/Main.cpp:990
 msgctxt "Main"
 msgid "Localization System Loaded"
 msgstr ""
 
 #: Sources/Gui/Main.cpp:1061 Sources/Gui/Runner.cpp:56
+#: Sources/Gui/Main.cpp:1068
 #, c++-format
 msgctxt "Main"
 msgid ""
@@ -864,6 +865,7 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/Main.cpp:1069 Sources/Gui/Runner.cpp:62
+#: Sources/Gui/Main.cpp:1076
 msgctxt "Main"
 msgid "ZeroSpades Fatal Error"
 msgstr ""
@@ -1014,18 +1016,21 @@ msgid "[1, 2, 3]"
 msgstr ""
 
 #: Sources/Gui/UI/Components/OfficialModsNotice.cpp:68
+#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:64
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0} are available (you have {1}). Click to download them."
 msgstr ""
 
 #: Sources/Gui/UI/Components/OfficialModsNotice.cpp:80
+#: Sources/Gui/UI/Components/OfficialModsNotice.cpp:76
 #, c++-format
 msgctxt "MainScreen"
 msgid "Official mods {0} need a newer ZeroSpades. Click to update the game."
 msgstr ""
 
 #: Sources/Gui/UI/Components/UpdateNotice.cpp:99
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:104
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1033,12 +1038,15 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/Components/UpdateNotice.cpp:127
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:147
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:148
 #, c++-format
 msgctxt "MainScreen"
 msgid "Up to date ({0})"
 msgstr ""
 
 #: Sources/Gui/UI/Components/UpdateNotice.cpp:199
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:234
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1052,11 +1060,13 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/Components/UpdateNotice.cpp:215
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:250
 msgctxt "MainScreen"
 msgid "Open Release Page"
 msgstr ""
 
 #: Sources/Gui/UI/Components/UpdateNotice.cpp:215
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:250
 msgctxt "MainScreen"
 msgid "Later"
 msgstr ""
@@ -1676,6 +1686,7 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:911
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:916
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1683,16 +1694,19 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:949
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:954
 msgctxt "MainScreen"
 msgid "Disable all mods? This takes effect after a restart."
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1000
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1005
 msgctxt "MainScreen"
 msgid "Mod download failed:"
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1038
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1043
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -1701,22 +1715,26 @@ msgid ""
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1076
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1081
 msgctxt "MainScreen"
 msgid "Failed to rename demo."
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1237
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1242
 msgctxt "MainScreen"
 msgid "Are you sure you want to quit?"
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1268
 #: Sources/Gui/UI/StartupScreen/StartupMainMenu.cpp:157
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1273
 msgctxt "StartupScreen"
 msgid "An unknown error has occurred while opening this url."
 msgstr ""
 
 #: Sources/Gui/UI/MainScreen/MainMenu.cpp:1319
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1324
 #, c++-format
 msgctxt "MainScreen"
 msgid ""
@@ -4124,4 +4142,49 @@ msgstr ""
 #, c++-format
 msgctxt "StartupScreen"
 msgid "Display {0}"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:912
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"A newer nightly ({0}) is out: update the game first to get the newest mods."
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:108
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"A newer nightly is out ({1}, {0} new commit; you have {2}). Click to open "
+"the release page."
+msgid_plural ""
+"A newer nightly is out ({1}, {0} new commits; you have {2}). Click to open "
+"the release page."
+msgstr[0] ""
+msgstr[1] ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:116
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"A newer nightly is out ({0}; you have {1}). Click to open the release page."
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:146
+#, c++-format
+msgctxt "MainScreen"
+msgid "Up to date (nightly {0})"
+msgstr ""
+
+#: Sources/Gui/UI/Components/UpdateNotice.cpp:228
+#, c++-format
+msgctxt "MainScreen"
+msgid ""
+"A newer ZeroSpades nightly is available!\n"
+"\n"
+"Installed nightly: {0}\n"
+"Latest nightly: {1}\n"
+"\n"
+"Open the release page to download it? ZeroSpades will close so the update "
+"can be installed."
 msgstr ""

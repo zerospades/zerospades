@@ -4,6 +4,12 @@ on:
   push:
   workflow_dispatch:
 
+env:
+  # The full commit, for the runs whose builds become the `nightly` release
+  # (same condition as `publish-nightly`); empty otherwise. A build configured
+  # with it checks the nightly release for updates instead of the stable one.
+  NIGHTLY_COMMIT: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && github.sha || '' }}
+
 jobs:
   build-windows-x86:
     name: Build (Windows x86)
@@ -36,6 +42,7 @@ jobs:
             -D CMAKE_BUILD_TYPE=Release `
             -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -D VCPKG_TARGET_TRIPLET=x86-windows-static `
+            -D ZEROSPADES_NIGHTLY_COMMIT="$env:NIGHTLY_COMMIT" `
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application
@@ -85,6 +92,7 @@ jobs:
             -D CMAKE_BUILD_TYPE=Release `
             -D CMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -D VCPKG_TARGET_TRIPLET=x64-windows-static `
+            -D ZEROSPADES_NIGHTLY_COMMIT="$env:NIGHTLY_COMMIT" `
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application
@@ -137,6 +145,7 @@ jobs:
             -D VCPKG_TARGET_TRIPLET=x64-osx \
             -D CMAKE_OSX_ARCHITECTURES=x86_64 \
             -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D ZEROSPADES_NIGHTLY_COMMIT="$NIGHTLY_COMMIT" \
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application
@@ -188,6 +197,7 @@ jobs:
             -D VCPKG_TARGET_TRIPLET=arm64-osx \
             -D CMAKE_OSX_ARCHITECTURES=arm64 \
             -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -D ZEROSPADES_NIGHTLY_COMMIT="$NIGHTLY_COMMIT" \
             -D CMAKE_CXX_STANDARD=17
 
       - name: Build application
@@ -216,7 +226,12 @@ jobs:
         uses: cachix/install-nix-action@v31
 
       - name: Build Nix flake
-        run: nix build
+        run: |
+          if [ -n "$NIGHTLY_COMMIT" ]; then
+            nix build .#nightly
+          else
+            nix build
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -256,6 +271,7 @@ jobs:
           cd build
           cmake .. \
             -D CMAKE_BUILD_TYPE=Release \
+            -D ZEROSPADES_NIGHTLY_COMMIT="$NIGHTLY_COMMIT" \
             -D CMAKE_CXX_STANDARD=17
           make -j$(nproc)
 

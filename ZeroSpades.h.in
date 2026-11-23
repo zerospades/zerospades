@@ -19,6 +19,11 @@
 	#define ZEROSPADES_VER_STR "ZeroSpades " ZEROSPADES_VERSION_FULL
 #endif
 
+// Defined only in a build published as the `nightly` release, with the full
+// SHA of the commit it was built from.
+#cmakedefine ZEROSPADES_NIGHTLY
+#define ZEROSPADES_NIGHTLY_COMMIT "${ZEROSPADES_NIGHTLY_COMMIT_VALUE}"
+
 #define ZEROSPADES_EXTRATITLE	"${ZEROSPADES_EXTRATITLE}"
 #define PACKAGE_STRING			ZEROSPADES_VER_STR ZEROSPADES_EXTRATITLE
 
