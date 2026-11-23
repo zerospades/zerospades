@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 
+#include <Gui/UI/Framework/TextUtils.h>
 #include <Gui/UI/Framework/UIElement.h>
 
 namespace spades {
@@ -39,14 +40,33 @@ namespace spades {
 				std::string newString;
 			};
 
+			/** Which end of an over-long text is elided with ".." while not focused. */
+			using FieldElision = TextElision;
+
 			/**
 			 * A single-line editable text field with selection, clipboard, IME and
 			 * undo/redo support. `Field` adds the default framed background.
+			 *
+			 * Text wider than the box scrolls horizontally while focused so the
+			 * caret stays visible, unless `wrapLines` continues it on the next row;
+			 * only the characters that fit are drawn, so
+			 * nothing ever spills outside the box (this does not rely on renderer
+			 * clipping, which not every backend supports).
 			 */
 			class FieldBase : public UIElement {
 				std::string text;
 				std::vector<FieldCommand> history;
 				int historyPos = 0; // index at which to insert the next command
+				int scrollIndex = 0; // byte index of the first visible character
+				// Width of what is drawn before `scrollIndex` (the ".." of a start
+				// elision), so mouse hits line up with what is on screen.
+				float leadingOffset = 0.0F;
+
+				float MeasureRange(const std::string& s, int from, int to) const;
+				float GetVisibleTextWidth() const;
+				// Adjusts `scrollIndex` so `caret` is visible and free space at the
+				// end is used; returns the byte index just past the last visible char.
+				int UpdateScroll(const std::string& displayText, int caret);
 
 				bool CheckCharType(const std::string& s) const;
 				void RunFieldCommand(const FieldCommand& cmd, bool autoSelect, bool addHistory);
@@ -70,6 +90,13 @@ namespace spades {
 				const std::vector<int>& GetRowStarts(const std::string& t) const;
 				float GetRowPitch() const;
 
+				// Draw the text, selection and composition of `Render`: on rows when `wrapLines`,
+				// else scrolled or elided on a single line.
+				void RenderWrapped(const std::string& displayText, const std::string& composition,
+				                   int markStart, int markEnd);
+				void RenderSingleLine(const std::string& displayText,
+				                      const std::string& composition, int markStart, int markEnd);
+
 				void DrawHighlight(client::IRenderer& r, float x, float y, float w, float h);
 				void DrawBeam(client::IRenderer& r, float x, float y, float h);
 				void DrawEditingLine(client::IRenderer& r, float x, float y, float w, float h);
@@ -81,6 +108,7 @@ namespace spades {
 				int markPosition = 0;
 				int cursorPosition = 0;
 				int maxLength = 255;
+				FieldElision elision = FieldElision::End;
 				bool denyNonAscii = false;
 				bool removeNewlines = false;
 

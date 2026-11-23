@@ -280,7 +280,7 @@ namespace spades {
 
 			// draw alive player count
 			if ((int)cg_hudPlayerCount >= 3) {
-				img = renderer.RegisterImage("Gfx/User.png");
+				img = renderer.RegisterImage("Gfx/IconUser.png");
 				IFont& guiFont = client->fontManager->GetGuiFont();
 
 				float iconSize = 12.0F;

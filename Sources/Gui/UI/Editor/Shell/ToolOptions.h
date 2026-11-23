@@ -1,0 +1,198 @@
+/*
+ Copyright (c) 2026 Fran6nd, ZeroSpades developers.
+
+ This file is part of ZeroSpades, a fork of OpenSpades.
+
+ ZeroSpades is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ ZeroSpades is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with ZeroSpades.  If not, see <http://www.gnu.org/licenses/>.
+
+ */
+
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace spades {
+	namespace gui {
+		// A single declarative tool option, rendered generically in the sub-toolbar.
+		// Tools list the options they want and the editor draws/handles them, so a
+		// new tool gets its UI for free without touching the toolbar
+		// code. Options sharing a non-empty `group` are drawn together behind a
+		// separator and a group label (e.g. the three "Mirror" toggles).
+		struct ToolOption {
+			enum class Type {
+				Bool,  // a toggle button; value lives in `bvalue`
+				Label, // a read-only text readout; the tool updates `label` each frame
+				Action, // a one-shot button; clicking calls EditorTool::OnAction(id)
+				// A colour the editor's picker sets while the tool is active, in
+				// place of the brush colour, the toolbar's swatch showing it; it
+				// takes no place on the bar. Reported through
+				// EditorTool::OnOptionColorChanged. A tool has one at most.
+				Color,
+				// An editable number: a box that can be typed into, with arrows
+				// stepping it by `step`. Reported through
+				// EditorTool::OnOptionNumberChanged, while it is being typed and
+				// again once the user has settled on it.
+				Number
+			};
+
+			std::string id;    // stable key, e.g. "mirror.x"
+			std::string label; // button text ("X"), or a readout's current text
+			std::string group; // shared group label ("Mirror"); empty = ungrouped
+			Type type = Type::Bool;
+			bool bvalue = false;     // Bool value
+			bool enabled = true;     // false greys a Bool or Action out (nothing to act on)
+			bool visible = true;     // false leaves it off the bar (it means nothing now)
+			float value = 0.0F;      // Number value; the tool refreshes it via SetNumber
+			float step = 1.0F;       // what one press of a Number's arrows adds
+			int decimals = 1;        // decimal places a Number is written with
+			bool hex = false;        // a Number that is a colour, 0xRRGGBB, typed as #RRGGBB
+			std::uint32_t color = 0; // Color value, 0x00BBGGRR; the tool refreshes it via SetColor
+			// Offered wherever the tool's options are, whether or not the tool is
+			// the active one: a command of a strip (see ToolTraits::stripOf),
+			// which shows on it while the strip is only on offer.
+			bool standing = false;
+		};
+
+		// An ordered list of a tool's options.
+		class ToolOptions {
+		public:
+			void AddBool(const std::string& id, const std::string& label,
+			             const std::string& group = "", bool initial = false) {
+				ToolOption o;
+				o.id = id;
+				o.label = label;
+				o.group = group;
+				o.type = ToolOption::Type::Bool;
+				o.bvalue = initial;
+				items.push_back(o);
+			}
+			// A one-shot button: it holds no state, and a click is reported to the
+			// tool as OnAction(id) rather than flipping a value.
+			void AddAction(const std::string& id, const std::string& label,
+			               const std::string& group = "") {
+				ToolOption o;
+				o.id = id;
+				o.label = label;
+				o.group = group;
+				o.type = ToolOption::Type::Action;
+				items.push_back(o);
+			}
+			// An editable number, labelled (an axis letter) and stepped by `step`.
+			// The tool refreshes its value via SetNumber each frame, except while
+			// the user is typing into it.
+			void AddNumber(const std::string& id, const std::string& label,
+			               const std::string& group = "", float step = 1.0F,
+			               int decimals = 1) {
+				ToolOption o;
+				o.id = id;
+				o.label = label;
+				o.group = group;
+				o.type = ToolOption::Type::Number;
+				o.step = step;
+				o.decimals = decimals;
+				items.push_back(o);
+			}
+			// A colour typed in hex: a Number holding 0xRRGGBB, with no arrows.
+			void AddHex(const std::string& id, const std::string& label,
+			            const std::string& group = "") {
+				AddNumber(id, label, group, 0.0F, 0);
+				items.back().hex = true;
+			}
+			// The colour the picker sets while the tool is active (see Type::Color).
+			void AddColor(const std::string& id) {
+				ToolOption o;
+				o.id = id;
+				o.type = ToolOption::Type::Color;
+				items.push_back(o);
+			}
+			void SetColor(const std::string& id, std::uint32_t color) {
+				if (ToolOption* o = Find(id))
+					o->color = color;
+			}
+			/** Makes `id` a standing option (see ToolOption::standing). */
+			void SetStanding(const std::string& id) {
+				if (ToolOption* o = Find(id))
+					o->standing = true;
+			}
+			/** The option of `type` that comes first, or null. */
+			const ToolOption* First(ToolOption::Type type) const {
+				for (const ToolOption& o : items)
+					if (o.type == type)
+						return &o;
+				return nullptr;
+			}
+			void SetNumber(const std::string& id, float value) {
+				if (ToolOption* o = Find(id))
+					o->value = value;
+			}
+			// What one press of a Number's arrows adds, where a setting of the
+			// tool's decides it rather than the kind of value: a tool whose Step
+			// the user picks sets it alongside the value, so the arrows and the
+			// tool's own dragging move by the same amount.
+			void SetStep(const std::string& id, float step) {
+				if (ToolOption* o = Find(id))
+					o->step = step;
+			}
+			// A read-only readout; the tool refreshes its text via SetLabel each frame.
+			void AddLabel(const std::string& id, const std::string& group = "") {
+				ToolOption o;
+				o.id = id;
+				o.group = group;
+				o.type = ToolOption::Type::Label;
+				items.push_back(o);
+			}
+			void SetLabel(const std::string& id, const std::string& text) {
+				if (ToolOption* o = Find(id))
+					o->label = text;
+			}
+			void SetEnabled(const std::string& id, bool enabled) {
+				if (ToolOption* o = Find(id))
+					o->enabled = enabled;
+			}
+			// An option of one sub-tool's is left off the bar under the others.
+			void SetVisible(const std::string& id, bool visible) {
+				if (ToolOption* o = Find(id))
+					o->visible = visible;
+			}
+
+			/** The option with `id`, or null if there is none. */
+			ToolOption* Find(const std::string& id) {
+				for (ToolOption& o : items)
+					if (o.id == id)
+						return &o;
+				return nullptr;
+			}
+
+			void Clear() { items.clear(); }
+			/** Adds `other`'s options after these, as they stand. */
+			void Append(const ToolOptions& other) {
+				items.insert(items.end(), other.items.begin(), other.items.end());
+			}
+
+			int Count() const { return int(items.size()); }
+			ToolOption& At(int i) { return items[i]; }
+			const ToolOption& At(int i) const { return items[i]; }
+
+			void SetBool(const std::string& id, bool value) {
+				if (ToolOption* o = Find(id))
+					o->bvalue = value;
+			}
+
+		private:
+			std::vector<ToolOption> items;
+		};
+	} // namespace gui
+} // namespace spades
