@@ -212,9 +212,9 @@ namespace spades {
 		// bars, the host's widgets or colour sampling took are none of the
 		// tool's business, and start no user action to end.
 		void VoxelEditor::BuildPointerLayers() {
-			// Constants, so the lambdas read them without capturing them.
-			constexpr PointerButton left = PointerButton::Left;
-			constexpr PointerButton right = PointerButton::Right;
+			// Static, so MSVC lets the lambdas use them without capturing them.
+			static constexpr PointerButton left = PointerButton::Left;
+			static constexpr PointerButton right = PointerButton::Right;
 			auto onPanel = [this](const Vector2& at) { return PanelTarget() && OnPanel(at); };
 
 			// Every button is the open menu's while it is down. The left one
