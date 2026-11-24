@@ -4211,3 +4211,16 @@ msgstr ""
 msgctxt "Preferences"
 msgid "Server lists not to download, known ones included, separated by spaces."
 msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1067
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1090
+msgctxt "MainScreen"
+msgid "All"
+msgstr ""
+
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1074
+#: Sources/Gui/UI/MainScreen/MainMenu.cpp:1083
+#, c++-format
+msgctxt "MainScreen"
+msgid "Server List: {0}"
+msgstr ""

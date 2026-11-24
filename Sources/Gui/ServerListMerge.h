@@ -75,6 +75,10 @@ namespace spades {
 		 * order is trust order: a later list cannot rename a server, or change the
 		 * game version used to connect to it, by claiming a newer report.
 		 *
+		 * Each merged entry gets `sources`: the indexes in `lists` of the lists
+		 * that report the server, in order (any `sources` the lists sent is
+		 * replaced).
+		 *
 		 * Entries without a string `identifier` are dropped, and so is anything in
 		 * `lists` that is not an array. The result keeps the order in which
 		 * servers first appear.

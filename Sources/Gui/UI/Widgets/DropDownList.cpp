@@ -20,9 +20,11 @@
 
 #include "DrawUtils.h"
 #include "DropDownList.h"
+
 #include <Client/IFont.h>
 #include <Client/IRenderer.h>
 #include <Gui/UI/Framework/UIManager.h>
+#include <algorithm>
 
 namespace spades {
 	namespace gui {
@@ -123,35 +125,60 @@ namespace spades {
 
 			// -- ShowDropDownList --
 
+			namespace {
+				constexpr float kRowHeight = 24.0F;
+				constexpr float kScreenMargin = 20.0F;
+
+				void ShowDropDownListAt(UIManager* manager, float x, float y, float width,
+				                        float height, std::vector<std::string> items,
+				                        DropDownListHandler handler, int selected) {
+					Handle<DropDownView> view =
+					  Handle<DropDownView>::New(manager, std::move(handler), items, selected);
+					Handle<DropDownBackground> bg =
+					  Handle<DropDownBackground>::New(manager, view.GetPointerOrNull());
+					view->bg = bg.GetPointerOrNull();
+
+					UIElement& root = manager->GetRootElement();
+					Vector2 sz = root.size;
+
+					bg->SetBounds(AABB2(0.0F, 0.0F, sz.x, sz.y));
+					view->SetBounds(AABB2(x, y, width, height));
+
+					root.AddChild(bg.GetPointerOrNull());
+					bg->AddChild(view.GetPointerOrNull());
+				}
+			} // namespace
+
 			void ShowDropDownList(UIManager* manager, float x, float y, float width,
 			                      std::vector<std::string> items, DropDownListHandler handler,
 			                      int selected) {
-				Handle<DropDownView> view =
-				    Handle<DropDownView>::New(manager, std::move(handler), items, selected);
-				Handle<DropDownBackground> bg =
-				    Handle<DropDownBackground>::New(manager, view.GetPointerOrNull());
-				view->bg = bg.GetPointerOrNull();
-
-				UIElement& root = manager->GetRootElement();
-				Vector2 sz = root.size;
-
-				float maxHeight = sz.y - y;
-				float height = 24.0F * static_cast<float>(items.size());
+				float maxHeight = manager->GetRootElement().size.y - y;
+				float height = kRowHeight * static_cast<float>(items.size());
 				if (height > maxHeight)
-					height = maxHeight - 20.0F;
-
-				bg->SetBounds(AABB2(0.0F, 0.0F, sz.x, sz.y));
-				view->SetBounds(AABB2(x, y, width, height));
-
-				root.AddChild(bg.GetPointerOrNull());
-				bg->AddChild(view.GetPointerOrNull());
+					height = maxHeight - kScreenMargin;
+				ShowDropDownListAt(manager, x, y, width, height, std::move(items),
+				                   std::move(handler), selected);
 			}
 
 			void ShowDropDownList(UIElement& e, std::vector<std::string> items,
 			                      DropDownListHandler handler, int selected) {
 				AABB2 b = e.GetScreenBounds();
-				ShowDropDownList(&e.GetManager(), b.min.x, b.max.y, b.max.x - b.min.x,
-				                 std::move(items), std::move(handler), selected);
+				UIManager* manager = &e.GetManager();
+				float needed = kRowHeight * static_cast<float>(items.size());
+				float below = manager->GetRootElement().size.y - b.max.y;
+				float above = b.min.y;
+
+				// Opens upward only when the list does not fit below but has more
+				// room above, as for a control at the bottom of the screen; a list
+				// that fits below opens there, as it always did.
+				if (needed > below && above > below) {
+					float height = std::min(needed, above - kScreenMargin);
+					ShowDropDownListAt(manager, b.min.x, b.min.y - height, b.max.x - b.min.x,
+					                   height, std::move(items), std::move(handler), selected);
+					return;
+				}
+				ShowDropDownList(manager, b.min.x, b.max.y, b.max.x - b.min.x, std::move(items),
+				                 std::move(handler), selected);
 			}
 		} // namespace ui
 	} // namespace gui

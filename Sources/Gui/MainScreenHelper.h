@@ -20,9 +20,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <memory>
 #include <unordered_set>
 #include <vector>
-#include <memory>
 
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
@@ -47,7 +48,9 @@ namespace spades {
 			int numPlayers;
 			int maxPlayers;
 			bool favorite;
-			
+			/** URLs of the server lists that report this server; empty for a LAN server. */
+			std::vector<std::string> sources;
+
 		protected:
 			~MainScreenServerItem();
 
@@ -66,10 +69,23 @@ namespace spades {
 			int GetMaxPlayers() const { return maxPlayers; }
 			bool IsFavorite() const { return favorite; }
 			void SetFavorite(bool favorite) { this->favorite = favorite; }
+			const std::vector<std::string>& GetSources() const { return sources; }
+			void SetSources(std::vector<std::string> s) { sources = std::move(s); }
+			bool IsListedBy(const std::string& url) const {
+				return std::find(sources.begin(), sources.end(), url) != sources.end();
+			}
+		};
+
+		/** A server list that answered the last query. */
+		struct MainScreenServerListSource {
+			std::string url;
+			std::string name; // short, for the filter
 		};
 
 		struct MainScreenServerList {
 			std::vector<Handle<MainScreenServerItem>> list;
+			/** The server lists merged into `list`, in merge order. */
+			std::vector<MainScreenServerListSource> sources;
 			std::string message;
 
 			~MainScreenServerList();
@@ -113,6 +129,11 @@ namespace spades {
 			std::vector<Handle<MainScreenServerItem>> GetServerList(const std::string& sortKey,
 			                                                        bool descending);
 			std::string GetServerListQueryMessage();
+			/**
+			 * The server lists merged into the current list. Empty until the first
+			 * list arrives; during a refresh, the lists of the previous one.
+			 */
+			std::vector<MainScreenServerListSource> GetServerListSources();
 			int GetServerPing(std::string address);
 			std::string ConnectServer(std::string hostname, int protocolVersion, std::string mapName = "");
 			std::string GetPendingErrorMessage();

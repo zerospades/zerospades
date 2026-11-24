@@ -78,22 +78,58 @@ namespace spades {
 		 * lists served over HTTPS come first: a tampered plain-HTTP response cannot
 		 * then rename a server or change the game version used to join it.
 		 */
-		constexpr const char* kKnownServerLists[] = {
+		struct KnownServerList {
+			const char* url;
+			const char* name; // shown in the server list filter
+		};
+		constexpr KnownServerList kKnownServerLists[] = {
 		  // A mirror of Build and Shoot's, over HTTPS.
-		  "https://checkpoint.aos.coffee/serverlist.json",
+		  {"https://checkpoint.aos.coffee/serverlist.json", "aos.coffee"},
 		  // Build and Shoot's master; caps capacity at 32. Plain HTTP only.
-		  "http://services.buildandshoot.com/serverlist.json",
+		  {"http://services.buildandshoot.com/serverlist.json", "Build and Shoot"},
 		  // LSd's author's master, which LSd servers announce to; reports real
 		  // capacity, up to 254 players.
-		  "https://66.135.15.57/serverlist.json",
+		  {"https://66.135.15.57/serverlist.json", "LSd"},
 		};
 
 		bool IsKnownServerList(const std::string& url) {
-			for (const char* known : kKnownServerLists) {
-				if (url == known)
+			for (const KnownServerList& known : kKnownServerLists) {
+				if (url == known.url)
 					return true;
 			}
 			return false;
+		}
+
+		/**
+		 * The short name of a server list: its own for a known list, its host
+		 * otherwise. When another list would get the same name, more of the URL is
+		 * kept (without, then with, its scheme), so no two lists share a name.
+		 */
+		std::string ServerListName(const std::string& url, const std::vector<std::string>& urls) {
+			for (const KnownServerList& known : kKnownServerLists) {
+				if (url == known.url)
+					return known.name;
+			}
+			auto withoutScheme = [](const std::string& u) {
+				std::size_t p = u.find("://");
+				return p == std::string::npos ? u : u.substr(p + 3);
+			};
+			auto host = [&](const std::string& u) {
+				std::string rest = withoutScheme(u);
+				return rest.substr(0, rest.find('/'));
+			};
+			auto clashes = [&](auto name) {
+				for (const std::string& other : urls) {
+					if (other != url && name(other) == name(url))
+						return true;
+				}
+				return false;
+			};
+			if (!clashes(host))
+				return host(url);
+			if (!clashes(withoutScheme))
+				return withoutScheme(url);
+			return url;
 		}
 
 		/**
@@ -159,8 +195,8 @@ namespace spades {
 						urls.push_back(url);
 				}
 			};
-			for (const char* url : kKnownServerLists)
-				add(url);
+			for (const KnownServerList& known : kKnownServerLists)
+				add(known.url);
 			add(cl_zsServerListUrls.CString());
 			return urls;
 		}
@@ -356,6 +392,7 @@ namespace spades {
 
 					// Merge whatever answered; fail only if nothing did.
 					std::vector<Json::Value> lists;
+					std::vector<std::string> listUrls; // parallel to `lists`
 					std::string firstError;
 					for (auto& source : sources) {
 						std::string error;
@@ -387,6 +424,7 @@ namespace spades {
 						SPLog("Server list %s: %u servers", source->url.c_str(),
 						      static_cast<unsigned>(root.size()));
 						lists.push_back(std::move(root));
+						listUrls.push_back(source->url);
 					}
 					if (lists.empty())
 						SPRaise("%s", firstError.c_str());
@@ -398,14 +436,24 @@ namespace spades {
 					      static_cast<unsigned>(merged.size()));
 
 					auto resp = stmp::make_unique<MainScreenServerList>();
+					for (const std::string& url : listUrls)
+						resp->sources.push_back({url, ServerListName(url, listUrls)});
 					for (const Json::Value& obj : merged) {
 						std::unique_ptr<ServerItem> srv{ServerItem::Create(obj)};
-						if (srv) {
-							resp->list.emplace_back(
-							  new MainScreenServerItem(srv.get(),
-							                           favorites.count(srv->GetAddress()) >= 1),
-							  false);
+						if (!srv)
+							continue;
+						Handle<MainScreenServerItem> item{
+						  new MainScreenServerItem(srv.get(),
+						                           favorites.count(srv->GetAddress()) >= 1),
+						  false};
+						std::vector<std::string> itemSources;
+						for (const Json::Value& index : obj["sources"]) {
+							const int i = index.asInt(); // written by MergeServerLists
+							if (i >= 0 && i < static_cast<int>(listUrls.size()))
+								itemSources.push_back(listUrls[i]);
 						}
+						item->SetSources(std::move(itemSources));
+						resp->list.push_back(std::move(item));
 					}
 					ReturnResult(std::move(resp));
 				} catch (std::exception &ex) {
@@ -722,6 +770,12 @@ namespace spades {
 			if (result == NULL)
 				return "";
 			return result->message;
+		}
+
+		std::vector<MainScreenServerListSource> MainScreenHelper::GetServerListSources() {
+			if (result == NULL)
+				return {};
+			return result->sources;
 		}
 
 		std::vector<std::string> MainScreenHelper::GetDemoList() {

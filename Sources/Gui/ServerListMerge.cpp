@@ -89,12 +89,15 @@ namespace spades {
 				Json::Value entry; // fields from the first list that has the server
 				int playersCurrent;
 				int playersMax;
+				std::vector<int> sources; // indexes in `lists`
 			};
 
 			std::vector<Merged> merged;
 			std::unordered_map<std::string, std::size_t> byIdentifier;
 
-			for (const Json::Value& list : lists) {
+			for (std::size_t listIndex = 0; listIndex < lists.size(); ++listIndex) {
+				const Json::Value& list = lists[listIndex];
+				const int source = static_cast<int>(listIndex);
 				// The bundled jsoncpp also calls null an array.
 				if (list.type() != Json::arrayValue)
 					continue;
@@ -109,12 +112,15 @@ namespace spades {
 					auto it = byIdentifier.find(identifier);
 					if (it == byIdentifier.end()) {
 						byIdentifier.emplace(identifier, merged.size());
-						merged.push_back({entry, playersCurrent, playersMax});
+						merged.push_back({entry, playersCurrent, playersMax, {source}});
 						merged.back().entry["identifier"] = identifier;
 						continue;
 					}
 
 					Merged& m = merged[it->second];
+					// A list that repeats a server counts once.
+					if (m.sources.back() != source)
+						m.sources.push_back(source);
 					m.playersCurrent = std::max(m.playersCurrent, playersCurrent);
 					// The highest limit wins because legacy server lists (Build and
 					// Shoot's, and its mirrors) show at most 32, even when the server
@@ -128,6 +134,10 @@ namespace spades {
 			for (Merged& m : merged) {
 				m.entry["players_current"] = m.playersCurrent;
 				m.entry["players_max"] = m.playersMax;
+				Json::Value sources(Json::arrayValue);
+				for (int source : m.sources)
+					sources.append(source);
+				m.entry["sources"] = sources;
 				result.append(m.entry);
 			}
 			return result;
