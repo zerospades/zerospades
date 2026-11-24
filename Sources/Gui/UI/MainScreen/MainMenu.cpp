@@ -1117,15 +1117,9 @@ namespace spades {
 				case 5: key = "Protocol"; break;
 				case 6: key = "Country"; break;
 			}
-			std::vector<Handle<MainScreenServerItem>> list =
-			    helper->GetServerList(key, (static_cast<int>(cg_serverlistSort) & 0x4000) != 0);
-			if (list.empty() || loading) {
-				serverList->SetModel(Handle<ListViewModel>::New().GetPointerOrNull()); // empty
-				return;
-			}
-
-			// A list that stopped answering cannot be picked again: show all.
-			if (!filterListUrl.empty()) {
+			// A list that stopped answering cannot be picked again: show all. Not
+			// while loading, when the lists are not known yet.
+			if (!loading && !filterListUrl.empty()) {
 				std::vector<MainScreenServerListSource> sources = helper->GetServerListSources();
 				if (std::none_of(sources.begin(), sources.end(),
 				                 [&](const MainScreenServerListSource& s) {
@@ -1134,6 +1128,13 @@ namespace spades {
 					filterListUrl.clear();
 					UpdateServerListFilterCaption();
 				}
+			}
+
+			std::vector<Handle<MainScreenServerItem>> list = helper->GetServerList(
+			  key, (static_cast<int>(cg_serverlistSort) & 0x4000) != 0, filterListUrl);
+			if (list.empty() || loading) {
+				serverList->SetModel(Handle<ListViewModel>::New().GetPointerOrNull()); // empty
+				return;
 			}
 
 			// filter the server list
@@ -1148,8 +1149,6 @@ namespace spades {
 				if (filterProtocol4 && (item->GetProtocol() != "0.76"))
 					continue;
 				if (filterFull && (item->GetNumPlayers() >= item->GetMaxPlayers()))
-					continue;
-				if (!filterListUrl.empty() && !item->IsListedBy(filterListUrl))
 					continue;
 				if (filterText.size() > 0) {
 					if (!(StringContainsCaseInsensitive(item->GetName(), filterText) ||

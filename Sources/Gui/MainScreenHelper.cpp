@@ -446,11 +446,14 @@ namespace spades {
 						  new MainScreenServerItem(srv.get(),
 						                           favorites.count(srv->GetAddress()) >= 1),
 						  false};
-						std::vector<std::string> itemSources;
-						for (const Json::Value& index : obj["sources"]) {
-							const int i = index.asInt(); // written by MergeServerLists
+						// Written by MergeServerLists, so the types are known.
+						std::vector<MainScreenServerListReport> itemSources;
+						for (const Json::Value& report : obj["sources"]) {
+							const int i = report["list"].asInt();
 							if (i >= 0 && i < static_cast<int>(listUrls.size()))
-								itemSources.push_back(listUrls[i]);
+								itemSources.push_back({listUrls[i],
+								                       report["players_current"].asInt(),
+								                       report["players_max"].asInt()});
 						}
 						item->SetSources(std::move(itemSources));
 						resp->list.push_back(std::move(item));
@@ -636,13 +639,24 @@ namespace spades {
 		}
 
 		std::vector<Handle<MainScreenServerItem>>
-		MainScreenHelper::GetServerList(const std::string& sortKey, bool descending) {
+		MainScreenHelper::GetServerList(const std::string& sortKey, bool descending,
+		                                const std::string& listUrl) {
 			if (result == NULL) {
 				return {};
 			}
 
 			using Item = const Handle<MainScreenServerItem> &;
-			std::vector<Handle<MainScreenServerItem>> &lst = result->list;
+			// One list's view: copies that list's player counts, sorted apart so
+			// the shared list keeps the highest counts.
+			std::vector<Handle<MainScreenServerItem>> listView;
+			if (!listUrl.empty()) {
+				for (const Handle<MainScreenServerItem>& item : result->list) {
+					if (const MainScreenServerListReport* report = item->GetReport(listUrl))
+						listView.emplace_back(new MainScreenServerItem(*item, *report), false);
+				}
+			}
+			std::vector<Handle<MainScreenServerItem>>& lst =
+			  listUrl.empty() ? result->list : listView;
 			if (lst.empty())
 				return {};
 
@@ -836,6 +850,22 @@ namespace spades {
 			numPlayers = item->GetNumPlayers();
 			maxPlayers = item->GetMaxNumPlayers();
 			this->favorite = favorite;
+		}
+
+		MainScreenServerItem::MainScreenServerItem(const MainScreenServerItem& base,
+		                                           const MainScreenServerListReport& report)
+		    : name(base.name),
+		      address(base.address),
+		      mapName(base.mapName),
+		      gameMode(base.gameMode),
+		      country(base.country),
+		      protocol(base.protocol),
+		      ping(base.ping),
+		      numPlayers(report.numPlayers),
+		      maxPlayers(report.maxPlayers),
+		      favorite(base.favorite),
+		      sources{report} {
+			SPADES_MARK_FUNCTION();
 		}
 
 		MainScreenServerItem::~MainScreenServerItem() { SPADES_MARK_FUNCTION(); }

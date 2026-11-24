@@ -89,7 +89,12 @@ namespace spades {
 				Json::Value entry; // fields from the first list that has the server
 				int playersCurrent;
 				int playersMax;
-				std::vector<int> sources; // indexes in `lists`
+				struct Report {
+					int list; // index in `lists`
+					int playersCurrent;
+					int playersMax;
+				};
+				std::vector<Report> sources; // one per list, in list order
 			};
 
 			std::vector<Merged> merged;
@@ -112,15 +117,23 @@ namespace spades {
 					auto it = byIdentifier.find(identifier);
 					if (it == byIdentifier.end()) {
 						byIdentifier.emplace(identifier, merged.size());
-						merged.push_back({entry, playersCurrent, playersMax, {source}});
+						merged.push_back({entry,
+						                  playersCurrent,
+						                  playersMax,
+						                  {{source, playersCurrent, playersMax}}});
 						merged.back().entry["identifier"] = identifier;
 						continue;
 					}
 
 					Merged& m = merged[it->second];
-					// A list that repeats a server counts once.
-					if (m.sources.back() != source)
-						m.sources.push_back(source);
+					// A list that repeats a server counts once, with its highest counts.
+					if (m.sources.back().list != source) {
+						m.sources.push_back({source, playersCurrent, playersMax});
+					} else {
+						Merged::Report& r = m.sources.back();
+						r.playersCurrent = std::max(r.playersCurrent, playersCurrent);
+						r.playersMax = std::max(r.playersMax, playersMax);
+					}
 					m.playersCurrent = std::max(m.playersCurrent, playersCurrent);
 					// The highest limit wins because legacy server lists (Build and
 					// Shoot's, and its mirrors) show at most 32, even when the server
@@ -135,8 +148,13 @@ namespace spades {
 				m.entry["players_current"] = m.playersCurrent;
 				m.entry["players_max"] = m.playersMax;
 				Json::Value sources(Json::arrayValue);
-				for (int source : m.sources)
-					sources.append(source);
+				for (const Merged::Report& r : m.sources) {
+					Json::Value report(Json::objectValue);
+					report["list"] = r.list;
+					report["players_current"] = r.playersCurrent;
+					report["players_max"] = r.playersMax;
+					sources.append(report);
+				}
 				m.entry["sources"] = sources;
 				result.append(m.entry);
 			}
