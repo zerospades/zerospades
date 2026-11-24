@@ -210,10 +210,12 @@ namespace spades {
 				const auto& p1 = Project(MakeVector2(x, gridRect.GetMinY()), rotates);
 				if (!rotates) {
 					float wx = roundf(p1.x); // rounded for better pixel alignment
-					for (float dx = 0; dx < outRect.GetHeight(); dx += 4) {
+					for (float dy = 0; dy < outRect.GetHeight(); dy += 4) {
+						// do not let the last dash go past the bottom edge
+						float len = std::min(2.0F, outRect.GetHeight() - dy);
 						renderer.DrawImage(nullptr,
-							MakeVector2(wx - 0.5F, outRect.GetMinY() + dx),
-								AABB2(0, 0, 1, 2));
+							MakeVector2(wx - 0.5F, outRect.GetMinY() + dy),
+								AABB2(0, 0, 1, len));
 					}
 				} else {
 					const auto& p2 = Project(MakeVector2(x, gridRect.GetMaxY()), rotates);
@@ -226,15 +228,42 @@ namespace spades {
 				const auto& p1 = Project(MakeVector2(gridRect.GetMinX(), y), rotates);
 				if (!rotates) {
 					float wy = roundf(p1.y); // rounded for better pixel alignment
-					for (float dy = 0; dy < outRect.GetWidth(); dy += 4) {
+					for (float dx = 0; dx < outRect.GetWidth(); dx += 4) {
+						// do not let the last dash go past the right edge
+						float len = std::min(2.0F, outRect.GetWidth() - dx);
 						renderer.DrawImage(nullptr,
-							MakeVector2(outRect.GetMinX() + dy, wy - 0.5F),
-								AABB2(0, 0, 2, 1));
+							MakeVector2(outRect.GetMinX() + dx, wy - 0.5F),
+								AABB2(0, 0, len, 1));
 					}
 				} else {
 					const auto& p2 = Project(MakeVector2(gridRect.GetMaxX(), y), rotates);
 					renderer.DrawLine(p1, p2);
 				}
+			}
+		}
+
+		void MapView::DrawOutOfBounds(const AABB2& view, const Vector2& mapSize, float alpha) {
+			renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.5F) * alpha);
+
+			const float vx0 = std::max(view.GetMinX(), 0.0F);
+			const float vx1 = std::min(view.GetMaxX(), mapSize.x);
+
+			// left, right, top and bottom strips, in that order
+			const float strips[4][4] = {
+				{view.GetMinX(), view.GetMinY(), std::min(0.0F, view.GetMaxX()), view.GetMaxY()},
+				{std::max(mapSize.x, view.GetMinX()), view.GetMinY(), view.GetMaxX(), view.GetMaxY()},
+				{vx0, view.GetMinY(), vx1, std::min(0.0F, view.GetMaxY())},
+				{vx0, std::max(mapSize.y, view.GetMinY()), vx1, view.GetMaxY()},
+			};
+
+			for (const auto& s : strips) {
+				if (s[2] <= s[0] || s[3] <= s[1])
+					continue;
+				renderer.DrawImage(nullptr,
+					Project(MakeVector2(s[0], s[1]), true),
+					Project(MakeVector2(s[2], s[1]), true),
+					Project(MakeVector2(s[0], s[3]), true),
+					AABB2(0, 0, 1, 1));
 			}
 		}
 
@@ -531,6 +560,12 @@ namespace spades {
 
 			AABB2 tracerClipRect = inRect;
 
+			// the part of the view that lies inside the map bounds
+			AABB2 visibleRect(
+				MakeVector2(std::max(inRect.GetMinX(), 0.0F), std::max(inRect.GetMinY(), 0.0F)),
+				MakeVector2(std::min(inRect.GetMaxX(), mapSize.x), std::min(inRect.GetMaxY(), mapSize.y))
+			);
+
 			this->inRect = inRect;
 			this->outRect = outRect;
 			this->mapCenter = (inRect.min + inRect.max) * 0.5F;
@@ -542,20 +577,25 @@ namespace spades {
 			float largeMapAlpha = largeMap ? zoomState : 1.0F;
 			float alpha = largeMap ? largeMapAlpha : Clamp((float)cg_minimapOpacity, 0.1F, 1.0F);
 
+			Vector2 gridSize = mapSize / 8.0F;
+			Vector4 gridCol = MakeVector4(0, 0, 0, 1) * 0.4F * alpha;
+
 			// draw map
 			if (circularMap) {
 				renderer.BeginClippingCircle(scrCenter, scrRadius);
 
+				// draw flat map
 				const auto& topLeft = RotateMap(MakeVector2(-scrHalfSize.x, -scrHalfSize.y));
 				const auto& topRight = RotateMap(MakeVector2(scrHalfSize.x, -scrHalfSize.y));
 				const auto& bottomLeft = RotateMap(MakeVector2(-scrHalfSize.x, scrHalfSize.y));
 				renderer.SetColorAlphaPremultiplied(MakeVector4(1, 1, 1, 1) * alpha);
 				renderer.DrawFlatGameMap(topLeft, topRight, bottomLeft, inRect);
 
+				// draw out of bounds area
+				DrawOutOfBounds(inRect, mapSize, alpha);
+
 				// draw grid lines
-				Vector2 gridSize = mapSize / 8.0F;
-				Vector4 gridCol = MakeVector4(0, 0, 0, 1) * 0.4F * alpha;
-				DrawGridLines(gridSize, inRect, gridCol, (mapAngle != 0.0F));
+				DrawGridLines(gridSize, visibleRect, gridCol, rotatingMap);
 
 				renderer.EndClippingCircle();
 			} else if (rotatingMap) {
@@ -564,29 +604,33 @@ namespace spades {
 
 				AABB2 bigInRect(mapCenter - bigMapHalf, mapCenter + bigMapHalf);
 				tracerClipRect = bigInRect;
+				visibleRect = AABB2(
+					MakeVector2(std::max(bigInRect.GetMinX(), 0.0F), std::max(bigInRect.GetMinY(), 0.0F)),
+					MakeVector2(std::min(bigInRect.GetMaxX(), mapSize.x), std::min(bigInRect.GetMaxY(), mapSize.y)));
 
 				renderer.BeginClippingRect(outRect);
 
+				// draw flat map
 				const auto& topLeft = RotateMap(MakeVector2(-bigScrHalf.x, -bigScrHalf.y));
 				const auto& topRight = RotateMap(MakeVector2(bigScrHalf.x, -bigScrHalf.y));
 				const auto& bottomLeft = RotateMap(MakeVector2(-bigScrHalf.x, bigScrHalf.y));
 				renderer.SetColorAlphaPremultiplied(MakeVector4(1, 1, 1, 1) * alpha);
 				renderer.DrawFlatGameMap(topLeft, topRight, bottomLeft, bigInRect);
 
+				// draw out of bounds area
+				DrawOutOfBounds(bigInRect, mapSize, alpha);
+
 				// draw grid lines
-				Vector2 gridSize = mapSize / 8.0F;
-				Vector4 gridCol = MakeVector4(0, 0, 0, 1) * 0.4F * alpha;
-				DrawGridLines(gridSize, bigInRect, gridCol, true);
+				DrawGridLines(gridSize, visibleRect, gridCol, true);
 
 				renderer.EndClippingRect();
 			} else {
+				// draw flat map
 				renderer.SetColorAlphaPremultiplied(MakeVector4(1, 1, 1, 1) * alpha);
 				renderer.DrawFlatGameMap(outRect, inRect);
 
 				// draw grid lines
-				Vector2 gridSize = mapSize / 8.0F;
-				Vector4 gridCol = MakeVector4(0, 0, 0, 1) * 0.4F * alpha;
-				DrawGridLines(gridSize, inRect, gridCol);
+				DrawGridLines(gridSize, visibleRect, gridCol);
 
 				// draw grid labels
 				Handle<IImage> mapFont = renderer.RegisterImage("Gfx/Fonts/MapFont.png");

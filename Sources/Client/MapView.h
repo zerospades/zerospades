@@ -58,6 +58,7 @@ namespace spades {
 			Vector2 RotateMap(const Vector2& offset) const;
 			Vector2 Project(const Vector2&, bool rotated = false) const;
 
+			void DrawOutOfBounds(const AABB2& view, const Vector2& mapSize, float alpha);
 			void DrawGridLines(const Vector2&, const AABB2&, const Vector4&, bool rotates = false);
 			void DrawIcon(const Vector2&, IImage& img, const Vector4&, float rotation = 0.0F);
 			void DrawText(IFont& font, std::string s, const Vector2&, const Vector4&);
