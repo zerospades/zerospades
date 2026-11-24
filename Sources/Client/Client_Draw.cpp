@@ -79,7 +79,6 @@ SPADES_SETTING(cg_keyDemoSpeedUp);
 SPADES_SETTING(cg_keyDemoSlowDown);
 SPADES_SETTING(cg_keyDemoToggleHud);
 DEFINE_SPADES_SETTING(cg_stats, "0");
-DEFINE_SPADES_SETTING(cg_statsSmallFont, "0");
 DEFINE_SPADES_SETTING(cg_playerStats, "0");
 DEFINE_SPADES_SETTING(cg_playerStatsShowPlacedBlocks, "0");
 DEFINE_SPADES_SETTING(cg_playerStatsHeight, "70");
@@ -412,41 +411,40 @@ namespace spades {
 
 		void Client::DrawRecordingIndicator() {
 			const float sw = renderer->ScreenWidth();
+			const float sh = renderer->ScreenHeight();
 
 			const int t = static_cast<int>(net->GetDemoRecordingTime());
 			char buf[32];
 			snprintf(buf, sizeof(buf), "REC %d:%02d", t / 60, t % 60);
 
-			IFont& font = fontManager->GetSmallGuiFont();
+			IFont& font = fontManager->GetSmallFont();
 			const Vector2 size = font.Measure(buf);
 
-			float minimapW = Clamp((float)cg_minimapSize, 32.0F, 256.0F);
-			float minimapY = 8.0F;
-			const int statsMode = cg_stats;
-			if (statsMode == 2 || (statsMode >= 3 && scoreboardVisible))
-				minimapY += cg_statsSmallFont ? 10.0F : 20.0F;
+			const float margin = 2.0F;
+			const float x = sw - margin - size.x;
+			const float y = sh - margin - size.y;
 
-			const float x = (sw - 8.0F) - minimapW - 8.0F - size.x;
-			const float y = minimapY;
-
-			const float right = x + size.x + 4.0F;
-			const float bottom = y + size.y + 4.0F;
+			const float barW = 2.0F;
+			const float rectPad = 2.0F;
+			const float rectLeft = x - rectPad;
+			const float rectTop = y - rectPad;
+			const float rectBottom = y + size.y + rectPad;
 
 			const Vector4 red = MakeVector4(1.0F, 0.15F, 0.15F, 1.0F);
 			const Vector4 black = MakeVector4(0.0F, 0.0F, 0.0F, 1.0F);
 			const Vector4 fade1 = MakeVector4(0.0F, 0.0F, 0.0F, 0.0F);
 			const Vector4 fade2 = MakeVector4(0.0F, 0.0F, 0.0F, 0.55F);
-			const Vector4 textColor = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
+			const Vector4 color = MakeVector4(1.0F, 1.0F, 1.0F, 1.0F);
 			const Vector4 outline = MakeVector4(0.0F, 0.0F, 0.0F, 0.7F);
 
 			const float pulse = 0.5F + 0.5F * sinf(time * 3.5F);
 			const Vector4 accent = black + (red - black) * pulse;
 
-			renderer->DrawFilledRectFade(x - 8.0F, y, right - 2.0F, bottom, fade1, fade2, true);
+			renderer->DrawFilledRectFade(rectLeft, rectTop, sw - barW, rectBottom, fade1, fade2, true);
 			renderer->SetColorAlphaPremultiplied(accent);
-			renderer->DrawFilledRect(right - 2.0F, y, right, bottom);
+			renderer->DrawFilledRect(sw - barW, rectTop, sw, rectBottom);
 
-			font.DrawOutline(buf, MakeVector2(x, y + 1.0F), 1.0F, textColor, outline);
+			font.DrawOutline(buf, MakeVector2(x - barW, y), 1.0F, color, outline);
 		}
 
 		void Client::DrawAlivePlayersCount() {
@@ -463,20 +461,15 @@ namespace spades {
 			float x = sw * 0.5F;
 			float y = 8.0F;
 
-			const int statsMode = cg_stats;
-
 			bool isDemoMode = IsDemoMode();
-			bool statsOnTop = statsMode == 2
-				|| (statsMode >= 3 && scoreboardVisible)
-				|| (statsMode == 1 && isDemoMode);
-			bool playerCountOnTop = (playerCountMode > 0
-				&& playerCountMode < 2)
-				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
+			bool statsEnabled = GetStatsLayout() == StatsLayout::Center;
+			bool statsOnTop = statsEnabled && isDemoMode;
+			bool playerCountOnTop = (playerCountMode > 0 && playerCountMode < 2)
+				|| ((playerCountMode >= 1 && playerCountMode < 3) && isDemoMode); // force on screen top for demo mode
 
 			// account for client stats height
-			if ((statsOnTop && playerCountOnTop)
-				|| ((statsMode > 0 && statsMode == 1) && !playerCountOnTop))
-				y += cg_statsSmallFont ? 10.0F : 20.0F;
+			if ((statsOnTop && playerCountOnTop) || (statsEnabled && !playerCountOnTop))
+				y += 10.0F;
 
 			float teamBarY = playerCountOnTop ? y : ((sh - y) - teamBarH);
 
@@ -1501,9 +1494,8 @@ namespace spades {
 			float winX = (sw - 8.0F) - wndSize.x;
 			float winY = (sh - 8.0F) - wndSize.y - 64.0F;
 
-			const int statsMode = cg_stats;
-			if (statsMode == 1)
-				winY -= cg_statsSmallFont ? 2.0F : 12.0F;
+			if (GetStatsLayout() == StatsLayout::Center)
+				winY -= 2.0F;
 
 			AABB2 inRect(128, 512 - 128, 256, 256 - 512); // flip Y axis
 			AABB2 outRect(winX, winY, wndSize.x, wndSize.y);
@@ -1761,9 +1753,8 @@ namespace spades {
 			float x = (sw - 16.0F) * safeZoneX;
 			float y = (sh - 16.0F) * safeZoneY;
 
-			const int statsMode = cg_stats;
-			if (statsMode == 1)
-				y -= cg_statsSmallFont ? 2.0F : 12.0F;
+			if (GetStatsLayout() == StatsLayout::Center)
+				y -= 2.0F;
 
 			// rounded for better pixel alignment
 			x = floorf(x);
@@ -2263,26 +2254,22 @@ namespace spades {
 			const float barH = 18.0F;
 			const float barX = (sw - barW) * 0.5F;
 
-			float barY = 16.0F;
+			float barY = 8.0F;
 
-			const int statsMode = cg_stats;
 			const int playerCountMode = cg_hudPlayerCount;
 
 			bool isDemoMode = IsDemoMode();
-			bool statsOnTop = statsMode == 2
-				|| (statsMode >= 3 && scoreboardVisible)
-				|| (statsMode == 1 && isDemoMode);
-			bool playerCountOnTop = (playerCountMode > 0
-				&& playerCountMode < 2)
-				|| (playerCountMode >= 1 && playerCountMode < 3 && isDemoMode); // force on screen top for demo mode
+			bool statsOnTop = GetStatsLayout() == StatsLayout::Center && isDemoMode;
+			bool playerCountOnTop = (playerCountMode > 0 && playerCountMode < 2)
+				|| ((playerCountMode >= 1 && playerCountMode < 3) && isDemoMode); // force on screen top for demo mode
 
 			// account for client stats height
 			if (statsOnTop)
-				barY += cg_statsSmallFont ? 10.0F : 20.0F;
+				barY += 10.0F;
 
 			// account for alive player count height
 			if (playerCountOnTop)
-				barY += 40.0F;
+				barY += 40.0F + 8.0F;
 
 			const Vector4 color = GetHUDColor(p);
 			float luminosity = color.x + color.y + color.z;
@@ -2601,10 +2588,8 @@ namespace spades {
 
 					if (cg_healScreenEffects)
 						DrawScreenEffect(false);
-
 					if (cg_playerNames && !debugScreenVisible)
 						DrawHottrackedPlayerName();
-
 					if (cg_damageIndicators && !debugScreenVisible)
 						DrawDamageIndicators();
 				} else if (spectatorPlayerNames && !debugScreenVisible) { // only if we are spectating
@@ -2834,77 +2819,146 @@ namespace spades {
 			font.Draw(hintStr, MakeVector2(margin, y), 1.0F, dim);
 		}
 
+		Client::StatsLayout Client::GetStatsLayout() {
+			const int statsMode = cg_stats;
+			if (statsMode <= 0)
+				return StatsLayout::Hidden;
+			// mode 3 only shows the stats while the scoreboard is visible
+			if (statsMode >= 3 && !scoreboardVisible)
+				return StatsLayout::Hidden;
+			// demo playback always uses the centered line, whatever the mode
+			if (statsMode == 1 || IsDemoMode())
+				return StatsLayout::Center;
+			return StatsLayout::Corner;
+		}
+
+		bool Client::ShowsNetworkStats() { return !IsDemoMode() && !netgraphVisible; }
+
+		namespace {
+			// Layout of the stats text. Shared by DrawStats and GetStatsCornerHeight so
+			// the killfeed offset always matches the list that is drawn.
+			constexpr float kStatsMargin = 2.0F;
+			constexpr float kStatsListEdge = 2.0F;
+			constexpr float kStatsListLineHeight = 12.0F;
+			constexpr float kStatsListGap = 2.0F;
+			constexpr float kStatsListKillfeedTop = 8.0F; // usual top margin of the killfeed
+			constexpr float kStatsListKillfeedGap = 4.0F; // space between the list and the killfeed
+
+			// The net graph has four label rows with a 2px gap between them, and the graph
+			// is as tall as that text block.
+			constexpr int kNetGraphRows = 4;
+			float NetGraphHeight() { return kStatsListLineHeight * kNetGraphRows - kStatsListGap; }
+
+			// FPS/UPS/ping, loss/choke and up/down with the network stats, otherwise FPS/UPS.
+			int StatsListLineCount(bool showNetwork) { return showNetwork ? 3 : 1; }
+
+			// Height of the top-left list; the list is flush with the top edge.
+			float StatsListHeight(int numLines) {
+				return kStatsListLineHeight * numLines + kStatsMargin * 2.0F - kStatsListGap;
+			}
+
+			// "60FPS", or "FPS: NA" when the rate is not known yet.
+			std::string FormatRate(double rate, const char* unit) {
+				if (rate <= 0)
+					return std::string(unit) + ": NA";
+				char buf[32];
+				snprintf(buf, sizeof(buf), "%.0f%s", rate, unit);
+				return buf;
+			}
+		} // namespace
+
+		float Client::GetStatsCornerHeight() {
+			// bottom edge of everything drawn in the top-left corner
+			float bottom = 0.0F;
+			if (GetStatsLayout() == StatsLayout::Corner)
+				bottom = StatsListHeight(StatsListLineCount(ShowsNetworkStats()));
+			if (netgraphVisible && !IsDemoMode())
+				bottom += NetGraphHeight() + kStatsMargin * 2.0F;
+			if (bottom <= 0.0F)
+				return 0.0F;
+
+			// extra offset the killfeed needs to end up `gap` below the list
+			return std::max(0.0F, bottom + kStatsListKillfeedGap - kStatsListKillfeedTop);
+		}
+
 		void Client::DrawStats() {
 			SPADES_MARK_FUNCTION();
 
-			bool isDemoMode = IsDemoMode();
-
-			// only draw stats when scoreboard is visible
-			const int statsMode = cg_stats;
-			if (statsMode >= 3 && !scoreboardVisible)
+			const StatsLayout layout = GetStatsLayout();
+			if (layout == StatsLayout::Hidden)
 				return;
 
-			float sw = renderer->ScreenWidth();
-			float sh = renderer->ScreenHeight();
+			const bool showNetwork = ShowsNetworkStats();
 
 			char buf[64];
-			std::string str;
+			const std::string fps = FormatRate(fpsCounter.GetFps(), "FPS");
+			const std::string ups = FormatRate(upsCounter.GetFps(), "UPS"); // world updates per second
+			std::string ping, upDown, loss, choke;
 
-			{
-				auto fps = fpsCounter.GetFps();
-				if (fps <= 0) {
-					str += "FPS: NA";
-				} else {
-					snprintf(buf, sizeof(buf), "%.0fFPS", fps);
-					str += buf;
-				}
-			}
-			{
-				// Display world updates per second
-				auto ups = upsCounter.GetFps();
-				if (ups <= 0) {
-					str += ", UPS: NA";
-				} else {
-					snprintf(buf, sizeof(buf), ", %.0fUPS", ups);
-					str += buf;
-				}
-			}
-
-			if (!isDemoMode && !netgraphVisible) {
-				auto ping = activeNet->GetPing();
-				snprintf(buf, sizeof(buf), ", ping: %dms", ping);
-				str += buf;
+			if (showNetwork) {
+				snprintf(buf, sizeof(buf), "ping: %dms", activeNet->GetPing());
+				ping = buf;
 
 				auto upbps = activeNet->GetUplinkBps() / 1000;
 				auto downbps = activeNet->GetDownlinkBps() / 1000;
-				snprintf(buf, sizeof(buf), ", up/down: %.02f/%.02fkbps", upbps, downbps);
-				str += buf;
+				snprintf(buf, sizeof(buf), "up/down: %.02f/%.02fkbps", upbps, downbps);
+				upDown = buf;
 
-				auto loss = activeNet->GetPacketLoss() * 100.0F;
-				snprintf(buf, sizeof(buf), ", loss: %.0f%%", loss);
-				str += buf;
+				auto lossPercent = activeNet->GetPacketLoss() * 100.0F;
+				snprintf(buf, sizeof(buf), "loss: %.0f%%", lossPercent);
+				loss = buf;
 
-				auto throttle = activeNet->GetPacketThrottle();
-				auto choke = (1.0F - throttle) * 100.0F;
-				snprintf(buf, sizeof(buf), ", choke: %.0f%%", choke);
-				str += buf;
+				auto chokePercent = (1.0F - activeNet->GetPacketThrottle()) * 100.0F;
+				snprintf(buf, sizeof(buf), "choke: %.0f%%", chokePercent);
+				choke = buf;
 			}
 
-			// add margin
-			const float margin = 2.0F;
-			IFont& font = cg_statsSmallFont
-				? fontManager->GetSmallFont()
-				: fontManager->GetGuiFont();
-			Vector2 size = font.Measure(str) + (margin * 2.0F);
+			IFont& font = fontManager->GetSmallFont();
+			const Vector4 white = MakeVector4(1, 1, 1, 1);
+			const Vector4 outline = MakeVector4(0, 0, 0, 0.8F);
+
+			if (layout == StatsLayout::Corner) {
+				std::vector<std::string> lines;
+				if (showNetwork) {
+					lines.push_back(fps + ", " + ups + ", " + ping);
+					lines.push_back(loss + ", " + choke);
+					lines.push_back(upDown);
+				} else {
+					lines.push_back(fps + ", " + ups);
+				}
+
+				float maxW = 0.0F;
+				for (const auto& line : lines)
+					maxW = std::max(maxW, font.Measure(line).x);
+
+				const float bottom = StatsListHeight(static_cast<int>(lines.size()));
+				const float fadeEnd = kStatsListEdge + maxW + kStatsMargin;
+				const Vector4 bgSolid = MakeVector4(0, 0, 0, 0.55F);
+				const Vector4 bgClear = MakeVector4(0, 0, 0, 0);
+				renderer->DrawFilledRectFade(0.0F, 0.0F, fadeEnd, bottom, bgSolid, bgClear, true);
+
+				float y = kStatsMargin;
+				for (const auto& line : lines) {
+					font.DrawOutline(line, MakeVector2(kStatsListEdge, y), 1.0F, white, outline);
+					y += kStatsListLineHeight;
+				}
+				return;
+			}
+
+			// StatsLayout::Center: one centered line, at the bottom of the screen
+			// (at the top in demo mode)
+			std::string text = fps + ", " + ups;
+			if (showNetwork)
+				text += ", " + ping + ", " + upDown + ", " + loss + ", " + choke;
+
+			const float sw = renderer->ScreenWidth();
+			const float sh = renderer->ScreenHeight();
+
+			Vector2 size = font.Measure(text) + (kStatsMargin * 2.0F);
 			Vector2 pos = MakeVector2(sw, sh) - size;
-			pos *= MakeVector2(0.5F, (statsMode >= 2 || isDemoMode) ? 0.0F : 1.0F);
-
-			Vector4 color = MakeVector4(1, 1, 1, 1);
-			Vector4 outline = MakeVector4(0, 0, 0, 0.8F);
-
-			// draw text
-			pos += MakeVector2(margin, margin);
-			font.DrawOutline(str, pos, 1.0F, color, outline);
+			pos *= MakeVector2(0.5F, IsDemoMode() ? 0.0F : 1.0F);
+			pos += MakeVector2(kStatsMargin, kStatsMargin);
+			font.DrawOutline(text, pos, 1.0F, white, outline);
 		}
 
 		void Client::DrawNetGraph() {
@@ -2912,21 +2966,24 @@ namespace spades {
 
 			IFont& font = fontManager->GetSmallFont();
 
-			// const float sw = renderer->ScreenWidth();
-			const float sh = renderer->ScreenHeight();
-
-			const float margin = 4.0F;
+			const float margin = kStatsMargin;
 			const float graphW = 128.0F;
-			const float graphH = 64.0F;
-			const float graphX = margin;
-			const float graphY = (sh * 0.5F) - margin - graphH * 0.5F;
-
-			// label column to the right of the graph
 			const float labelColW = 64.0F;
+
+			// Vertical layout: every label row is the text height plus a 2px gap,
+			// and the graph is as tall as the text block (no trailing gap).
+			const float rowH = kStatsListLineHeight;
+			const float graphH = NetGraphHeight();
+
+			// Top left corner, below the corner stats list when it is visible.
+			float top = 0.0F;
+			if (GetStatsLayout() == StatsLayout::Corner)
+				top = StatsListHeight(StatsListLineCount(ShowsNetworkStats()));
+
+			const float graphX = margin;
+			const float graphY = top + kStatsMargin;
 			const float panelX = graphX;
 			const float panelW = graphW + margin + labelColW;
-			const float panelH = graphH;
-			const float panelY = graphY;
 
 			// colors
 			const Vector4 white = MakeVector4(1, 1, 1, 1);
@@ -2938,8 +2995,8 @@ namespace spades {
 			const Vector4 colBorder = MakeVector4(0.6F, 0.6F, 0.6F, 0.6F);
 
 			// draw background
-			const float bgTop = panelY - margin;
-			const float bgBottom = panelY + panelH + margin;
+			const float bgTop = top;
+			const float bgBottom = graphY + graphH + kStatsMargin;
 			const float solidEnd = graphX + graphW + margin;
 			const float fadeEnd = panelX + panelW + margin;
 			const Vector4 bgTransparent = MakeVector4(0, 0, 0, 0);
@@ -2972,21 +3029,21 @@ namespace spades {
 				float baseH = graphY + graphH;
 
 				{
-					float top = std::max(baseH - downH, graphY);
+					float rectTop = std::max(baseH - downH, graphY);
 					renderer->SetColorAlphaPremultiplied(colDown);
-					renderer->DrawFilledRect(x, top, x + colW, baseH);
-					baseH = top;
+					renderer->DrawFilledRect(x, rectTop, x + colW, baseH);
+					baseH = rectTop;
 				}
 				{
-					float top = std::max(baseH - upH, graphY);
+					float rectTop = std::max(baseH - upH, graphY);
 					renderer->SetColorAlphaPremultiplied(colUp);
-					renderer->DrawFilledRect(x, top, x + colW, baseH);
-					baseH = top;
+					renderer->DrawFilledRect(x, rectTop, x + colW, baseH);
+					baseH = rectTop;
 				}
 				{
-					float top = std::max(baseH - pingH, graphY);
+					float rectTop = std::max(baseH - pingH, graphY);
 					renderer->SetColorAlphaPremultiplied(colPing);
-					renderer->DrawFilledRect(x, top, x + colW, baseH);
+					renderer->DrawFilledRect(x, rectTop, x + colW, baseH);
 				}
 			}
 
@@ -2994,20 +3051,18 @@ namespace spades {
 			renderer->SetColorAlphaPremultiplied(colBorder);
 			renderer->DrawOutlinedRect(graphX - 1, graphY - 1, graphX + graphW + 1, graphY + graphH + 1);
 
-			// draw labels (right-aligned text in the label column)
+			// draw labels (right-aligned values in the label column)
 			const float downKbps = std::min(static_cast<float>(activeNet->GetDownlinkBps() / 1000.0), 999.0F);
 			const float upKbps = std::min(static_cast<float>(activeNet->GetUplinkBps() / 1000.0), 999.0F);
 			const float pingMs = std::min(static_cast<float>(activeNet->GetPing()), 999.0F);
 			const float lossPer = activeNet->GetPacketLoss() * 100.0F;
 
 			char buf[64];
-			const float lh = graphH / 4.0F;
-			Vector2 labelPos = MakeVector2(graphX + graphW + margin, panelY);
+			Vector2 labelPos = MakeVector2(graphX + graphW + margin, graphY);
 			auto drawLabel = [&](const std::string& label, const std::string& value, const Vector4& col) {
-				float ty = labelPos.y + (lh - font.Measure(label).y) * 0.5F;
-				font.DrawOutline(label, MakeVector2(labelPos.x, ty), 1.0F, col, outline);
-				font.DrawOutline(value, MakeVector2(labelPos.x + labelColW - font.Measure(value).x, ty), 1.0F, col, outline);
-				labelPos.y += lh;
+				font.DrawOutline(label, labelPos, 1.0F, col, outline);
+				font.DrawOutline(value, MakeVector2(labelPos.x + labelColW - font.Measure(value).x, labelPos.y), 1.0F, col, outline);
+				labelPos.y += rowH;
 			};
 
 			snprintf(buf, sizeof(buf), "%.0fkbps", downKbps);

@@ -231,7 +231,6 @@ namespace spades {
 			                 {_Tr("Preferences", "OFF"), _Tr("Preferences", "Top"),
 			                  _Tr("Preferences", "Bottom")},
 			                 {0, 2, 1});
-			l.AddToggleField(_Tr("Preferences", "Small Stats Font"), "cg_statsSmallFont");
 			l.AddToggleField(_Tr("Preferences", "Show Player Statistics"), "cg_playerStats");
 			l.AddToggleField(_Tr("Preferences", "Show Placed Blocks"),
 			                 "cg_playerStatsShowPlacedBlocks");

@@ -36,9 +36,6 @@ DEFINE_SPADES_SETTING(cg_killfeedHeight, "26");
 DEFINE_SPADES_SETTING(cg_chatFadeTime, "12");
 DEFINE_SPADES_SETTING(cg_killfeedFadeTime, "6");
 
-SPADES_SETTING(cg_stats);
-SPADES_SETTING(cg_statsSmallFont);
-
 namespace spades {
 	namespace client {
 
@@ -230,12 +227,9 @@ namespace spades {
 			float lh = GetLineHeight();
 			float y = killfeed ? firstY : winH - firstY;
 
-			if (killfeed) {
-				bool demoMode = client->IsDemoMode();
-				const int statsMode = cg_stats;
-				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !demoMode)
-					winY += cg_statsSmallFont ? 10.0F : 20.0F;
-			}
+			// push the killfeed down below the top-left stats list (cg_stats 2 and 3)
+			if (killfeed)
+				winY += client->GetStatsCornerHeight();
 
 			Vector4 shadowColor = { 0, 0, 0, 0.8F };
 			Vector4 brightShadowColor = { 1, 1, 1, 0.8F };

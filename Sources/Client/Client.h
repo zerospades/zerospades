@@ -631,6 +631,11 @@ namespace spades {
 			void DrawCompassBar(Player&);
 			void DrawReloadIndicator(const Vector4&);
 			void DrawStats();
+
+			enum class StatsLayout { Hidden, Center, Corner };
+			StatsLayout GetStatsLayout();
+			/** Whether the stats include the network values (ping, up/down, loss, choke). */
+			bool ShowsNetworkStats();
 			void DrawNetGraph();
 
 			struct DebugScreenLine;
@@ -840,6 +845,10 @@ namespace spades {
 			bool IsScoreboardVisible() { return scoreboardVisible; }
 			bool IsNetgraphVisible() { return netgraphVisible; }
 			bool IsDebugScreenVisible() { return debugScreenVisible; }
+
+			/** Extra vertical offset the killfeed needs to sit below the top-left stats list
+			 * (cg_stats 2, or 3 with the scoreboard visible); 0 when that list is not shown. */
+			float GetStatsCornerHeight();
 
 			/** What the Teamplay extension has made this client remember. */
 			const Teamplay& GetTeamplay() const { return *teamplay; }

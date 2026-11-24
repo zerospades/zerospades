@@ -48,9 +48,6 @@ DEFINE_SPADES_SETTING(cg_minimapPlayerColor, "1");
 DEFINE_SPADES_SETTING(cg_minimapPlayerNames, "0");
 DEFINE_SPADES_SETTING(cg_minimapPlayerSounds, "0");
 
-SPADES_SETTING(cg_stats);
-SPADES_SETTING(cg_statsSmallFont);
-
 using std::pair;
 using stmp::optional;
 
@@ -522,12 +519,6 @@ namespace spades {
 
 			float winX = (sw - 8.0F) - mapWndSize.x;
 			float winY = 8.0F;
-
-			if (!largeMap) {
-				const int statsMode = cg_stats;
-				if ((statsMode == 2 || (statsMode >= 3 && client->IsScoreboardVisible())) && !isDemoMode)
-					winY += cg_statsSmallFont ? 10.0F : 20.0F;
-			}
 
 			AABB2 outRect(winX, winY, mapWndSize.x, mapWndSize.y);
 			if (largeMap) {
