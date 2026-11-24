@@ -80,6 +80,9 @@ namespace spades {
 			ui::Button* filterProtocol4Button;
 			ui::Button* filterFullButton;
 			ui::Field* filterField;
+			ui::Button* filterListButton;
+			/** URL of the only server list to show; empty shows all of them. */
+			std::string filterListUrl;
 
 			ui::ListView* serverList;
 			MainScreenServerListLoadingView* loadingView;
@@ -168,6 +171,8 @@ namespace spades {
 
 			void SortServerList(int keyId);
 			void UpdateServerList(bool refresh = true);
+			void ShowServerListFilter();
+			void UpdateServerListFilterCaption();
 			void CheckServerList();
 
 			void OnAddressChanged(ui::UIElement& sender);

@@ -38,6 +38,7 @@
 #include <Gui/UI/Framework/UIManager.h>
 #include <Gui/UI/Settings/PreferenceView.h>
 #include <Gui/UI/Widgets/DrawUtils.h>
+#include <Gui/UI/Widgets/DropDownList.h>
 #include <Gui/UI/Widgets/Label.h>
 #include <Gui/UI/Widgets/MessageBox.h>
 #include <Gui/UI/Widgets/TextPromptScreen.h>
@@ -322,6 +323,22 @@ namespace spades {
 					filterField->placeholder = _Tr("MainScreen", "Filter");
 					filterField->changed = [this](UIElement&) { UpdateServerList(); };
 					serverPanel->AddChild(filterField);
+				}
+
+				{
+					// Between the text filter and the Setup button, which starts at
+					// contentsWidth - 212. On a screen too narrow for it, it is left
+					// out and every list is shown.
+					const float left = 315.0F;
+					const float width = std::min(220.0F, contentsWidth - 217.0F - left);
+					Handle<Button> button = Handle<Button>::New(manager);
+					filterListButton = button.GetPointerOrNull();
+					filterListButton->SetBounds(
+					  AABB2(contentsLeft + left, footerPos, std::max(width, 0.0F), 30.0F));
+					filterListButton->visible = width >= 80.0F;
+					filterListButton->activated = [this](UIElement&) { ShowServerListFilter(); };
+					serverPanel->AddChild(filterListButton);
+					UpdateServerListFilterCaption();
 				}
 
 				// --- Demo panel contents ---
@@ -1046,6 +1063,49 @@ namespace spades {
 			UpdateServerList();
 		}
 
+		void MainScreenMainMenu::UpdateServerListFilterCaption() {
+			std::string name = _Tr("MainScreen", "All");
+			for (const MainScreenServerListSource& s : helper->GetServerListSources()) {
+				if (s.url == filterListUrl)
+					name = s.name;
+			}
+
+			// Buttons do not clip their caption: shorten the name until it fits.
+			std::string caption = _Tr("MainScreen", "Server List: {0}", name);
+			client::IFont* font = filterListButton->GetFont();
+			const float room = filterListButton->GetBounds().GetWidth() - 12.0F;
+			while (font && font->Measure(caption).x > room && !name.empty()) {
+				// Drop one UTF-8 character: its continuation bytes, then its lead byte.
+				while (!name.empty() && (static_cast<unsigned char>(name.back()) & 0xC0) == 0x80)
+					name.pop_back();
+				if (!name.empty())
+					name.pop_back();
+				caption = _Tr("MainScreen", "Server List: {0}", name + "...");
+			}
+			filterListButton->caption = caption;
+		}
+
+		void MainScreenMainMenu::ShowServerListFilter() {
+			std::vector<MainScreenServerListSource> sources = helper->GetServerListSources();
+			std::vector<std::string> items{_Tr("MainScreen", "All")};
+			int selected = 0;
+			for (const MainScreenServerListSource& s : sources) {
+				if (s.url == filterListUrl)
+					selected = static_cast<int>(items.size());
+				items.push_back(s.name);
+			}
+			ui::ShowDropDownList(
+			  *filterListButton, std::move(items),
+			  [this, sources](int index) {
+				  if (index < 0)
+					  return; // dismissed
+				  filterListUrl = index == 0 ? std::string() : sources[index - 1].url;
+				  UpdateServerListFilterCaption();
+				  UpdateServerList();
+			  },
+			  selected);
+		}
+
 		void MainScreenMainMenu::UpdateServerList(bool refresh) {
 			std::string key = "";
 			switch (static_cast<int>(cg_serverlistSort) & 0xFFF) {
@@ -1057,8 +1117,21 @@ namespace spades {
 				case 5: key = "Protocol"; break;
 				case 6: key = "Country"; break;
 			}
-			std::vector<Handle<MainScreenServerItem>> list =
-			    helper->GetServerList(key, (static_cast<int>(cg_serverlistSort) & 0x4000) != 0);
+			// A list that stopped answering cannot be picked again: show all. Not
+			// while loading, when the lists are not known yet.
+			if (!loading && !filterListUrl.empty()) {
+				std::vector<MainScreenServerListSource> sources = helper->GetServerListSources();
+				if (std::none_of(sources.begin(), sources.end(),
+				                 [&](const MainScreenServerListSource& s) {
+					                 return s.url == filterListUrl;
+				                 })) {
+					filterListUrl.clear();
+					UpdateServerListFilterCaption();
+				}
+			}
+
+			std::vector<Handle<MainScreenServerItem>> list = helper->GetServerList(
+			  key, (static_cast<int>(cg_serverlistSort) & 0x4000) != 0, filterListUrl);
 			if (list.empty() || loading) {
 				serverList->SetModel(Handle<ListViewModel>::New().GetPointerOrNull()); // empty
 				return;

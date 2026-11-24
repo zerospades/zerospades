@@ -533,9 +533,17 @@ namespace spades {
 			fpsSlider->mapper = [](float v) { return (v < 20) ? 0.0F : v; };
 			l.AddSliderField(_Tr("Preferences", "Console Scrollback Lines"),
 			                 "cl_consoleScrollbackLines", 100, 2000, 100, NumberFormatter(0, ""));
-			l.AddInputField(_Tr("Preferences", "Server List URL"), "cl_serverListUrl", true, true);
-			l.AddInputField(_Tr("Preferences", "Server List Alt. URL"), "cl_serverListUrlFallback",
+			l.AddInputField(_Tr("Preferences", "Your Server Lists"), "cl_zsServerListUrls", true,
+			                true);
+			l.AddHelp(_Tr("Preferences",
+			              "Server lists to add to the known ones, separated by spaces. Every list "
+			              "is downloaded and merged into one. When lists disagree on a server's "
+			              "player count or capacity, the highest wins."));
+			l.AddInputField(_Tr("Preferences", "Excluded Server Lists"), "cl_zsServerListsExcluded",
 			                true, true);
+			l.AddHelp(_Tr("Preferences",
+			              "Server lists not to download, known ones included, separated by "
+			              "spaces."));
 			l.AddToggleField(_Tr("Preferences", "Allow Unicode"), "cg_unicode");
 			l.AddHelp(_Tr("Preferences",
 				"Lets you use other alphabets and symbols (such as Cyrillic or Japanese) "

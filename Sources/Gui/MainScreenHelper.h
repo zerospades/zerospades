@@ -20,9 +20,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <memory>
 #include <unordered_set>
 #include <vector>
-#include <memory>
 
 #include <Core/RefCountedObject.h>
 #include <Core/TMPUtils.h>
@@ -34,6 +35,13 @@ namespace spades {
 	namespace gui {
 		class MainScreen;
 		class SoftwareCursor;
+
+		/** What one server list says of a server. */
+		struct MainScreenServerListReport {
+			std::string url; // the list
+			int numPlayers;
+			int maxPlayers;
+		};
 
 		class MainScreenServerItem : public RefCountedObject {
 			friend class MainScreenHelper;
@@ -47,12 +55,17 @@ namespace spades {
 			int numPlayers;
 			int maxPlayers;
 			bool favorite;
-			
+			/** The server lists that report this server; empty for a LAN server. */
+			std::vector<MainScreenServerListReport> sources;
+
 		protected:
 			~MainScreenServerItem();
 
 		public:
 			MainScreenServerItem(ServerItem *, bool favorite);
+			/** `base` as `report`'s list alone describes it: with its player counts. */
+			MainScreenServerItem(const MainScreenServerItem& base,
+			                     const MainScreenServerListReport& report);
 
 			std::string GetName() const { return name; }
 			std::string GetAddress() const { return address; }
@@ -66,10 +79,28 @@ namespace spades {
 			int GetMaxPlayers() const { return maxPlayers; }
 			bool IsFavorite() const { return favorite; }
 			void SetFavorite(bool favorite) { this->favorite = favorite; }
+			const std::vector<MainScreenServerListReport>& GetSources() const { return sources; }
+			void SetSources(std::vector<MainScreenServerListReport> s) { sources = std::move(s); }
+			/** What the list at `url` says of this server; null if it does not list it. */
+			const MainScreenServerListReport* GetReport(const std::string& url) const {
+				for (const MainScreenServerListReport& r : sources) {
+					if (r.url == url)
+						return &r;
+				}
+				return nullptr;
+			}
+		};
+
+		/** A server list that answered the last query. */
+		struct MainScreenServerListSource {
+			std::string url;
+			std::string name; // short, for the filter
 		};
 
 		struct MainScreenServerList {
 			std::vector<Handle<MainScreenServerItem>> list;
+			/** The server lists merged into `list`, in merge order. */
+			std::vector<MainScreenServerListSource> sources;
 			std::string message;
 
 			~MainScreenServerList();
@@ -110,9 +141,19 @@ namespace spades {
 			/** Returns `true` once after a LAN server was added to the list. */
 			bool PollLanServers();
 			void StartQuery();
-			std::vector<Handle<MainScreenServerItem>> GetServerList(const std::string& sortKey,
-			                                                        bool descending);
+			/**
+			 * The servers, sorted. With `listUrl`, only those that list reports, with
+			 * that list's own player counts instead of the highest of every list.
+			 */
+			std::vector<Handle<MainScreenServerItem>>
+			GetServerList(const std::string& sortKey, bool descending,
+			              const std::string& listUrl = "");
 			std::string GetServerListQueryMessage();
+			/**
+			 * The server lists merged into the current list. Empty until the first
+			 * list arrives; during a refresh, the lists of the previous one.
+			 */
+			std::vector<MainScreenServerListSource> GetServerListSources();
 			int GetServerPing(std::string address);
 			std::string ConnectServer(std::string hostname, int protocolVersion, std::string mapName = "");
 			std::string GetPendingErrorMessage();
