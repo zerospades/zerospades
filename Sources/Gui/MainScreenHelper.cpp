@@ -22,10 +22,12 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <memory>
+#include <sstream>
 #include <sys/stat.h>
+#include <vector>
 
 #include <curl/curl.h>
 #include <json/json.h>
@@ -38,12 +40,21 @@
 #include <Core/IStream.h>
 #include <Core/Settings.h>
 #include <Core/Thread.h>
+#include <Gui/ServerListMerge.h>
 #include <Gui/Utils/LanDiscovery.h>
 #include <Gui/Utils/PingTester.h>
 #include <ZeroSpades.h>
 
 DEFINE_SPADES_SETTING(cl_serverListUrl, "http://services.buildandshoot.com/serverlist.json");
 DEFINE_SPADES_SETTING(cl_serverListUrlFallback, "https://checkpoint.aos.coffee/serverlist.json");
+// The player's own server lists, separated by spaces, merged with the known ones
+// below. Prefixed `zs` because the client shares SPConfig.cfg with OpenSpades.
+DEFINE_SPADES_SETTING(cl_zsServerListUrls, "");
+// Server lists not to download, separated by spaces, known ones included.
+DEFINE_SPADES_SETTING(cl_zsServerListsExcluded, "");
+// Set once a custom cl_serverListUrl / cl_serverListUrlFallback was copied into
+// cl_zsServerListUrls, so a list the player then removes stays removed.
+DEFINE_SPADES_SETTING(cl_zsServerListsMigrated, "0");
 
 namespace spades {
 	extern std::string g_pendingMapName;
@@ -54,6 +65,105 @@ namespace spades {
 		struct CURLEasyDeleter {
 			void operator()(CURL *ptr) const { curl_easy_cleanup(ptr); }
 		};
+
+		struct CURLMultiDeleter {
+			void operator()(CURLM* ptr) const { curl_multi_cleanup(ptr); }
+		};
+
+		/**
+		 * Every server list known to be live, always merged. A list is added here
+		 * rather than to a setting's default: settings are saved with their value,
+		 * so a new default would never reach players who already have a config.
+		 * Earlier entries win ties when lists disagree (see `MergeServerLists`), so
+		 * lists served over HTTPS come first: a tampered plain-HTTP response cannot
+		 * then rename a server or change the game version used to join it.
+		 */
+		constexpr const char* kKnownServerLists[] = {
+		  // A mirror of Build and Shoot's, over HTTPS.
+		  "https://checkpoint.aos.coffee/serverlist.json",
+		  // Build and Shoot's master; caps capacity at 32. Plain HTTP only.
+		  "http://services.buildandshoot.com/serverlist.json",
+		  // LSd's author's master, which LSd servers announce to; reports real
+		  // capacity, up to 254 players.
+		  "https://66.135.15.57/serverlist.json",
+		};
+
+		bool IsKnownServerList(const std::string& url) {
+			for (const char* known : kKnownServerLists) {
+				if (url == known)
+					return true;
+			}
+			return false;
+		}
+
+		/**
+		 * Copies, once, a custom list set in the settings inherited from
+		 * OpenSpades (`cl_serverListUrl`, `cl_serverListUrlFallback`) into the
+		 * player's own lists, where Preferences shows it and it can be removed.
+		 * The inherited settings are left as they are, since OpenSpades reads
+		 * them from the same file, and are not read again.
+		 */
+		void MigrateInheritedServerListSettings() {
+			if (static_cast<bool>(cl_zsServerListsMigrated))
+				return;
+
+			std::string own = cl_zsServerListUrls.CString();
+			std::vector<std::string> ownUrls;
+			{
+				std::istringstream in(own);
+				std::string url;
+				while (in >> url)
+					ownUrls.push_back(url);
+			}
+			for (const char* setting :
+			     {cl_serverListUrl.CString(), cl_serverListUrlFallback.CString()}) {
+				std::istringstream in(setting);
+				std::string url;
+				while (in >> url) {
+					if (IsKnownServerList(url) ||
+					    std::find(ownUrls.begin(), ownUrls.end(), url) != ownUrls.end())
+						continue;
+					SPLog("Server lists: keeping %s, set in an older setting, as your own list",
+					      url.c_str());
+					ownUrls.push_back(url);
+					own += own.empty() ? url : " " + url;
+				}
+			}
+			cl_zsServerListUrls = own;
+			cl_zsServerListsMigrated = 1;
+		}
+
+		/**
+		 * Every server list to merge: the known ones, then the player's own, split
+		 * on spaces, without empty entries, duplicates or excluded lists. Call on
+		 * the UI thread: it reads and may write settings.
+		 */
+		std::vector<std::string> ServerListUrls() {
+			MigrateInheritedServerListSettings();
+
+			std::vector<std::string> excluded;
+			{
+				std::istringstream in(cl_zsServerListsExcluded.CString());
+				std::string url;
+				while (in >> url)
+					excluded.push_back(url);
+			}
+
+			std::vector<std::string> urls;
+			auto add = [&](const char* text) {
+				std::istringstream in(text);
+				std::string url;
+				while (in >> url) {
+					if (std::find(urls.begin(), urls.end(), url) == urls.end() &&
+					    std::find(excluded.begin(), excluded.end(), url) == excluded.end())
+						urls.push_back(url);
+				}
+			};
+			for (const char* url : kKnownServerLists)
+				add(url);
+			add(cl_zsServerListUrls.CString());
+			return urls;
+		}
 	} // namespace
 
 	class ServerItem {
@@ -67,7 +177,7 @@ namespace spades {
 				   const std::string &version, int ping, int players, int maxPlayers);
 
 	public:
-		static ServerItem *Create(Json::Value &val);
+		static ServerItem* Create(const Json::Value& val);
 
 		inline const std::string &GetName() const { return mName; }
 		inline const std::string &GetAddress() const { return mIp; }
@@ -93,26 +203,21 @@ namespace spades {
 		  mPlayers(players),
 		  mMaxPlayers(maxPlayers) {}
 
-	ServerItem *ServerItem::Create(Json::Value &val) {
-		ServerItem *item = NULL;
-		if (val.type() == Json::objectValue) {
-			std::string name, ip, map, gameMode, country, version;
-			int ping = 0, players = 0, maxPlayers = 0;
-
-			name = TrimSpaces(val["name"].asString());
-			ip = val["identifier"].asString();
-			map = val["map"].asString();
-			gameMode = val["game_mode"].asString();
-			country = val["country"].asString();
-			version = val["game_version"].asString();
-
-			ping = val["latency"].asInt();
-			players = val["players_current"].asInt();
-			maxPlayers = val["players_max"].asInt();
-			item =
-			  new ServerItem(name, ip, map, gameMode, country, version, ping, players, maxPlayers);
-		}
-		return item;
+	ServerItem* ServerItem::Create(const Json::Value& val) {
+		// The entry comes from the network: a field of the wrong type reads as
+		// missing instead of throwing, which would lose the whole list.
+		if (!val.isObject())
+			return NULL;
+		using gui::ServerListIdentifier;
+		using gui::ServerListInt;
+		using gui::ServerListPlayers;
+		using gui::ServerListString;
+		return new ServerItem(TrimSpaces(ServerListString(val, "name")), ServerListIdentifier(val),
+		                      ServerListString(val, "map"), ServerListString(val, "game_mode"),
+		                      ServerListString(val, "country"),
+		                      ServerListString(val, "game_version"), ServerListInt(val, "latency"),
+		                      ServerListPlayers(val, "players_current"),
+		                      ServerListPlayers(val, "players_max"));
 	}
 
 	namespace gui {
@@ -120,83 +225,189 @@ namespace spades {
 
 		class MainScreenHelper::ServerListQuery final : public Thread {
 			Handle<MainScreenHelper> owner;
-			std::string buffer;
+
+			// Copied on the UI thread when the query is made: the UI changes the
+			// owner's favorites and the settings while the query runs.
+			const std::unordered_set<std::string> favorites;
+			std::vector<std::string> urls;
+
+			// A list can take this long in all, so a dead or trickling one only
+			// leaves itself out instead of holding up the others.
+			static constexpr long kConnectTimeoutSeconds = 5;
+			static constexpr long kTotalTimeoutSeconds = 10;
+
+			// About ten times the largest list today (Build and Shoot's, 8246 bytes on
+			// 2026-11-24); a larger response is cut off rather than held in memory.
+			static constexpr std::size_t kMaxListBytes = 85 * 1024;
+
+			/** One server list being downloaded. */
+			struct Source {
+				std::string url;
+				std::string body;
+				std::unique_ptr<CURL, CURLEasyDeleter> handle;
+				CURLcode result = CURLE_OK;
+				bool done = false;
+				bool tooLarge = false;
+			};
+
+			/**
+			 * Detaches every transfer from the group before the group is freed,
+			 * as libcurl requires, including when an error cuts the fetch short.
+			 */
+			struct MultiGuard {
+				std::unique_ptr<CURLM, CURLMultiDeleter> multi;
+				std::vector<CURL*> added;
+				~MultiGuard() {
+					for (CURL* h : added)
+						curl_multi_remove_handle(multi.get(), h);
+				}
+			};
 
 			void ReturnResult(std::unique_ptr<MainScreenServerList> &&list) {
 				owner->resultCell.store(std::move(list));
 				owner = NULL; // release owner
 			}
 
-			void ProcessResponse() {
-				Json::Reader reader;
-				Json::Value root;
-				auto resp = stmp::make_unique<MainScreenServerList>();
-
-				if (reader.parse(buffer, root, false)) {
-					for (Json::Value::iterator it = root.begin(); it != root.end(); ++it) {
-						Json::Value &obj = *it;
-						std::unique_ptr<ServerItem> srv{ServerItem::Create(obj)};
-						if (srv) {
-							resp->list.emplace_back(
-							  new MainScreenServerItem(
-								srv.get(), owner->favorites.count(srv->GetAddress()) >= 1),
-							  false);
-						}
-					}
+			static size_t Write(void* ptr, size_t size, size_t nmemb, Source* source) {
+				size_t numBytes = size * nmemb;
+				if (numBytes > kMaxListBytes - source->body.size()) {
+					// Returning less than given aborts the transfer.
+					source->tooLarge = true;
+					return 0;
 				}
-
-				ReturnResult(std::move(resp));
+				source->body.append(reinterpret_cast<char*>(ptr), numBytes);
+				return numBytes;
 			}
 
-			// Performs a single HTTP GET against `url`, appending the response
-			// body to `buffer`. Returns the cURL result code so the caller can
-			// decide whether to fall back to another URL.
-			CURLcode FetchUrl(const char* url) {
-				std::unique_ptr<CURL, CURLEasyDeleter> cHandle{curl_easy_init()};
-				if (!cHandle)
+			/**
+			 * Downloads every source at the same time, so a dead list costs no more
+			 * time than a single request did.
+			 */
+			static void FetchAll(std::vector<std::unique_ptr<Source>>& sources) {
+				MultiGuard guard;
+				guard.multi.reset(curl_multi_init());
+				CURLM* multi = guard.multi.get();
+				if (!multi)
 					SPRaise("Failed to create cURL object.");
 
-				size_t (*curlWriteCallback)(void*, size_t, size_t, ServerListQuery*) =
-				  [](void* ptr, size_t size, size_t nmemb, ServerListQuery* self) -> size_t {
-					size_t numBytes = size * nmemb;
-					self->buffer.append(reinterpret_cast<char*>(ptr), numBytes);
-					return numBytes;
-				};
-				curl_easy_setopt(cHandle.get(), CURLOPT_USERAGENT, PACKAGE_STRING);
-				curl_easy_setopt(cHandle.get(), CURLOPT_URL, url);
-				curl_easy_setopt(cHandle.get(), CURLOPT_WRITEFUNCTION, curlWriteCallback);
-				curl_easy_setopt(cHandle.get(), CURLOPT_WRITEDATA, this);
-				curl_easy_setopt(cHandle.get(), CURLOPT_LOW_SPEED_TIME, 30l);
-				curl_easy_setopt(cHandle.get(), CURLOPT_LOW_SPEED_LIMIT, 15l);
-				curl_easy_setopt(cHandle.get(), CURLOPT_CONNECTTIMEOUT, 30l);
-				return curl_easy_perform(cHandle.get());
+				size_t (*writeCallback)(void*, size_t, size_t, Source*) = &Write;
+				for (auto& source : sources) {
+					source->handle.reset(curl_easy_init());
+					if (!source->handle)
+						SPRaise("Failed to create cURL object.");
+					CURL* h = source->handle.get();
+					curl_easy_setopt(h, CURLOPT_USERAGENT, PACKAGE_STRING);
+					curl_easy_setopt(h, CURLOPT_URL, source->url.c_str());
+					curl_easy_setopt(h, CURLOPT_WRITEFUNCTION, writeCallback);
+					curl_easy_setopt(h, CURLOPT_WRITEDATA, source.get());
+					curl_easy_setopt(h, CURLOPT_PRIVATE, source.get());
+					curl_easy_setopt(h, CURLOPT_FAILONERROR, 1L);
+					// Redirects are not followed, as before lists were merged, and
+					// only HTTP(S) is spoken: a list is untrusted, and one is plain
+					// HTTP.
+#if LIBCURL_VERSION_NUM >= 0x075500 // 7.85.0
+					curl_easy_setopt(h, CURLOPT_PROTOCOLS_STR, "http,https");
+#else
+					curl_easy_setopt(h, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+#endif
+					curl_easy_setopt(h, CURLOPT_NOSIGNAL, 1L);
+					curl_easy_setopt(h, CURLOPT_CONNECTTIMEOUT, kConnectTimeoutSeconds);
+					curl_easy_setopt(h, CURLOPT_TIMEOUT, kTotalTimeoutSeconds);
+					if (curl_multi_add_handle(multi, h) != CURLM_OK)
+						SPRaise("Failed to start a server list request.");
+					guard.added.push_back(h);
+				}
+
+				int running = 0;
+				do {
+					CURLMcode mc = curl_multi_perform(multi, &running);
+					if (mc == CURLM_OK && running)
+						mc = curl_multi_wait(multi, nullptr, 0, 1000, nullptr);
+					if (mc != CURLM_OK)
+						SPRaise("HTTP request error (%s).", curl_multi_strerror(mc));
+				} while (running);
+
+				int queued = 0;
+				while (CURLMsg* msg = curl_multi_info_read(multi, &queued)) {
+					if (msg->msg != CURLMSG_DONE)
+						continue;
+					Source* source = nullptr;
+					curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &source);
+					if (source) {
+						source->result = msg->data.result;
+						source->done = true;
+					}
+				}
 			}
 
 		public:
-			ServerListQuery(MainScreenHelper* owner) : owner{owner} {}
+			ServerListQuery(MainScreenHelper* owner)
+			    : owner{owner}, favorites{owner->favorites}, urls{ServerListUrls()} {}
 
 			void Run() override {
 				try {
-					const std::string primaryUrl = cl_serverListUrl.CString();
-					const std::string fallbackUrl = cl_serverListUrlFallback.CString();
-
-					auto reqret = FetchUrl(primaryUrl.c_str());
-
-					// Primary endpoint unreachable (timeout, DNS failure, non-OK
-					// transfer, etc.) -- retry once against the fallback mirror
-					// before giving up.
-					if (CURLE_OK != reqret && !fallbackUrl.empty() && fallbackUrl != primaryUrl) {
-						SPLog("[!] Primary server list (%s) failed: %s. Trying fallback (%s).",
-							  primaryUrl.c_str(), curl_easy_strerror(reqret), fallbackUrl.c_str());
-						buffer.clear();
-						reqret = FetchUrl(fallbackUrl.c_str());
+					std::vector<std::unique_ptr<Source>> sources;
+					for (std::string& url : urls) {
+						sources.emplace_back(new Source());
+						sources.back()->url = std::move(url);
 					}
 
-					if (CURLE_OK == reqret) {
-						ProcessResponse();
-					} else {
-						SPRaise("HTTP request error (%s).", curl_easy_strerror(reqret));
+					FetchAll(sources);
+
+					// Merge whatever answered; fail only if nothing did.
+					std::vector<Json::Value> lists;
+					std::string firstError;
+					for (auto& source : sources) {
+						std::string error;
+						Json::Value root;
+						Json::Reader reader;
+						if (!source->done)
+							error = "HTTP request error (transfer did not finish).";
+						else if (source->tooLarge)
+							error = "Server list response is too large.";
+						else if (source->result != CURLE_OK)
+							error = std::string("HTTP request error (") +
+							        curl_easy_strerror(source->result) + ").";
+						// The bundled jsoncpp parses by recursion, with no depth limit:
+						// deep nesting would overflow this thread's stack.
+						else if (!ServerListNestingWithin(source->body, kMaxServerListNesting))
+							error = "Invalid server list response (nested too deeply).";
+						// The bundled jsoncpp also calls null an array.
+						else if (!reader.parse(source->body, root, false) ||
+						         root.type() != Json::arrayValue)
+							error = "Invalid server list response.";
+
+						if (!error.empty()) {
+							SPLog("[!] Server list %s failed: %s", source->url.c_str(),
+							      error.c_str());
+							if (firstError.empty())
+								firstError = error;
+							continue;
+						}
+						SPLog("Server list %s: %u servers", source->url.c_str(),
+						      static_cast<unsigned>(root.size()));
+						lists.push_back(std::move(root));
 					}
+					if (lists.empty())
+						SPRaise("%s", firstError.c_str());
+
+					Json::Value merged = MergeServerLists(lists);
+					SPLog("Server lists merged: %u of %u answered, %u servers",
+					      static_cast<unsigned>(lists.size()),
+					      static_cast<unsigned>(sources.size()),
+					      static_cast<unsigned>(merged.size()));
+
+					auto resp = stmp::make_unique<MainScreenServerList>();
+					for (const Json::Value& obj : merged) {
+						std::unique_ptr<ServerItem> srv{ServerItem::Create(obj)};
+						if (srv) {
+							resp->list.emplace_back(
+							  new MainScreenServerItem(srv.get(),
+							                           favorites.count(srv->GetAddress()) >= 1),
+							  false);
+						}
+					}
+					ReturnResult(std::move(resp));
 				} catch (std::exception &ex) {
 					auto lst = stmp::make_unique<MainScreenServerList>();
 					lst->message = ex.what();

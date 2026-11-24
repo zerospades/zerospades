@@ -4188,3 +4188,26 @@ msgid ""
 "Open the release page to download it? ZeroSpades will close so the update "
 "can be installed."
 msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:537
+msgctxt "Preferences"
+msgid "Your Server Lists"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:540
+msgctxt "Preferences"
+msgid ""
+"Server lists to add to the known ones, separated by spaces. Every list is "
+"downloaded and merged into one. When lists disagree on a server's player "
+"count or capacity, the highest wins."
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:543
+msgctxt "Preferences"
+msgid "Excluded Server Lists"
+msgstr ""
+
+#: Sources/Gui/UI/Settings/PreferencePanels.cpp:546
+msgctxt "Preferences"
+msgid "Server lists not to download, known ones included, separated by spaces."
+msgstr ""
