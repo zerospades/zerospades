@@ -342,8 +342,21 @@ namespace spades {
 
 			// Everything queued so far keeps the previous clip.
 			FinishCurrentBatch();
-			currentClip.circleCenter = center;
-			currentClip.circleRadius = radius;
+
+			// `center` and `radius` are in 2D units (window units); the shader
+			// tests them against gl_FragCoord, in framebuffer pixels, which are
+			// more on a high-DPI display, as the clip rectangle's scissor is.
+			const Vector2 pixelsPerUnit = PixelsPerUnit();
+			currentClip.circleCenter =
+			  MakeVector2(center.x * pixelsPerUnit.x, center.y * pixelsPerUnit.y);
+			currentClip.circleRadius = radius * pixelsPerUnit.x;
+		}
+
+		Vector2 VulkanImageRenderer::PixelsPerUnit() {
+			const VkRect2D full = FullScissor();
+			return MakeVector2(
+			  static_cast<float>(full.extent.width) / std::max(1.0F, renderer.ScreenWidth()),
+			  static_cast<float>(full.extent.height) / std::max(1.0F, renderer.ScreenHeight()));
 		}
 
 		void VulkanImageRenderer::ClearClipCircle() {
@@ -367,8 +380,9 @@ namespace spades {
 			const VkRect2D full = FullScissor();
 			const float maxX = static_cast<float>(full.extent.width);
 			const float maxY = static_cast<float>(full.extent.height);
-			const float sx = maxX / std::max(1.0F, renderer.ScreenWidth());
-			const float sy = maxY / std::max(1.0F, renderer.ScreenHeight());
+			const Vector2 pixelsPerUnit = PixelsPerUnit();
+			const float sx = pixelsPerUnit.x;
+			const float sy = pixelsPerUnit.y;
 
 			float x0 = Clamp(floorf(rect.GetMinX() * sx), 0.0f, maxX);
 			float y0 = Clamp(floorf(rect.GetMinY() * sy), 0.0f, maxY);

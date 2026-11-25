@@ -118,6 +118,10 @@ namespace spades {
 			// The whole UI surface, i.e. "no rectangular clip".
 			VkRect2D FullScissor() const;
 
+			/** Framebuffer pixels per 2D (window) unit, across and down: more than
+			 * one on a high-DPI display. Clips given in units are tested in pixels. */
+			Vector2 PixelsPerUnit();
+
 		public:
 			VulkanImageRenderer(VulkanRenderer& r);
 			~VulkanImageRenderer();
