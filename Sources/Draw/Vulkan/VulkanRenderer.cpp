@@ -1071,8 +1071,10 @@ namespace spades {
 
 			// Without an image (a minimised window, or a swapchain gone out of
 			// date) EndScene and Flip see the UINT32_MAX sentinel and drop the
-			// frame instead of indexing past the per-image arrays.
-			currentImageIndex = AcquireFrameImage();
+			// frame instead of indexing past the per-image arrays. A frame spent
+			// on EndSceneToBitmap left its image acquired: this one draws into it.
+			if (!frameImageHeld)
+				currentImageIndex = AcquireFrameImage();
 
 			// The swapchain has more images than frame slots, and per-image resources
 			// (command buffer + the image renderer's descriptor pools / vertex buffers)
@@ -1363,6 +1365,41 @@ namespace spades {
 			}
 		}
 
+		Handle<Bitmap> VulkanRenderer::EndSceneToBitmap() {
+			SPADES_MARK_FUNCTION();
+			EnsureSceneStarted();
+
+			// As GL's: the scene is drawn and filtered as any is, and read back
+			// from its colour target, where the 2D layer never goes. GL spends the
+			// frame by finishing it unswapped; here nothing of it is presented,
+			// and the swapchain image it acquired is kept for the next frame.
+			sceneToBitmap = true;
+			try {
+				EndScene();
+			} catch (...) {
+				sceneToBitmap = false;
+				throw;
+			}
+			sceneToBitmap = false;
+
+			// Read back, never presented (ReadBitmap presents what it reads)
+			Handle<Bitmap> picture;
+			if (sceneUsedInThisFrame && framebufferManager)
+				picture = ReadSceneColor();
+
+			// The frame under way is spent: whatever of it was drawn is never
+			// shown, and what follows starts a frame afresh
+			sceneUsedInThisFrame = false;
+			if (imageRenderer)
+				imageRenderer->Discard();
+			pendingMultiplyColors.clear();
+			FrameDone();
+
+			if (!picture)
+				SPRaise("No frame to draw the scene into");
+			return picture;
+		}
+
 		void VulkanRenderer::EndScene() {
 			SPADES_MARK_FUNCTION();
 			EnsureSceneStarted();
@@ -1432,9 +1469,18 @@ namespace spades {
 			submitInfo.signalSemaphoreCount = 1;
 			submitInfo.pSignalSemaphores = signalSemaphores;
 
+			// A scene drawn for EndSceneToBitmap never reaches the swapchain
+			// image: it neither waits for the image nor readies it to present,
+			// and the image is kept, acquired, for the frame that follows.
+			if (sceneToBitmap) {
+				submitInfo.waitSemaphoreCount = 0;
+				submitInfo.signalSemaphoreCount = 0;
+			}
+
 			VkResult result = vkQueueSubmit(device->GetGraphicsQueue(), 1, &submitInfo, inFlightFences[currentFrameSlot]);
 			HandleSubmitResult(result, "scene");
 
+			frameImageHeld = sceneToBitmap;
 			duringSceneRendering = false;
 		}
 
@@ -1710,9 +1756,12 @@ namespace spades {
 				currentFrameSlot = device->GetCurrentFrame();
 				vkWaitForFences(device->GetDevice(), 1, &inFlightFences[currentFrameSlot], VK_TRUE, UINT64_MAX);
 
-				// Unless the scene of this frame already found no image to draw on
-				currentImageIndex =
-				  frameImageUnavailable ? UINT32_MAX : AcquireFrameImage();
+				// Unless the scene of this frame already found no image to draw on,
+				// and into the one a frame spent on EndSceneToBitmap held if it did
+				currentImageIndex = frameImageUnavailable ? UINT32_MAX
+				                    : frameImageHeld      ? currentImageIndex
+				                                          : AcquireFrameImage();
+				frameImageHeld = false;
 				if (currentImageIndex == UINT32_MAX) {
 					// Everything the frame queued goes with it
 					if (imageRenderer) { imageRenderer->Discard(); }
@@ -1773,6 +1822,26 @@ namespace spades {
 
 			if (!framebufferManager || !sceneUsedInThisFrame)
 				return Handle<Bitmap>();
+
+			Handle<Bitmap> bmp = ReadSceneColor();
+			if (!bmp)
+				return bmp;
+
+			// Present the swapchain image acquired by StartScene. Without this
+			// the screenshot path leaks an acquired-but-never-presented image
+			// every call, exhausting the swapchain pool after a few shots and
+			// stalling the next vkAcquireNextImageKHR until the GPU watchdog
+			// kills the device.
+			VkSemaphore waitSemaphores[] = {renderFinishedSemaphore};
+			device->PresentImage(currentImageIndex, waitSemaphores, 1);
+			lastTime = sceneDef.time;
+			sceneUsedInThisFrame = false;
+
+			return bmp;
+		}
+
+		Handle<Bitmap> VulkanRenderer::ReadSceneColor() {
+			SPADES_MARK_FUNCTION();
 
 			// The final post-process result is mirrored into the resolved colour
 			// image (== the raw colour image when MSAA is off), so read that.
@@ -1970,16 +2039,6 @@ namespace spades {
 					std::swap(topRow[x], bottomRow[x]);
 				}
 			}
-
-			// Present the swapchain image acquired by StartScene. Without this
-			// the screenshot path leaks an acquired-but-never-presented image
-			// every call, exhausting the swapchain pool after a few shots and
-			// stalling the next vkAcquireNextImageKHR until the GPU watchdog
-			// kills the device.
-			VkSemaphore waitSemaphores[] = {renderFinishedSemaphore};
-			device->PresentImage(currentImageIndex, waitSemaphores, 1);
-			lastTime = sceneDef.time;
-			sceneUsedInThisFrame = false;
 
 			return bmp;
 		}
@@ -3014,7 +3073,7 @@ namespace spades {
 				int sf = (int)r_scaleFilter;
 				if (sf == 0) {
 					blitFilter = VK_FILTER_NEAREST;
-				} else if (sf == 2 && resampleBicubicFilter && temporaryImagePool &&
+				} else if (sf == 2 && !sceneToBitmap && resampleBicubicFilter && temporaryImagePool &&
 				           currentInput &&
 				           ((uint32_t)renderWidth != scExtent.width ||
 				            (uint32_t)renderHeight != scExtent.height)) {
@@ -3071,6 +3130,7 @@ namespace spades {
 			// been waited on -- a write to an image the presentation engine may
 			// still be reading. Scoping it to TRANSFER puts it after the wait,
 			// which the submit performs at TRANSFER | COLOR_ATTACHMENT_OUTPUT.
+			if (!sceneToBitmap)
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -3089,6 +3149,7 @@ namespace spades {
 			blitRegion.dstOffsets[1] = {static_cast<int32_t>(device->GetSwapchainExtent().width),
 			                            static_cast<int32_t>(device->GetSwapchainExtent().height), 1};
 
+			if (!sceneToBitmap)
 			vkCmdBlitImage(commandBuffer,
 				blitSrc->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				device->GetSwapchainImage(imageIndex), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -3174,10 +3235,21 @@ namespace spades {
 			barrier2.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
 			                         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+			if (!sceneToBitmap)
 			vkCmdPipelineBarrier(commandBuffer,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				0, 0, nullptr, 0, nullptr, 1, &barrier2);
+		}
+
+		// The picture EndSceneToBitmap reads is the scene alone, filtered, in
+		// the scene's colour target: none of the 2D layer, nor the glares and
+		// tints drawn over the finished frame, and nothing on the swapchain.
+		if (sceneToBitmap) {
+			if (glareRenderer)
+				glareRenderer->Clear();
+			vkEndCommandBuffer(commandBuffer);
+			return;
 		}
 
 		// Begin swapchain render pass for 2D UI rendering.

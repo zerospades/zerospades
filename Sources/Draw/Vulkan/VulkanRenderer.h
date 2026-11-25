@@ -289,6 +289,19 @@ namespace spades {
 			 * its 2D pass does not try (and wait) again */
 			bool frameImageUnavailable{false};
 
+			/** The scene under way is drawn for EndSceneToBitmap: into the scene's
+			 * targets and through its filters only, never onto the swapchain image */
+			bool sceneToBitmap{false};
+
+			/** A frame spent on EndSceneToBitmap left its swapchain image acquired
+			 * and unpresented, its acquire semaphore still to be waited on: the
+			 * frame that follows draws into that image instead of acquiring one */
+			bool frameImageHeld{false};
+
+			/** The filtered scene of the frame's last submission, read back from its
+			 * colour target once that submission is done */
+			Handle<Bitmap> ReadSceneColor();
+
 			uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 			uint32_t FindMemoryTypeWithFallback(uint32_t typeFilter,
 			                                    VkMemoryPropertyFlags preferred,
@@ -446,6 +459,7 @@ namespace spades {
 			void RenderModel(client::IModel&, const client::ModelRenderParam& param) override;
 
 			void EndScene() override;
+			Handle<Bitmap> EndSceneToBitmap() override;
 
 			void MultiplyScreenColor(Vector3) override;
 
