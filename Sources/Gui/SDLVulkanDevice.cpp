@@ -36,8 +36,8 @@
 SPADES_SETTING(r_multisamples);
 SPADES_SETTING(r_vsync);
 
-#if defined(__APPLE__) && defined(__x86_64__)
-// MoltenVK global-configuration API, used to disable MTLHeap on Intel Macs.
+#if defined(__APPLE__)
+// MoltenVK global-configuration API (argument buffers off; MTLHeap off on Intel).
 // vkGetMoltenVKConfigurationMVK lives in the private API header;
 // vkSetMoltenVKConfigurationMVK is in the (still functional) deprecated header.
 #include <MoltenVK/mvk_private_api.h>
@@ -242,35 +242,47 @@ namespace spades {
 		void SDLVulkanDevice::CreateInstance() {
 			SPADES_MARK_FUNCTION();
 
-#if defined(__APPLE__) && defined(__x86_64__)
-			// MoltenVK 1.4 defaults useMTLHeap to WHERE_SAFE, which on any
-			// non-AMD GPU means "always use MTLHeapTypePlacement". Intel Macs
-			// (HD 5000 / Iris Pro, Haswell) report GPU Family Mac 2 yet their
-			// Metal driver rejects placement heaps, so vkAllocateMemory aborts
-			// hard inside the driver ("Placement heap type is not supported").
-			// Forcing NEVER routes allocations to plain MTLBuffer/MTLTexture and
-			// avoids the crash; the lost memory-aliasing optimization is
-			// irrelevant for this workload. Scoped to the x86_64 (Intel) build
-			// only — the Apple Silicon build keeps heaps, where they are safe.
-			//
-			// The MVK_CONFIG_USE_MTLHEAP env var is read only once, when
-			// MoltenVK first initializes its global config; the startup-screen
-			// capability probe already created and destroyed a VkInstance before
-			// we get here, so setenv() would be too late. Mutating the global
-			// config directly works because each new VkInstance snapshots it,
-			// and the instance we create just below picks up the override.
+#if defined(__APPLE__)
+			// MoltenVK settings, made before the instance is created: the
+			// MVK_CONFIG_* env vars are read only once, when MoltenVK first
+			// initializes its global config, and the startup-screen capability
+			// probe already created and destroyed a VkInstance before we get
+			// here, so setenv() would be too late. Mutating the global config
+			// directly works because each new VkInstance snapshots it, and the
+			// instance we create just below picks up the override.
 			{
 				MVKConfiguration mvkConfig{};
 				size_t configSize = sizeof(mvkConfig);
 				VkResult cfgRes =
 				    vkGetMoltenVKConfigurationMVK(VK_NULL_HANDLE, &mvkConfig, &configSize);
 				if (cfgRes == VK_SUCCESS || cfgRes == VK_INCOMPLETE) {
-					mvkConfig.useMTLHeap = MVK_CONFIG_USE_MTLHEAP_NEVER;
-					// Intel Mac Metal requires 256-byte constant-buffer offset
-					// alignment; MoltenVK's argument buffers sub-allocate descriptor
-					// buffers at 16-byte offsets, so descriptors are read from wrong
-					// offsets there. Bind descriptors discretely instead.
+					// Descriptors bound discretely, not through Metal argument
+					// buffers. A texture reached only through an argument buffer
+					// is not one Metal tracks: a render pass sampling an image the
+					// pass before it rendered then does not wait for that pass,
+					// whatever the render passes' dependencies say. The post
+					// filters are chains of exactly such passes; the auto-exposure
+					// one read a level of its downsampling half written, a NaN
+					// now and then, and the scene brightened and darkened in turn
+					// as the exposure fell to its minimum and recovered.
+					//
+					// Intel Macs need it besides: their Metal requires 256-byte
+					// constant-buffer offset alignment, and MoltenVK's argument
+					// buffers sub-allocate descriptor buffers at 16-byte offsets,
+					// so descriptors were read from wrong offsets there.
 					mvkConfig.useMetalArgumentBuffers = VK_FALSE;
+#if defined(__x86_64__)
+					// MoltenVK 1.4 defaults useMTLHeap to WHERE_SAFE, which on any
+					// non-AMD GPU means "always use MTLHeapTypePlacement". Intel Macs
+					// (HD 5000 / Iris Pro, Haswell) report GPU Family Mac 2 yet their
+					// Metal driver rejects placement heaps, so vkAllocateMemory aborts
+					// hard inside the driver ("Placement heap type is not supported").
+					// Forcing NEVER routes allocations to plain MTLBuffer/MTLTexture and
+					// avoids the crash; the lost memory-aliasing optimization is
+					// irrelevant for this workload. Scoped to the x86_64 (Intel) build
+					// only — the Apple Silicon build keeps heaps, where they are safe.
+					mvkConfig.useMTLHeap = MVK_CONFIG_USE_MTLHEAP_NEVER;
+#endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 					vkSetMoltenVKConfigurationMVK(VK_NULL_HANDLE, &mvkConfig, &configSize);
