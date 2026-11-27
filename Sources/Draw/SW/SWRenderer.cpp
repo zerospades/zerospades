@@ -1343,13 +1343,63 @@ namespace spades {
 			imageRenderer->DrawPolygon(whiteImage.GetPointerOrNull(), vtx0, vtx1, vtx2);
 		}
 		void SWRenderer::DrawFilledRectFade(float x0, float y0, float x1, float y1,
-                                     Vector4 color0, Vector4 color1, bool horizontal) {
+		                                    Vector4 color0, Vector4 color1, bool horizontal) {
+			SPADES_MARK_FUNCTION();
+
 			EnsureValid();
 			EnsureSceneNotStarted();
 
-			// SW renderer doesn't support this yet
-			SetColorAlphaPremultiplied((color0 + color1) * 0.5F);
-			DrawImage(nullptr, AABB2(x0, y0, x1 - x0, y1 - y0));
+			if (color0.w <= 0.0F && color1.w <= 0.0F)
+				return; // skip fully transparent draws
+
+			// The rectangle covers the same pixels `DrawImage` gives it: the image
+			// renderer truncates the corners and fills from the first pixel up to, but
+			// not including, the last one.
+			auto toInt = [](float v) { return ToIntClamped(v, 65536.0F); };
+			const int ix0 = toInt(x0);
+			const int iy0 = toInt(y0);
+			const int ix1 = toInt(x1);
+			const int iy1 = toInt(y1);
+			const int rectW = ix1 - ix0;
+			const int rectH = iy1 - iy0;
+			if (rectW <= 0 || rectH <= 0)
+				return;
+
+			const int fbW = fb->GetWidth();
+			const int fbH = fb->GetHeight();
+			const int minX = std::max(ix0, 0);
+			const int maxX = std::min(ix1, fbW);
+			const int minY = std::max(iy0, 0);
+			const int maxY = std::min(iy1, fbH);
+			if (minX >= maxX || minY >= maxY)
+				return;
+
+			// Interpolates the colour of one line of the gradient.
+			auto shadeAt = [&](int index, int count) {
+				const float t = (static_cast<float>(index) + 0.5F) / static_cast<float>(count);
+				return MakePremultipliedColor(color0 + (color1 - color0) * t);
+			};
+
+			uint32_t* pixels = fb->GetPixels();
+			if (horizontal) {
+				// left is `color0`, right is `color1`
+				std::vector<PremultipliedColor> shades(static_cast<std::size_t>(maxX - minX));
+				for (int x = minX; x < maxX; x++)
+					shades[static_cast<std::size_t>(x - minX)] = shadeAt(x - ix0, rectW);
+				for (int y = minY; y < maxY; y++) {
+					uint32_t* row = pixels + static_cast<std::size_t>(y) * fbW;
+					for (int x = minX; x < maxX; x++)
+						BlendPremultiplied(row[x], shades[static_cast<std::size_t>(x - minX)]);
+				}
+			} else {
+				// top is `color0`, bottom is `color1`
+				for (int y = minY; y < maxY; y++) {
+					const PremultipliedColor s = shadeAt(y - iy0, rectH);
+					uint32_t* row = pixels + static_cast<std::size_t>(y) * fbW;
+					for (int x = minX; x < maxX; x++)
+						BlendPremultiplied(row[x], s);
+				}
+			}
 		}
 
 		void SWRenderer::DrawFlatGameMap(const spades::AABB2& outRect,
