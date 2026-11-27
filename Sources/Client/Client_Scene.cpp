@@ -564,14 +564,18 @@ namespace spades {
 
 			Handle<IModel> model = renderer->RegisterModel("Models/Weapons/Grenade/Grenade.kv6");
 
-			// Move the grenade slightly so that it doesn't look like sinking in the ground
+			// Move the grenade slightly so that it doesn't look like sinking in the ground.
+			// It lies on its side when resting, so lift it by the radius of the model.
+			const AABB3 box = model->GetBoundingBox();
+			const float scale = 0.03F;
+			const float radius = std::max(box.max.x, -box.min.x) * scale;
 			Vector3 position = g.GetPosition();
-			position.z -= 0.03F * 3.0F;
+			position.z -= radius;
 
 			ModelRenderParam param;
 			param.matrix = Matrix4::Translate(position);
 			param.matrix = param.matrix * g.GetOrientation().ToRotationMatrix();
-			param.matrix = param.matrix * Matrix4::Scale(0.03F);
+			param.matrix = param.matrix * Matrix4::Scale(scale);
 			renderer->RenderModel(*model, param);
 		}
 
