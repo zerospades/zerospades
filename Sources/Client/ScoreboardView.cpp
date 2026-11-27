@@ -215,7 +215,7 @@ namespace spades {
 				// count spectators
 				int teamId = player.GetTeamId();
 				if (teamId == spectatorTeamId) {
-					numSpectators++; 
+					numSpectators++;
 					continue;
 				}
 
@@ -247,11 +247,11 @@ namespace spades {
 			float spectatorsBottom = playersBottom + spectatorsHeight;
 
 			// draw shadow
-			img = renderer.RegisterImage("Gfx/Scoreboard/TopShadow.png");
 			size.y = 32.0F;
-			renderer.SetColorAlphaPremultiplied(MakeVector4(0, 0, 0, 0.2F));
-			renderer.DrawImage(img, AABB2(0, teamBarTop - size.y, sw, size.y));
-			renderer.DrawImage(img, AABB2(0, spectatorsBottom + size.y, sw, -size.y));
+			const Vector4 fadeColor = MakeVector4(0, 0, 0, 0.2F);
+			const Vector4 fadeClear = MakeVector4(0, 0, 0, 0);
+			renderer.DrawFilledRectFade(0, teamBarTop - size.y, sw, teamBarTop, fadeClear, fadeColor, false);
+			renderer.DrawFilledRectFade(0, spectatorsBottom, sw, spectatorsBottom + size.y, fadeColor, fadeClear, false);
 
 			// draw team bar
 			renderer.SetColorAlphaPremultiplied(AdjustColor(GetTeamColor(0), 0.8F, 0.3F));
@@ -348,7 +348,7 @@ namespace spades {
 		void ScoreboardView::DrawPlayers(int team, float left, float top, float width, float height) {
 			char buf[16];
 			Vector2 size;
-			
+
 			int numPlayers = 0;
 			std::vector<ScoreboardEntry> entries;
 			for (size_t i = 0; i < world->GetNumPlayerSlots(); i++) {
