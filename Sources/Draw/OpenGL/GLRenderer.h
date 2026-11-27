@@ -282,6 +282,8 @@ namespace spades {
 			void BeginClippingRect(const AABB2& outRect) override;
 			void EndClippingRect() override;
 
+			void DrawModelOverlay(client::IModel&, const client::ModelOverlayParam&) override;
+
 			void FrameDone() override;
 			void Flip() override;
 			Handle<Bitmap> ReadBitmap() override;

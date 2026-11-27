@@ -39,6 +39,12 @@
 
 namespace spades {
 	namespace draw {
+		namespace {
+			/** The distance from the screen plane, in overlay space units, up to which
+			 * `ModelOverlayParam::matrix` may put geometry along the depth axis. */
+			constexpr float kOverlayDepthRange = 2048.0F;
+		} // namespace
+
 		void GLOptimizedVoxelModel::PreloadShaders(GLRenderer& renderer) {
 			if (renderer.GetSettings().r_physicalLighting)
 				renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelPhys.program");
@@ -48,6 +54,11 @@ namespace spades {
 			renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelShadowMap.program");
 			renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOutlines.program");
 			renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelXRay.program");
+			if (renderer.GetSettings().r_physicalLighting)
+				renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlayPhys.program");
+			else
+				renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlay.program");
+			renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlayOutlines.program");
 			renderer.RegisterImage("Gfx/AmbientOcclusion.png");
 		}
 		GLOptimizedVoxelModel::GLOptimizedVoxelModel(VoxelModel* m, GLRenderer& r)
@@ -65,6 +76,11 @@ namespace spades {
 			shadowMapProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelShadowMap.program");
 			outlinesProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOutlines.program");
 			xrayProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelXRay.program");
+			if (r.GetSettings().r_physicalLighting)
+				overlayProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlayPhys.program");
+			else
+				overlayProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlay.program");
+			overlayOutlineProgram = renderer.RegisterProgram("Shaders/OpenGL/OptimizedVoxelModelOverlayOutlines.program");
 			aoImage = renderer.RegisterImage("Gfx/AmbientOcclusion.png").Cast<GLImage>();
 
 			buffer = device.GenBuffer();
@@ -1173,6 +1189,211 @@ namespace spades {
 			device.EnableVertexAttribArray(textureCoordAttribute(), false);
 			device.EnableVertexAttribArray(normalAttribute(), false);
 
+			device.ActiveTexture(0);
+			device.BindTexture(IGLDevice::Texture2D, 0);
+		}
+
+		void GLOptimizedVoxelModel::RenderOverlay(const client::ModelOverlayParam& param,
+		                                          float screenWidth, float screenHeight,
+		                                          bool linearOutput) {
+			SPADES_MARK_FUNCTION();
+
+			if (screenWidth <= 0.0F || screenHeight <= 0.0F)
+				return;
+
+			const Matrix4& modelMatrix = param.matrix;
+			const Vector3 axisX = modelMatrix.GetAxis(0);
+			const Vector3 axisY = modelMatrix.GetAxis(1);
+			const Vector3 axisZ = modelMatrix.GetAxis(2);
+
+			// Overlay space to clip space. `param.matrix` brings a model-space point to
+			// overlay space: X is the screen's X, Z is the screen's Y (downwards) and Y
+			// is the depth, where -Y is away from the viewer.
+			const float kx = 2.0F / screenWidth;
+			const float ky = -2.0F / screenHeight;
+			const float kz = -1.0F / kOverlayDepthRange;
+
+			Matrix4 mat = Matrix4::Identity();
+			for (int c = 0; c < 4; ++c) {
+				mat.m[c * 4 + 0] = kx * modelMatrix.m[c * 4 + 0];
+				mat.m[c * 4 + 1] = ky * modelMatrix.m[c * 4 + 2];
+				mat.m[c * 4 + 2] = kz * modelMatrix.m[c * 4 + 1];
+				mat.m[c * 4 + 3] = 0.0F;
+			}
+			mat.m[12] -= 1.0F;
+			mat.m[13] += 1.0F;
+			mat.m[15] = 1.0F;
+
+			device.ActiveTexture(0);
+			aoImage->Bind(IGLDevice::Texture2D);
+			device.TexParamater(IGLDevice::Texture2D,
+				IGLDevice::TextureMinFilter, IGLDevice::Linear);
+
+			device.ActiveTexture(1);
+			image->Bind(IGLDevice::Texture2D);
+			device.TexParamater(IGLDevice::Texture2D,
+				IGLDevice::TextureMinFilter, IGLDevice::Nearest);
+			device.TexParamater(IGLDevice::Texture2D,
+				IGLDevice::TextureMagFilter, IGLDevice::Nearest);
+
+			overlayProgram->Use();
+
+			static GLProgramUniform aoUniform("ambientOcclusionTexture");
+			aoUniform(overlayProgram);
+			aoUniform.SetValue(0);
+
+			static GLProgramUniform modelTexture("modelTexture");
+			modelTexture(overlayProgram);
+			modelTexture.SetValue(1);
+
+			static GLProgramUniform modelOrigin("modelOrigin");
+			modelOrigin(overlayProgram);
+			modelOrigin.SetValue(origin.x, origin.y, origin.z);
+
+			static GLProgramUniform texScale("texScale");
+			texScale(overlayProgram);
+			texScale.SetValue(1.0F / image->GetWidth(), 1.0F / image->GetHeight());
+
+			static GLProgramUniform customColor("customColor");
+			customColor(overlayProgram);
+			customColor.SetValue(param.customColor.x, param.customColor.y, param.customColor.z);
+
+			static GLProgramUniform outputIsLinear("outputIsLinear");
+			outputIsLinear(overlayProgram);
+			outputIsLinear.SetValue(linearOutput ? 1 : 0);
+
+			static GLProgramUniform modelOpacity("modelOpacity");
+			modelOpacity(overlayProgram);
+			modelOpacity.SetValue(param.opacity);
+
+			static GLProgramUniform sunLightDirection("sunLightDirection");
+			sunLightDirection(overlayProgram);
+			Vector3 sunPos = MakeVector3(0, 1, -1);
+			sunPos = sunPos.Normalize();
+			sunLightDirection.SetValue(sunPos.x, sunPos.y, sunPos.z);
+
+			static GLProgramUniform eyeDirection("eyeDirection");
+			eyeDirection(overlayProgram);
+			eyeDirection.SetValue(0.0F, 1.0F, 0.0F);
+
+			static GLProgramUniform projectionViewModelMatrix("projectionViewModelMatrix");
+			projectionViewModelMatrix(overlayProgram);
+			projectionViewModelMatrix.SetValue(mat);
+
+			// Only used to turn the normals.
+			static GLProgramUniform modelMatrixU("modelMatrix");
+			modelMatrixU(overlayProgram);
+			modelMatrixU.SetValue(param.matrix);
+
+			// setup attributes
+			static GLProgramAttribute positionAttribute("positionAttribute");
+			static GLProgramAttribute textureCoordAttribute("textureCoordAttribute");
+			static GLProgramAttribute normalAttribute("normalAttribute");
+			positionAttribute(overlayProgram);
+			textureCoordAttribute(overlayProgram);
+			normalAttribute(overlayProgram);
+
+			device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
+			device.VertexAttribPointer(positionAttribute(), 4,
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
+			device.VertexAttribPointer(textureCoordAttribute(), 2,
+				IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)8);
+			device.VertexAttribPointer(normalAttribute(), 3,
+				IGLDevice::Byte, false, sizeof(Vertex), (void*)12);
+			device.BindBuffer(IGLDevice::ArrayBuffer, 0);
+
+			device.EnableVertexAttribArray(positionAttribute(), true);
+			device.EnableVertexAttribArray(textureCoordAttribute(), true);
+			device.EnableVertexAttribArray(normalAttribute(), true);
+
+			device.BindBuffer(IGLDevice::ElementArrayBuffer, idxBuffer);
+
+			const bool isMirrored = Vector3::Dot(Vector3::Cross(axisX, axisY), axisZ) < 0.0F;
+			if (isMirrored)
+				device.FrontFace(IGLDevice::CCW);
+
+			const bool translucent = param.opacity < 1.0F;
+			if (translucent) {
+				// Depth-only prepass so that each pixel is blended once: this blend
+				// function keeps the framebuffer as it is, so only the depth changes.
+				device.Enable(IGLDevice::Blend, true);
+				device.BlendFunc(IGLDevice::Zero, IGLDevice::One, IGLDevice::Zero,
+				                 IGLDevice::One);
+				device.DrawElements(IGLDevice::Triangles,
+					numIndices, IGLDevice::UnsignedInt, (void*)0);
+
+				device.DepthMask(false);
+				device.DepthFunc(IGLDevice::Equal);
+				device.BlendFunc(IGLDevice::SrcAlpha, IGLDevice::OneMinusSrcAlpha,
+				                 IGLDevice::Zero, IGLDevice::One);
+			}
+
+			device.DrawElements(IGLDevice::Triangles,
+				numIndices, IGLDevice::UnsignedInt, (void*)0);
+
+			if (translucent) {
+				device.DepthMask(true);
+				device.DepthFunc(IGLDevice::Less);
+			}
+
+			if (param.drawOutline && renderer.GetSettings().r_outlines) {
+				// Same technique as the world's outline pass: with the front faces
+				// culled only the back faces rasterize, drawn as lines. The filled
+				// model hides all of them except what sticks out past its silhouette.
+				overlayOutlineProgram->Use();
+
+				static GLProgramUniform outlineMatrix("projectionViewModelMatrix");
+				outlineMatrix(overlayOutlineProgram);
+				outlineMatrix.SetValue(mat);
+
+				static GLProgramUniform outlineOrigin("modelOrigin");
+				outlineOrigin(overlayOutlineProgram);
+				outlineOrigin.SetValue(origin.x, origin.y, origin.z);
+
+				static GLProgramUniform outlineOpacity("modelOpacity");
+				outlineOpacity(overlayOutlineProgram);
+				outlineOpacity.SetValue(param.opacity);
+
+				// This program has its own attribute locations, so the pointer is set
+				// up again for it.
+				static GLProgramAttribute outlinePositionAttribute("positionAttribute");
+				outlinePositionAttribute(overlayOutlineProgram);
+
+				device.BindBuffer(IGLDevice::ArrayBuffer, buffer);
+				device.VertexAttribPointer(outlinePositionAttribute(), 4,
+					IGLDevice::UnsignedShort, false, sizeof(Vertex), (void*)0);
+				device.BindBuffer(IGLDevice::ArrayBuffer, 0);
+				device.EnableVertexAttribArray(outlinePositionAttribute(), true);
+
+				device.CullFaceMode(IGLDevice::Front);
+				device.Enable(IGLDevice::PolygonOffsetLine, true);
+				device.PolygonMode(IGLDevice::FrontAndBack, IGLDevice::Line);
+				device.PolygonOffset(1.0F, 1.0F);
+				device.LineWidth(2.0F);
+
+				device.DrawElements(IGLDevice::Triangles,
+					numIndices, IGLDevice::UnsignedInt, (void*)0);
+
+				device.CullFaceMode(IGLDevice::Back);
+				device.Enable(IGLDevice::PolygonOffsetLine, false);
+				device.PolygonMode(IGLDevice::FrontAndBack, IGLDevice::Fill);
+				device.PolygonOffset(0.0F, 0.0F);
+				device.LineWidth(1.0F);
+
+				device.EnableVertexAttribArray(outlinePositionAttribute(), false);
+			}
+
+			if (isMirrored)
+				device.FrontFace(IGLDevice::CW);
+
+			device.BindBuffer(IGLDevice::ElementArrayBuffer, 0);
+
+			device.EnableVertexAttribArray(positionAttribute(), false);
+			device.EnableVertexAttribArray(textureCoordAttribute(), false);
+			device.EnableVertexAttribArray(normalAttribute(), false);
+
+			device.ActiveTexture(1);
+			device.BindTexture(IGLDevice::Texture2D, 0);
 			device.ActiveTexture(0);
 			device.BindTexture(IGLDevice::Texture2D, 0);
 		}

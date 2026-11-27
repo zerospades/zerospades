@@ -186,7 +186,30 @@ namespace spades {
 						return client->GetWorld()->GetTeamName(teamId);
 					return teamId == 0 ? "Team 1" : (teamId == 1 ? "Team 2" : "");
 				}
+				Vector3 GetTeamColor(int teamId) override {
+					World* world = client->GetWorld();
+					if (!world || teamId < 0 || teamId > 1)
+						return MakeVector3(1, 1, 1);
+					return ConvertColorRGB(world->GetTeamColor(teamId));
+				}
+				std::string GetPlayerHeadModelPath(int teamId, WeaponType weapon) override {
+					// Same choice as ClientPlayer: the hat replaces the head, zombie or not.
+					if (client->isChristmasOn)
+						return "Models/Player/XmasHat.kv6";
+
+					// A team is zombie by name; IsTeamZombie also rejects spectators.
+					World* world = client->GetWorld();
+					const bool zombie = world && world->IsTeamZombie(teamId);
+
+					const char* name = "Rifle";
+					if (weapon == SMG_WEAPON)
+						name = "SMG";
+					else if (weapon == SHOTGUN_WEAPON)
+						name = "Shotgun";
+					return ClientPlayer::GetModelPath(zombie, name) + "Head.kv6";
+				}
 				bool HasLocalPlayer() override { return client->HasLocalPlayer(); }
+				float GetTime() const override { return client->GetTime(); }
 			};
 
 			auto hostAdapter = Handle<ClientLimboHost>::New(this);

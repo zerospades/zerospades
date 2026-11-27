@@ -1428,6 +1428,17 @@ namespace spades {
 			DrawImage(flatMapRenderer->GetImage(), outTopLeft, outTopRight, outBottomLeft, inRect);
 		}
 
+		void SWRenderer::DrawModelOverlay(client::IModel& model,
+		                                  const client::ModelOverlayParam& param) {
+			SPADES_MARK_FUNCTION();
+
+			EnsureInitialized();
+			EnsureSceneNotStarted();
+
+			SWModel& swModel = dynamic_cast<SWModel&>(model);
+			modelRenderer->RenderOverlay(swModel, param);
+		}
+
 		void SWRenderer::FrameDone() {
 			SPADES_MARK_FUNCTION();
 			EnsureValid();

@@ -56,6 +56,8 @@ namespace spades {
 			GLProgram* shadowMapProgram;
 			GLProgram* outlinesProgram;
 			GLProgram* xrayProgram;
+			GLProgram* overlayProgram;
+			GLProgram* overlayOutlineProgram;
 
 			Handle<GLImage> image;
 			Handle<GLImage> aoImage;
@@ -97,6 +99,13 @@ namespace spades {
 			void RenderDynamicLightPass(const std::vector<client::ModelRenderParam>& params, const std::vector<GLDynamicLight>& lights) override;
 			void RenderOutlinePass(const std::vector<client::ModelRenderParam>& params) override;
 			void RenderXRayPass(const std::vector<client::ModelRenderParam>& params) override;
+
+			/**
+			 * Draws this model onto the screen with an orthographic projection. The
+			 * caller sets up the render state (see `GLRenderer::DrawModelOverlay`).
+			 */
+			void RenderOverlay(const client::ModelOverlayParam& param, float screenWidth,
+			                   float screenHeight, bool linearOutput);
 
 			IntVector3 GetDimensions() override { return dimensions; }
 			AABB3 GetBoundingBox() override { return boundingBox; }

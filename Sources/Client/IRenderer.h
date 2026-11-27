@@ -83,6 +83,35 @@ namespace spades {
 			/** The colour the model is tinted with where `xray` reveals it. */
 			Vector3 xrayColor = MakeVector3(1, 1, 1);
 		};
+		
+		/**
+		 * Describes a model drawn flat onto the screen with an orthographic projection,
+		 * for HUD and UI elements (see `IRenderer::DrawModelOverlay`).
+		 */
+		struct ModelOverlayParam {
+			/**
+			 * Brings the model's space to the screen. The result is in the renderer's
+			 * 2D units: X is the screen's X, Z is the screen's Y (downwards) and Y is
+			 * the depth, where -Y is away from the viewer. Depth is kept within 2048
+			 * units of the screen plane. For example, to draw a model with its pivot at
+			 * `(x, y)` and one voxel being `s` units wide:
+			 * `Translate(x, 0, y) * Scale(s)`.
+			 */
+			Matrix4 matrix = Matrix4::Identity();
+
+			/** Voxels having a color value `(0, 0, 0)` are replaced with this color. */
+			Vector3 customColor = MakeVector3(0, 0, 0);
+
+			/** Draws a black outline around the model and along the places where it
+			 * folds over itself, like the outlines of the models in the world. */
+			bool drawOutline = true;
+			
+			/**
+			 * How opaque the model and its outline are, from 0 to 1. Lower values blend
+			 * them with what is behind.
+			 */
+			float opacity = 1.0F;
+		};
 
 		enum DynamicLightType {
 			DynamicLightTypePoint,
@@ -304,6 +333,15 @@ namespace spades {
 			 */
 			virtual void BeginClippingRect(const AABB2& outRect) {}
 			virtual void EndClippingRect() {}
+
+			/**
+			 * Draws a model onto the screen. The projection is orthographic, so the model's size
+			 * does not depend on the field of view.
+			 *
+			 * Must not be called between `StartScene` and `EndScene`. Renderer backends
+			 * that do not implement it draw nothing.
+			 */
+			virtual void DrawModelOverlay(IModel&, const ModelOverlayParam&) {}
 
 			/**
 			 * Returns whether this renderer backend is the software

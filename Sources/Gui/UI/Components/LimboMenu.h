@@ -78,6 +78,9 @@ namespace spades {
 				float teamX = 0.0F;
 				float weapX = 0.0F;
 				float firstY = 0.0F;
+				AABB2 previewRect = AABB2(0.0F, 0.0F, 0.0F, 0.0F);
+				/** false when the screen is too narrow to fit the preview. */
+				bool hasPreview = false;
 				bool isValid = false;
 			} cachedLayout;
 
@@ -87,6 +90,7 @@ namespace spades {
 			void EnsureLayout();
 			void UpdateItemVisibility();
 			void UpdateHover();
+			void DrawPlayerPreview();
 			int MenuButtonAt(const Vector2& p) const;
 			void HandleMenuItemSelection(MenuItemType type);
 		};

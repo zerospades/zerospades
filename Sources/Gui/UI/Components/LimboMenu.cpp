@@ -23,7 +23,10 @@
 #include <Client/IRenderer.h>
 #include <Client/Fonts.h>
 #include <Client/IFont.h>
+#include <Client/IModel.h>
 #include <Core/Strings.h>
+#include <algorithm>
+#include <cmath>
 
 namespace spades {
 	namespace gui {
@@ -41,6 +44,14 @@ namespace spades {
 					case MenuItemType::WeaponRifle: return RIFLE_WEAPON;
 					case MenuItemType::WeaponSMG: return SMG_WEAPON;
 					default: return SHOTGUN_WEAPON;
+				}
+			}
+			/** The model shown for a weapon */
+			const char* WeaponModelPathOf(WeaponType weapon) {
+				switch (weapon) {
+					case RIFLE_WEAPON: return "Models/Weapons/Rifle/Weapon.kv6";
+					case SMG_WEAPON: return "Models/Weapons/SMG/Weapon.kv6";
+					default: return "Models/Weapons/Shotgun/Weapon.kv6";
 				}
 			}
 		} // namespace
@@ -90,10 +101,6 @@ namespace spades {
 			cachedLayout.screenWidth = renderer->ScreenWidth();
 			cachedLayout.screenHeight = renderer->ScreenHeight();
 
-			cachedLayout.menuWidth = 200.0F;
-			cachedLayout.menuHeight = cachedLayout.menuWidth / 8.0F;
-			cachedLayout.rowHeight = cachedLayout.menuHeight + 3.0F;
-
 			cachedLayout.contentsWidth = cachedLayout.screenWidth - 8.0F;
 			float maxContentsWidth = 800.0F;
 			if (cachedLayout.contentsWidth > maxContentsWidth)
@@ -102,16 +109,50 @@ namespace spades {
 			cachedLayout.left = (cachedLayout.screenWidth - cachedLayout.contentsWidth) * 0.5F;
 			cachedLayout.top = cachedLayout.screenHeight - 150.0F;
 
-			cachedLayout.teamX = cachedLayout.left + 10.0F;
-			cachedLayout.weapX = cachedLayout.left + 260.0F;
+			cachedLayout.menuHeight = 25.0F;
+			cachedLayout.rowHeight = cachedLayout.menuHeight + 3.0F;
 			cachedLayout.firstY = cachedLayout.top + 35.0F;
+
+			// Left to right: team column, weapon column, preview, spawn button. The
+			// spawn button keeps its place on the right (see `RecalculateItemRects`);
+			// the columns shrink on narrow screens, and the preview gives way when
+			// they would have to get too narrow to fit it.
+			const float margin = 10.0F;
+			const float minGap = 10.0F;
+			const float spawnWidth = 156.0F;
+			const float previewSize = 120.0F;
+			const float maxColumnWidth = 200.0F;
+			const float minColumnWidth = 130.0F;
+
+			const float room = cachedLayout.contentsWidth - margin * 2.0F - spawnWidth;
+
+			float columnWidth = std::min(maxColumnWidth, (room - previewSize - minGap * 3.0F) * 0.5F);
+			cachedLayout.hasPreview = columnWidth >= minColumnWidth;
+			if (!cachedLayout.hasPreview)
+				columnWidth = std::min(maxColumnWidth, (room - minGap * 2.0F) * 0.5F);
+			columnWidth = std::max(columnWidth, 80.0F);
+
+			// Whatever the columns don't use is shared between the gaps.
+			const float gapCount = cachedLayout.hasPreview ? 3.0F : 2.0F;
+			const float blocksWidth = columnWidth * 2.0F + (cachedLayout.hasPreview ? previewSize : 0.0F);
+			const float gap = std::max(minGap, (room - blocksWidth) / gapCount);
+
+			cachedLayout.menuWidth = columnWidth;
+			cachedLayout.teamX = cachedLayout.left + margin;
+			cachedLayout.weapX = cachedLayout.teamX + columnWidth + gap;
+
+			if (cachedLayout.hasPreview) {
+				cachedLayout.previewRect = AABB2(cachedLayout.weapX + columnWidth + gap,
+												 cachedLayout.top + 10.0F, previewSize, previewSize);
+			}
 
 			cachedLayout.isValid = true;
 		}
 
 		void LimboMenu::EnsureLayout() {
-			if (cachedLayout.isValid && cachedLayout.screenWidth == renderer->ScreenWidth() &&
-				cachedLayout.screenHeight == renderer->ScreenHeight())
+			if (cachedLayout.isValid
+				&& cachedLayout.screenWidth == renderer->ScreenWidth()
+				&& cachedLayout.screenHeight == renderer->ScreenHeight())
 				return;
 
 			RecalculateLayout();
@@ -255,6 +296,8 @@ namespace spades {
 			renderer->SetColorAlphaPremultiplied(MakeVector4(0.0F, 0.0F, 0.0F, 0.5F));
 			renderer->DrawFilledRect(left, top, left + contentsWidth, top + height);
 
+			DrawPlayerPreview();
+
 			Vector4 color = MakeVector4(1, 1, 1, 1);
 			Vector4 shadowColor = MakeVector4(0, 0, 0, 0.4F);
 			Vector4 hotkeyColor = MakeVector4(1, 1, 1, 0.6F);
@@ -348,6 +391,15 @@ namespace spades {
 					else if (item.type == MenuItemType::Team2)
 						str = host->GetTeamName(1);
 
+					// Reserve room for the hotkey hint, then shorten the label if it
+					// still doesn't fit: the columns get narrower on small screens.
+					std::string hint;
+					float hintWidth = 0.0F;
+					if (index > 0) {
+						hint = Format("[{0}]", index);
+						hintWidth = font.Measure(hint).x + 5.0F;
+					}
+
 					Vector2 size = font.Measure(str);
 					Vector2 pos = item.rect.min;
 					pos.x += 5.0F;
@@ -356,15 +408,96 @@ namespace spades {
 
 					// draw hotkey hint
 					if (index > 0) {
-						str = Format("[{0}]", index);
-						pos.x = (item.rect.GetMaxX() - 5.0F) - font.Measure(str).x;
-						font.DrawShadow(str, pos, 1.0F, hotkeyColor, shadowColor);
+						pos.x = (item.rect.GetMaxX() - 5.0F) - font.Measure(hint).x;
+						font.DrawShadow(hint, pos, 1.0F, hotkeyColor, shadowColor);
 					}
 				}
 			}
 
 			// draw cursor
 			cursor.Draw();
+		}
+
+		void LimboMenu::DrawPlayerPreview() {
+			const int team = host->GetSelectedTeam();
+			// Nothing to show while spectating, or when the screen is too narrow.
+			if (!cachedLayout.hasPreview || team >= 2)
+				return;
+
+			const AABB2& r = cachedLayout.previewRect;
+
+			renderer->SetColorAlphaPremultiplied(MakeVector4(0.0F, 0.0F, 0.0F, 0.3F));
+			renderer->DrawFilledRect(r.GetMinX(), r.GetMinY(), r.GetMaxX(), r.GetMaxY());
+			renderer->SetColorAlphaPremultiplied(MakeVector4(0.16F, 0.16F, 0.16F, 0.4F));
+			renderer->DrawOutlinedRect(r.GetMinX(), r.GetMinY(), r.GetMaxX(), r.GetMaxY());
+
+			const WeaponType weapon = host->GetSelectedWeapon();
+
+			// How far above the horizontal the barrel points. If the weapon comes out
+			// pointing down instead of up, flip the sign.
+			const float weaponRoll = kQuarterPi;
+
+			// A slow sway keeps the models from looking flat.
+			const float sway = std::sin(host->GetTime() * 1.2F);
+
+			// The weapon runs along the frame's diagonal, and the head sits in the
+			// lower corner that leaves free.
+			{
+				const std::string path = host->GetPlayerHeadModelPath(team, weapon);
+				Handle<client::IModel> model = renderer->RegisterModel(path.c_str());
+
+				client::ModelOverlayParam param;
+				param.customColor = host->GetTeamColor(team);
+
+				// Scale so that the model's bounding sphere fills its corner of the frame.
+				const AABB3 bounds = model->GetBoundingBox();
+				const float diagonal = std::max((bounds.max - bounds.min).GetLength(), 20.0F);
+				const float scale = r.GetHeight() * 0.75F / diagonal;
+
+				const Vector3 boundsCenter = (bounds.min + bounds.max) * 0.5F;
+				const Vector2 center = Mix(r.min, r.max, 0.76F);
+
+				param.matrix =
+				  Matrix4::Translate(center.x, 0.0F, center.y) *
+				  Matrix4::Scale(scale) *
+				  Matrix4::Rotate(MakeVector3(1, 0, 0), DEG2RAD(10.0F)) *
+				  Matrix4::Rotate(MakeVector3(0, 0, 1), sway * 0.6F) *
+				  Matrix4::Translate(-boundsCenter);
+				renderer->DrawModelOverlay(*model, param);
+			}
+
+			{
+				Handle<client::IModel> model = renderer->RegisterModel(WeaponModelPathOf(weapon));
+
+				client::ModelOverlayParam param;
+
+				// The barrel runs along the model's Y axis: it is first turned sideways,
+				// then rolled in the screen plane to point up at `weaponRoll`.
+				const AABB3 bounds = model->GetBoundingBox();
+				const Vector3 size = bounds.max - bounds.min;
+				const float length = std::max(std::max(size.x, size.y), 1.0F);
+				const float height = std::max(size.z, 1.0F);
+
+				// Size of the rolled weapon on screen, per unit of scale.
+				const float extentX = length * std::cos(weaponRoll) + height * std::sin(weaponRoll);
+				const float extentY = length * std::sin(weaponRoll) + height * std::cos(weaponRoll);
+				const float scale = std::min(r.GetWidth() * 0.9F / extentX, r.GetHeight() * 0.9F / extentY);
+
+				const Vector3 boundsCenter = (bounds.min + bounds.max) * 0.5F;
+				const Vector2 center = Mix(r.min, r.max, 0.5F);
+
+				// If the barrel points the wrong way round, flip the sign of this angle.
+				const float sideYaw = -kHalfPi;
+
+				param.matrix =
+				  Matrix4::Translate(center.x, 0.0F, center.y) *
+				  Matrix4::Scale(scale) *
+				  Matrix4::Rotate(MakeVector3(1, 0, 0), DEG2RAD(10.0F)) *
+				  Matrix4::Rotate(MakeVector3(0, 1, 0), weaponRoll) *
+				  Matrix4::Rotate(MakeVector3(0, 0, 1), sideYaw + sway * 0.3F) *
+				  Matrix4::Translate(-boundsCenter);
+				renderer->DrawModelOverlay(*model, param);
+			}
 		}
 
 		void LimboMenu::Update(float dt) {

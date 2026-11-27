@@ -95,6 +95,9 @@ DEFINE_SPADES_SETTING(cg_hudPlayerCount, "0");
 DEFINE_SPADES_SETTING(cg_hudHealthBar, "1");
 DEFINE_SPADES_SETTING(cg_hudHealthAnimation, "1");
 DEFINE_SPADES_SETTING(cg_hudReloadIndicator, "1");
+DEFINE_SPADES_SETTING(cg_hudHotbar, "1");
+DEFINE_SPADES_SETTING(cg_hudHotbarY, "64");
+DEFINE_SPADES_SETTING(cg_hudHotbarModelScale, "1");
 DEFINE_SPADES_SETTING(cg_playerNames, "2");
 DEFINE_SPADES_SETTING(cg_playerNameX, "0");
 DEFINE_SPADES_SETTING(cg_playerNameY, "0");
@@ -108,7 +111,6 @@ DEFINE_SPADES_SETTING(cg_damageIndicators, "1");
 DEFINE_SPADES_SETTING(cg_hurtScreenEffects, "1");
 DEFINE_SPADES_SETTING(cg_healScreenEffects, "1");
 
-DEFINE_SPADES_SETTING(cg_hudHotbar, "1");
 SPADES_SETTING(cg_keyToolSpade);
 SPADES_SETTING(cg_keyToolBlock);
 SPADES_SETTING(cg_keyToolWeapon);
@@ -1844,23 +1846,29 @@ namespace spades {
 				paletteView->Draw();
 
 			// draw hotbar when unable to use tool
-			if (cg_hudHotbar && (!CanLocalPlayerUseTool() || (isToolWeapon && isReloading))) {
+			int hotbarStyle = cg_hudHotbar;
+			if (hotbarStyle > 0 && (!CanLocalPlayerUseTool() || (isToolWeapon && isReloading))) {
 				IFont& font = fontManager->GetSmallFont();
+				const bool modelStyle = hotbarStyle >= 2;
 
 				// register tool icons
 				Handle<IImage> blockIcon = renderer->RegisterImage("Gfx/Hotbar/Block.png");
 				Handle<IImage> grenadeIcon = renderer->RegisterImage("Gfx/Hotbar/Grenade.png");
 				Handle<IImage> spadeIcon = renderer->RegisterImage("Gfx/Hotbar/Spade.png");
 				Handle<IImage> weaponIcon;
+				const char* weaponModelPath = "Models/Weapons/Rifle/Weapon.kv6";
 				switch (curWeaponType) {
 					case RIFLE_WEAPON:
 						weaponIcon = renderer->RegisterImage("Gfx/Hotbar/Rifle.png");
+						weaponModelPath = "Models/Weapons/Rifle/Weapon.kv6";
 						break;
 					case SMG_WEAPON:
 						weaponIcon = renderer->RegisterImage("Gfx/Hotbar/SMG.png");
+						weaponModelPath = "Models/Weapons/SMG/Weapon.kv6";
 						break;
 					case SHOTGUN_WEAPON:
 						weaponIcon = renderer->RegisterImage("Gfx/Hotbar/Shotgun.png");
+						weaponModelPath = "Models/Weapons/Shotgun/Weapon.kv6";
 						break;
 				}
 
@@ -1874,21 +1882,41 @@ namespace spades {
 					cg_keyToolWeapon, cg_keyToolGrenade
 				};
 
-				const float iconHeight = 20.0F;
-				const float iconSpacing = 10.0F;
+				Handle<IModel> toolModels[toolCount];
+				if (modelStyle) {
+					toolModels[0] = renderer->RegisterModel("Models/Weapons/Spade/Spade.kv6");
+					toolModels[1] = renderer->RegisterModel("Models/Weapons/Block/Block.kv6");
+					toolModels[2] = renderer->RegisterModel(weaponModelPath);
+					toolModels[3] = renderer->RegisterModel("Models/Weapons/Grenade/Grenade.kv6");
+				}
+
+				// Models all get the same slot, so the bar does not change width with them.
+				// The slot size is the one place the models are scaled from.
+				const float hotbarScale = modelStyle ? Clamp((float)cg_hudHotbarModelScale, 0.1F, 2.0F) : 1.0F;
+				const float iconHeight = modelStyle ? (80.0F * hotbarScale) : 20.0F;
+				const float iconSpacing = modelStyle ? (20.0F * hotbarScale) : 10.0F;
+
+				auto slotWidth = [&](int i) {
+					return modelStyle ? (80.0F * hotbarScale) : static_cast<float>(toolIcons[i]->GetWidth());
+				};
 
 				float totalWidth = 0.0F;
 				for (int i = 0; i < toolCount; i++) {
 					if (!p.IsToolSelectable(static_cast<Player::ToolType>(i)))
 						continue;
-					totalWidth += toolIcons[i]->GetWidth() + iconSpacing;
+					totalWidth += slotWidth(i) + iconSpacing;
 				}
 
-				Vector2 iconPos = MakeVector2((sw - totalWidth) * 0.5F, sh * 0.6F);
+				// The bar's height is a percentage of the screen height, measured from the top.
+				const float hotbarY = Clamp((float)cg_hudHotbarY, 0.0F, 100.0F) / 100.0F;
+				Vector2 iconPos = MakeVector2((sw - totalWidth) * 0.5F, sh * hotbarY);
 
 				// rounded for better pixel alignment
 				iconPos.x = floorf(iconPos.x);
 				iconPos.y = floorf(iconPos.y);
+
+				// hotkeys are queued and drawn after every model
+				std::vector<std::pair<std::string, Vector2>> hotkeyLabels;
 
 				for (int i = 0; i < toolCount; i++) {
 					const auto tool = static_cast<Player::ToolType>(i);
@@ -1897,8 +1925,9 @@ namespace spades {
 
 					// draw icon
 					Handle<IImage> icon = toolIcons[i];
-					float iconWidth = icon->GetWidth();
+					float iconWidth = slotWidth(i);
 					Vector2 pos = iconPos;
+					float modelScale = 1.0F;
 
 					Vector4 iconColor = color;
 					Vector4 iconShadow = shadowP;
@@ -1909,24 +1938,54 @@ namespace spades {
 						iconShadow *= 0.25F;
 					} else {
 						float state = 1.0F - hotBarIconState;
-						pos.y -= floorf(10.0F * state);
+						if (modelStyle) {
+							modelScale += 0.5F * state;
+							pos.y -= (iconHeight * 0.5F) * state;
+						} else {
+							pos.y -= floorf((iconHeight * 0.5F) * state);
+						}
 					}
 
-					renderer->SetColorAlphaPremultiplied(iconShadow);
-					renderer->DrawImage(icon, pos + MakeVector2(1, 1));
+					if (modelStyle) {
+						ModelOverlayParam param;
 
-					renderer->SetColorAlphaPremultiplied(iconColor);
-					renderer->DrawImage(icon, pos);
+						// apply block color
+						if (tool == Player::ToolBlock)
+							param.customColor = ConvertColorRGB(p.GetBlockColor());
 
-					// draw hotkey
-					Vector4 hotKeyColor = MakeVector4(1, 1, 1, 1);
-					Vector4 hotKeyShadow = MakeVector4(0, 0, 0, 0.8F);
-					std::string hotkeyStr = hotKeys[i];
+						const AABB3 bounds = toolModels[i]->GetBoundingBox();
+						const float diagonal = std::max((bounds.max - bounds.min).GetLength(), 50.0F);
+						const float scale = iconWidth * 2.0F / diagonal * modelScale;
+
+						const Vector3 boundsCenter = (bounds.min + bounds.max) * 0.5F;
+						const Vector2 center = pos + MakeVector2(iconWidth * 0.5F, iconHeight * 0.5F);
+
+						param.matrix =
+						  Matrix4::Translate(center.x, 0.0F, center.y) *
+						  Matrix4::Scale(scale) *
+						  Matrix4::Rotate(MakeVector3(1, 0, 0), DEG2RAD(22.5F)) *
+						  Matrix4::Rotate(MakeVector3(0, 0, 1), time) *
+						  Matrix4::Translate(-boundsCenter);
+						renderer->DrawModelOverlay(*toolModels[i], param);
+					} else {
+						renderer->SetColorAlphaPremultiplied(iconShadow);
+						renderer->DrawImage(icon, pos + MakeVector2(1, 1));
+						renderer->SetColorAlphaPremultiplied(iconColor);
+						renderer->DrawImage(icon, pos);
+					}
+
+					// queue hotkey
 					Vector2 hotkeyPos = iconPos + MakeVector2(iconWidth - 1.0F, iconHeight - 1.0F);
-					font.DrawOutline(hotkeyStr, hotkeyPos, 1.0F, hotKeyColor, hotKeyShadow);
+					hotkeyLabels.emplace_back(hotKeys[i], hotkeyPos);
 
 					iconPos.x += iconWidth + iconSpacing;
 				}
+
+				// draw hotkeys
+				const Vector4 hotKeyColor = MakeVector4(1, 1, 1, 1);
+				const Vector4 hotKeyShadow = MakeVector4(0, 0, 0, 0.8F);
+				for (const auto& label : hotkeyLabels)
+					font.DrawOutline(label.first, label.second, 1.0F, hotKeyColor, hotKeyShadow);
 			}
 
 			// draw indicator when the player has the intel

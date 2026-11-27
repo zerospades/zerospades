@@ -150,6 +150,12 @@ namespace spades {
 			ClientPlayer(Player& p, Client&);
 			Player& GetPlayer() const { return player; }
 
+			/**
+			 * Base path of a player model set. Shared with the limbo menu, which has
+			 * no `Player` to ask.
+			 */
+			static std::string GetModelPath(bool zombie, const std::string& weaponName);
+
 			void Update(float dt);
 			void AddToScene();
 			void Draw2D();

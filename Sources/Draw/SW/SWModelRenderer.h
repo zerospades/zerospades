@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 #include "SWFeatureLevel.h"
 #include <Client/IRenderer.h>
 
@@ -32,6 +35,10 @@ namespace spades {
 			SWRenderer *r;
 			SWFeatureLevel level;
 
+			/** Scratch buffers of `RenderOverlay`, as large as the biggest overlay so far. */
+			std::vector<float> overlayDepth;
+			std::vector<uint32_t> overlayColor;
+
 			template <SWFeatureLevel>
 			void RenderInner(SWModel &model, const client::ModelRenderParam &param);
 
@@ -40,6 +47,9 @@ namespace spades {
 			~SWModelRenderer();
 
 			void Render(SWModel &model, const client::ModelRenderParam &param);
+
+			/** Draws the model flat onto the framebuffer (see `IRenderer::DrawModelOverlay`). */
+			void RenderOverlay(SWModel &model, const client::ModelOverlayParam &param);
 		};
 	} // namespace draw
 } // namespace spades

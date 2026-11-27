@@ -1645,6 +1645,47 @@ namespace spades {
 			device->Enable(IGLDevice::ScissorTest, false);
 		}
 
+		void GLRenderer::DrawModelOverlay(client::IModel& model,
+		                                    const client::ModelOverlayParam& param) {
+			SPADES_MARK_FUNCTION();
+			
+			// Only the optimized voxel model has an overlay pass.
+			auto* glModel = dynamic_cast<GLOptimizedVoxelModel*>(&model);
+			if (!glModel)
+				return;
+
+			EnsureInitialized();
+			EnsureSceneNotStarted();
+
+			// Everything queued so far has to end up underneath the model.
+			imageRenderer->Flush();
+
+			// The framebuffer is encoded by the hardware only in the sRGB 2D mode,
+			// see `FrameDone`.
+			const bool linearOutput =
+				settings.r_srgb && settings.r_srgb2D && sceneUsedInThisFrame;
+
+			// Only the scene uses the depth buffer and it is done with it by now, so it
+			// is wiped to sort the model's own faces.
+			device->Enable(IGLDevice::Blend, false);
+			device->Enable(IGLDevice::DepthTest, true);
+			device->Enable(IGLDevice::CullFace, true);
+			device->DepthFunc(IGLDevice::Less);
+			device->DepthMask(true);
+			device->FrontFace(IGLDevice::CW);
+			device->ClearDepth(1.0F);
+			device->Clear(IGLDevice::DepthBufferBit);
+
+			glModel->RenderOverlay(param, ScreenWidth(), ScreenHeight(), linearOutput);
+
+			// Back to the state the 2D drawing expects.
+			device->Enable(IGLDevice::DepthTest, false);
+			device->Enable(IGLDevice::CullFace, false);
+			device->Enable(IGLDevice::Blend, true);
+			device->BlendFunc(IGLDevice::One, IGLDevice::OneMinusSrcAlpha, IGLDevice::Zero,
+			                  IGLDevice::One);
+		}
+
 		void GLRenderer::SetColor(spades::Vector4 col) {
 			drawColorAlphaPremultiplied = col;
 			legacyColorPremultiply = true;

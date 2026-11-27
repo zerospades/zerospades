@@ -21,7 +21,9 @@
 #pragma once
 
 #include <Client/GameConstants.h>
+#include <Core/Math.h>
 #include <Core/RefCountedObject.h>
+#include <string>
 
 namespace spades {
 	namespace client {
@@ -41,8 +43,11 @@ namespace spades {
 			virtual int GetSelectedTeam() = 0;
 			virtual WeaponType GetSelectedWeapon() = 0;
 			virtual std::string GetTeamName(int teamId) = 0;
+			virtual Vector3 GetTeamColor(int teamId) = 0;
+			virtual std::string GetPlayerHeadModelPath(int teamId, WeaponType weapon) = 0;
 			/** False until the first spawn, which is when the menu has nothing to close back to. */
 			virtual bool HasLocalPlayer() = 0;
+			virtual float GetTime() const = 0;
 		};
 	} // namespace gui
 } // namespace spades

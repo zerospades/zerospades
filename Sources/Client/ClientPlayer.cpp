@@ -204,6 +204,16 @@ namespace spades {
 				if (CheckVisibility(bounds))
 					base->RenderModel(model, p);
 			}
+
+			void DrawModelOverlay(IModel& model, const ModelOverlayParam& param) {
+				// Drawing onto the screen is only allowed for the same skins that
+				// may call `DrawImage`.
+				if (allowDepthHack)
+					base->DrawModelOverlay(model, param);
+				else
+					OnProhibitedAction();
+			}
+
 			void AddDebugLine(Vector3 a, Vector3 b, Vector4 color) { OnProhibitedAction(); }
 
 			void AddSprite(IImage& image, Vector3 center, float radius, float rotation) {
@@ -744,13 +754,17 @@ namespace spades {
 			return axes;
 		}
 
-		std::string ClientPlayer::GetModelPath() {
+		std::string ClientPlayer::GetModelPath(bool zombie, const std::string& weaponName) {
 			std::string modelPath = "Models/Player/";
-			if (player.IsZombie())
+			if (zombie)
 				modelPath += "Zombie/";
 			else if (!cg_classicPlayerModels)
-				modelPath += player.GetWeapon().GetName() + "/";
+				modelPath += weaponName + "/";
 			return modelPath;
+		}
+
+		std::string ClientPlayer::GetModelPath() {
+			return GetModelPath(player.IsZombie(), player.GetWeapon().GetName());
 		}
 
 		bool ClientPlayer::IsLampBuried(const Vector3& lightOrigin) {

@@ -591,7 +591,7 @@ namespace spades {
 						// window units, so it stays out of this.
 						sdlFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
 						SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+						SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 						SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 						if (!r_allowSoftwareRendering)
 							SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);

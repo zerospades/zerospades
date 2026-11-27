@@ -82,6 +82,17 @@ namespace spades {
 					ScriptContextUtils().SetNativeException(ex);
 				}
 			}
+			static void DrawModelOverlay(IModel* model, const ModelOverlayParam& param,
+			                               IRenderer* r) {
+				try {
+					if (!model) {
+						SPInvalidArgument("model");
+					}
+					return r->DrawModelOverlay(*model, param);
+				} catch (const std::exception& ex) {
+					ScriptContextUtils().SetNativeException(ex);
+				}
+			}
 			static void AddDebugLine(const Vector3& a, const Vector3& b, const Vector4& color,
 			                         IRenderer* r) {
 				try {
@@ -265,6 +276,7 @@ namespace spades {
 				}
 			}
 			static void ModelRenderParamFactory(ModelRenderParam* p) { new (p) ModelRenderParam(); }
+			static void ModelOverlayParamFactory(ModelOverlayParam* p) { new (p) ModelOverlayParam(); }
 			static void DynamicLightParamFactory(DynamicLightParam* p) {
 				new (p) DynamicLightParam();
 			}
@@ -311,6 +323,9 @@ namespace spades {
 						r = eng->RegisterObjectType("ModelRenderParam", sizeof(ModelRenderParam),
 						                            asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_CDAK);
 						manager->CheckError(r);
+						r = eng->RegisterObjectType("ModelOverlayParam", sizeof(ModelOverlayParam),
+						                            asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_CDAK);
+						manager->CheckError(r);
 						r = eng->RegisterObjectType("DynamicLightParam", sizeof(DynamicLightParam),
 						                            asOBJ_VALUE | asOBJ_APP_CLASS_CDAK);
 						manager->CheckError(r);
@@ -353,6 +368,23 @@ namespace spades {
 						manager->CheckError(r);
 						r = eng->RegisterObjectProperty("ModelRenderParam", "float opacity",
 						                                asOFFSET(ModelRenderParam, opacity));
+						manager->CheckError(r);
+
+						r = eng->RegisterObjectBehaviour(
+						  "ModelOverlayParam", asBEHAVE_CONSTRUCT, "void f()",
+						  asFUNCTION(ModelOverlayParamFactory), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectProperty("ModelOverlayParam", "Matrix4 matrix",
+						                                asOFFSET(ModelOverlayParam, matrix));
+						manager->CheckError(r);
+						r = eng->RegisterObjectProperty("ModelOverlayParam", "Vector3 customColor",
+						                                asOFFSET(ModelOverlayParam, customColor));
+						manager->CheckError(r);
+						r = eng->RegisterObjectProperty("ModelOverlayParam", "bool drawOutline",
+						                                asOFFSET(ModelOverlayParam, drawOutline));
+						manager->CheckError(r);
+						r = eng->RegisterObjectProperty("ModelOverlayParam", "float opacity",
+						                                asOFFSET(ModelOverlayParam, opacity));
 						manager->CheckError(r);
 
 						r = eng->RegisterObjectBehaviour(
@@ -525,6 +557,10 @@ namespace spades {
 						r = eng->RegisterObjectMethod(
 						  "Renderer", "void AddModel(Model@+, const ModelRenderParam& in)",
 						  asFUNCTION(RenderModel), asCALL_CDECL_OBJLAST);
+						manager->CheckError(r);
+						r = eng->RegisterObjectMethod(
+						  "Renderer", "void DrawModelOverlay(Model@+, const ModelOverlayParam& in)",
+						  asFUNCTION(DrawModelOverlay), asCALL_CDECL_OBJLAST);
 						manager->CheckError(r);
 						r = eng->RegisterObjectMethod(
 						  "Renderer",
