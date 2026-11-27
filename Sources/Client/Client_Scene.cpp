@@ -764,7 +764,10 @@ namespace spades {
 							int blocks = static_cast<int>(cells.size());
 							bool valid = blocks <= p.GetNumBlocks();
 							bool active = blockCursorActive && valid;
-							bool debugCursor = cg_debugBlockCursor;
+
+							// The SW renderer splats a 1x1x1 model as a single screen-aligned square and
+							// ignores ghost/opacity, so for the moment we draw the cursor as a wireframe cube.
+							bool debugCursor = cg_debugBlockCursor || renderer->IsRendererSW();
 
 							for (const auto& v : cells) {
 								const Vector3 blockF = MakeVector3(v);
