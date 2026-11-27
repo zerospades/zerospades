@@ -1189,15 +1189,27 @@ namespace spades {
 		}
 
 		void Player::MoveCorpse(float fsynctics) {
+			const Handle<GameMap>& map = world.GetMap();
+			SPAssert(map);
+
+			const float f = fsynctics * 32.0F;
+
+			// buried: push straight up, discarding any downward or sideways motion
+			if (map->ClipWorld(position.x, position.y, position.z)) {
+				velocity.x = 0.0F;
+				velocity.y = 0.0F;
+				velocity.z = std::min(velocity.z, 0.0F);
+				velocity.z -= fsynctics * 0.5F;
+				position.z += velocity.z * f;
+				SetPosition(position);
+				return;
+			}
+
 			Vector3 oldPos = position; // old position
 
 			// do velocity & gravity (friction is negligible)
-			float f = fsynctics * 32.0F;
 			velocity.z += fsynctics * 0.5F;
 			position += velocity * f;
-
-			const Handle<GameMap>& map = world.GetMap();
-			SPAssert(map);
 
 			// Collision
 			IntVector3 lp = position.Floor();
@@ -1216,11 +1228,6 @@ namespace spades {
 
 				position = oldPos; // set back to old position
 				velocity *= 0.36F; // lose some velocity due to friction
-			}
-
-			if (map->ClipBox(position.x, position.y, position.z)) {
-				velocity.z -= fsynctics * 6.0F;
-				position += velocity * f;
 			}
 
 			SetPosition(position);
