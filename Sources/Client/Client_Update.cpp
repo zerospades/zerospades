@@ -37,6 +37,7 @@
 #include "ClientUI.h"
 #include "Corpse.h"
 #include "FallingBlock.h"
+#include "GunProp.h"
 #include "HurtRingView.h"
 #include "ILocalEntity.h"
 #include "MapView.h"
@@ -55,6 +56,8 @@ DEFINE_SPADES_SETTING(cg_ragdoll, "1");
 SPADES_SETTING(cg_blood);
 DEFINE_SPADES_SETTING(cg_ejectBrass, "1");
 DEFINE_SPADES_SETTING(cg_ejectBrassLifetime, "1");
+DEFINE_SPADES_SETTING(cg_throwWeapon, "1");
+DEFINE_SPADES_SETTING(cg_throwWeaponLifetime, "1");
 DEFINE_SPADES_SETTING(cg_hitFeedbackSoundGain, "0.2");
 DEFINE_SPADES_SETTING(cg_headshotFeedbackSoundGain, "0.2");
 DEFINE_SPADES_SETTING(cg_deathSoundGain, "0.2");
@@ -614,7 +617,6 @@ namespace spades {
 			// sending to the server and passing to the player object.
 			PlayerInput inp = playerInput;
 			WeaponInput winp = weapInput;
-
 
 			bool isToolWeapon = player.IsToolWeapon();
 			bool isWeaponShotgun = weapon.IsReloadSlow();
@@ -1180,6 +1182,61 @@ namespace spades {
 			}
 		}
 
+		void Client::SpawnGunProp(Player& p) {
+			const char* modelName = nullptr;
+
+			// longest side of the item in world units (blocks), independent of the
+			// voxel resolution of the model
+			float targetSize = 1.5F;
+			switch (p.GetWeaponType()) {
+				case RIFLE_WEAPON:
+					targetSize = 1.75F;
+					modelName = "Models/Weapons/Rifle/Weapon.kv6";
+					break;
+				case SMG_WEAPON:
+					modelName = "Models/Weapons/SMG/Weapon.kv6";
+					break;
+				case SHOTGUN_WEAPON:
+					modelName = "Models/Weapons/Shotgun/Weapon.kv6";
+					break;
+				default: break;
+			}
+			if (!modelName)
+				return;
+
+			Handle<IModel> model = renderer->RegisterModel(modelName);
+
+			// derive the scale from the model's size so every model ends up the same size
+			const AABB3 bounds = model->GetBoundingBox();
+			const Vector3 modelSize = bounds.max - bounds.min;
+			const float longestSide = std::max(modelSize.x, std::max(modelSize.y, modelSize.z));
+			if (longestSide <= 0.0F)
+				return;
+			const float scale = targetSize / longestSide;
+
+			Handle<IAudioChunk> bounce = audioDevice->RegisterSound("Sounds/Misc/BlockBounce.opus");
+
+			Vector3 color = ConvertColorRGB(p.GetColor());
+
+			// start where the tool is held
+			const Vector3 right = p.GetRight();
+			const Vector3 front = p.GetFront();
+			const Vector3 up = p.GetUp();
+			const Vector3 pos = p.GetEye() + front * 0.9F - up * 0.35F + right * 0.4F;
+			const Matrix4 mat = Matrix4::FromAxis(-right, front, -up, pos);
+
+			// add player momentum, plus a small random toss upwards
+			Vector3 vel = p.GetVelocity() * 32.0F;
+			vel.x += (SampleRandomFloat() - SampleRandomFloat()) * 2.0F;
+			vel.y += (SampleRandomFloat() - SampleRandomFloat()) * 2.0F;
+			vel.z -= 2.0F + SampleRandomFloat() * 2.0F;
+
+			float lifetime = std::max((float)cg_throwWeaponLifetime, 0.1F);
+			auto ent = stmp::make_unique<GunProp>(*this,
+				model, bounce, color, scale, mat, vel, lifetime);
+			AddLocalEntity(std::move(ent));
+		}
+		
 		void Client::PlayerKilledPlayer(spades::client::Player& killer,
 			spades::client::Player& victim, KillType kt) {
 
@@ -1427,6 +1484,9 @@ namespace spades {
 				case KillTypeWeapon: Bleed(victim.GetEye()); break;
 				default: break;
 			}
+
+			if (cg_throwWeapon && victim.IsToolWeapon())
+				SpawnGunProp(victim);
 
 			// create ragdoll corpse
 			if (cg_ragdoll) {

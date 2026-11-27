@@ -526,6 +526,9 @@ namespace spades {
 			void BulletHitWaterSurface(Vector3);
 			void EmitSnowflakes(Vector3);
 			void EmitSoundIndicator(Vector3, SoundType type);
+			
+			/** Throws the victim's current weapon away as a local entity. */
+			void SpawnGunProp(Player& victim);
 
 			// drawings
 			Handle<FontManager> fontManager;
