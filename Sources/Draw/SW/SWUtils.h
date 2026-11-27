@@ -22,10 +22,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <memory>
 
 #include <Core/ConcurrentDispatch.h>
 #include <Core/Debug.h>
+#include <Core/Math.h>
 
 namespace spades {
 	namespace draw {
@@ -46,7 +48,6 @@ namespace spades {
 		}
 
 		template <class F> static void InvokeParallel2(F f) {
-
 			unsigned int numThreads = static_cast<unsigned int>(GetNumSWRendererThreads());
 			numThreads = std::max(numThreads, 1U);
 			numThreads = std::min(numThreads, 32U);
@@ -63,14 +64,31 @@ namespace spades {
 				disp[i]->Join();
 		}
 
-		static inline PURE int ToFixed8(float v) {
-			int i = static_cast<int>(v * 255.0F + 0.5F);
-			return std::max(std::min(i, 255), 0);
-		}
+		static inline PURE int ToFixed8(float v) { return Clamp(static_cast<int>(v * 255.0F + 0.5F), 0, 255); }
+		static inline PURE int ToFixedFactor8(float v) { return Clamp(static_cast<int>(v * 256.0F + 0.5F), 0, 256); }
+		static inline PURE int ToIntClamped(float v, float limit) { return static_cast<int>(Clamp(v, -limit, limit)); }
 
-		static inline PURE int ToFixedFactor8(float v) {
-			int i = static_cast<int>(v * 256.0F + 0.5F);
-			return std::max(std::min(i, 256), 0);
+		/**
+		 * What a draw adds to a framebuffer pixel, for colours with premultiplied
+		 * alpha: a pixel becomes `colour + destination * (1 - alpha)`.
+		 */
+		struct PremultipliedColor {
+			unsigned int r, g, b, invA;
+		};
+		static inline PremultipliedColor MakePremultipliedColor(const Vector4& c) {
+			PremultipliedColor s;
+			s.r = (255U * static_cast<unsigned int>(ToFixedFactor8(c.x))) >> 8;
+			s.g = (255U * static_cast<unsigned int>(ToFixedFactor8(c.y))) >> 8;
+			s.b = (255U * static_cast<unsigned int>(ToFixedFactor8(c.z))) >> 8;
+			s.invA = 256U - static_cast<unsigned int>(ToFixedFactor8(c.w));
+			return s;
+		}
+		static inline void BlendPremultiplied(uint32_t& dest, const PremultipliedColor& s) {
+			const uint32_t d = DarkenColor(dest, s.invA);
+			const unsigned int r = std::min(s.r + ((d >> 16) & 0xFF), 255U);
+			const unsigned int g = std::min(s.g + ((d >> 8) & 0xFF), 255U);
+			const unsigned int b = std::min(s.b + (d & 0xFF), 255U);
+			dest = (r << 16) | (g << 8) | b;
 		}
 	} // namespace draw
 } // namespace spades

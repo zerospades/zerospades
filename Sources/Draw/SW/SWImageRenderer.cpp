@@ -408,11 +408,14 @@ namespace spades {
 
 				Interpolator longSpanX(x1, x3, y3 - y1);
 				SWImageGouraudInterpolator<level> longSpan(v1, v3, y3 - y1);
+				// Row the long span has been advanced to (it is shared by both halves).
+				int longRow = y1;
 				{
 					Interpolator shortSpanX(x1, x2, y2 - y1);
 					SWImageGouraudInterpolator<level> shortSpan(v1, v2, y2 - y1);
 					int minY = std::max(0, y1);
 					int maxY = std::min(fbH, y2);
+					longRow = std::max(minY, maxY);
 					shortSpanX.MoveNext(minY - y1);
 					shortSpan.MoveNext(minY - y1);
 					longSpanX.MoveNext(minY - y1);
@@ -444,8 +447,8 @@ namespace spades {
 					int maxY = std::min(fbH, y3);
 					shortSpanX.MoveNext(minY - y2);
 					shortSpan.MoveNext(minY - y2);
-					longSpanX.MoveNext(minY - y2);
-					longSpan.MoveNext(minY - y2);
+					longSpanX.MoveNext(minY - longRow);
+					longSpan.MoveNext(minY - longRow);
 					for (int y = minY; y < maxY; y++) {
 						int lineX1 = shortSpanX.GetCurrent();
 						auto line1 = shortSpan.GetCurrent();
@@ -823,11 +826,14 @@ namespace spades {
 
 				Interpolator longSpanX(x1, x3, y3 - y1);
 				SWImageGouraudInterpolator<SWFeatureLevel::SSE2> longSpan(v1, v3, y3 - y1);
+				// Row the long span has been advanced to (it is shared by both halves).
+				int longRow = y1;
 				{
 					Interpolator shortSpanX(x1, x2, y2 - y1);
 					SWImageGouraudInterpolator<SWFeatureLevel::SSE2> shortSpan(v1, v2, y2 - y1);
 					int minY = std::max(0, y1);
 					int maxY = std::min(fbH, y2);
+					longRow = std::max(minY, maxY);
 					shortSpanX.MoveNext(minY - y1);
 					shortSpan.MoveNext(minY - y1);
 					longSpanX.MoveNext(minY - y1);
@@ -859,8 +865,8 @@ namespace spades {
 					int maxY = std::min(fbH, y3);
 					shortSpanX.MoveNext(minY - y2);
 					shortSpan.MoveNext(minY - y2);
-					longSpanX.MoveNext(minY - y2);
-					longSpan.MoveNext(minY - y2);
+					longSpanX.MoveNext(minY - longRow);
+					longSpan.MoveNext(minY - longRow);
 					for (int y = minY; y < maxY; y++) {
 						int lineX1 = shortSpanX.GetCurrent();
 						auto line1 = shortSpan.GetCurrent();
@@ -1087,11 +1093,14 @@ namespace spades {
 
 				Interpolator longSpanX(x1, x3, y3 - y1);
 				SWImageGouraudInterpolator<SWFeatureLevel::SSE2> longSpan(v1, v3, y3 - y1);
+				// Row the long span has been advanced to (it is shared by both halves).
+				int longRow = y1;
 				{
 					Interpolator shortSpanX(x1, x2, y2 - y1);
 					SWImageGouraudInterpolator<SWFeatureLevel::SSE2> shortSpan(v1, v2, y2 - y1);
 					int minY = std::max(0, y1);
 					int maxY = std::min(fbH, y2);
+					longRow = std::max(minY, maxY);
 					shortSpanX.MoveNext(minY - y1);
 					shortSpan.MoveNext(minY - y1);
 					longSpanX.MoveNext(minY - y1);
@@ -1123,8 +1132,8 @@ namespace spades {
 					int maxY = std::min(fbH, y3);
 					shortSpanX.MoveNext(minY - y2);
 					shortSpan.MoveNext(minY - y2);
-					longSpanX.MoveNext(minY - y2);
-					longSpan.MoveNext(minY - y2);
+					longSpanX.MoveNext(minY - longRow);
+					longSpan.MoveNext(minY - longRow);
 					for (int y = minY; y < maxY; y++) {
 						int lineX1 = shortSpanX.GetCurrent();
 						auto line1 = shortSpan.GetCurrent();
