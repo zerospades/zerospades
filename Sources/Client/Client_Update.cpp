@@ -54,6 +54,7 @@
 DEFINE_SPADES_SETTING(cg_ragdoll, "1");
 SPADES_SETTING(cg_blood);
 DEFINE_SPADES_SETTING(cg_ejectBrass, "1");
+DEFINE_SPADES_SETTING(cg_ejectBrassLifetime, "1");
 DEFINE_SPADES_SETTING(cg_hitFeedbackSoundGain, "0.2");
 DEFINE_SPADES_SETTING(cg_headshotFeedbackSoundGain, "0.2");
 DEFINE_SPADES_SETTING(cg_deathSoundGain, "0.2");

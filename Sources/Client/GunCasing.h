@@ -33,10 +33,14 @@ namespace spades {
 			Client* client;
 			IRenderer& renderer;
 			IModel* model;
+			float scale;
+			AABB3 box; // bounding box of the model, cached
 			Matrix4 matrix;
 			Vector3 velocity;
-			int rotDir;
+			Vector2 rot; // angular speed around local X / Y, in rad/s
 			float time;
+			bool resting;
+			float groundZ; // z of the surface the item landed on
 
 			IAudioChunk* dropSound;
 			IAudioChunk* waterSound;
@@ -44,7 +48,7 @@ namespace spades {
 		public:
 			// TODO: Replace pointers with references
 			GunCasing(Client* client, IModel* model, IAudioChunk* dropSound,
-			          IAudioChunk* waterSound, Vector3 pos, Vector3 dir, Vector3 flyDir);
+			          IAudioChunk* waterSound, Vector3 pos, Vector3 dir, Vector3 flyDir, float lifeTime);
 			~GunCasing();
 			bool Update(float dt) override;
 			void Render3D() override;

@@ -67,8 +67,8 @@ DEFINE_SPADES_SETTING(cg_debugToolSkinAnchors, "0");
 DEFINE_SPADES_SETTING(cg_trueAimDownSight, "1");
 DEFINE_SPADES_SETTING(cg_muzzleFire, "0");
 
+SPADES_SETTING(cg_ejectBrassLifetime);
 SPADES_SETTING(cg_orientationSmoothing);
-
 SPADES_SETTING(cg_pngScope);
 
 namespace spades {
@@ -1828,7 +1828,7 @@ namespace spades {
 
 				if (skinHandlesSide) {
 					const Vector3 dir = handedSkin.GetCaseEjectDirection();
-					if (dir.GetSquaredLength() > 1.0e-8F) {
+					if (dir.GetSquaredLength() > 1.0E-8F) {
 						const Matrix4 eye = GetEyeMatrix();
 						vel = (eye * dir).GetXYZ() - eye.GetOrigin();
 					}
@@ -1836,11 +1836,11 @@ namespace spades {
 
 				if (weaponType == SHOTGUN_WEAPON)
 					vel *= 0.5F;
-
+				
+				float lifetime = std::max((float)cg_ejectBrassLifetime, 0.1F);
 				auto ent = stmp::make_unique<GunCasing>(&client,
 					model.GetPointerOrNull(), snd.GetPointerOrNull(),
-					snd2.GetPointerOrNull(), origin, o, vel);
-
+					snd2.GetPointerOrNull(), origin, o, vel, lifetime);
 				client.AddLocalEntity(std::move(ent));
 			}
 		}
